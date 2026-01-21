@@ -3,13 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <title>Goorac</title>
+    <meta name="description" content="Login or create an account now to get started with Goorac.">
+    <meta property="og:title" content="Goorac">
+    <meta property="og:description" content="Login or create an account now.">
+    <meta property="og:image" content="https://your-domain.com/path-to-your-logo.png"> <meta property="og:type" content="website">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
     <style>
+        :root {
+            --primary: #00d2ff;
+            --secondary: #9d50bb;
+            --bg: #050505;
+        }
+
         body {
-            background-color: #050505;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(157, 80, 187, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 0% 0%, rgba(0, 210, 255, 0.05) 0%, transparent 30%);
             margin: 0;
             display: flex;
             flex-direction: column;
@@ -17,33 +32,55 @@
             align-items: center;
             height: 100vh;
             color: white;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            padding: 40px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
         /* Pulsing Anime Logo */
         .logo {
-            font-size: 3rem;
+            font-size: 4rem;
             font-weight: 900;
-            letter-spacing: -2px;
-            background: linear-gradient(45deg, #00d2ff, #9d50bb);
+            letter-spacing: -3px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: pulse 2s infinite ease-in-out;
+            animation: pulse 2.5s infinite ease-in-out;
+            margin-bottom: 10px;
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: 20px;
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 15px rgba(0,210,255,0.5)); }
+            0%, 100% { transform: scale(1); opacity: 0.9; filter: brightness(1); }
+            50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 20px rgba(0,210,255,0.4)) brightness(1.2); }
         }
 
+        /* Custom Loader */
         .loader {
-            margin-top: 20px;
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid #00d2ff;
+            margin: 30px auto 0;
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(255,255,255,0.05);
+            border-top: 2px solid var(--primary);
+            border-right: 2px solid var(--secondary);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
         }
 
         @keyframes spin {
@@ -53,11 +90,14 @@
 </head>
 <body>
 
-    <div class="logo">GOORAC</div>
-    <div class="loader"></div>
+    <div class="container">
+        <div class="logo">GOORAC</div>
+        <div class="loader"></div>
+        <div class="status-text">Securing Connection</div>
+    </div>
 
     <script>
-        // 1. Firebase Config (Must match your other files)
+        // 1. Firebase Config (Unchanged)
         const firebaseConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
             authDomain: "goorac-c3b59.firebaseapp.com",
@@ -70,17 +110,17 @@
         firebase.initializeApp(firebaseConfig);
 
         // 2. The Redirect Logic
-        // This listens to the local storage/session automatically
         firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                // User is signed in, send to home
-                console.log("User detected, redirecting to Home...");
-                window.location.href = "home.html";
-            } else {
-                // No user is signed in, send to login
-                console.log("No user, redirecting to Login...");
-                window.location.href = "login.html";
-            }
+            // Added a slight delay so the animation looks smooth to the user
+            setTimeout(() => {
+                if (user) {
+                    console.log("User detected, redirecting to Home...");
+                    window.location.href = "home.html";
+                } else {
+                    console.log("No user, redirecting to Login...");
+                    window.location.href = "login.html";
+                }
+            }, 800); 
         });
     </script>
 </body>
