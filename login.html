@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Goorac | Secure Login</title>
+    <style>
+        :root {
+            /* X (Twitter) Professional Dark Palette */
+            --bg: #000000;
+            --card: #000000;
+            --text: #eff3f4;
+            --text-muted: #71767b;
+            --accent: #1d9bf0;
+            --error: #f4212e;
+            --border: #333639;
+            --btn-hover: #e6e6e6;
+        }
+
+        /* Anti-Copy and Anti-Zoom System */
+        * {
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+            animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* X-Style Iconography */
+        .logo-box {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 2.5rem;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+        }
+
+        h1 { 
+            font-size: 2.5rem; 
+            margin-bottom: 0.5rem; 
+            font-weight: 800; 
+            letter-spacing: -1px;
+            line-height: 1.2;
+        }
+
+        p { 
+            color: var(--text-muted); 
+            margin-bottom: 3rem; 
+            font-size: 1.1rem; 
+            font-weight: 400;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .google-btn {
+            background: #ffffff;
+            color: #0f1419;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 9999px; /* X-Style Pill */
+            width: 100%;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .google-btn:hover {
+            background: var(--btn-hover);
+            transform: scale(0.98);
+        }
+
+        .google-btn:active {
+            transform: scale(0.95);
+        }
+
+        .google-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status-msg {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+            text-align: center;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .error-text { color: var(--error); }
+        .success-text { color: var(--accent); }
+
+        .footer-note {
+            margin-top: 4rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .footer-note span {
+            color: var(--accent);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;"> 
+
+<div class="login-card">
+    <div class="logo-box">G</div>
+    <h1>Secure. Quantum. <br>Universal.</h1>
+    <p>Join Goorac today.</p>
+    
+    <div class="btn-group">
+        <button id="login-btn" class="google-btn">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+            Sign up with Google
+        </button>
+    </div>
+
+    <div id="status-msg">Ready to initialize</div>
+    
+    <div class="footer-note">
+        By signing up, you agree to the <span>Terms of Service</span> and <span>Privacy Policy</span>, including <span>Cookie Use</span>.
+    </div>
+</div>
+
+<script type="module">
+    // Using stable CDN imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // Your Goorac Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    const btn = document.getElementById('login-btn');
+    const msg = document.getElementById('status-msg');
+
+    // Anti-Zoom Script for Mobile
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    btn.addEventListener('click', async () => {
+        msg.innerText = "Authenticating...";
+        msg.className = "success-text";
+        btn.disabled = true;
+
+        try {
+            // 1. Authenticate with Google
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            
+            msg.innerText = "Checking profile...";
+
+            // 2. Check Firestore 'users' collection for the user's document
+            const userDocRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userDocRef);
+
+            if (userSnap.exists()) {
+                msg.innerText = "Welcome back! Redirecting...";
+                setTimeout(() => { window.location.href = "home.html"; }, 500);
+            } else {
+                msg.innerText = "New user! Redirecting to setup...";
+                setTimeout(() => { window.location.href = "setup.html"; }, 500);
+            }
+
+        } catch (error) {
+            console.error("Login Error:", error);
+            btn.disabled = false;
+            msg.className = "error-text";
+            
+            if (error.code === 'auth/unauthorized-domain') {
+                msg.innerText = "Error: Domain not authorized.";
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                msg.innerText = "Login cancelled.";
+            } else {
+                msg.innerText = "Error: " + error.message;
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

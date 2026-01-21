@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Search</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        :root {
+            --bg: #000;
+            --card: #0a0a0a;
+            --accent: #00d2ff;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(255, 255, 255, 0.03);
+            --text-dim: #888;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding-bottom: 120px;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+
+        /* --- Professional Header --- */
+        header {
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+        }
+
+        .header-title { 
+            font-weight: 800; 
+            font-size: 1.1rem; 
+            letter-spacing: -0.5px; 
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- Search Area --- */
+        .search-container { 
+            padding: 30px 20px; 
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .search-instructions {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 15px;
+            display: block;
+            text-align: left;
+            padding-left: 5px;
+        }
+        
+        .search-wrapper {
+            position: relative;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 8px;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .search-wrapper:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+        }
+
+        .search-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 15px 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            outline: none;
+            box-sizing: border-box;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        /* Hide number spinners */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+        .search-btn {
+            width: 100%;
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 16px;
+            border-radius: 18px;
+            font-weight: 800;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 1rem;
+            letter-spacing: -0.2px;
+        }
+        .search-btn:active { transform: scale(0.96); opacity: 0.9; }
+
+        /* --- Result Area --- */
+        #result-area { 
+            margin: 0 auto; 
+            padding: 0 20px;
+            max-width: 500px;
+            display: none; 
+        }
+
+        .user-card {
+            background: linear-gradient(145deg, #0f0f0f 0%, #050505 100%);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 35px 25px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp { 
+            from { opacity: 0; transform: translateY(20px) scale(0.95); } 
+            to { opacity: 1; transform: translateY(0) scale(1); } 
+        }
+
+        .res-pfp { 
+            width: 100px; 
+            height: 100px; 
+            border-radius: 35px; 
+            object-fit: cover; 
+            margin-bottom: 20px; 
+            border: 2px solid var(--border);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .res-name-row { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+            font-size: 1.4rem; 
+            font-weight: 800; 
+            letter-spacing: -0.5px;
+        }
+
+        .v-tick { width: 20px; height: 20px; }
+
+        .res-id-tag { 
+            color: var(--accent); 
+            font-size: 0.85rem; 
+            font-weight: 700; 
+            margin-top: 6px; 
+            display: inline-block;
+            background: rgba(0, 210, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 100px;
+            margin-bottom: 25px;
+        }
+
+        .action-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .action-btn {
+            padding: 16px;
+            border-radius: 18px;
+            border: none;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .btn-view { 
+            background: var(--glass); 
+            color: white; 
+            border: 1px solid var(--border); 
+        }
+
+        .btn-msg { 
+            background: var(--accent); 
+            color: black; 
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+        }
+
+        .action-btn:active { transform: scale(0.94); }
+
+        /* --- Loading Shimmer --- */
+        .loading-shimmer {
+            color: transparent !important;
+            background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<header>
+    <div class="header-title">Find Contacts</div>
+    <div style="font-size: 1.2rem;">🔍</div>
+</header>
+
+<div class="search-container">
+    <span class="search-instructions">Secure Network Search</span>
+    <div class="search-wrapper">
+        <input type="number" id="search-input" class="search-input" placeholder="Enter 10-digit Goorac ID" oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);">
+    </div>
+    <button class="search-btn" id="search-btn">Search Network</button>
+</div>
+
+<div id="result-area">
+    <div class="user-card">
+        <img id="res-pfp" src="" class="res-pfp">
+        <div class="res-name-row">
+            <span id="res-name">User Name</span>
+            <img id="res-v" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="v-tick" style="display:none;">
+        </div>
+        <span class="res-id-tag">ID: <span id="res-num">----------</span></span>
+        
+        <div class="action-group">
+            <button id="view-profile-btn" class="action-btn btn-view">View Profile</button>
+            <button id="message-btn" class="action-btn btn-msg">Message</button>
+        </div>
+    </div>
+</div>
+
+<script src="components/navbar.js" defer></script>
+<main-navbar></main-navbar>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUserUID = "";
+    let targetUsername = "";
+
+    auth.onAuthStateChanged(user => {
+        if(user) currentUserUID = user.uid;
+        else window.location.href = "login.html";
+    });
+
+    document.getElementById('search-btn').onclick = async () => {
+        const btn = document.getElementById('search-btn');
+        const idToSearch = document.getElementById('search-input').value;
+        
+        if(idToSearch.length < 10) {
+            alert("Please enter a valid 10-digit ID");
+            return;
+        }
+
+        // UI Feedback: Loading state
+        btn.innerText = "Searching...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
+        try {
+            const snapshot = await db.collection("users").where("gooracNumber", "==", parseInt(idToSearch)).get();
+
+            if (snapshot.empty) {
+                alert("No user found on the Goorac network.");
+                document.getElementById('result-area').style.display = "none";
+            } else {
+                const userData = snapshot.docs[0].data();
+                targetUsername = userData.username;
+
+                document.getElementById('res-pfp').src = userData.photoURL || 'https://via.placeholder.com/150';
+                document.getElementById('res-name').innerText = userData.name || userData.username;
+                document.getElementById('res-num').innerText = userData.gooracNumber;
+                document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
+                
+                document.getElementById('result-area').style.display = "block";
+                
+                // Smooth scroll to result
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+        } catch (error) {
+            console.error("Search error:", error);
+            alert("An error occurred during the search.");
+        } finally {
+            btn.innerText = "Search Network";
+            btn.style.opacity = "1";
+            btn.disabled = false;
+        }
+    };
+
+    document.getElementById('view-profile-btn').onclick = () => {
+        if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
+    };
+
+    document.getElementById('message-btn').onclick = () => {
+        if(targetUsername) window.location.href = `chat.html?user=${targetUsername}`;
+    };
+</script>
+
+<script src="components/call-notifier.js" defer></script>
+<call-notifier></call-notifier>
+</body>
+</html>

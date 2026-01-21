@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Quantum Inbox</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --bg: #000;
+            --accent: #00d2ff;
+            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: #888;
+            --danger: #ff4444;
+        }
+
+        body {
+            background: var(--bg); color: white; margin: 0;
+            font-family: -apple-system, system-ui, sans-serif;
+            padding-bottom: 90px; overflow-x: hidden;
+            -webkit-user-select: none; 
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        header {
+            position: sticky; top: 0; background: rgba(0,0,0,0.9);
+            padding: 15px 20px; display: flex; justify-content: space-between;
+            align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; }
+
+        .search-wrap { padding: 12px 20px; }
+        .search-input {
+            width: 100%; background: #111; border: 1px solid var(--border);
+            padding: 12px 15px; border-radius: 12px; color: white; outline: none; box-sizing: border-box;
+            font-size: 16px !important;
+            -webkit-user-select: text; user-select: text;
+        }
+
+        .skeleton-item {
+            display: flex; align-items: center; padding: 15px 20px; opacity: 0.5;
+            animation: quantumPulse 1.5s infinite ease-in-out;
+        }
+        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
+        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
+        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
+
+        .chat-item { 
+            display: flex; align-items: center; padding: 15px 20px; 
+            cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s;
+            -webkit-touch-callout: none;
+        }
+        .chat-item:active { background: rgba(255,255,255,0.05); }
+
+        .chat-pfp { width: 55px; height: 55px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; }
+        .chat-info { flex: 1; min-width: 0; }
+        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        
+        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 5px; color: #fff; }
+        .v-badge { height: 15px; width: 15px; }
+        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
+
+        .follow-btn { 
+            background: transparent; color: var(--accent); border: 1px solid var(--accent); 
+            padding: 5px 10px; border-radius: 15px; font-size: 0.65rem; font-weight: 800; cursor: pointer;
+        }
+
+        .unread-badge { 
+            background: var(--accent); color: #000; 
+            min-width: 20px; height: 20px; border-radius: 10px; 
+            font-size: 0.75rem; font-weight: 900;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 6px; box-shadow: 0 0 12px var(--accent);
+            flex-shrink: 0;
+        }
+
+        #delete-menu {
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: #111; border-top: 1px solid var(--border);
+            z-index: 3000; border-radius: 20px 20px 0 0;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px; box-sizing: border-box;
+        }
+        #delete-menu.active { bottom: 0; }
+        .menu-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 2999; display: none; backdrop-filter: blur(4px);
+        }
+        .del-btn-big {
+            width: 100%; background: var(--danger); color: white; border: none;
+            padding: 16px; border-radius: 14px; font-weight: 800; font-size: 1rem;
+            margin-bottom: 10px; cursor: pointer;
+        }
+        .cancel-btn {
+            width: 100%; background: #222; color: white; border: none;
+            padding: 16px; border-radius: 14px; font-weight: 600; cursor: pointer;
+        }
+
+
+        #search-results { display: none; background: #000; min-height: 100vh; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<header><div class="header-logo">GOORAC</div></header>
+
+<div class="search-wrap">
+    <input type="text" class="search-input" id="main-search" placeholder="Search followers or following..." oninput="searchUsers(this.value)" autocomplete="off">
+</div>
+
+<div id="search-results"></div>
+
+<div id="inbox-content">
+    <div style="padding: 10px 20px; font-size: 0.7rem; color: #555; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">Recent Transmissions</div>
+    
+    <div id="chats-list">
+        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
+        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:30%"></div><div class="skeleton-line" style="width:60%"></div></div></div>
+    </div>
+</div>
+
+<div class="menu-overlay" id="overlay" onclick="closeDeleteMenu()"></div>
+<div id="delete-menu">
+    <div style="text-align: center; margin-bottom: 15px; color: #666; font-size: 0.8rem; font-weight: 600;">CHAT OPTIONS</div>
+    <button class="del-btn-big" id="confirm-delete">Delete For Both</button>
+    <button class="cancel-btn" onclick="closeDeleteMenu()">Cancel</button>
+</div>
+<script src="components/navbar.js" defer></script>
+<main-navbar></main-navbar>
+
+
+
+<script src="components/call-notifier.js" defer></script>
+<call-notifier></call-notifier>
+
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const rdb = firebase.database();
+    const auth = firebase.auth();
+    const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
+
+    let myUid = "";
+    let myFollowingList = [];
+    let myFollowersList = [];
+    let longPressTimer;
+    let activeChatId = null;
+
+    document.addEventListener('contextmenu', event => event.preventDefault());
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            myUid = user.uid;
+            fetchUserData();
+            listenToInbox();
+        } else { window.location.href = 'login.html'; }
+    });
+
+    async function fetchUserData() {
+        const userDoc = await db.collection("users").doc(myUid).get();
+        const data = userDoc.data();
+        myFollowingList = data?.following || [];
+        myFollowersList = data?.followers || [];
+    }
+
+    function listenToInbox() {
+        db.collection("chats").where("participants", "array-contains", myUid)
+        .onSnapshot(async snap => {
+            const list = document.getElementById('chats-list');
+            const chatPromises = snap.docs.map(async d => {
+                const chat = d.data();
+                const otherUid = chat.participants.find(id => id !== myUid);
+                const otherDoc = await db.collection("users").doc(otherUid).get();
+                return { id: d.id, chat, u: otherDoc.data(), otherUid };
+            });
+
+            const results = await Promise.all(chatPromises);
+            results.sort((a,b) => (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0));
+
+            list.innerHTML = "";
+            results.forEach(({id, chat, u, otherUid}) => {
+                if(!u) return;
+                const isUnread = (chat.lastSender !== myUid && chat.seen === false);
+                let displayCount = "";
+                if (chat.unreadCount && chat.unreadCount[myUid]) {
+                    const num = chat.unreadCount[myUid];
+                    displayCount = num > 99 ? "99+" : num;
+                }
+                const amIFollowing = myFollowingList.includes(otherUid);
+                const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
+                const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Message unsent</span>`;
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id), 600); };
+                const handleEnd = () => { clearTimeout(longPressTimer); };
+                item.ontouchstart = handleStart; item.ontouchend = handleEnd;
+                item.onmousedown = handleStart; item.onmouseup = handleEnd;
+                item.onclick = (e) => { if(activeChatId) return; location.href=`chat.html?user=${u.username}`; };
+                
+                item.innerHTML = `
+                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                    <div class="chat-info">
+                        <div class="chat-top-row">
+                            <span class="u-name">
+                                ${finalDisplayName} 
+                                ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                            </span>
+                            <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
+                                ${lastMsgSnippet}
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
+                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Visit Profile</button>` : ''}
+                                ${isUnread ? `<div class="unread-badge">${displayCount}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(item);
+                rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
+                    const msgEl = document.getElementById(`last-msg-${id}`);
+                    if(!msgEl) return;
+                    if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
+                    else { msgEl.innerHTML = lastMsgSnippet; }
+                });
+            });
+            if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No transmissions found.</p>";
+        });
+    }
+
+    function openDeleteMenu(chatId) {
+        activeChatId = chatId;
+        document.getElementById('delete-menu').classList.add('active');
+        document.getElementById('overlay').style.display = 'block';
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+    }
+
+    function closeDeleteMenu() {
+        activeChatId = null;
+        document.getElementById('delete-menu').classList.remove('active');
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    document.getElementById('confirm-delete').onclick = async () => {
+        if(!activeChatId) return;
+        const cid = activeChatId; 
+        closeDeleteMenu();
+        
+        try {
+            // FIXED: Explicitly only delete messages and the chat doc
+            // This prevents triggers from accidentally touching user profiles
+            const messagesRef = db.collection("chats").doc(cid).collection("messages");
+            const snapshot = await messagesRef.get();
+            const batch = db.batch();
+            
+            // Delete all messages in the subcollection
+            snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+            
+            // Delete the main chat document
+            batch.delete(db.collection("chats").doc(cid));
+            
+            await batch.commit();
+            
+            // Clean up Realtime Database typing indicator
+            await rdb.ref(`typing/${cid}`).remove();
+        } catch(e) { 
+            console.error("Strict deletion failed:", e); 
+        }
+    };
+
+    function visitProfile(e, username) {
+        e.stopPropagation();
+        location.href = `userProfile.html?user=${username}`;
+    }
+
+    function searchUsers(val) {
+        const results = document.getElementById('search-results');
+        const content = document.getElementById('inbox-content');
+        if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
+        results.style.display = 'block'; content.style.display = 'none';
+        const queryText = val.toLowerCase();
+        const myContacts = [...new Set([...myFollowingList, ...myFollowersList])];
+        if (myContacts.length === 0) {
+            results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>";
+            return;
+        }
+        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', myContacts.slice(0, 10)).get().then(snap => {
+            results.innerHTML = snap.docs
+            .filter(doc => {
+                const u = doc.data();
+                const name = (u.name || u.displayName || u.username || "").toLowerCase();
+                const username = (u.username || "").toLowerCase();
+                return name.includes(queryText) || username.includes(queryText);
+            })
+            .map(doc => {
+                const u = doc.data();
+                const searchName = u.name || u.displayName || u.username;
+                return `
+                    <div class="chat-item" onclick="location.href='chat.html?user=${u.username}'">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;">
+                        <div class="chat-info">
+                            <div class="u-name">${searchName} ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}</div>
+                            <div style="font-size:0.8rem; color:#555;">@${u.username}</div>
+                        </div>
+                    </div>`;
+            }).join('');
+            if(results.innerHTML === "") {
+                results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No matching followers/following.</p>";
+            }
+        });
+    }
+
+    function formatTime(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo";
+        interval = seconds / 604800;
+        if (interval > 1) return Math.floor(interval) + "w";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m";
+        return "now";
+    }
+</script>
+</body>
+</html>

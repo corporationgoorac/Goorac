@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Quantum Calls</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --bg: #0b141a;
+            --accent: #00d2ff; 
+            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: #888; 
+            --danger: #ff4444; 
+            --success: #1ebea5;
+            --ig-blue: #0095f6;
+        }
+
+        /* Anti-Copy CSS */
+        body {
+            background: #000; color: white; margin: 0;
+            font-family: -apple-system, system-ui, sans-serif;
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        input {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        header { padding: 15px 20px; border-bottom: 1px solid var(--border); background: #000; }
+        .header-logo { font-weight: 900; font-size: 1.4rem; color: var(--accent); }
+        .search-box { padding: 15px; }
+        .search-box input { width: 100%; background: #111; border: 1px solid var(--border); padding: 12px; border-radius: 12px; color: white; outline: none; box-sizing: border-box; }
+        .tabs { display: flex; padding: 0 20px 10px; gap: 20px; border-bottom: 1px solid var(--border); }
+        .tab { font-size: 0.8rem; font-weight: 800; color: var(--text-dim); cursor: pointer; padding-bottom: 5px; }
+        .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
+        #list-container { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding-bottom: 80px; 
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; gap: 15px; }
+        .sk-pfp { width: 50px; height: 50px; border-radius: 50%; }
+        .sk-text { height: 12px; width: 60%; margin-bottom: 8px; }
+        .sk-meta { height: 10px; width: 40%; }
+
+        .call-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .call-pfp { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 1.5px solid var(--border); }
+        .call-info { flex: 1; }
+        .u-name { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        
+        .v-badge { 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 15px;
+            height: 15px;
+            background-color: var(--ig-blue);
+            -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
+            mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            position: relative;
+            margin-left: 4px;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .v-badge::before {
+            content: "";
+            width: 3.5px;
+            height: 6.5px;
+            border: solid white;
+            border-width: 0 1.8px 1.8px 0;
+            transform: translateY(-1px) rotate(45deg);
+        }
+
+        .call-meta { font-size: 0.75rem; color: var(--text-dim); }
+        .status-missed { color: var(--danger); font-weight: bold; }
+        .status-incoming { color: var(--success); }
+        .status-outgoing { color: var(--accent); }
+        .time-stamp { font-size: 0.7rem; opacity: 0.6; margin-left: 5px; }
+        .btn-call { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0, 210, 255, 0.1); color: var(--accent); cursor: pointer; }
+
+        #call-screen {
+            position: fixed; inset: 0; 
+            background: linear-gradient(to bottom, #0b141a, #121b22); 
+            z-index: 9999;
+            display: none; flex-direction: column; align-items: center; 
+            justify-content: space-between; padding: 60px 20px 40px;
+        }
+        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; }
+        #local-video { position: absolute; top: 40px; right: 20px; width: 90px; height: 130px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 10; display: none; background: #000; }
+        .call-header { z-index: 5; text-align: center; }
+        .call-header h2 { font-size: 1.8rem; margin: 0 0 8px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        #call-status { font-size: 0.9rem; color: #aebac1; text-transform: uppercase; letter-spacing: 1.5px; margin: 0; }
+        #call-timer { font-size: 1rem; color: white; margin-top: 5px; font-weight: 400; display: none; }
+        .call-body { z-index: 5; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .big-pfp-container { position: relative; }
+        #target-pfp { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); }
+        .pulse { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); animation: pulse-ring 2s infinite; }
+        @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
+        .call-controls { display: flex; flex-direction: column; gap: 30px; z-index: 20; width: 100%; align-items: center; }
+        .control-row { display: flex; gap: 25px; align-items: center; justify-content: center; }
+        .ctrl-btn { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; background: rgba(255,255,255,0.15); }
+        .btn-end { width: 65px; height: 65px; background: var(--danger) !important; }
+        .btn-accept { width: 65px; height: 65px; background: var(--success) !important; }
+        .btn-off { background: rgba(255,255,255,0.5); color: black; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <audio id="ringtone" loop preload="auto"><source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg"></audio>
+    <audio id="dialtone" loop preload="auto"><source src="https://www.soundjay.com/phone/sounds/phone-calling-1.mp3" type="audio/mpeg"></audio>
+
+    <header>
+        <div class="header-logo">GOORAC</div>
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search..." autocomplete="off">
+        </div>
+        <div class="tabs">
+            <div class="tab active" id="tab-recent" onclick="switchTab('recent')">Recent</div>
+            <div class="tab" id="tab-contacts" onclick="switchTab('contacts')">Contacts</div>
+        </div>
+    </header>
+
+    <div id="list-container"></div>
+
+    <div id="call-screen">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+        <div class="call-header">
+            <h2 id="target-name">User</h2>
+            <p id="call-status">RINGING...</p>
+            <div id="call-timer">00:00</div>
+        </div>
+        <div class="call-body" id="pfp-area">
+            <div class="big-pfp-container">
+                <div class="pulse" id="ring-animation"></div>
+                <img src="" id="target-pfp">
+            </div>
+        </div>
+        <div class="call-controls">
+            <div class="control-row">
+                <button class="ctrl-btn" id="mic-btn" onclick="toggleMic()">🎙️</button>
+                <button class="ctrl-btn" id="cam-btn" onclick="toggleCam()">📷</button>
+                <button class="ctrl-btn" id="speaker-btn">🔊</button>
+            </div>
+            <div class="control-row">
+                <button class="ctrl-btn btn-accept" id="answer-btn" style="display:none;" onclick="answerCall()">📞</button>
+                <button class="ctrl-btn btn-end" id="hangup-btn" onclick="hangUp()">📞</button>
+            </div>
+        </div>
+    </div>
+
+    <call-notifier></call-notifier>
+
+    <script src="components/navbar.js" defer></script> 
+    <main-navbar></main-navbar>
+
+    <script>
+        // Define Custom Element for Notifier
+        class CallNotifier extends HTMLElement {
+            constructor() { super(); }
+            connectedCallback() {
+                this.innerHTML = `
+                <style>
+                    #notif-banner {
+                        position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
+                        width: calc(100% - 30px); max-width: 400px;
+                        background: rgba(10, 15, 20, 0.98); backdrop-filter: blur(20px);
+                        border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 24px;
+                        padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+                        z-index: 100000; box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+                        transition: top 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+                    }
+                    #notif-banner.active { top: 20px; }
+                    .nb-info { display: flex; align-items: center; gap: 12px; color: white; }
+                    .nb-pfp { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
+                    .nb-text h4 { margin: 0; font-size: 0.95rem; }
+                    .nb-text p { margin: 0; font-size: 0.75rem; color: var(--accent); }
+                    .nb-actions { display: flex; gap: 10px; }
+                    .nb-btn { border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+                    .nb-acc { background: var(--accent); color: black; }
+                    .nb-dec { background: rgba(255,68,68,0.2); color: #ff4444; }
+                </style>
+                <div id="notif-banner">
+                    <div class="nb-info">
+                        <img id="nb-img" class="nb-pfp" src="">
+                        <div class="nb-text"><h4 id="nb-user">User</h4><p>Incoming Call...</p></div>
+                    </div>
+                    <div class="nb-actions">
+                        <button class="nb-btn nb-dec" id="nb-decline">Decline</button>
+                        <button class="nb-btn nb-acc" id="nb-answer">Answer</button>
+                    </div>
+                </div>`;
+            }
+            show(name, pfp, onAccept, onDecline) {
+                const b = this.querySelector('#notif-banner');
+                this.querySelector('#nb-user').innerText = name;
+                this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
+                b.classList.add('active');
+                this.querySelector('#nb-answer').onclick = () => { 
+                    b.classList.remove('active'); 
+                    document.getElementById('ringtone').pause();
+                    onAccept(); 
+                };
+                this.querySelector('#nb-decline').onclick = () => { 
+                    b.classList.remove('active'); 
+                    document.getElementById('ringtone').pause();
+                    onDecline(); 
+                };
+            }
+            hide() { 
+                const b = this.querySelector('#notif-banner');
+                if(b) b.classList.remove('active'); 
+                document.getElementById('ringtone').pause();
+            }
+        }
+        customElements.define('call-notifier', CallNotifier);
+
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'u' || e.key === 's' || e.key === 'a' || e.key === 'p')) {
+                e.preventDefault();
+            }
+            if (e.key === 'F12') e.preventDefault();
+        });
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            storageBucket: "goorac-c3b59.firebasestorage.app",
+            messagingSenderId: "746746595332",
+            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const rdb = firebase.database();
+        const auth = firebase.auth();
+
+        let myUid, myData, pc, localStream, timerInterval;
+        let currentCallId = null;
+        let isCaller = false;
+        let secondsElapsed = 0;
+        let currentActiveTarget = null; 
+        let activeTab = 'recent';
+        let isCamOn = false;
+        let cachedList = []; 
+        let isLoggingInProgress = false;
+
+        const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
+
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                myUid = user.uid;
+                const doc = await db.collection("users").doc(myUid).get();
+                myData = doc.data() || {};
+                loadData();
+                listenForPings();
+                checkAutoAnswer();
+            } else { window.location.href = 'login.html'; }
+        });
+
+        async function checkAutoAnswer() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const callId = urlParams.get('callId');
+            const shouldAnswer = urlParams.get('answer');
+
+            if (callId && shouldAnswer === 'true') {
+                try {
+                    const snap = await rdb.ref(`calls/${callId}`).get();
+                    const callData = snap.val();
+                    if (!callData || ['ended', 'declined', 'cancelled'].includes(callData.status)) return;
+
+                    isCaller = false;
+                    currentCallId = callId;
+                    
+                    const uDoc = await db.collection("users").doc(callData.callerId).get();
+                    const uData = uDoc.data() || {};
+                    currentActiveTarget = { uid: callData.callerId, name: uData.name, pfp: uData.photoURL };
+                    
+                    showCallUI(uData.name, uData.photoURL, "CONNECTING...", uData.verified);
+                    answerCall();
+                } catch (e) { console.error("Auto-answer failed", e); }
+            }
+        }
+
+        document.getElementById('search').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            renderFilteredList(query);
+        });
+
+        function showSkeleton() {
+            const list = document.getElementById('list-container');
+            let html = '';
+            for(let i=0; i<6; i++) {
+                html += `
+                    <div class="skeleton-item">
+                        <div class="sk-pfp skeleton"></div>
+                        <div style="flex:1">
+                            <div class="sk-text skeleton"></div>
+                            <div class="sk-meta skeleton"></div>
+                        </div>
+                    </div>`;
+            }
+            list.innerHTML = html;
+        }
+
+        function renderFilteredList(query = '') {
+            const list = document.getElementById('list-container');
+            const filtered = cachedList.filter(item => item.name.toLowerCase().includes(query));
+            
+            if (filtered.length === 0) {
+                list.innerHTML = `<p style="text-align:center; padding:20px; opacity:0.5;">No results found</p>`;
+                return;
+            }
+
+            list.innerHTML = "";
+            filtered.forEach(item => {
+                const badge = (item.verified === true) ? `<span class="v-badge"></span>` : "";
+                list.innerHTML += `
+                    <div class="call-item">
+                        <img src="${item.pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
+                        <div class="call-info">
+                            <div class="u-name">${item.name} ${badge}</div>
+                            <div class="call-meta ${item.statusClass || ''}">${item.metaText}</div>
+                        </div>
+                        <button class="btn-call" onclick="startCall('${item.uid}', '${item.name}', '${item.pfp}', ${item.verified})">📞</button>
+                    </div>`;
+            });
+        }
+
+        function switchTab(tab) {
+            if (activeTab === tab) return;
+            activeTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            document.getElementById('search').value = "";
+            loadData();
+        }
+
+        async function loadData() {
+            showSkeleton();
+            if (activeTab === 'recent') await loadRecent(); else await loadContacts();
+        }
+
+        async function loadRecent() {
+            try {
+                const snapshot = await db.collection("call_logs")
+                    .where('participants', 'array-contains', myUid)
+                    .orderBy('timestamp', 'desc')
+                    .limit(10) 
+                    .get();
+                    
+                if (snapshot.empty) {
+                    document.getElementById('list-container').innerHTML = `<p style="text-align:center; padding:20px; opacity:0.5;">No call history</p>`;
+                    cachedList = [];
+                    return;
+                }
+
+                let calls = [];
+                snapshot.forEach(doc => calls.push(doc.data()));
+                
+                cachedList = await Promise.all(calls.map(async call => {
+                    const isOutgoing = call.callerId === myUid;
+                    const otherUid = isOutgoing ? call.receiverId : call.callerId;
+                    const uDoc = await db.collection("users").doc(otherUid).get();
+                    const uData = uDoc.data() || {};
+                    
+                    let statusText = (call.status === 'missed' || call.status === 'declined' || call.status === 'cancelled') 
+                        ? (isOutgoing ? "Cancelled" : "Missed") 
+                        : (isOutgoing ? "Outgoing" : "Incoming");
+                    
+                    let statusClass = (statusText === "Missed" || statusText === "Cancelled") ? "status-missed" : (isOutgoing ? "status-outgoing" : "status-incoming");
+                    const time = new Date(call.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                    return {
+                        uid: otherUid,
+                        name: isOutgoing ? (call.receiverName || uData.name) : (call.callerName || uData.name),
+                        pfp: isOutgoing ? (call.receiverPfp || uData.photoURL) : (call.callerPfp || uData.photoURL),
+                        verified: uData.verified || false,
+                        statusClass: statusClass,
+                        metaText: `${statusText} • ${call.duration || '0s'} • ${time}`
+                    };
+                }));
+                renderFilteredList();
+            } catch (e) { 
+                console.error("Firestore Error:", e);
+                document.getElementById('list-container').innerHTML = `<div style="text-align:center; padding:40px; opacity:0.6;"><p>Error loading recent calls.</p></div>`;
+            }
+        }
+
+        async function loadContacts() {
+            const following = myData.following || [];
+            if (following.length === 0) {
+                document.getElementById('list-container').innerHTML = `<p style="text-align:center; padding:20px; opacity:0.5;">No contacts found</p>`;
+                return;
+            }
+
+            const contactPromises = following.map(async (uid) => {
+                const uDoc = await db.collection("users").doc(uid).get();
+                const u = uDoc.data();
+                if(u && u.following && u.following.includes(myUid)) {
+                    return {
+                        uid: uid,
+                        name: u.name || u.username,
+                        pfp: u.photoURL,
+                        verified: u.verified || false,
+                        metaText: `@${u.username || 'unknown'}`
+                    };
+                }
+                return null;
+            });
+
+            const results = await Promise.all(contactPromises);
+            cachedList = results.filter(c => c !== null);
+            renderFilteredList();
+        }
+
+        async function startCall(targetUid, name, pfp, isVerified) {
+            if (currentCallId) return;
+            isCaller = true;
+            secondsElapsed = 0;
+            isLoggingInProgress = false;
+            currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
+            currentCallId = "call_" + Date.now() + "_" + myUid;
+            
+            showCallUI(name, pfp, "DIALING...", isVerified);
+            document.getElementById('dialtone').play().catch(() => {});
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                document.getElementById('local-video').srcObject = localStream;
+                localStream.getVideoTracks()[0].enabled = false;
+
+                pc = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(event.candidate.toJSON());
+                    }
+                };
+
+                pc.ontrack = (event) => {
+                    const rv = document.getElementById('remote-video');
+                    rv.srcObject = event.streams[0];
+                    rv.style.display = 'block';
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const callPayload = {
+                    offer: { sdp: offer.sdp, type: offer.type },
+                    callerId: myUid, callerName: myData.name || "User", callerPfp: myData.photoURL || "",
+                    receiverId: targetUid, status: 'ringing', timestamp: Date.now()
+                };
+
+                await rdb.ref(`calls/${currentCallId}`).set(callPayload);
+                await rdb.ref(`signaling/${targetUid}`).set({ 
+                    from: myUid, callId: currentCallId, name: myData.name || "User", 
+                    pfp: myData.photoURL || "", timestamp: Date.now() 
+                });
+
+                rdb.ref(`calls/${currentCallId}`).on('value', snap => {
+                    const data = snap.val();
+                    if (!data) return;
+                    
+                    if (data.status === 'declined' || data.status === 'cancelled' || data.status === 'ended') {
+                        handleHangUpEffectively(false);
+                    }
+                    if (data.answer && !pc.currentRemoteDescription) {
+                        pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        document.getElementById('dialtone').pause();
+                        startTimer();
+                        updateCallStatus("CONNECTED", "#1ebea5");
+                        document.getElementById('ring-animation').style.display = 'none';
+                    }
+                });
+
+                rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).on('child_added', snap => {
+                    if (pc.remoteDescription) {
+                        pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                    }
+                });
+
+            } catch (e) { alert("Camera/Mic Permission Denied"); hangUp(); }
+        }
+
+        function listenForPings() {
+            rdb.ref(`signaling/${myUid}`).on('value', snap => {
+                const data = snap.val();
+                if (!data) return;
+
+                const urlParams = new URLSearchParams(window.location.search);
+                if (!currentCallId && urlParams.get('callId') !== data.callId) {
+                    if (Date.now() - data.timestamp > 30000) {
+                        rdb.ref(`signaling/${myUid}`).remove();
+                        return;
+                    }
+                    
+                    const notifier = document.querySelector('call-notifier');
+                    notifier.show(data.name, data.pfp, 
+                        () => { 
+                            isCaller = false;
+                            secondsElapsed = 0;
+                            isLoggingInProgress = false;
+                            currentCallId = data.callId;
+                            currentActiveTarget = { uid: data.from, name: data.name, pfp: data.pfp };
+                            showCallUI(data.name, data.pfp, "INCOMING CALL...", false);
+                            answerCall(); 
+                        },
+                        () => { 
+                            rdb.ref(`calls/${data.callId}`).update({ status: 'declined' });
+                            rdb.ref(`signaling/${myUid}`).remove();
+                            document.getElementById('ringtone').pause();
+                        }
+                    );
+
+                    document.getElementById('ringtone').play().catch(() => {});
+
+                    rdb.ref(`calls/${data.callId}`).on('value', s => {
+                        const val = s.val();
+                        // Fix: Receiver now correctly hangs up when status changes to 'ended', 'cancelled', or 'declined'
+                        if (val?.status === 'cancelled' || val?.status === 'ended' || val?.status === 'declined') {
+                            notifier.hide();
+                            handleHangUpEffectively(false);
+                        } else if (val?.status === 'connected') {
+                            notifier.hide();
+                        }
+                    });
+                }
+            });
+        }
+
+        async function answerCall() {
+            document.getElementById('ringtone').pause();
+            document.getElementById('answer-btn').style.display = 'none';
+            document.getElementById('hangup-btn').style.transform = 'none';
+            updateCallStatus("CONNECTING...", "var(--accent)");
+
+            try {
+                const snap = await rdb.ref(`calls/${currentCallId}`).get();
+                const callData = snap.val();
+
+                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                document.getElementById('local-video').srcObject = localStream;
+                localStream.getVideoTracks()[0].enabled = false;
+
+                pc = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                pc.onicecandidate = (e) => e.candidate && rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(e.candidate.toJSON());
+                pc.ontrack = (e) => {
+                    const rv = document.getElementById('remote-video');
+                    rv.srcObject = e.streams[0];
+                    rv.style.display = 'block';
+                };
+
+                await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                await rdb.ref(`calls/${currentCallId}`).update({ 
+                    answer: { sdp: answer.sdp, type: answer.type }, 
+                    status: 'connected' 
+                });
+
+                rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
+                    pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                });
+
+                rdb.ref(`signaling/${myUid}`).remove();
+                startTimer();
+                updateCallStatus("CONNECTED", "#1ebea5");
+                document.getElementById('ring-animation').style.display = 'none';
+
+                // Monitor call status for hang-up
+                rdb.ref(`calls/${currentCallId}`).on('value', snap => {
+                    const data = snap.val();
+                    if (data && (data.status === 'ended' || data.status === 'cancelled' || data.status === 'declined')) {
+                        handleHangUpEffectively(false);
+                    }
+                });
+
+            } catch (e) { hangUp(); }
+        }
+
+        async function hangUp() {
+            await handleHangUpEffectively(true);
+        }
+
+        async function handleHangUpEffectively(shouldNotifyRemote) {
+            document.getElementById('ringtone').pause();
+            document.getElementById('dialtone').pause();
+            
+            if (currentCallId) {
+                let finalStatus = (secondsElapsed > 0) ? 'completed' : (isCaller ? 'cancelled' : 'declined');
+                
+                if (shouldNotifyRemote) {
+                    let rdbStatus = (secondsElapsed > 0) ? 'ended' : (isCaller ? 'cancelled' : 'declined');
+                    await rdb.ref(`calls/${currentCallId}`).update({ status: rdbStatus });
+                }
+
+                if (isCaller && !isLoggingInProgress) {
+                    isLoggingInProgress = true;
+                    await logCall(finalStatus);
+                }
+            }
+
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (pc) {
+                pc.ontrack = null;
+                pc.onicecandidate = null;
+                pc.close();
+                pc = null;
+            }
+            
+            await rdb.ref(`signaling/${myUid}`).remove();
+            if(currentActiveTarget) await rdb.ref(`signaling/${currentActiveTarget.uid}`).remove();
+
+            document.getElementById('call-screen').style.display = 'none';
+            currentCallId = null;
+            
+            const url = new URL(window.location);
+            url.searchParams.delete('callId');
+            url.searchParams.delete('answer');
+            window.history.replaceState({}, document.title, url.toString());
+            
+            setTimeout(() => window.location.reload(), 800);
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval); 
+            secondsElapsed = 0;
+            const timerEl = document.getElementById('call-timer');
+            timerEl.style.display = 'block';
+            timerEl.innerText = "00:00";
+            
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+                const secs = String(secondsElapsed % 60).padStart(2, '0');
+                timerEl.innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        async function logCall(finalStatus) {
+            if(!currentActiveTarget || !myUid) return;
+            
+            let durationStr = "0s";
+            if (secondsElapsed > 0) {
+                const m = Math.floor(secondsElapsed / 60);
+                const s = secondsElapsed % 60;
+                durationStr = m > 0 ? `${m}m ${s}s` : `${s}s`;
+            }
+
+            try {
+                const logData = {
+                    participants: [String(myUid), String(currentActiveTarget.uid)],
+                    callerId: isCaller ? String(myUid) : String(currentActiveTarget.uid),
+                    receiverId: isCaller ? String(currentActiveTarget.uid) : String(myUid),
+                    callerName: isCaller ? (myData.name || "User") : currentActiveTarget.name,
+                    receiverName: isCaller ? currentActiveTarget.name : (myData.name || "User"),
+                    callerPfp: isCaller ? (myData.photoURL || "") : (currentActiveTarget.pfp || ""),
+                    receiverPfp: isCaller ? (currentActiveTarget.pfp || "") : (myData.photoURL || ""),
+                    status: finalStatus,
+                    duration: durationStr,
+                    timestamp: Date.now()
+                };
+                
+                await db.collection("call_logs").add(logData);
+            } catch (e) { console.error("Firestore logging failed:", e); }
+        }
+
+        function showCallUI(name, pfp, status, verified) {
+            document.getElementById('call-screen').style.display = 'flex';
+            const badge = (verified === true) ? `<span class="v-badge"></span>` : "";
+            document.getElementById('target-name').innerHTML = `${name} ${badge}`;
+            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
+            updateCallStatus(status, "var(--accent)");
+        }
+
+        function updateCallStatus(text, color) {
+            const el = document.getElementById('call-status');
+            el.innerText = text; el.style.color = color;
+        }
+
+        function toggleMic() {
+            if(!localStream) return;
+            const t = localStream.getAudioTracks()[0];
+            t.enabled = !t.enabled;
+            document.getElementById('mic-btn').classList.toggle('btn-off', !t.enabled);
+        }
+
+        function toggleCam() {
+            if(!localStream) return;
+            isCamOn = !isCamOn;
+            const t = localStream.getVideoTracks()[0];
+            t.enabled = isCamOn;
+            document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
+            document.getElementById('remote-video').style.display = isCamOn ? 'block' : 'none';
+            document.getElementById('local-video').style.display = isCamOn ? 'block' : 'none';
+            document.getElementById('pfp-area').style.display = isCamOn ? 'none' : 'flex';
+        }
+    </script>
+</body>
+</html>

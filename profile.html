@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Profile</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script src="components/navbar.js" defer></script>
+    <script src="components/call-notifier.js" defer></script>
+
+    <style>
+        :root {
+            --bg: #000000;
+            --card: #0a0a0a;
+            --accent: #00d2ff;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Security: Avoid Copy & Selection */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding-bottom: 100px;
+            overflow-x: hidden;
+        }
+
+        /* Skeleton Animation */
+        .skeleton {
+            background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite linear;
+            border-radius: 8px;
+            color: transparent !important;
+        }
+
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Persistent Header */
+        header {
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+        }
+
+        .header-username { font-weight: 800; font-size: 1rem; color: #fff; min-width: 80px; }
+
+        .profile-hero {
+            padding: 40px 20px 20px;
+            text-align: center;
+            background: radial-gradient(circle at top, rgba(0, 210, 255, 0.05) 0%, transparent 70%);
+        }
+
+        /* PFP Zoom Effect */
+        .pfp-container {
+            width: 110px;
+            height: 110px;
+            margin: 0 auto 20px;
+            overflow: visible;
+        }
+
+        .pfp-main {
+            width: 100%;
+            height: 100%;
+            border-radius: 38px;
+            object-fit: cover;
+            border: 2px solid var(--border);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        .pfp-main:active {
+            transform: scale(1.5);
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .name-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            min-height: 32px;
+        }
+
+        .full-name { font-size: 1.6rem; font-weight: 900; }
+
+        .verify-badge { width: 20px; height: 20px; display: none; }
+
+        .goorac-id-tag {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 25px;
+            min-width: 120px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .goorac-id-tag:active { 
+            opacity: 0.6; 
+            transform: scale(0.95);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 0 20px;
+            margin-bottom: 35px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 18px;
+            border-radius: 24px;
+        }
+
+        .stat-card span { display: block; font-size: 1.3rem; font-weight: 900; margin-bottom: 2px; }
+        .stat-card label { font-size: 0.7rem; color: #666; font-weight: 700; text-transform: uppercase; }
+
+        .bio-section { padding: 0 25px; margin-bottom: 35px; }
+        .bio-section h3 { font-size: 0.75rem; color: #555; text-transform: uppercase; margin-bottom: 10px; }
+        .bio-section p { font-size: 0.95rem; color: #bbb; line-height: 1.6; min-height: 20px; }
+
+        .action-grid {
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 16px;
+            border-radius: 20px;
+            border: none;
+            font-weight: 800;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-edit { background: #fff; color: #000; }
+        .btn-logout { background: #1a1a1a; color: #ff4b4b; border: 1px solid rgba(255, 75, 75, 0.1); }
+
+        /* Toast Styles */
+        #toast {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 0.8rem;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s ease;
+            transition: opacity 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { bottom: 80px; opacity: 0; }
+            to { bottom: 110px; opacity: 1; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<header>
+    <div class="header-username skeleton" id="header-user">@username</div>
+    <div style="font-size: 1.2rem; opacity: 0.4;">⚙️</div>
+</header>
+
+<div class="profile-hero">
+    <div class="pfp-container">
+        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton">
+    </div>
+    
+    <div class="name-container">
+        <span class="full-name skeleton" id="user-full-name">User Name Placeholder</span>
+        <img id="v-badge" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="verify-badge">
+    </div>
+    
+    <div class="goorac-id-tag skeleton" id="id-tag-wrap" onclick="copyGooracID()">
+        GOORAC ID: <span id="user-id-num">00000000</span>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <span id="stat-followers" class="skeleton">00</span>
+        <label>Followers</label>
+    </div>
+    <div class="stat-card">
+        <span id="stat-following" class="skeleton">00</span>
+        <label>Following</label>
+    </div>
+</div>
+
+<div class="bio-section">
+    <h3>Bio</h3>
+    <p id="bio-text" class="skeleton">This is a placeholder bio text that will be replaced.</p>
+</div>
+
+<div class="action-grid">
+    <a href="setup.html" class="btn btn-edit">Edit Profile</a>
+    <button id="logoutBtn" class="btn btn-logout">Logout</button>
+</div>
+
+<div id="toast">Copied to Clipboard</div>
+
+<main-navbar></main-navbar>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            try {
+                const doc = await db.collection("users").doc(user.uid).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
+
+                    // Populate UI
+                    const pfp = document.getElementById('pfp-img');
+                    pfp.src = data.photoURL || 'https://via.placeholder.com/150';
+                    pfp.onload = () => pfp.classList.remove('skeleton');
+
+                    document.getElementById('user-full-name').innerText = data.name || "User";
+                    removeSkeleton('user-full-name');
+
+                    document.getElementById('header-user').innerText = "@" + (data.username || "user");
+                    removeSkeleton('header-user');
+
+                    document.getElementById('user-id-num').innerText = data.gooracNumber || "----------";
+                    removeSkeleton('id-tag-wrap');
+
+                    document.getElementById('bio-text').innerText = data.bio || "Welcome to my Goorac profile.";
+                    removeSkeleton('bio-text');
+                    
+                    document.getElementById('stat-followers').innerText = data.followerCount || 0;
+                    removeSkeleton('stat-followers');
+
+                    document.getElementById('stat-following').innerText = data.followingCount || 0;
+                    removeSkeleton('stat-following');
+
+                    if (data.verified === true) {
+                        document.getElementById('v-badge').style.display = 'inline';
+                    }
+
+                } else {
+                    window.location.href = "setup.html";
+                }
+            } catch (err) {
+                console.error("Profile Error:", err);
+            }
+        } else {
+            window.location.href = "login.html";
+        }
+    });
+
+    // ROBUST COPY FUNCTION
+    function copyGooracID() {
+        const idElement = document.getElementById('user-id-num');
+        const id = idElement.innerText.trim();
+        
+        if (!id || id === "----------" || id === "00000000") return;
+        
+        if (navigator.vibrate) navigator.vibrate(50);
+
+        // Try Modern API first
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(id).then(() => {
+                showToast();
+            }).catch(() => {
+                fallbackCopy(id);
+            });
+        } else {
+            fallbackCopy(id);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+            showToast();
+        } catch (err) {
+            console.error('Copy failed', err);
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        toast.style.opacity = '1';
+        setTimeout(() => { 
+            toast.style.opacity = '0';
+            setTimeout(() => { toast.style.display = 'none'; }, 300);
+        }, 2000);
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+        auth.signOut().then(() => {
+            window.location.href = "login.html";
+        });
+    };
+</script>
+
+<script src="components/call-notifier.js" defer></script>
+<call-notifier></call-notifier>
+</body>
+</html>

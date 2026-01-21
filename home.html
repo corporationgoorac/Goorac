@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Quantum Home</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script src="components/navbar.js" defer></script>
+    <script src="components/call-notifier.js" defer></script>
+
+    <style>
+        :root {
+            --bg: #000;
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.3);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-dim: #a0a0a0;
+            --danger: #ff4444;
+            --danger-glow: rgba(255, 68, 68, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding-bottom: 100px;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(0,0,0,0.7);
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+        }
+
+        .logo { 
+            font-size: 1.2rem; 
+            font-weight: 900; 
+            color: var(--accent); 
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .header-pfp { 
+            width: 38px; height: 38px; border-radius: 12px; 
+            object-fit: cover; border: 1px solid var(--border);
+            cursor: pointer; background: #111;
+            transition: transform 0.2s;
+        }
+        .header-pfp:active { transform: scale(0.9); }
+
+        #progress-bar {
+            position: fixed;
+            top: 0; left: 0; height: 2px;
+            background: var(--accent); width: 0%; z-index: 1001;
+            transition: width 0.4s ease, opacity 0.3s;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .content { 
+            padding: 24px 20px; 
+            max-width: 500px; 
+            margin: 0 auto; 
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            display: block;
+            opacity: 0.7;
+        }
+
+        .welcome-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            border: 1px solid var(--border);
+            padding: 30px 25px;
+            border-radius: 32px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .welcome-card h1 { 
+            margin: 0; font-size: 1.8rem; font-weight: 800; 
+            letter-spacing: -0.5px;
+            background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-card p { 
+            color: var(--text-dim); margin-top: 12px; 
+            font-size: 0.95rem; line-height: 1.6; font-weight: 400;
+        }
+
+        .activity-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .activity-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 18px;
+            border-radius: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: left;
+            position: relative;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .activity-card:active {
+            transform: scale(0.96);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .card-icon-area {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .card-icon-area img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .count-num {
+            font-size: 1.1rem;
+            font-weight: 800;
+            display: block;
+            margin-bottom: 2px;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .count-label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .time-badge {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            display: block;
+            opacity: 0.6;
+        }
+
+        .activity-card.has-count { 
+            border-color: var(--accent);
+            background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%);
+        }
+        .has-count .count-num { color: var(--accent); }
+        .has-count .card-icon-area { border-color: var(--accent); }
+        
+        .activity-card.missed-alert {
+            border-color: var(--danger-glow);
+            background: linear-gradient(145deg, rgba(255, 68, 68, 0.05) 0%, transparent 100%);
+        }
+        .missed-alert .count-num { color: var(--danger); }
+        .missed-alert .card-icon-area { border-color: var(--danger); }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--accent);
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            margin-bottom: 18px;
+            border: 1px solid rgba(0, 210, 255, 0.2);
+        }
+
+        .dot {
+            width: 8px; height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite linear;
+            border-radius: 12px;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;"> 
+
+<div id="progress-bar"></div>
+
+<header>
+    <div class="logo">GOORAC</div>
+    <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
+</header>
+
+<div class="content">
+    <span class="section-label">Quantum Terminal</span>
+    
+    <div class="welcome-card">
+        <div class="status-badge">
+            <div class="dot"></div> ENCRYPTION ACTIVE
+        </div>
+        
+        <h1 id="welcome-name" class="skeleton" style="height: 35px; width: 70%;"></h1>
+        <p id="welcome-text" class="skeleton" style="height: 50px; width: 100%; margin-top: 15px;"></p>
+        
+        <div class="activity-grid">
+            <div class="activity-card" id="msg-card" onclick="window.location.href='messages.html'">
+                <div class="card-icon-area" id="msg-pfp-area">
+                    <div style="color:var(--text-dim); font-size:10px;">MSG</div>
+                </div>
+                <span id="msg-time" class="time-badge">No active data</span>
+                <span id="msg-header" class="count-num">Recent</span>
+                <span id="msg-subtext" class="count-label">History</span>
+            </div>
+            
+            <div class="activity-card" id="call-card" onclick="window.location.href='calls.html'">
+                <div class="card-icon-area" id="call-pfp-area">
+                    <div style="color:var(--text-dim); font-size:10px;">LOG</div>
+                </div>
+                <span id="call-time" class="time-badge">No active data</span>
+                <span id="call-count" class="count-num">Log</span>
+                <span id="call-label" class="count-label">History</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main-navbar></main-navbar>
+<call-notifier></call-notifier>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const prog = document.getElementById('progress-bar');
+
+    // Professional Time Formatter
+    function formatTime(timestamp) {
+        if (!timestamp) return "";
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo ago";
+        interval = seconds / 604800;
+        if (interval > 1) return Math.floor(interval) + "w ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m ago";
+        return "Just now";
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            prog.style.width = '60%';
+            const doc = await db.collection("users").doc(user.uid).get();
+            if (doc.exists) {
+                updateUI(doc.data());
+                startLiveCounters(user.uid);
+            } else { window.location.href = "setup.html"; }
+        } else { window.location.href = "login.html"; }
+    });
+
+    function updateUI(data) {
+        const nameEl = document.getElementById('welcome-name');
+        const textEl = document.getElementById('welcome-text');
+        const pfpEl = document.getElementById('header-pfp');
+
+        nameEl.classList.remove('skeleton');
+        nameEl.innerText = "Welcome, " + (data.name.split(' ')[0] || "Agent");
+        
+        textEl.classList.remove('skeleton');
+        textEl.innerText = "All neural-links are operational. Your communication is currently isolated and secure.";
+        
+        pfpEl.classList.remove('skeleton');
+        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
+        
+        prog.style.width = '100%';
+        setTimeout(() => prog.style.opacity = '0', 400);
+    }
+
+    function startLiveCounters(uid) {
+        // 1. MESSAGES LOGIC
+        db.collection("chats")
+          .where("participants", "array-contains", uid)
+          .orderBy("lastTimestamp", "desc")
+          .onSnapshot(snap => {
+              let latestUnreadChat = null;
+              
+              for (const doc of snap.docs) {
+                  const d = doc.data();
+                  const isUnread = (d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0);
+                  if (isUnread) {
+                      latestUnreadChat = d;
+                      break; 
+                  }
+              }
+
+              const header = document.getElementById('msg-header');
+              const subtext = document.getElementById('msg-subtext');
+              const time = document.getElementById('msg-time');
+              const card = document.getElementById('msg-card');
+              const pfpArea = document.getElementById('msg-pfp-area');
+
+              if (latestUnreadChat) {
+                  header.innerText = "New Message";
+                  subtext.innerText = "From " + (latestUnreadChat.lastSenderName || "User");
+                  time.innerText = formatTime(latestUnreadChat.lastTimestamp);
+                  card.classList.add('has-count');
+                  
+                  if (latestUnreadChat.lastSenderPfp) {
+                      pfpArea.innerHTML = `<img src="${latestUnreadChat.lastSenderPfp}">`;
+                  }
+              } else {
+                  header.innerText = "Recent";
+                  subtext.innerText = "History";
+                  time.innerText = snap.empty ? "No data" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
+                  card.classList.remove('has-count');
+                  pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">MSG</div>`;
+              }
+          });
+
+        // 2. CALLS LOGIC
+        db.collection("call_logs")
+          .where("participants", "array-contains", uid)
+          .orderBy("timestamp", "desc")
+          .limit(1)
+          .onSnapshot(snap => {
+              const el = document.getElementById('call-count');
+              const label = document.getElementById('call-label');
+              const time = document.getElementById('call-time');
+              const card = document.getElementById('call-card');
+              const pfpArea = document.getElementById('call-pfp-area');
+              
+              if (!snap.empty) {
+                  const call = snap.docs[0].data();
+                  const isReceiver = (call.receiverId === uid);
+                  time.innerText = formatTime(call.timestamp);
+                  
+                  if (isReceiver && (call.status === "missed" || call.status === "cancelled")) {
+                      el.innerText = "Missed";
+                      label.innerText = call.callerName || "Recent Call";
+                      card.classList.add('missed-alert');
+                      if (call.callerPfp) {
+                          pfpArea.innerHTML = `<img src="${call.callerPfp}">`;
+                      }
+                  } else {
+                      el.innerText = "Log";
+                      label.innerText = "History";
+                      card.classList.remove('missed-alert');
+                      pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">LOG</div>`;
+                  }
+              }
+          });
+    }
+
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
+    }, false);
+</script>
+</body>
+</html>

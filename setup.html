@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Goorac | Profile Setup</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        :root { --bg: #050505; --card: #111; --accent: #00d2ff; --success: #00ff88; --error: #ff4444; --border: rgba(255,255,255,0.1); }
+        
+        body { 
+            background: var(--bg); color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            display: flex; justify-content: center; align-items: center; 
+            min-height: 100vh; margin: 0; overflow-x: hidden;
+        }
+
+        /* Anime Entrance */
+        .setup-box {
+            background: var(--card); width: 90%; max-width: 400px;
+            padding: 30px; border-radius: 35px; border: 1px solid var(--border);
+            text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+            opacity: 0; transform: translateY(30px) scale(0.95);
+            animation: animePop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            position: relative;
+        }
+
+        @keyframes animePop { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        /* Back Button */
+        .back-btn {
+            position: absolute; top: 25px; left: 25px;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            color: white; width: 40px; height: 40px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 1.2rem; transition: 0.3s;
+        }
+        .back-btn:hover { background: var(--accent); color: black; border-color: var(--accent); }
+
+        /* DP Glow Ring */
+        .pfp-container { position: relative; width: 120px; height: 120px; margin: 10px auto 20px; cursor: pointer; }
+        .pfp-ring {
+            width: 100%; height: 100%; border-radius: 50%; padding: 4px;
+            background: linear-gradient(135deg, var(--accent), #7000ff);
+            animation: ringRotate 4s linear infinite; box-sizing: border-box;
+        }
+        @keyframes ringRotate { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+        .pfp-image { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #000; border: 3px solid #111; }
+        
+        .edit-badge {
+            position: absolute; bottom: 5px; right: 5px;
+            background: var(--accent); color: black; border-radius: 50%;
+            width: 30px; height: 30px; display: flex; align-items: center; 
+            justify-content: center; font-size: 0.8rem; border: 3px solid #111;
+        }
+
+        .id-label { color: var(--accent); font-size: 0.7rem; font-weight: 900; letter-spacing: 2px; margin-bottom: 25px; display: block; opacity: 0.8; }
+
+        .input-field {
+            width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a;
+            padding: 16px; border-radius: 18px; color: white;
+            margin-bottom: 15px; box-sizing: border-box; outline: none; font-size: 0.95rem;
+            transition: 0.3s;
+        }
+        .input-field:focus { border-color: var(--accent); background: #1f1f1f; box-shadow: 0 0 20px rgba(0, 210, 255, 0.1); }
+
+        #status { font-size: 0.75rem; display: block; margin-top: -10px; margin-bottom: 15px; text-align: left; padding-left: 10px; height: 1rem; font-weight: 600; }
+
+        .btn-launch {
+            background: white; color: black; border: none; padding: 18px;
+            border-radius: 20px; font-weight: 800; width: 100%; cursor: pointer;
+            margin-top: 10px; display: none; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            font-size: 1rem; letter-spacing: 0.5px;
+        }
+        .btn-launch:active { transform: scale(0.95); }
+
+        /* Loader */
+        #loader-overlay { 
+            position: fixed; inset: 0; background: #000; z-index: 999; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        }
+        .spinner { width: 50px; height: 50px; border: 3px solid rgba(0, 210, 255, 0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-weight: 800; letter-spacing: 2px; font-size: 0.8rem; color: var(--accent); text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+<div id="loader-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Synchronizing Network...</div>
+</div>
+
+<div class="setup-box">
+    <button class="back-btn" onclick="history.back()">⇠</button>
+    
+    <div class="pfp-container" onclick="changePFP()">
+        <div class="pfp-ring">
+            <img id="user-pfp" src="" class="pfp-image">
+        </div>
+        <div class="edit-badge">✎</div>
+    </div>
+
+    <span class="id-label">GOORAC NO: <span id="display-id">--------</span></span>
+
+    <input type="text" id="full-name" class="input-field" placeholder="Display Name">
+    <input type="text" id="username" class="input-field" placeholder="Username" autocomplete="off">
+    <span id="status"></span>
+    <textarea id="bio" class="input-field" placeholder="Write a short bio..." rows="2"></textarea>
+
+    <button id="launchBtn" class="btn-launch">Complete Transmission</button>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let activeUser = null;
+    let finalGooracID = null;
+    let currentSavedUsername = "";
+    let isAlreadyVerified = false; // Persistent verification check
+    let currentPhotoURL = "";
+
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            activeUser = user;
+            currentPhotoURL = user.photoURL;
+            checkExistingProfile(user);
+        } else {
+            window.location.href = "login.html";
+        }
+    });
+
+    async function checkExistingProfile(user) {
+        try {
+            const doc = await db.collection("users").doc(user.uid).get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                finalGooracID = data.gooracNumber;
+                currentSavedUsername = data.username;
+                isAlreadyVerified = data.verified || false;
+                currentPhotoURL = data.photoURL || user.photoURL;
+
+                document.getElementById('full-name').value = data.name || "";
+                document.getElementById('username').value = data.username || "";
+                document.getElementById('bio').value = data.bio || "";
+                document.getElementById('launchBtn').style.display = "block";
+                document.getElementById('launchBtn').innerText = "Update Profile";
+            } else {
+                finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
+            }
+
+            document.getElementById('display-id').innerText = finalGooracID;
+            document.getElementById('user-pfp').src = currentPhotoURL;
+            document.getElementById('loader-overlay').style.display = "none";
+        } catch (error) {
+            console.error("Setup Error:", error);
+            document.getElementById('loader-overlay').style.display = "none";
+        }
+    }
+
+    function changePFP() {
+        const newUrl = prompt("Enter new Profile Image URL (or leave blank to use Google photo):", currentPhotoURL);
+        if (newUrl !== null) {
+            currentPhotoURL = newUrl || activeUser.photoURL;
+            document.getElementById('user-pfp').src = currentPhotoURL;
+        }
+    }
+
+    const userInp = document.getElementById('username');
+    const statusMsg = document.getElementById('status');
+    const launchBtn = document.getElementById('launchBtn');
+
+    userInp.addEventListener('input', async () => {
+        const val = userInp.value.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+        userInp.value = val;
+        launchBtn.style.display = "none";
+
+        if (val.length < 3) {
+            statusMsg.innerText = "Minimum 3 characters";
+            statusMsg.style.color = "#555";
+            return;
+        }
+
+        if (currentSavedUsername && val === currentSavedUsername) {
+            statusMsg.innerText = "✔ Your current handle";
+            statusMsg.style.color = "#00ff88";
+            launchBtn.style.display = "block";
+            return;
+        }
+
+        const query = await db.collection("users").where("username", "==", val).get();
+        if (query.empty) {
+            statusMsg.innerText = "✔ Handle is available";
+            statusMsg.style.color = "#00ff88";
+            launchBtn.style.display = "block";
+        } else {
+            statusMsg.innerText = "✖ Already synchronized";
+            statusMsg.style.color = "#ff4444";
+        }
+    });
+
+    launchBtn.onclick = async () => {
+        launchBtn.innerText = "Synchronizing...";
+        launchBtn.disabled = true;
+
+        const profileData = {
+            uid: activeUser.uid,
+            gooracNumber: finalGooracID,
+            name: document.getElementById('full-name').value,
+            username: userInp.value,
+            bio: document.getElementById('bio').value,
+            photoURL: currentPhotoURL,
+            verified: isAlreadyVerified, // Keeps verification status if true
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Only add joinedAt if user doesn't exist yet
+        if (!currentSavedUsername) {
+            profileData.joinedAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+
+        try {
+            await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
+            window.location.href = "home.html";
+        } catch (e) {
+            alert("Error: " + e.message);
+            launchBtn.disabled = false;
+            launchBtn.innerText = "Save Profile";
+        }
+    };
+</script>
+</body>
+</html>
