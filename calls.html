@@ -254,7 +254,7 @@
 
         let myUid, myData, peer, currentCall, localStream, timerInterval;
         let isCaller = false;
-        let isLogged = false; // Prevents duplicate logs
+        let isLogged = false; 
         let secondsElapsed = 0;
         let activeTab = 'recent';
         let isCamOn = false;
@@ -267,11 +267,14 @@
                 const doc = await db.collection("users").doc(myUid).get();
                 myData = doc.data() || {};
                 
-                // Initialize PeerJS
                 peer = new Peer(myUid, { host: '0.peerjs.com', secure: true, port: 443, debug: 1 });
                 
+                peer.on('open', () => {
+                    checkAutoAnswer(); // Check for redirect answers
+                });
+
                 peer.on('call', (call) => {
-                    incomingCallRef = call; // Ensure incomingCallRef is globally stored
+                    incomingCallRef = call; 
                     handleIncomingCall(call);
                 });
                 
@@ -279,6 +282,26 @@
                 listenForSignaling();
             } else { window.location.href = 'login.html'; }
         });
+
+        /* -------------------------------------------------------------------------- */
+        /* AUTO ANSWER LOGIC (FOR REDIRECTS)                                         */
+        /* -------------------------------------------------------------------------- */
+        async function checkAutoAnswer() {
+            const params = new URLSearchParams(window.location.search);
+            const autoAnswer = params.get('autoAnswer');
+            const targetUid = params.get('targetUid');
+
+            if (autoAnswer === 'true' && targetUid) {
+                // Remove params from URL without refreshing
+                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.pushState({path:newurl},'',newurl);
+
+                // Start answering process
+                // In a redirect scenario, the actual 'call' object from PeerJS 
+                // might take a second to arrive via the 'call' event listener
+                updateCallStatus("PREPARING...", "var(--accent)");
+            }
+        }
 
         /* -------------------------------------------------------------------------- */
         /* SIGNALING & PERSISTENT RINGING                                             */
@@ -320,7 +343,7 @@
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCall) return;
             isCaller = true;
-            isLogged = false; // Reset log flag
+            isLogged = false; 
             secondsElapsed = 0;
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             
@@ -328,7 +351,6 @@
             document.getElementById('dialtone').play().catch(()=>{});
 
             try {
-                // Ensure media access is handled before calling
                 if(!localStream) {
                     localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 }
@@ -346,17 +368,25 @@
                 
             } catch (e) { 
                 console.error("Stream error:", e);
-                alert("Please enable camera/mic permissions in your browser settings.");
+                alert("Please enable camera/mic permissions.");
                 hangUp(); 
             }
         }
 
         function handleIncomingCall(incoming) {
+            incomingCallRef = incoming;
             const callerId = incoming.peer;
             
-            // Re-fetch user data for UI
             db.collection("users").doc(callerId).get().then(uDoc => {
                 const uData = uDoc.data() || {};
+                
+                // If this page was loaded via a 'Answer' click on another page
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('autoAnswer') === 'true') {
+                    triggerAnswer();
+                    return;
+                }
+
                 document.getElementById('ringtone').play().catch(()=>{});
                 document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                     () => triggerAnswer(), 
@@ -371,7 +401,9 @@
 
         async function triggerAnswer() {
             if (!incomingCallRef) {
-                console.error("No call reference to answer");
+                // Wait briefly if PeerJS hasn't received the call event yet
+                updateCallStatus("WAITING...", "var(--accent)");
+                setTimeout(triggerAnswer, 1000);
                 return;
             }
 
@@ -385,7 +417,6 @@
             currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
 
             try {
-                // Pre-check for local stream
                 if(!localStream) {
                     localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 }
@@ -396,6 +427,7 @@
                 setupCallEvents(incomingCallRef, uData.name, uData.photoURL, uData.verified);
                 
                 rdb.ref(`calls_status/${myUid}`).set('connected');
+                rdb.ref(`calls_status/${callerId}`).set('connected');
             } catch(e) { 
                 console.error("Answer error:", e);
                 hangUp(); 
@@ -598,10 +630,9 @@
 
         function updateCallStatus(text, color) {
             const el = document.getElementById('call-status');
-            el.innerText = text; el.style.color = color;
+            if (el) { el.innerText = text; el.style.color = color; }
         }
 
-        // Security: Prevent Inspections
         document.addEventListener('keydown', e => {
             if (e.ctrlKey && ['c', 'v', 'u', 's', 'a', 'p'].includes(e.key)) e.preventDefault();
             if (e.key === 'F12') e.preventDefault();
