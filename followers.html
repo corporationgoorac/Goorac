@@ -27,11 +27,10 @@
             color: var(--text);
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
-            padding-top: 110px; /* Increased for search bar */
-            padding-bottom: 70px; /* Navbar space */
+            padding-top: 110px;
+            padding-bottom: 70px;
         }
 
-        /* Header */
         .header {
             position: fixed;
             top: 0; width: 100%;
@@ -59,7 +58,6 @@
 
         .header h1 { font-size: 1rem; font-weight: 600; flex-grow: 1; text-align: center; margin-right: 30px; }
 
-        /* Search Bar */
         .search-container {
             padding: 10px 15px;
             background: var(--bg);
@@ -76,7 +74,6 @@
             font-size: 0.9rem;
         }
 
-        /* Follower List */
         .list-container {
             padding: 10px 15px;
             max-width: 600px;
@@ -88,7 +85,6 @@
             color: var(--dim);
             margin: 15px 0 10px 0;
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         .user-item {
@@ -192,7 +188,6 @@
         try {
             let targetUID = currentUser.uid;
 
-            // Resolve target user
             if (targetUsername) {
                 const userQuery = await db.collection("users").where("username", "==", targetUsername).get();
                 if (userQuery.empty) {
@@ -210,32 +205,31 @@
                 document.getElementById('header-title').innerText = `Your Followers`;
             }
 
-            // Mutual lock logic for viewing others' lists
+            // Mutual Check Logic
             if (!globalIsOwnProfile) {
                 const [myDoc, targetDoc] = await Promise.all([
                     db.collection("users").doc(currentUser.uid).get(),
                     db.collection("users").doc(targetUID).get()
                 ]);
                 
-                const myData = myDoc.data();
-                const targetData = targetDoc.data();
+                const myData = myDoc.data() || {};
+                const targetData = targetDoc.data() || {};
 
-                const iFollowThem = myData.following && myData.following.includes(targetUID);
-                const theyFollowMe = targetData.following && targetData.following.includes(currentUser.uid);
+                const iFollowThem = (myData.following || []).includes(targetUID);
+                const theyFollowMe = (targetData.following || []).includes(currentUser.uid);
 
                 if (!(iFollowThem && theyFollowMe)) {
                     contentDiv.innerHTML = `
                         <div class="mutual-lock">
                             <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
                             <p>This list is only visible to mutual followers.</p>
-                            <p style="font-size: 0.8rem;">Follow @${targetUsername} and wait for them to follow you back.</p>
                         </div>`;
                     loadingDiv.style.display = 'none';
                     return;
                 }
             }
 
-            // Real-time listener
+            // High Performance Listener
             db.collection("users").doc(targetUID).onSnapshot(async (doc) => {
                 if(!doc.exists) {
                     loadingDiv.style.display = 'none';
@@ -253,19 +247,20 @@
                 fetchSuggestions(currentUser.uid, followerIDs);
             }, (error) => {
                 console.error("Snapshot error:", error);
-                loadingDiv.innerText = "Access Denied.";
+                loadingDiv.style.display = 'none'; // Clear loading even on error
             });
 
         } catch (error) {
-            console.error("Error loading followers:", error);
+            console.error("Initialization error:", error);
             loadingDiv.innerText = "Error syncing data.";
+            setTimeout(() => loadingDiv.style.display = 'none', 2000);
         }
     }
 
     async function loadAndStoreFollowers(uids, isOwnProfile) {
         const loadingDiv = document.getElementById('loading');
         try {
-            // High-speed parallel fetching of profile data
+            // Parallel Fetch with individual existence check
             const snapshots = await Promise.all(uids.map(uid => db.collection("users").doc(uid).get()));
             
             allFollowersData = snapshots
@@ -276,18 +271,13 @@
         } catch (e) {
             console.error("Batch load error:", e);
         } finally {
-            loadingDiv.style.display = 'none';
+            loadingDiv.style.display = 'none'; // CRITICAL: This hides the "Synchronizing" text
         }
     }
 
     function renderUserList(users, containerId, isOwnProfile) {
         const container = document.getElementById(containerId);
         container.innerHTML = "";
-
-        if (users.length === 0 && containerId === 'followers-list') {
-            container.innerHTML = "<div class='mutual-lock'>No users found.</div>";
-            return;
-        }
 
         users.forEach(u => {
             const userEl = document.createElement('div');
@@ -314,45 +304,41 @@
             (u.username && u.username.toLowerCase().includes(query)) || 
             (u.name && u.name.toLowerCase().includes(query))
         );
-        
         renderUserList(filtered, 'followers-list', globalIsOwnProfile);
         document.getElementById('suggestions-section').style.display = query.length > 0 ? 'none' : 'block';
     }
 
     async function fetchSuggestions(myUid, existingFollowerIDs) {
-        const sugSection = document.getElementById('suggestions-section');
-        const usersSnap = await db.collection("users").limit(15).get();
-        const suggestions = [];
-        
-        usersSnap.forEach(doc => {
-            const data = doc.data();
-            if (doc.id !== myUid && !existingFollowerIDs.includes(doc.id)) {
-                suggestions.push({ ...data, uid: doc.id });
-            }
-        });
+        try {
+            const sugSection = document.getElementById('suggestions-section');
+            const usersSnap = await db.collection("users").limit(10).get();
+            const suggestions = [];
+            
+            usersSnap.forEach(doc => {
+                if (doc.id !== myUid && !existingFollowerIDs.includes(doc.id)) {
+                    suggestions.push({ ...doc.data(), uid: doc.id });
+                }
+            });
 
-        if (suggestions.length > 0) {
-            sugSection.style.display = 'block';
-            renderUserList(suggestions.slice(0, 5), 'suggestions-list', false);
-        }
+            if (suggestions.length > 0) {
+                sugSection.style.display = 'block';
+                renderUserList(suggestions.slice(0, 5), 'suggestions-list', false);
+            }
+        } catch(e) { console.warn("Suggestions failed", e); }
     }
 
     async function removeFollower(followerUID) {
         if (!confirm("Remove this follower?")) return;
-        
         const myUID = auth.currentUser.uid;
         const batch = db.batch();
-
         batch.update(db.collection("users").doc(myUID), {
             followers: firebase.firestore.FieldValue.arrayRemove(followerUID),
             followerCount: firebase.firestore.FieldValue.increment(-1)
         });
-
         batch.update(db.collection("users").doc(followerUID), {
             following: firebase.firestore.FieldValue.arrayRemove(myUID),
             followingCount: firebase.firestore.FieldValue.increment(-1)
         });
-
         await batch.commit();
     }
 </script>
