@@ -181,6 +181,34 @@
 
     <script>
         /* -------------------------------------------------------------------------- */
+        /* CONFIG & GLOBALS                                                           */
+        /* -------------------------------------------------------------------------- */
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            storageBucket: "goorac-c3b59.firebasestorage.app",
+            messagingSenderId: "746746595332",
+            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const rdb = firebase.database();
+        const auth = firebase.auth();
+
+        let myUid, myData, peer, currentCall, localStream, timerInterval;
+        let isCaller = false;
+        let isLogged = false; 
+        let secondsElapsed = 0;
+        let activeTab = 'recent';
+        let isCamOn = false;
+        let currentActiveTarget = null;
+        let incomingCallRef = null;
+        let isAnswering = false; // Flag to prevent duplicate answering
+
+        /* -------------------------------------------------------------------------- */
         /* CUSTOM ELEMENT: CALL NOTIFIER                                              */
         /* -------------------------------------------------------------------------- */
         class CallNotifier extends HTMLElement {
@@ -220,6 +248,7 @@
             }
             show(name, pfp, onAccept, onDecline) {
                 const b = this.querySelector('#notif-banner');
+                if(!b) return;
                 this.querySelector('#nb-user').innerText = name;
                 this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
                 b.classList.add('active');
@@ -235,32 +264,8 @@
         customElements.define('call-notifier', CallNotifier);
 
         /* -------------------------------------------------------------------------- */
-        /* FIREBASE & PEER INITIALIZATION                                             */
+        /* AUTH & INITIALIZATION                                                      */
         /* -------------------------------------------------------------------------- */
-        const firebaseConfig = {
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-            authDomain: "goorac-c3b59.firebaseapp.com",
-            projectId: "goorac-c3b59",
-            storageBucket: "goorac-c3b59.firebasestorage.app",
-            messagingSenderId: "746746595332",
-            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const rdb = firebase.database();
-        const auth = firebase.auth();
-
-        let myUid, myData, peer, currentCall, localStream, timerInterval;
-        let isCaller = false;
-        let isLogged = false; 
-        let secondsElapsed = 0;
-        let activeTab = 'recent';
-        let isCamOn = false;
-        let currentActiveTarget = null;
-        let incomingCallRef = null;
-
         auth.onAuthStateChanged(async user => {
             if (user) {
                 myUid = user.uid;
@@ -270,12 +275,18 @@
                 peer = new Peer(myUid, { host: '0.peerjs.com', secure: true, port: 443, debug: 1 });
                 
                 peer.on('open', () => {
-                    checkAutoAnswer(); // Check for redirect answers
+                    console.log("Peer ID:", myUid);
+                    checkAutoAnswer();
                 });
 
                 peer.on('call', (call) => {
-                    incomingCallRef = call; 
-                    handleIncomingCall(call);
+                    console.log("Incoming call from:", call.peer);
+                    incomingCallRef = call;
+                    if(isAnswering) {
+                        triggerAnswer(); // Auto-answer if we already clicked the button
+                    } else {
+                        handleIncomingCall(call);
+                    }
                 });
                 
                 loadData();
@@ -283,23 +294,11 @@
             } else { window.location.href = 'login.html'; }
         });
 
-        /* -------------------------------------------------------------------------- */
-        /* AUTO ANSWER LOGIC (FOR REDIRECTS)                                         */
-        /* -------------------------------------------------------------------------- */
         async function checkAutoAnswer() {
             const params = new URLSearchParams(window.location.search);
-            const autoAnswer = params.get('autoAnswer');
-            const targetUid = params.get('targetUid');
-
-            if (autoAnswer === 'true' && targetUid) {
-                // Remove params from URL without refreshing
-                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.pushState({path:newurl},'',newurl);
-
-                // Start answering process
-                // In a redirect scenario, the actual 'call' object from PeerJS 
-                // might take a second to arrive via the 'call' event listener
-                updateCallStatus("PREPARING...", "var(--accent)");
+            if (params.get('autoAnswer') === 'true') {
+                isAnswering = true;
+                showCallUI("Loading...", "", "PREPARING...", false);
             }
         }
 
@@ -309,7 +308,6 @@
         function listenForSignaling() {
             rdb.ref(`calls_status/${myUid}`).on('value', async snap => {
                 const callData = snap.val();
-                
                 if (!callData) return;
 
                 if (callData === 'declined' || callData === 'ended') {
@@ -318,7 +316,8 @@
                     return;
                 }
 
-                if (callData.status === 'ringing' && !currentCall) {
+                // Handle incoming ringing state
+                if (callData.status === 'ringing' && !currentCall && !isAnswering) {
                     const callerId = callData.callerId;
                     const uDoc = await db.collection("users").doc(callerId).get();
                     const uData = uDoc.data() || {};
@@ -327,10 +326,10 @@
                     document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                         () => triggerAnswer(), 
                         () => {
-                            document.getElementById('ringtone').pause();
                             rdb.ref(`calls_status/${callerId}`).set('declined');
                             rdb.ref(`calls_status/${myUid}`).remove();
                             if(incomingCallRef) incomingCallRef.close();
+                            document.getElementById('ringtone').pause();
                         }
                     );
                 }
@@ -338,7 +337,7 @@
         }
 
         /* -------------------------------------------------------------------------- */
-        /* CALL HANDLING LOGIC                                                        */
+        /* CALL LOGIC                                                                 */
         /* -------------------------------------------------------------------------- */
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCall) return;
@@ -351,9 +350,7 @@
             document.getElementById('dialtone').play().catch(()=>{});
 
             try {
-                if(!localStream) {
-                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-                }
+                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
 
@@ -365,52 +362,38 @@
 
                 const call = peer.call(targetUid, localStream);
                 setupCallEvents(call, name, pfp, isVerified);
-                
             } catch (e) { 
-                console.error("Stream error:", e);
-                alert("Please enable camera/mic permissions.");
+                alert("Camera/Mic access denied.");
                 hangUp(); 
             }
         }
 
         function handleIncomingCall(incoming) {
-            incomingCallRef = incoming;
             const callerId = incoming.peer;
-            
             db.collection("users").doc(callerId).get().then(uDoc => {
                 const uData = uDoc.data() || {};
-                
-                // If this page was loaded via a 'Answer' click on another page
-                const params = new URLSearchParams(window.location.search);
-                if (params.get('autoAnswer') === 'true') {
-                    triggerAnswer();
-                    return;
-                }
-
                 document.getElementById('ringtone').play().catch(()=>{});
                 document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                     () => triggerAnswer(), 
                     () => {
-                        document.getElementById('ringtone').pause();
                         incoming.close();
                         rdb.ref(`calls_status/${callerId}`).set('declined');
+                        document.getElementById('ringtone').pause();
                     }
                 );
             });
         }
 
         async function triggerAnswer() {
+            isAnswering = true;
+            document.getElementById('ringtone').pause();
+            
+            // If the peer object hasn't arrived yet, show UI and wait
             if (!incomingCallRef) {
-                // Wait briefly if PeerJS hasn't received the call event yet
-                updateCallStatus("WAITING...", "var(--accent)");
-                setTimeout(triggerAnswer, 1000);
-                return;
+                showCallUI("Waiting...", "", "CONNECTING...", false);
+                return; 
             }
 
-            document.getElementById('ringtone').pause();
-            isCaller = false;
-            isLogged = true; 
-            
             const callerId = incomingCallRef.peer;
             const uDoc = await db.collection("users").doc(callerId).get();
             const uData = uDoc.data() || {};
@@ -429,7 +412,7 @@
                 rdb.ref(`calls_status/${myUid}`).set('connected');
                 rdb.ref(`calls_status/${callerId}`).set('connected');
             } catch(e) { 
-                console.error("Answer error:", e);
+                console.error(e);
                 hangUp(); 
             }
         }
@@ -450,21 +433,17 @@
             });
 
             call.on('close', () => executeHangupSequence(false));
-            call.on('error', (err) => {
-                console.error("Peer Error:", err);
-                executeHangupSequence(false);
-            });
+            call.on('error', () => executeHangupSequence(false));
         }
 
-        async function hangUp() {
+        function hangUp() {
             executeHangupSequence(true);
         }
 
         async function executeHangupSequence(notifyRemote) {
             if (isCaller && !isLogged) {
                 isLogged = true; 
-                const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
-                await logCall(status);
+                await logCall(secondsElapsed > 0 ? 'completed' : 'cancelled');
             }
 
             if (notifyRemote && currentActiveTarget) {
@@ -472,29 +451,18 @@
                 rdb.ref(`calls_status/${myUid}`).remove();
             }
 
-            if (currentCall) {
-                currentCall.close();
-                currentCall = null;
-            }
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-                localStream = null;
-            }
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+            if (currentCall) currentCall.close();
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
             
             document.getElementById('ringtone').pause();
             document.getElementById('dialtone').pause();
             document.getElementById('call-screen').style.display = 'none';
             
-            incomingCallRef = null;
-            setTimeout(() => window.location.reload(), 600);
+            setTimeout(() => window.location.reload(), 500);
         }
 
         /* -------------------------------------------------------------------------- */
-        /* UI RENDERING & DATA                                                        */
+        /* UI HELPERS                                                                 */
         /* -------------------------------------------------------------------------- */
         function switchTab(tab) {
             activeTab = tab;
@@ -505,96 +473,78 @@
 
         async function loadData() {
             showSkeleton();
-            if (activeTab === 'recent') await loadRecent(); else await loadContacts();
+            activeTab === 'recent' ? loadRecent() : loadContacts();
         }
 
         async function loadRecent() {
-            const snapshot = await db.collection("call_logs")
-                .where('participants', 'array-contains', myUid)
-                .orderBy('timestamp', 'desc').limit(10).get();
-            
+            const snap = await db.collection("call_logs").where('participants', 'array-contains', myUid).orderBy('timestamp', 'desc').limit(15).get();
             let html = "";
-            snapshot.forEach(doc => {
+            snap.forEach(doc => {
                 const call = doc.data();
-                const isOutgoing = call.callerId === myUid;
-                const otherUid = isOutgoing ? call.receiverId : call.callerId;
-                const name = isOutgoing ? call.receiverName : call.callerName;
-                const pfp = isOutgoing ? call.receiverPfp : call.callerPfp;
-                const time = new Date(call.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                const statusClass = (call.status === 'missed' || call.status === 'cancelled') ? 'status-missed' : (isOutgoing ? 'status-outgoing' : 'status-incoming');
-
-                html += `
-                    <div class="call-item">
-                        <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
-                        <div class="call-info">
-                            <div class="u-name">${name}</div>
-                            <div class="call-meta ${statusClass}">${isOutgoing ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'} • ${time}</div>
-                        </div>
-                        <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
-                    </div>`;
+                const isOut = call.callerId === myUid;
+                const otherUid = isOut ? call.receiverId : call.callerId;
+                const name = isOut ? call.receiverName : call.callerName;
+                const pfp = isOut ? call.receiverPfp : call.callerPfp;
+                const statusClass = (call.status === 'missed' || call.status === 'cancelled') ? 'status-missed' : (isOut ? 'status-outgoing' : 'status-incoming');
+                html += `<div class="call-item">
+                    <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
+                    <div class="call-info">
+                        <div class="u-name">${name}</div>
+                        <div class="call-meta ${statusClass}">${isOut ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'}</div>
+                    </div>
+                    <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
+                </div>`;
             });
-            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No call history</p>";
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center;margin-top:20px;opacity:0.5;'>No history</p>";
         }
 
         async function loadContacts() {
             const following = myData.following || [];
-            if (following.length === 0) {
-                document.getElementById('list-container').innerHTML = "<p style='text-align:center; padding:40px; opacity:0.5;'>No mutual contacts</p>";
-                return;
-            }
-
             let html = "";
             for (let uid of following) {
                 const uDoc = await db.collection("users").doc(uid).get();
                 const u = uDoc.data();
                 if (u && u.following && u.following.includes(myUid)) {
-                    html += `
-                        <div class="call-item">
-                            <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
-                            <div class="call-info">
-                                <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
-                                <div class="call-meta">@${u.username || 'user'}</div>
-                            </div>
-                            <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
-                        </div>`;
+                    html += `<div class="call-item">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
+                        <div class="call-info">
+                            <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                            <div class="call-meta">@${u.username || 'user'}</div>
+                        </div>
+                        <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
+                    </div>`;
                 }
             }
-            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center;margin-top:20px;opacity:0.5;'>No mutual contacts</p>";
         }
 
         function showSkeleton() {
             let html = '';
-            for(let i=0; i<6; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
+            for(let i=0; i<5; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
             document.getElementById('list-container').innerHTML = html;
         }
 
-        /* -------------------------------------------------------------------------- */
-        /* CALL CONTROLS & UTILS                                                      */
-        /* -------------------------------------------------------------------------- */
         function startTimer() {
-            secondsElapsed = 0;
-            const timerEl = document.getElementById('call-timer');
-            timerEl.style.display = 'block';
+            const el = document.getElementById('call-timer');
+            el.style.display = 'block';
             timerInterval = setInterval(() => {
                 secondsElapsed++;
-                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-                const secs = String(secondsElapsed % 60).padStart(2, '0');
-                timerEl.innerText = `${mins}:${secs}`;
+                const m = String(Math.floor(secondsElapsed/60)).padStart(2,'0');
+                const s = String(secondsElapsed%60).padStart(2,'0');
+                el.innerText = `${m}:${s}`;
             }, 1000);
         }
 
         async function logCall(status) {
             if(!currentActiveTarget) return;
-            const durationStr = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
-            try {
-                await db.collection("call_logs").add({
-                    participants: [myUid, currentActiveTarget.uid],
-                    callerId: myUid, receiverId: currentActiveTarget.uid,
-                    callerName: myData.name || "User", receiverName: currentActiveTarget.name,
-                    callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
-                    duration: durationStr, status: status, timestamp: Date.now()
-                });
-            } catch(e) { console.error("Log failed", e); }
+            await db.collection("call_logs").add({
+                participants: [myUid, currentActiveTarget.uid],
+                callerId: myUid, receiverId: currentActiveTarget.uid,
+                callerName: myData.name || "User", receiverName: currentActiveTarget.name,
+                callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
+                duration: Math.floor(secondsElapsed/60) + "m " + (secondsElapsed%60) + "s",
+                status: status, timestamp: Date.now()
+            });
         }
 
         function toggleMic() {
@@ -624,7 +574,7 @@
         function showCallUI(name, pfp, status, verified) {
             document.getElementById('call-screen').style.display = 'flex';
             document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
-            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
+            if(pfp) document.getElementById('target-pfp').src = pfp;
             updateCallStatus(status, "var(--accent)");
         }
 
