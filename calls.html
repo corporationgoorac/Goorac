@@ -271,7 +271,7 @@
         let secondsElapsed = 0;
         let currentActiveTarget = null; 
         let activeTab = 'recent';
-        let isCamOn = false;
+        let isCamOn = true; // Video call by default
         let cachedList = []; 
         let isLoggingInProgress = false;
         let remoteCandidatesQueue = [];
@@ -453,6 +453,7 @@
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             currentCallId = "call_" + Date.now() + "_" + myUid;
             remoteCandidatesQueue = [];
+            isCamOn = true; 
             
             showCallUI(name, pfp, "DIALING...", isVerified);
             document.getElementById('dialtone').play().catch(() => {});
@@ -460,6 +461,8 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('local-video').style.display = 'block';
+                document.getElementById('pfp-area').style.display = 'none';
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -574,6 +577,7 @@
             document.getElementById('hangup-btn').style.transform = 'none';
             updateCallStatus("CONNECTING...", "var(--accent)");
             remoteCandidatesQueue = [];
+            isCamOn = true;
 
             try {
                 const snap = await rdb.ref(`calls/${currentCallId}`).get();
@@ -581,6 +585,8 @@
 
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('local-video').style.display = 'block';
+                document.getElementById('pfp-area').style.display = 'none';
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
