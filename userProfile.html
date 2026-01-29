@@ -143,7 +143,7 @@
 
         <div class="actions">
             <button class="btn btn-msg skeleton" id="msg-btn">Message</button>
-            <button class="btn btn-f skeleton" id="follow-action-btn">Follow</button>
+            <button class="btn btn-f skeleton" id="follow-action-btn" style="visibility: hidden;">Follow</button>
         </div>
     </div>
 </div>
@@ -168,9 +168,8 @@
     const targetUsername = params.get('user');
     let currentUserUID = "";
     let targetUserUID = "";
-    let isProcessing = false; // Lock to prevent multiple clicks
+    let isActionLocked = false; 
 
-    // Show app immediately to reveal skeletons
     document.getElementById('main').classList.add('show');
     document.getElementById('loader').style.opacity = '0';
     setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
@@ -195,7 +194,6 @@
 
             const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
 
-            // Image Loading Logic
             const pfp = document.getElementById('pfp');
             const pfpWrap = document.getElementById('pfp-wrap');
             pfp.src = userData.photoURL || 'https://via.placeholder.com/150';
@@ -204,7 +202,6 @@
                 pfp.style.opacity = '1';
             };
 
-            // Text Data Logic
             const nameEl = document.getElementById('d-name');
             nameEl.innerText = userData.name || userData.username;
             nameEl.classList.remove('skeleton');
@@ -221,30 +218,32 @@
             bioEl.innerText = userData.bio || "No bio available.";
             bioEl.classList.remove('skeleton');
 
-            const fers = document.getElementById('c-followers');
-            fers.innerText = userData.followerCount || 0;
-            fers.classList.remove('skeleton');
+            // Prevent Background update from overriding the button while user is clicking
+            if (!isActionLocked) {
+                const fers = document.getElementById('c-followers');
+                fers.innerText = userData.followerCount || 0;
+                fers.classList.remove('skeleton');
 
-            const fing = document.getElementById('c-following');
-            fing.innerText = userData.followingCount || 0;
-            fing.classList.remove('skeleton');
+                const fing = document.getElementById('c-following');
+                fing.innerText = userData.followingCount || 0;
+                fing.classList.remove('skeleton');
+                
+                await updateFollowButton();
+            }
 
             document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
 
-            // Buttons Logic
             removeSkeleton('msg-btn');
             removeSkeleton('follow-action-btn');
 
             document.getElementById('go-followers').onclick = () => window.location.href = `followers.html?user=${userData.username}`;
             document.getElementById('go-following').onclick = () => window.location.href = `following.html?user=${userData.username}`;
             document.getElementById('msg-btn').onclick = () => window.location.href = `chat.html?user=${userData.username}`;
-
-            await updateFollowButton();
         });
     }
 
     async function updateFollowButton() {
-        if (currentUserUID === targetUserUID) {
+        if (currentUserUID === targetUserUID || !targetUserUID) {
             document.getElementById('follow-action-btn').style.display = "none";
             return;
         }
@@ -252,6 +251,8 @@
         const myDoc = await db.collection("users").doc(currentUserUID).get();
         const myFollowingList = myDoc.data().following || [];
         const btn = document.getElementById('follow-action-btn');
+
+        btn.style.visibility = "visible"; // Show only after logic is ready
 
         if (myFollowingList.includes(targetUserUID)) {
             btn.innerText = "Following";
@@ -262,58 +263,65 @@
         }
     }
 
-    document.getElementById('follow-action-btn').onclick = async function(e) {
-        if (isProcessing) return; // Ignore multiple clicks
+    document.getElementById('follow-action-btn').onclick = async function() {
+        if (isActionLocked || !targetUserUID || currentUserUID === targetUserUID) return;
         
         const btn = this;
-        if(btn.classList.contains('skeleton')) return;
-        
         const isCurrentlyFollowing = btn.innerText === "Following";
-        
-        // --- Optimistic UI Update (Makes it feel instant) ---
-        isProcessing = true;
-        btn.disabled = true; // Disable physically
-        
+        const followersCountLabel = document.getElementById('c-followers');
+        let currentCount = parseInt(followersCountLabel.innerText);
+
+        // LOCK UI
+        isActionLocked = true;
+        btn.disabled = true;
+
+        // OPTIMISTIC UPDATE (Change UI before server responds)
         if (!isCurrentlyFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
+            followersCountLabel.innerText = currentCount + 1;
         } else {
             btn.innerText = "Follow";
             btn.className = "btn btn-f";
+            followersCountLabel.innerText = Math.max(0, currentCount - 1);
         }
 
         try {
+            const batch = db.batch();
+            const myRef = db.collection("users").doc(currentUserUID);
+            const targetRef = db.collection("users").doc(targetUserUID);
+
             if (!isCurrentlyFollowing) {
-                // Perform database updates
-                const batch = db.batch();
-                batch.update(db.collection("users").doc(currentUserUID), {
+                batch.update(myRef, {
                     following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
                     followingCount: firebase.firestore.FieldValue.increment(1)
                 });
-                batch.update(db.collection("users").doc(targetUserUID), {
+                batch.update(targetRef, {
                     followers: firebase.firestore.FieldValue.arrayUnion(currentUserUID),
                     followerCount: firebase.firestore.FieldValue.increment(1)
                 });
-                await batch.commit();
             } else {
-                const batch = db.batch();
-                batch.update(db.collection("users").doc(currentUserUID), {
+                batch.update(myRef, {
                     following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
                     followingCount: firebase.firestore.FieldValue.increment(-1)
                 });
-                batch.update(db.collection("users").doc(targetUserUID), {
+                batch.update(targetRef, {
                     followers: firebase.firestore.FieldValue.arrayRemove(currentUserUID),
                     followerCount: firebase.firestore.FieldValue.increment(-1)
                 });
-                await batch.commit();
             }
+
+            await batch.commit();
         } catch (err) {
-            console.error("Action failed", err);
-            // Revert UI if database failed
+            console.error("Transaction failed", err);
+            // Revert on error
             await updateFollowButton();
         } finally {
-            isProcessing = false;
-            btn.disabled = false;
+            // RELEASE LOCK
+            setTimeout(() => {
+                isActionLocked = false;
+                btn.disabled = false;
+            }, 500); // Small cooldown
         }
     };
 
