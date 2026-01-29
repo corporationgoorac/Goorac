@@ -252,7 +252,7 @@
         const rdb = firebase.database();
         const auth = firebase.auth();
 
-        let myUid, myData, peer, currentCall, localStream, timerInterval;
+        let myUid, myData, peer, currentCall, localStream, timerInterval, connectionRetry;
         let isCaller = false;
         let isLogged = false; 
         let secondsElapsed = 0;
@@ -260,7 +260,7 @@
         let isCamOn = false;
         let currentActiveTarget = null;
         let incomingCallRef = null;
-        let pendingAutoAnswer = false; // Flag for late arrivals
+        let pendingAutoAnswer = false; 
 
         auth.onAuthStateChanged(async user => {
             if (user) {
@@ -298,8 +298,13 @@
 
             if (autoAnswer === 'true' && targetUid) {
                 pendingAutoAnswer = true;
-                showCallUI("Loading...", "", "PREPARING...", false);
                 
+                // Fetch details so screen isn't blank
+                db.collection("users").doc(targetUid).get().then(doc => {
+                    const d = doc.data();
+                    showCallUI(d.name || "User", d.photoURL, "CONNECTING...", d.verified);
+                });
+
                 // Clear URL
                 const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.history.pushState({path:newurl},'',newurl);
@@ -369,8 +374,27 @@
                     timestamp: Date.now()
                 });
 
-                const call = peer.call(targetUid, localStream);
-                setupCallEvents(call, name, pfp, isVerified);
+                // RETRY LOOP: Keeps trying to connect in case user reloads page to answer
+                let attempts = 0;
+                const connect = () => {
+                    if (currentCall || attempts > 20) return; // Stop if connected or timeout
+                    const call = peer.call(targetUid, localStream);
+                    
+                    // Listen to this specific attempt
+                    call.on('stream', (rs) => {
+                        clearInterval(connectionRetry); // Stop retrying
+                        handleStream(call, rs); 
+                    });
+                    
+                    // Cleanup failed attempts silently
+                    call.on('close', () => { if(!currentCall) call.close(); });
+                    call.on('error', () => { });
+                    
+                    attempts++;
+                };
+
+                connect(); // First attempt
+                connectionRetry = setInterval(connect, 750); // Retry every 750ms
                 
             } catch (e) { 
                 console.error("Stream error:", e);
@@ -383,6 +407,11 @@
             incomingCallRef = incoming;
             const callerId = incoming.peer;
             
+            if(pendingAutoAnswer) {
+                triggerAnswer();
+                return;
+            }
+
             db.collection("users").doc(callerId).get().then(uDoc => {
                 const uData = uDoc.data() || {};
                 document.getElementById('ringtone').play().catch(()=>{});
@@ -399,7 +428,8 @@
 
         async function triggerAnswer() {
             if (!incomingCallRef) {
-                updateCallStatus("WAITING FOR SIGNAL...", "var(--accent)");
+                // If answer triggered but stream not yet arrived, wait.
+                updateCallStatus("WAITING FOR STREAM...", "var(--accent)");
                 pendingAutoAnswer = true;
                 return;
             }
@@ -410,9 +440,11 @@
             pendingAutoAnswer = false;
             
             const callerId = incomingCallRef.peer;
-            const uDoc = await db.collection("users").doc(callerId).get();
-            const uData = uDoc.data() || {};
-            currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
+            if(!currentActiveTarget) {
+                const uDoc = await db.collection("users").doc(callerId).get();
+                const uData = uDoc.data() || {};
+                currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
+            }
 
             try {
                 if(!localStream) {
@@ -422,7 +454,9 @@
                 localStream.getVideoTracks()[0].enabled = false;
                 
                 incomingCallRef.answer(localStream);
-                setupCallEvents(incomingCallRef, uData.name, uData.photoURL, uData.verified);
+                
+                incomingCallRef.on('stream', (rs) => handleStream(incomingCallRef, rs));
+                incomingCallRef.on('close', () => executeHangupSequence(false));
                 
                 rdb.ref(`calls_status/${myUid}`).set('connected');
                 rdb.ref(`calls_status/${callerId}`).set('connected');
@@ -432,21 +466,24 @@
             }
         }
 
-        function setupCallEvents(call, name, pfp, isVerified) {
+        function handleStream(call, remoteStream) {
+            if(currentCall) return; // Prevent double binding
             currentCall = call;
-            showCallUI(name, pfp, "CONNECTING...", isVerified);
+            
+            if(connectionRetry) clearInterval(connectionRetry);
+            
+            document.getElementById('dialtone').pause();
+            document.getElementById('ringtone').pause();
+            
+            const rv = document.getElementById('remote-video');
+            rv.srcObject = remoteStream;
+            rv.style.display = 'block';
+            
+            updateCallStatus("CONNECTED", "var(--success)");
+            document.getElementById('ring-animation').style.display = 'none';
+            if (!timerInterval) startTimer();
 
-            call.on('stream', (remoteStream) => {
-                document.getElementById('dialtone').pause();
-                document.getElementById('ringtone').pause();
-                const rv = document.getElementById('remote-video');
-                rv.srcObject = remoteStream;
-                rv.style.display = 'block';
-                updateCallStatus("CONNECTED", "var(--success)");
-                document.getElementById('ring-animation').style.display = 'none';
-                if (!timerInterval) startTimer();
-            });
-
+            // Set global close handler
             call.on('close', () => executeHangupSequence(false));
             call.on('error', (err) => {
                 console.error("Peer Error:", err);
@@ -474,6 +511,8 @@
                 currentCall.close();
                 currentCall = null;
             }
+            if(connectionRetry) clearInterval(connectionRetry);
+            
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
                 localStream = null;
