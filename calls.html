@@ -23,15 +23,19 @@
             --ig-blue: #0095f6;
         }
 
-        /* Full layout and Anti-Copy preservation */
+        /* Anti-Copy & Layout Preservation */
         body {
             background: #000; color: white; margin: 0;
             font-family: -apple-system, system-ui, sans-serif;
             height: 100vh; overflow: hidden;
             display: flex; flex-direction: column;
             -webkit-user-select: none;
+            -ms-user-select: none;
             user-select: none;
+            -webkit-touch-callout: none;
         }
+
+        input { -webkit-user-select: text; user-select: text; }
 
         header { padding: 15px 20px; border-bottom: 1px solid var(--border); background: #000; }
         .header-logo { font-weight: 900; font-size: 1.4rem; color: var(--accent); }
@@ -48,13 +52,21 @@
 
         #list-container { flex: 1; overflow-y: auto; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
 
-        /* Preserved Skeleton Loading */
+        /* Skeleton Loading Styles */
+        .skeleton {
+            background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .skeleton-item { display: flex; align-items: center; padding: 15px 20px; gap: 15px; }
-        .sk-pfp { width: 50px; height: 50px; border-radius: 50%; background: #222; }
-        .sk-text { height: 12px; width: 60%; background: #222; margin-bottom: 8px; }
+        .sk-pfp { width: 50px; height: 50px; border-radius: 50%; }
+        .sk-text { height: 12px; width: 60%; margin-bottom: 8px; }
 
+        /* List Item Styles */
         .call-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .call-pfp { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; }
+        .call-pfp { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 1.5px solid var(--border); }
         .call-info { flex: 1; }
         .u-name { font-weight: 700; display: flex; align-items: center; gap: 4px; }
         
@@ -66,10 +78,9 @@
         }
 
         .call-meta { font-size: 0.75rem; color: var(--text-dim); }
-        .status-missed { color: var(--danger); font-weight: bold; }
         .btn-call { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0, 210, 255, 0.1); color: var(--accent); cursor: pointer; }
 
-        /* Full Call Screen Preservation */
+        /* Full Call Screen */
         #call-screen {
             position: fixed; inset: 0; background: linear-gradient(to bottom, #0b141a, #121b22); 
             z-index: 9999; display: none; flex-direction: column; align-items: center; 
@@ -79,6 +90,7 @@
         #local-video { position: absolute; top: 40px; right: 20px; width: 90px; height: 130px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 10; display: none; background: #000; }
         
         .call-header { z-index: 5; text-align: center; }
+        .call-header h2 { font-size: 1.8rem; margin: 0 0 8px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px; }
         #call-status { font-size: 0.9rem; color: #aebac1; letter-spacing: 1.5px; }
         #call-timer { font-size: 1rem; color: white; margin-top: 5px; display: none; }
         
@@ -96,8 +108,7 @@
             font-size: 1.4rem; display: flex; align-items: center; justify-content: center; 
             cursor: pointer; color: white; background: rgba(255,255,255,0.15); 
         }
-        .btn-end { background: var(--danger) !important; }
-        .btn-accept { background: var(--success) !important; }
+        .btn-end { background: var(--danger) !important; width: 65px; height: 65px; }
         .btn-off { background: rgba(255,255,255,0.5); color: black; }
     </style>
 </head>
@@ -147,7 +158,7 @@
 
     <script>
         /* -------------------------------------------------------------------------- */
-        /* NOTIFIER COMPONENT PRESERVED                      */
+        /* NOTIFIER COMPONENT                                                         */
         /* -------------------------------------------------------------------------- */
         class CallNotifier extends HTMLElement {
             constructor() { super(); }
@@ -161,11 +172,13 @@
                         border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 24px;
                         padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
                         z-index: 100000; transition: top 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+                        box-shadow: 0 15px 40px rgba(0,0,0,0.8);
                     }
                     #notif-banner.active { top: 20px; }
                     .nb-info { display: flex; align-items: center; gap: 12px; color: white; }
                     .nb-pfp { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
                     .nb-text h4 { margin: 0; font-size: 0.95rem; }
+                    .nb-text p { margin: 0; font-size: 0.75rem; color: var(--accent); }
                     .nb-actions { display: flex; gap: 10px; }
                     .nb-btn { border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; }
                     .nb-acc { background: var(--accent); color: black; }
@@ -195,7 +208,7 @@
         customElements.define('call-notifier', CallNotifier);
 
         /* -------------------------------------------------------------------------- */
-        /* FIREBASE CONFIG PRESERVED                         */
+        /* FIREBASE CONFIG                                                            */
         /* -------------------------------------------------------------------------- */
         const firebaseConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
@@ -218,7 +231,7 @@
         let isCamOn = false;
 
         /* -------------------------------------------------------------------------- */
-        /* PEERJS (THE ALTERNATIVE) LOGIC                       */
+        /* PEERJS LOGIC                                                               */
         /* -------------------------------------------------------------------------- */
         
         auth.onAuthStateChanged(async user => {
@@ -227,7 +240,6 @@
                 const doc = await db.collection("users").doc(myUid).get();
                 myData = doc.data() || {};
                 
-                // We use your Firebase UID as the Peer ID for direct mapping
                 peer = new Peer(myUid, {
                     host: '0.peerjs.com',
                     secure: true,
@@ -235,7 +247,6 @@
                     debug: 1
                 });
 
-                // Listening for incoming "Alternative" PeerJS calls
                 peer.on('call', async (incomingCall) => {
                     const callerId = incomingCall.peer;
                     const uDoc = await db.collection("users").doc(callerId).get();
@@ -245,17 +256,17 @@
                     
                     document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                         async () => {
-                            // On Answer
                             document.getElementById('ringtone').pause();
-                            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-                            document.getElementById('local-video').srcObject = localStream;
-                            localStream.getVideoTracks()[0].enabled = false; // default start with cam off like original logic
-                            
-                            incomingCall.answer(localStream);
-                            setupCallHandling(incomingCall, uData.name, uData.photoURL, uData.verified);
+                            try {
+                                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                                document.getElementById('local-video').srcObject = localStream;
+                                localStream.getVideoTracks()[0].enabled = false;
+                                
+                                incomingCall.answer(localStream);
+                                setupCallHandling(incomingCall, uData.name, uData.photoURL, uData.verified);
+                            } catch(e) { console.error(e); hangUp(); }
                         },
                         () => {
-                            // On Decline
                             document.getElementById('ringtone').pause();
                             incomingCall.close();
                             rdb.ref(`calls_status/${callerId}`).set('declined');
@@ -268,7 +279,6 @@
             } else { window.location.href = 'login.html'; }
         });
 
-        // Triggering an Alternative Call
         async function startCall(targetUid, name, pfp, isVerified) {
             isCaller = true;
             secondsElapsed = 0;
@@ -280,15 +290,12 @@
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
 
-                // Instead of RTCPeerConnection Offer/Answer, we use one line:
                 const call = peer.call(targetUid, localStream);
                 setupCallHandling(call, name, pfp, isVerified);
-                
-                // Signal to target via Firebase (preserving your RDB signaling logic)
                 rdb.ref(`calls_status/${targetUid}`).set('ringing');
             } catch (e) { 
                 console.error(e);
-                alert("Media access denied or Peer unavailable."); 
+                alert("Media access denied."); 
                 hangUp(); 
             }
         }
@@ -308,14 +315,11 @@
             });
 
             call.on('close', () => hangUp());
-            call.on('error', (err) => {
-                console.error("PeerJS Error:", err);
-                hangUp();
-            });
+            call.on('error', () => hangUp());
         }
 
         /* -------------------------------------------------------------------------- */
-        /* UI & LOGGING LOGIC PRESERVED                      */
+        /* UI & LOGGING                                                               */
         /* -------------------------------------------------------------------------- */
         
         function listenForStatus() {
@@ -348,8 +352,7 @@
             document.getElementById('dialtone').pause();
             document.getElementById('call-screen').style.display = 'none';
             
-            // Log to Firestore (Preserved Logic)
-            if (isCaller && secondsElapsed > 0) {
+            if (isCaller && secondsElapsed > 0 && currentCall) {
                 await db.collection("call_logs").add({
                     participants: [myUid, currentCall.peer],
                     duration: secondsElapsed + "s",
@@ -381,13 +384,13 @@
         }
 
         /* -------------------------------------------------------------------------- */
-        /* LIST RENDERING PRESERVED                          */
+        /* LIST RENDERING                                                             */
         /* -------------------------------------------------------------------------- */
 
         async function loadData() {
             document.getElementById('list-container').innerHTML = `
-                <div class="skeleton-item"><div class="sk-pfp"></div><div class="sk-text"></div></div>
-                <div class="skeleton-item"><div class="sk-pfp"></div><div class="sk-text"></div></div>
+                <div class="skeleton-item"><div class="sk-pfp skeleton"></div><div class="sk-text skeleton"></div></div>
+                <div class="skeleton-item"><div class="sk-pfp skeleton"></div><div class="sk-text skeleton"></div></div>
             `;
             if (activeTab === 'recent') loadRecent(); else loadContacts();
         }
@@ -458,7 +461,7 @@
             loadData();
         }
 
-        // Anti-Copy Key preservation
+        // Key preservation for Anti-Copy
         document.addEventListener('keydown', e => {
             if (e.ctrlKey && (e.key === 'c' || e.key === 'u' || e.key === 's')) e.preventDefault();
         });
