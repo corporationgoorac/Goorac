@@ -254,6 +254,7 @@
 
         let myUid, myData, peer, currentCall, localStream, timerInterval;
         let isCaller = false;
+        let isLogged = false; // Prevents duplicate logs
         let secondsElapsed = 0;
         let activeTab = 'recent';
         let isCamOn = false;
@@ -273,31 +274,40 @@
                 
                 loadData();
                 listenForSignaling();
-                checkDeepLink();
             } else { window.location.href = 'login.html'; }
         });
 
         /* -------------------------------------------------------------------------- */
-        /* SIGNALING & DEEP LINKS                                                     */
+        /* SIGNALING & PERSISTENT RINGING                                             */
         /* -------------------------------------------------------------------------- */
         function listenForSignaling() {
-            // Listen for remote signals (declines/hangups) via RTDB
-            rdb.ref(`calls_status/${myUid}`).on('value', snap => {
-                const status = snap.val();
-                if (status === 'declined' || status === 'ended') {
+            rdb.ref(`calls_status/${myUid}`).on('value', async snap => {
+                const callData = snap.val();
+                
+                if (!callData) return;
+
+                if (callData === 'declined' || callData === 'ended') {
                     rdb.ref(`calls_status/${myUid}`).remove();
                     executeHangupSequence(false);
+                    return;
+                }
+
+                if (callData.status === 'ringing' && !currentCall && !incomingCallRef) {
+                    const callerId = callData.callerId;
+                    const uDoc = await db.collection("users").doc(callerId).get();
+                    const uData = uDoc.data() || {};
+                    
+                    document.getElementById('ringtone').play().catch(()=>{});
+                    document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
+                        () => triggerAnswer(), 
+                        () => {
+                            document.getElementById('ringtone').pause();
+                            rdb.ref(`calls_status/${callerId}`).set('declined');
+                            rdb.ref(`calls_status/${myUid}`).remove();
+                        }
+                    );
                 }
             });
-        }
-
-        async function checkDeepLink() {
-            const params = new URLSearchParams(window.location.search);
-            const callId = params.get('callId');
-            if (callId && params.get('answer') === 'true') {
-                // Auto-trigger if callId is provided
-                console.log("Deep link detected for call:", callId);
-            }
         }
 
         /* -------------------------------------------------------------------------- */
@@ -306,6 +316,7 @@
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCall) return;
             isCaller = true;
+            isLogged = false; // Reset log flag
             secondsElapsed = 0;
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             
@@ -317,9 +328,15 @@
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
 
+                rdb.ref(`calls_status/${targetUid}`).set({
+                    status: 'ringing',
+                    callerId: myUid,
+                    timestamp: Date.now()
+                });
+
                 const call = peer.call(targetUid, localStream);
                 setupCallEvents(call, name, pfp, isVerified);
-                rdb.ref(`calls_status/${targetUid}`).set('ringing');
+                
             } catch (e) { 
                 console.error("Stream error:", e);
                 alert("Please enable camera/mic permissions");
@@ -331,25 +348,31 @@
             incomingCallRef = incoming;
             const callerId = incoming.peer;
             
-            db.collection("users").doc(callerId).get().then(uDoc => {
-                const uData = uDoc.data() || {};
-                document.getElementById('ringtone').play().catch(()=>{});
-                
-                document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
-                    () => triggerAnswer(), 
-                    () => {
-                        document.getElementById('ringtone').pause();
-                        incoming.close();
-                        rdb.ref(`calls_status/${callerId}`).set('declined');
-                    }
-                );
-            });
+            if (!document.querySelector('#notif-banner').classList.contains('active')) {
+                db.collection("users").doc(callerId).get().then(uDoc => {
+                    const uData = uDoc.data() || {};
+                    document.getElementById('ringtone').play().catch(()=>{});
+                    document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
+                        () => triggerAnswer(), 
+                        () => {
+                            document.getElementById('ringtone').pause();
+                            incoming.close();
+                            rdb.ref(`calls_status/${callerId}`).set('declined');
+                        }
+                    );
+                });
+            }
         }
 
         async function triggerAnswer() {
-            if (!incomingCallRef) return;
+            if (!incomingCallRef) {
+                updateCallStatus("CONNECTING...", "var(--accent)");
+                return;
+            }
+
             document.getElementById('ringtone').pause();
             isCaller = false;
+            isLogged = true; // Receiver does not log
             
             const callerId = incomingCallRef.peer;
             const uDoc = await db.collection("users").doc(callerId).get();
@@ -363,6 +386,8 @@
                 
                 incomingCallRef.answer(localStream);
                 setupCallEvents(incomingCallRef, uData.name, uData.photoURL, uData.verified);
+                
+                rdb.ref(`calls_status/${myUid}`).set('connected');
             } catch(e) { hangUp(); }
         }
 
@@ -390,24 +415,35 @@
         }
 
         async function executeHangupSequence(notifyRemote) {
-            if (notifyRemote && currentActiveTarget) {
-                rdb.ref(`calls_status/${currentActiveTarget.uid}`).set('ended');
+            // Log only if I am the caller and haven't logged yet
+            if (isCaller && !isLogged) {
+                isLogged = true; // Lock logging
+                const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
+                await logCall(status);
             }
 
-            if (currentCall) currentCall.close();
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (timerInterval) clearInterval(timerInterval);
+            if (notifyRemote && currentActiveTarget) {
+                rdb.ref(`calls_status/${currentActiveTarget.uid}`).set('ended');
+                rdb.ref(`calls_status/${myUid}`).remove();
+            }
+
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
             
             document.getElementById('ringtone').pause();
             document.getElementById('dialtone').pause();
             document.getElementById('call-screen').style.display = 'none';
             
-            if (isCaller) {
-                const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
-                await logCall(status);
-            }
-
-            currentCall = null;
             incomingCallRef = null;
             setTimeout(() => window.location.reload(), 600);
         }
@@ -428,9 +464,10 @@
         }
 
         async function loadRecent() {
+            // Optimized: Get only 10 recent calls to prevent read/write limits
             const snapshot = await db.collection("call_logs")
                 .where('participants', 'array-contains', myUid)
-                .orderBy('timestamp', 'desc').limit(20).get();
+                .orderBy('timestamp', 'desc').limit(10).get();
             
             let html = "";
             snapshot.forEach(doc => {
@@ -456,7 +493,6 @@
         }
 
         async function loadContacts() {
-            // Mutual Friends Logic: I follow them AND they follow me
             const following = myData.following || [];
             if (following.length === 0) {
                 document.getElementById('list-container').innerHTML = "<p style='text-align:center; padding:40px; opacity:0.5;'>No mutual contacts</p>";
@@ -518,12 +554,14 @@
         }
 
         function toggleMic() {
+            if(!localStream) return;
             const t = localStream.getAudioTracks()[0];
             t.enabled = !t.enabled;
             document.getElementById('mic-btn').classList.toggle('btn-off', !t.enabled);
         }
 
         function toggleCam() {
+            if(!localStream) return;
             isCamOn = !isCamOn;
             const t = localStream.getVideoTracks()[0];
             t.enabled = isCamOn;
