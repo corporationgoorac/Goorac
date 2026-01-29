@@ -168,6 +168,7 @@
     const targetUsername = params.get('user');
     let currentUserUID = "";
     let targetUserUID = "";
+    let isProcessing = false; // Lock to prevent multiple clicks
 
     // Show app immediately to reveal skeletons
     document.getElementById('main').classList.add('show');
@@ -261,30 +262,58 @@
         }
     }
 
-    document.getElementById('follow-action-btn').onclick = async () => {
-        const btn = document.getElementById('follow-action-btn');
+    document.getElementById('follow-action-btn').onclick = async function(e) {
+        if (isProcessing) return; // Ignore multiple clicks
+        
+        const btn = this;
         if(btn.classList.contains('skeleton')) return;
         
         const isCurrentlyFollowing = btn.innerText === "Following";
-
+        
+        // --- Optimistic UI Update (Makes it feel instant) ---
+        isProcessing = true;
+        btn.disabled = true; // Disable physically
+        
         if (!isCurrentlyFollowing) {
-            await db.collection("users").doc(currentUserUID).update({
-                following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
-                followingCount: firebase.firestore.FieldValue.increment(1)
-            });
-            await db.collection("users").doc(targetUserUID).update({
-                followers: firebase.firestore.FieldValue.arrayUnion(currentUserUID),
-                followerCount: firebase.firestore.FieldValue.increment(1)
-            });
+            btn.innerText = "Following";
+            btn.className = "btn btn-following";
         } else {
-            await db.collection("users").doc(currentUserUID).update({
-                following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
-                followingCount: firebase.firestore.FieldValue.increment(-1)
-            });
-            await db.collection("users").doc(targetUserUID).update({
-                followers: firebase.firestore.FieldValue.arrayRemove(currentUserUID),
-                followerCount: firebase.firestore.FieldValue.increment(-1)
-            });
+            btn.innerText = "Follow";
+            btn.className = "btn btn-f";
+        }
+
+        try {
+            if (!isCurrentlyFollowing) {
+                // Perform database updates
+                const batch = db.batch();
+                batch.update(db.collection("users").doc(currentUserUID), {
+                    following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
+                    followingCount: firebase.firestore.FieldValue.increment(1)
+                });
+                batch.update(db.collection("users").doc(targetUserUID), {
+                    followers: firebase.firestore.FieldValue.arrayUnion(currentUserUID),
+                    followerCount: firebase.firestore.FieldValue.increment(1)
+                });
+                await batch.commit();
+            } else {
+                const batch = db.batch();
+                batch.update(db.collection("users").doc(currentUserUID), {
+                    following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
+                    followingCount: firebase.firestore.FieldValue.increment(-1)
+                });
+                batch.update(db.collection("users").doc(targetUserUID), {
+                    followers: firebase.firestore.FieldValue.arrayRemove(currentUserUID),
+                    followerCount: firebase.firestore.FieldValue.increment(-1)
+                });
+                await batch.commit();
+            }
+        } catch (err) {
+            console.error("Action failed", err);
+            // Revert UI if database failed
+            await updateFollowButton();
+        } finally {
+            isProcessing = false;
+            btn.disabled = false;
         }
     };
 
