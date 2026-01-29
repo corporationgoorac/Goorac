@@ -64,7 +64,7 @@ class CallNotifier extends HTMLElement {
                 transform: translateX(-50%) scale(0.9);
                 width: calc(100% - 32px); 
                 max-width: 400px;
-                background: rgba(28, 39, 46, 0.85); 
+                background: rgba(28, 39, 46, 0.95); 
                 backdrop-filter: blur(20px) saturate(180%);
                 -webkit-backdrop-filter: blur(20px) saturate(180%);
                 border: 1px solid rgba(255, 255, 255, 0.1); 
@@ -109,7 +109,6 @@ class CallNotifier extends HTMLElement {
             .n-dec { background: rgba(255, 68, 68, 0.15); color: #ff4444; }
             .n-ans { background: #1ebea5; color: #fff; box-shadow: 0 8px 20px rgba(30, 190, 165, 0.3); }
             
-            /* SVG Icons */
             .n-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
             @keyframes pulse-border {
@@ -119,8 +118,6 @@ class CallNotifier extends HTMLElement {
             }
             #notif-banner.active { animation: pulse-border 2s infinite; }
         </style>
-
-        
 
         <div id="notif-banner">
             <div class="c-prof">
@@ -162,7 +159,7 @@ class CallNotifier extends HTMLElement {
 
         banner.addEventListener('touchstart', (e) => {
             startY = e.touches[0].clientY;
-            banner.style.transition = 'none'; // Disable transition during swipe
+            banner.style.transition = 'none'; 
         }, { passive: true });
 
         banner.addEventListener('touchmove', (e) => {
@@ -187,28 +184,35 @@ class CallNotifier extends HTMLElement {
 
     listen() {
         const uid = firebase.auth().currentUser.uid;
-        this.signalRef = firebase.database().ref(`signaling/${uid}`);
+        // Signaling node for incoming calls
+        this.signalRef = firebase.database().ref(`calls_status/${uid}`);
         
         this.signalRef.on('value', snap => {
             const data = snap.val();
-            if (!data) { this.hide(); return; }
+            // data typically contains { status: 'ringing', callerId: '...', callerName: '...' }
+            if (!data || data.status !== 'ringing') { 
+                this.hide(); 
+                return; 
+            }
 
-            if (Date.now() - data.timestamp > 45000) {
+            // Safety: timeout call if timestamp is too old (45s)
+            if (data.timestamp && (Date.now() - data.timestamp > 45000)) {
                 this.signalRef.remove();
                 this.hide();
                 return;
             }
 
+            // Don't show if user is already on the calls page for this specific call
             if (window.location.pathname.endsWith('calls.html')) {
-                const params = new URLSearchParams(window.location.search);
-                if (params.get('callId') === data.callId) return;
+                return;
             }
 
             this.show(data);
 
             this.querySelector('#n-dec').onclick = (e) => {
                 e.preventDefault();
-                firebase.database().ref(`calls/${data.callId}`).update({ status: 'declined' });
+                // Notify caller that call was declined
+                firebase.database().ref(`calls_status/${data.callerId}`).set('declined');
                 this.signalRef.remove();
                 this.hide();
             };
@@ -217,17 +221,12 @@ class CallNotifier extends HTMLElement {
                 e.preventDefault();
                 this.signalRef.off();
                 this.hide();
+                // Redirect to calls.html with the caller's ID and auto-answer flag
                 const url = new URL('calls.html', window.location.href);
-                url.searchParams.set('callId', data.callId);
-                url.searchParams.set('answer', 'true');
+                url.searchParams.set('targetUid', data.callerId);
+                url.searchParams.set('autoAnswer', 'true');
                 window.location.href = url.href;
             };
-
-            firebase.database().ref(`calls/${data.callId}/status`).on('value', s => {
-                if (['cancelled', 'ended', 'connected', 'declined'].includes(s.val())) {
-                    this.hide();
-                }
-            });
         });
     }
 
@@ -238,9 +237,10 @@ class CallNotifier extends HTMLElement {
         const vEl = this.querySelector('#n-v');
         const tone = this.querySelector('#n-tone');
 
-        userEl.childNodes[0].textContent = data.name + " ";
+        // Extract name and verification status from the signaling data
+        userEl.childNodes[0].textContent = (data.callerName || "Unknown") + " ";
         vEl.className = data.verified ? 'v-chk' : '';
-        imgEl.src = data.pfp || 'https://via.placeholder.com/150';
+        imgEl.src = data.callerPfp || 'https://via.placeholder.com/150';
         
         banner.classList.add('active');
 
@@ -249,7 +249,7 @@ class CallNotifier extends HTMLElement {
         const playPromise = tone.play();
         if (playPromise !== undefined) {
             playPromise.catch(() => {
-                console.log("Waiting for user interaction for audio...");
+                console.log("Audio waiting for interaction...");
             });
         }
     }
