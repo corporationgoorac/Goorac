@@ -143,7 +143,7 @@
 
         <div class="actions">
             <button class="btn btn-msg skeleton" id="msg-btn">Message</button>
-            <button class="btn btn-f skeleton" id="follow-action-btn" style="visibility: hidden;">Follow</button>
+            <button class="btn btn-f skeleton" id="follow-action-btn">Follow</button>
         </div>
     </div>
 </div>
@@ -218,7 +218,6 @@
             bioEl.innerText = userData.bio || "No bio available.";
             bioEl.classList.remove('skeleton');
 
-            // Prevent Background update from overriding the button while user is clicking
             if (!isActionLocked) {
                 const fers = document.getElementById('c-followers');
                 fers.innerText = userData.followerCount || 0;
@@ -252,8 +251,6 @@
         const myFollowingList = myDoc.data().following || [];
         const btn = document.getElementById('follow-action-btn');
 
-        btn.style.visibility = "visible"; // Show only after logic is ready
-
         if (myFollowingList.includes(targetUserUID)) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
@@ -271,11 +268,11 @@
         const followersCountLabel = document.getElementById('c-followers');
         let currentCount = parseInt(followersCountLabel.innerText);
 
-        // LOCK UI
+        // Instant Feedback: Vibration & State Lock
+        if (navigator.vibrate) navigator.vibrate(10);
         isActionLocked = true;
-        btn.disabled = true;
 
-        // OPTIMISTIC UPDATE (Change UI before server responds)
+        // Ultra-Fast UI Swap (No waiting for database)
         if (!isCurrentlyFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
@@ -286,42 +283,38 @@
             followersCountLabel.innerText = Math.max(0, currentCount - 1);
         }
 
+        const myRef = db.collection("users").doc(currentUserUID);
+        const targetRef = db.collection("users").doc(targetUserUID);
+
         try {
-            const batch = db.batch();
-            const myRef = db.collection("users").doc(currentUserUID);
-            const targetRef = db.collection("users").doc(targetUserUID);
-
             if (!isCurrentlyFollowing) {
-                batch.update(myRef, {
-                    following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
-                    followingCount: firebase.firestore.FieldValue.increment(1)
-                });
-                batch.update(targetRef, {
-                    followers: firebase.firestore.FieldValue.arrayUnion(currentUserUID),
-                    followerCount: firebase.firestore.FieldValue.increment(1)
-                });
+                await Promise.all([
+                    myRef.update({
+                        following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
+                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    }),
+                    targetRef.update({
+                        followers: firebase.firestore.FieldValue.arrayUnion(currentUserUID),
+                        followerCount: firebase.firestore.FieldValue.increment(1)
+                    })
+                ]);
             } else {
-                batch.update(myRef, {
-                    following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
-                    followingCount: firebase.firestore.FieldValue.increment(-1)
-                });
-                batch.update(targetRef, {
-                    followers: firebase.firestore.FieldValue.arrayRemove(currentUserUID),
-                    followerCount: firebase.firestore.FieldValue.increment(-1)
-                });
+                await Promise.all([
+                    myRef.update({
+                        following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
+                        followingCount: firebase.firestore.FieldValue.increment(-1)
+                    }),
+                    targetRef.update({
+                        followers: firebase.firestore.FieldValue.arrayRemove(currentUserUID),
+                        followerCount: firebase.firestore.FieldValue.increment(-1)
+                    })
+                ]);
             }
-
-            await batch.commit();
         } catch (err) {
-            console.error("Transaction failed", err);
-            // Revert on error
-            await updateFollowButton();
+            console.error("Action failed", err);
+            await updateFollowButton(); // Revert on failure
         } finally {
-            // RELEASE LOCK
-            setTimeout(() => {
-                isActionLocked = false;
-                btn.disabled = false;
-            }, 500); // Small cooldown
+            isActionLocked = false;
         }
     };
 
