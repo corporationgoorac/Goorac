@@ -39,7 +39,8 @@ class CallNotifier extends HTMLElement {
         const scripts = [
             'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
             'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js',
-            'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js'
+            'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js',
+            'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js'
         ];
         for (const src of scripts) {
             if (!document.querySelector(`script[src="${src}"]`)) {
@@ -184,34 +185,40 @@ class CallNotifier extends HTMLElement {
 
     listen() {
         const uid = firebase.auth().currentUser.uid;
-        // Signaling node for incoming calls
         this.signalRef = firebase.database().ref(`calls_status/${uid}`);
         
-        this.signalRef.on('value', snap => {
+        this.signalRef.on('value', async snap => {
             const data = snap.val();
-            // data typically contains { status: 'ringing', callerId: '...', callerName: '...' }
             if (!data || data.status !== 'ringing') { 
                 this.hide(); 
                 return; 
             }
 
-            // Safety: timeout call if timestamp is too old (45s)
             if (data.timestamp && (Date.now() - data.timestamp > 45000)) {
                 this.signalRef.remove();
                 this.hide();
                 return;
             }
 
-            // Don't show if user is already on the calls page for this specific call
             if (window.location.pathname.endsWith('calls.html')) {
                 return;
             }
 
-            this.show(data);
+            // Fetch Caller Info from Firestore to fix "Unknown User" and no PFP
+            const userDoc = await firebase.firestore().collection("users").doc(data.callerId).get();
+            const userData = userDoc.exists ? userDoc.data() : {};
+            
+            const callerInfo = {
+                name: userData.name || "Unknown User",
+                pfp: userData.photoURL || 'https://via.placeholder.com/150',
+                verified: userData.verified || false,
+                callerId: data.callerId
+            };
+
+            this.show(callerInfo);
 
             this.querySelector('#n-dec').onclick = (e) => {
                 e.preventDefault();
-                // Notify caller that call was declined
                 firebase.database().ref(`calls_status/${data.callerId}`).set('declined');
                 this.signalRef.remove();
                 this.hide();
@@ -221,7 +228,6 @@ class CallNotifier extends HTMLElement {
                 e.preventDefault();
                 this.signalRef.off();
                 this.hide();
-                // Redirect to calls.html with the caller's ID and auto-answer flag
                 const url = new URL('calls.html', window.location.href);
                 url.searchParams.set('targetUid', data.callerId);
                 url.searchParams.set('autoAnswer', 'true');
@@ -230,21 +236,19 @@ class CallNotifier extends HTMLElement {
         });
     }
 
-    show(data) {
+    show(caller) {
         const banner = this.querySelector('#notif-banner');
         const userEl = this.querySelector('#n-user');
         const imgEl = this.querySelector('#n-img');
         const vEl = this.querySelector('#n-v');
         const tone = this.querySelector('#n-tone');
 
-        // Extract name and verification status from the signaling data
-        userEl.childNodes[0].textContent = (data.callerName || "Unknown") + " ";
-        vEl.className = data.verified ? 'v-chk' : '';
-        imgEl.src = data.callerPfp || 'https://via.placeholder.com/150';
+        userEl.childNodes[0].textContent = caller.name + " ";
+        vEl.className = caller.verified ? 'v-chk' : '';
+        imgEl.src = caller.pfp;
         
         banner.classList.add('active');
 
-        // Play the ringtone
         tone.muted = false;
         const playPromise = tone.play();
         if (playPromise !== undefined) {
