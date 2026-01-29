@@ -159,6 +159,7 @@
 </div>
 
 <div id="loading">Synchronizing...</div>
+
 <div id="content" class="list-container">
     <div id="followers-list"></div>
     <div id="suggestions-section" style="display: none;">
@@ -198,12 +199,14 @@
                     loadingDiv.style.display = 'none';
                     return;
                 }
-                const targetData = userQuery.docs[0].data();
-                targetUID = targetData.uid;
+                const targetDoc = userQuery.docs[0];
+                targetUID = targetDoc.id;
+                const targetData = targetDoc.data();
                 globalIsOwnProfile = (targetUID === currentUser.uid);
                 document.getElementById('header-title').innerText = `@${targetData.username}'s Followers`;
             }
 
+            // Mutual check logic as requested
             if (!globalIsOwnProfile) {
                 const myDoc = await db.collection("users").doc(currentUser.uid).get();
                 const myData = myDoc.data();
@@ -225,7 +228,12 @@
                 }
             }
 
+            // Listener for real-time updates
             db.collection("users").doc(targetUID).onSnapshot(async (doc) => {
+                if(!doc.exists) {
+                    loadingDiv.style.display = 'none';
+                    return;
+                }
                 const userData = doc.data();
                 const followerIDs = userData.followers || [];
 
@@ -236,6 +244,9 @@
                     await loadAndStoreFollowers(followerIDs, globalIsOwnProfile);
                 }
                 fetchSuggestions(currentUser.uid, followerIDs);
+            }, (error) => {
+                console.error("Snapshot error:", error);
+                loadingDiv.innerText = "Access Denied.";
             });
 
         } catch (error) {
@@ -245,16 +256,22 @@
     }
 
     async function loadAndStoreFollowers(uids, isOwnProfile) {
-        // Fetch all users in parallel for speed
-        const userPromises = uids.map(uid => db.collection("users").doc(uid).get());
-        const snapshots = await Promise.all(userPromises);
-        
-        allFollowersData = snapshots
-            .filter(snap => snap.exists)
-            .map(snap => ({ ...snap.data(), uid: snap.id }));
+        const loadingDiv = document.getElementById('loading');
+        try {
+            // Fetch all profile details in parallel
+            const userPromises = uids.map(uid => db.collection("users").doc(uid).get());
+            const snapshots = await Promise.all(userPromises);
+            
+            allFollowersData = snapshots
+                .filter(snap => snap.exists)
+                .map(snap => ({ ...snap.data(), uid: snap.id }));
 
-        renderUserList(allFollowersData, 'followers-list', isOwnProfile);
-        document.getElementById('loading').style.display = 'none';
+            renderUserList(allFollowersData, 'followers-list', isOwnProfile);
+        } catch (e) {
+            console.error("Batch load error:", e);
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
     }
 
     function renderUserList(users, containerId, isOwnProfile) {
@@ -262,7 +279,7 @@
         container.innerHTML = "";
 
         if (users.length === 0 && containerId === 'followers-list') {
-            container.innerHTML = "<div class='mutual-lock'>No users found matching your search.</div>";
+            container.innerHTML = "<div class='mutual-lock'>No users found.</div>";
             return;
         }
 
@@ -273,8 +290,8 @@
                 <a href="userProfile.html?user=${u.username}" class="user-info">
                     <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="user-pfp">
                     <div>
-                        <div class="username">${u.username} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
-                        <div class="full-name">${u.name}</div>
+                        <div class="username">${u.username || 'unknown'} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                        <div class="full-name">${u.name || ''}</div>
                     </div>
                 </a>
                 ${isOwnProfile && containerId === 'followers-list' ? 
@@ -300,7 +317,8 @@
         const sugSection = document.getElementById('suggestions-section');
         const sugList = document.getElementById('suggestions-list');
         
-        const usersSnap = await db.collection("users").limit(10).get();
+        // Fetch users excluding yourself and current followers
+        const usersSnap = await db.collection("users").limit(15).get();
         const suggestions = [];
         
         usersSnap.forEach(doc => {
