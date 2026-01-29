@@ -286,7 +286,6 @@
 
     let currentUserUID = "";
     let targetUsername = "";
-    let isProcessingFollow = false; // Flag to prevent multiple clicks
 
     auth.onAuthStateChanged(user => {
         if(user) currentUserUID = user.uid;
@@ -352,35 +351,6 @@
             document.getElementById('search-input').blur();
         }
     });
-
-    /** * FIX FOR MULTIPLE CLICKS INCREASING COUNT 
-     * Use this pattern on your Follow button in userProfile.html or elsewhere.
-     */
-    async function handleFollow(targetUserId, followBtnElement) {
-        if (isProcessingFollow) return; // Ignore if already working
-        
-        isProcessingFollow = true;
-        followBtnElement.disabled = true; // Disable UI immediately
-        followBtnElement.style.opacity = "0.5";
-
-        try {
-            // Use FieldValue.increment to prevent incorrect counts
-            const increment = firebase.firestore.FieldValue.increment(1);
-            
-            // Example: Atomic update
-            await db.collection("users").doc(targetUserId).update({
-                followersCount: increment
-            });
-            
-            console.log("Followed successfully");
-        } catch (e) {
-            console.error("Follow error", e);
-        } finally {
-            isProcessingFollow = false;
-            followBtnElement.disabled = false;
-            followBtnElement.style.opacity = "1";
-        }
-    }
 </script>
 
 <script src="components/call-notifier.js" defer></script>
