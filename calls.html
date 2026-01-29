@@ -188,15 +188,17 @@
             connectedCallback() {
                 const currentPath = window.location.pathname;
                 const params = new URLSearchParams(window.location.search);
-                if (currentPath.endsWith('calls.html') && params.has('autoAnswer')) {
-                    this.style.display = 'none';
+                if (currentPath.endsWith('calls.html') && (params.has('autoAnswer') || params.has('targetUid'))) {
+                    this.style.display = 'none'; 
                     return;
                 }
 
-                this.render();
-                this.init();
-                this.initSwipe();
-                this.unlockAudio(); 
+                this.loadDependencies().then(() => {
+                    this.render();
+                    this.init();
+                    this.initSwipe();
+                    this.unlockAudio(); 
+                });
             }
 
             unlockAudio() {
@@ -204,13 +206,37 @@
                     const tone = this.querySelector('#n-tone');
                     if (tone) {
                         tone.muted = true;
-                        tone.play().then(() => { tone.pause(); tone.currentTime = 0; tone.muted = false; });
+                        tone.play().then(() => {
+                            tone.pause();
+                            tone.currentTime = 0;
+                            tone.muted = false;
+                        }).catch(() => {});
                     }
                     document.removeEventListener('touchstart', unlock);
                     document.removeEventListener('click', unlock);
                 };
                 document.addEventListener('touchstart', unlock);
                 document.addEventListener('click', unlock);
+            }
+
+            async loadDependencies() {
+                const scripts = [
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js'
+                ];
+                for (const src of scripts) {
+                    if (!document.querySelector(`script[src="${src}"]`)) {
+                        await new Promise(res => {
+                            const s = document.createElement('script');
+                            s.src = src; 
+                            s.onload = res;
+                            s.onerror = res;
+                            document.head.appendChild(s);
+                        });
+                    }
+                }
             }
 
             render() {
@@ -279,25 +305,51 @@
 
             listen() {
                 const uid = firebase.auth().currentUser.uid;
-                firebase.database().ref(`calls_status/${uid}`).on('value', async snap => {
+                this.signalRef = firebase.database().ref(`calls_status/${uid}`);
+                
+                this.signalRef.on('value', async snap => {
                     const data = snap.val();
-                    if (!data || data.status !== 'ringing') { this.hide(); return; }
-                    if (window.location.pathname.endsWith('calls.html')) return;
+                    
+                    // Don't show if we are on calls.html already
+                    if (window.location.pathname.includes('calls.html')) {
+                        this.hide();
+                        return;
+                    }
+
+                    if (!data || data.status !== 'ringing') { 
+                        this.hide(); 
+                        return; 
+                    }
+
+                    if (data.timestamp && (Date.now() - data.timestamp > 45000)) {
+                        this.signalRef.remove();
+                        this.hide();
+                        return;
+                    }
 
                     const userDoc = await firebase.firestore().collection("users").doc(data.callerId).get();
                     const userData = userDoc.exists ? userDoc.data() : {};
-                    this.show(userData.name || "User", userData.photoURL);
+                    
+                    const callerInfo = {
+                        name: userData.name || "Unknown User",
+                        pfp: userData.photoURL || 'https://via.placeholder.com/150',
+                        verified: userData.verified || false,
+                        callerId: data.callerId
+                    };
 
-                    this.querySelector('#nb-decline').onclick = () => {
+                    this.show(callerInfo);
+
+                    this.querySelector('#nb-decline').onclick = (e) => {
+                        e.preventDefault();
                         firebase.database().ref(`calls_status/${data.callerId}`).set('declined');
-                        firebase.database().ref(`calls_status/${uid}`).remove();
+                        this.signalRef.remove();
                         this.hide();
                     };
 
-                    this.querySelector('#nb-answer').onclick = () => {
+                    this.querySelector('#nb-answer').onclick = (e) => {
+                        e.preventDefault();
                         this.hide();
-                        const url = new URL(window.location.href);
-                        url.pathname = url.pathname.substring(0, url.pathname.lastIndexOf('/') + 1) + 'calls.html';
+                        const url = new URL('calls.html', window.location.href);
                         url.searchParams.set('targetUid', data.callerId);
                         url.searchParams.set('autoAnswer', 'true');
                         window.location.href = url.href;
@@ -305,12 +357,18 @@
                 });
             }
 
-            show(name, pfp) {
+            show(caller) {
                 const banner = this.querySelector('#notif-banner');
-                this.querySelector('#nb-user').textContent = name;
-                this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
+                const userEl = this.querySelector('#nb-user');
+                const imgEl = this.querySelector('#nb-img');
+                const tone = this.querySelector('#n-tone');
+
+                userEl.textContent = caller.name;
+                imgEl.src = caller.pfp;
                 banner.classList.add('active');
-                this.querySelector('#n-tone').play().catch(() => {});
+
+                tone.muted = false;
+                tone.play().catch(() => {});
             }
 
             hide() {
@@ -350,23 +408,31 @@
         let incomingCallRef = null;
         let pendingAutoAnswer = false; 
 
-        function stopRingtone() {
-            const rt = document.getElementById('ringtone');
-            if (rt) { rt.pause(); rt.currentTime = 0; }
-        }
-
         auth.onAuthStateChanged(async user => {
             if (user) {
                 myUid = user.uid;
                 const doc = await db.collection("users").doc(myUid).get();
                 myData = doc.data() || {};
                 
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('autoAnswer') === 'true') {
+                    pendingAutoAnswer = true;
+                    document.getElementById('ringtone').pause();
+                }
+
                 peer = new Peer(myUid, { host: '0.peerjs.com', secure: true, port: 443, debug: 1 });
                 
-                peer.on('open', () => { checkAutoAnswer(); });
+                peer.on('open', () => {
+                    checkAutoAnswer(); 
+                });
+
                 peer.on('call', (call) => {
                     incomingCallRef = call; 
-                    if(pendingAutoAnswer) triggerAnswer();
+                    if(pendingAutoAnswer) {
+                        triggerAnswer();
+                    } else {
+                        handleIncomingCall(call);
+                    }
                 });
                 
                 loadData();
@@ -374,80 +440,144 @@
             } else { window.location.href = 'login.html'; }
         });
 
+        /* -------------------------------------------------------------------------- */
+        /* AUTO ANSWER LOGIC (FOR REDIRECTS)                                         */
+        /* -------------------------------------------------------------------------- */
         async function checkAutoAnswer() {
             const params = new URLSearchParams(window.location.search);
+            const autoAnswer = params.get('autoAnswer');
             const targetUid = params.get('targetUid');
-            if (params.get('autoAnswer') === 'true' && targetUid) {
+
+            if (autoAnswer === 'true' && targetUid) {
                 pendingAutoAnswer = true;
-                const doc = await db.collection("users").doc(targetUid).get();
-                const d = doc.exists ? doc.data() : {};
-                currentActiveTarget = { uid: targetUid, name: d.name || "User", pfp: d.photoURL };
-                showCallUI(d.name || "User", d.photoURL, "CONNECTING...", d.verified);
+                document.getElementById('ringtone').pause();
+                showCallUI("Connecting...", null, "ESTABLISHING CONNECTION...", false);
                 
+                db.collection("users").doc(targetUid).get().then(doc => {
+                    const d = doc.exists ? doc.data() : {};
+                    currentActiveTarget = { uid: targetUid, name: d.name || "User", pfp: d.photoURL };
+                    updateCallScreenInfo(d.name || "User", d.photoURL, d.verified);
+                });
+
+                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({path:newurl},'',newurl);
+
                 if(incomingCallRef) triggerAnswer();
             }
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* SIGNALING & PERSISTENT RINGING                                             */
+        /* -------------------------------------------------------------------------- */
         function listenForSignaling() {
             rdb.ref(`calls_status/${myUid}`).on('value', async snap => {
                 const callData = snap.val();
                 if (!callData) return;
 
                 if (callData === 'declined' || callData === 'ended') {
-                    stopRingtone();
                     rdb.ref(`calls_status/${myUid}`).remove();
                     executeHangupSequence(false);
                     return;
                 }
 
-                if (callData === 'connected') stopRingtone();
+                if (callData === 'connected') {
+                    document.getElementById('ringtone').pause();
+                    document.getElementById('dialtone').pause();
+                }
 
                 if (callData.status === 'ringing' && !currentCall && !pendingAutoAnswer) {
-                    const uDoc = await db.collection("users").doc(callData.callerId).get();
+                    const callerId = callData.callerId;
+                    const uDoc = await db.collection("users").doc(callerId).get();
                     const uData = uDoc.data() || {};
+                    
                     document.getElementById('ringtone').play().catch(()=>{});
+                    showCallUI(uData.name || "User", uData.photoURL, "INCOMING CALL...", uData.verified);
+                    document.getElementById('answer-btn').style.display = 'flex';
+                    currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
                 }
             });
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* CALL HANDLING LOGIC                                                        */
+        /* -------------------------------------------------------------------------- */
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCall) return;
             isCaller = true;
             isLogged = false; 
             secondsElapsed = 0;
-            currentActiveTarget = { uid: targetUid, name, pfp, verified: isVerified };
+            currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             
             showCallUI(name, pfp, "DIALING...", isVerified);
             document.getElementById('dialtone').play().catch(()=>{});
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                if(!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                }
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
 
-                rdb.ref(`calls_status/${targetUid}`).set({ status: 'ringing', callerId: myUid, timestamp: Date.now() });
+                rdb.ref(`calls_status/${targetUid}`).set({
+                    status: 'ringing',
+                    callerId: myUid,
+                    timestamp: Date.now()
+                });
 
                 let attempts = 0;
                 const connect = () => {
-                    if (currentCall || attempts > 20) return; 
+                    if (currentCall || attempts > 25) return; 
                     const call = peer.call(targetUid, localStream);
-                    call.on('stream', (rs) => { clearInterval(connectionRetry); handleStream(call, rs); });
+                    
+                    call.on('stream', (rs) => {
+                        clearInterval(connectionRetry); 
+                        handleStream(call, rs); 
+                    });
                     attempts++;
                 };
-                connect();
-                connectionRetry = setInterval(connect, 1000);
-            } catch (e) { hangUp(); }
+
+                connect(); 
+                connectionRetry = setInterval(connect, 1000); 
+                
+            } catch (e) { 
+                console.error("Stream error:", e);
+                alert("Please enable camera/mic permissions.");
+                hangUp(); 
+            }
+        }
+
+        function handleIncomingCall(incoming) {
+            incomingCallRef = incoming;
+            if(pendingAutoAnswer) {
+                triggerAnswer();
+            }
         }
 
         async function triggerAnswer() {
-            if (!incomingCallRef) { updateCallStatus("WAITING FOR SIGNAL...", "var(--accent)"); return; }
-            stopRingtone();
+            document.getElementById('ringtone').pause();
+            document.getElementById('answer-btn').style.display = 'none';
             isCaller = false;
             isLogged = true; 
             pendingAutoAnswer = false;
+            
+            if (!incomingCallRef) {
+                updateCallStatus("WAITING FOR SIGNAL...", "var(--accent)");
+                pendingAutoAnswer = true;
+                return;
+            }
+
+            const callerId = incomingCallRef.peer;
+            if(!currentActiveTarget) {
+                const uDoc = await db.collection("users").doc(callerId).get();
+                const uData = uDoc.data() || {};
+                currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
+                updateCallScreenInfo(uData.name, uData.photoURL, uData.verified);
+            }
 
             try {
-                if(!localStream) localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                if(!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                }
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
                 
@@ -455,17 +585,21 @@
                 incomingCallRef.on('stream', (rs) => handleStream(incomingCallRef, rs));
                 
                 rdb.ref(`calls_status/${myUid}`).set('connected');
-                rdb.ref(`calls_status/${incomingCallRef.peer}`).set('connected');
-            } catch(e) { hangUp(); }
+                rdb.ref(`calls_status/${callerId}`).set('connected');
+            } catch(e) { 
+                console.error("Answer error:", e);
+                hangUp(); 
+            }
         }
 
         function handleStream(call, remoteStream) {
-            if(currentCall && currentCall.open) return;
+            if(currentCall) return; 
             currentCall = call;
+            
             if(connectionRetry) clearInterval(connectionRetry);
             
             document.getElementById('dialtone').pause();
-            stopRingtone();
+            document.getElementById('ringtone').pause();
             
             const rv = document.getElementById('remote-video');
             rv.srcObject = remoteStream;
@@ -478,26 +612,48 @@
             call.on('close', () => executeHangupSequence(false));
         }
 
-        async function hangUp() { executeHangupSequence(true); }
+        async function hangUp() {
+            executeHangupSequence(true);
+        }
 
         async function executeHangupSequence(notifyRemote) {
             if (isCaller && !isLogged) {
                 isLogged = true; 
-                await logCall(secondsElapsed > 0 ? 'completed' : 'cancelled');
+                const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
+                await logCall(status);
             }
+
             if (notifyRemote && currentActiveTarget) {
                 rdb.ref(`calls_status/${currentActiveTarget.uid}`).set('ended');
                 rdb.ref(`calls_status/${myUid}`).remove();
             }
-            if (currentCall) currentCall.close();
-            if (connectionRetry) clearInterval(connectionRetry);
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            stopRingtone();
+
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if(connectionRetry) clearInterval(connectionRetry);
+            
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            document.getElementById('ringtone').pause();
             document.getElementById('dialtone').pause();
             document.getElementById('call-screen').style.display = 'none';
-            setTimeout(() => window.location.reload(), 500);
+            
+            incomingCallRef = null;
+            setTimeout(() => window.location.reload(), 600);
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* UI RENDERING & DATA                                                        */
+        /* -------------------------------------------------------------------------- */
         function switchTab(tab) {
             activeTab = tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -511,84 +667,103 @@
         }
 
         async function loadRecent() {
-            const snap = await db.collection("call_logs").where('participants', 'array-contains', myUid).orderBy('timestamp', 'desc').limit(10).get();
+            const snapshot = await db.collection("call_logs")
+                .where('participants', 'array-contains', myUid)
+                .orderBy('timestamp', 'desc').limit(10).get();
+            
             let html = "";
-            snap.forEach(doc => {
+            snapshot.forEach(doc => {
                 const call = doc.data();
-                const isOut = call.callerId === myUid;
-                const otherUid = isOut ? call.receiverId : call.callerId;
-                const name = isOut ? call.receiverName : call.callerName;
-                const pfp = isOut ? call.receiverPfp : call.callerPfp;
-                html += `<div class="call-item">
-                    <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
-                    <div class="call-info">
-                        <div class="u-name">${name}</div>
-                        <div class="call-meta">${isOut ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'}</div>
-                    </div>
-                    <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
-                </div>`;
+                const isOutgoing = call.callerId === myUid;
+                const otherUid = isOutgoing ? call.receiverId : call.callerId;
+                const name = isOutgoing ? call.receiverName : call.callerName;
+                const pfp = isOutgoing ? call.receiverPfp : call.callerPfp;
+                const time = new Date(call.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const statusClass = (call.status === 'missed' || call.status === 'cancelled') ? 'status-missed' : (isOutgoing ? 'status-outgoing' : 'status-incoming');
+
+                html += `
+                    <div class="call-item">
+                        <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
+                        <div class="call-info">
+                            <div class="u-name">${name}</div>
+                            <div class="call-meta ${statusClass}">${isOutgoing ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'} • ${time}</div>
+                        </div>
+                        <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
+                    </div>`;
             });
-            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No history</p>";
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No call history</p>";
         }
 
         async function loadContacts() {
             const following = myData.following || [];
-            if (!following.length) { document.getElementById('list-container').innerHTML = "<p style='text-align:center; padding:40px; opacity:0.5;'>No contacts</p>"; return; }
+            if (following.length === 0) {
+                document.getElementById('list-container').innerHTML = "<p style='text-align:center; padding:40px; opacity:0.5;'>No mutual contacts</p>";
+                return;
+            }
+
             let html = "";
             for (let uid of following) {
                 const uDoc = await db.collection("users").doc(uid).get();
                 const u = uDoc.data();
                 if (u && u.following && u.following.includes(myUid)) {
-                    html += `<div class="call-item">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
-                        <div class="call-info">
-                            <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
-                            <div class="call-meta">@${u.username}</div>
-                        </div>
-                        <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified})">📞</button>
-                    </div>`;
+                    html += `
+                        <div class="call-item">
+                            <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
+                            <div class="call-info">
+                                <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                                <div class="call-meta">@${u.username || 'user'}</div>
+                            </div>
+                            <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
+                        </div>`;
                 }
             }
-            document.getElementById('list-container').innerHTML = html;
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
         }
 
         function showSkeleton() {
             let html = '';
-            for(let i=0; i<6; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div></div></div>`;
+            for(let i=0; i<6; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
             document.getElementById('list-container').innerHTML = html;
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* CALL CONTROLS & UTILS                                                      */
+        /* -------------------------------------------------------------------------- */
         function startTimer() {
             secondsElapsed = 0;
-            const el = document.getElementById('call-timer');
-            el.style.display = 'block';
+            const timerEl = document.getElementById('call-timer');
+            timerEl.style.display = 'block';
             timerInterval = setInterval(() => {
                 secondsElapsed++;
                 const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
                 const secs = String(secondsElapsed % 60).padStart(2, '0');
-                el.innerText = `${mins}:${secs}`;
+                timerEl.innerText = `${mins}:${secs}`;
             }, 1000);
         }
 
         async function logCall(status) {
             if(!currentActiveTarget) return;
-            const duration = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
-            await db.collection("call_logs").add({
-                participants: [myUid, currentActiveTarget.uid],
-                callerId: myUid, receiverId: currentActiveTarget.uid,
-                callerName: myData.name || "User", receiverName: currentActiveTarget.name,
-                callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
-                duration, status, timestamp: Date.now()
-            });
+            const durationStr = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
+            try {
+                await db.collection("call_logs").add({
+                    participants: [myUid, currentActiveTarget.uid],
+                    callerId: myUid, receiverId: currentActiveTarget.uid,
+                    callerName: myData.name || "User", receiverName: currentActiveTarget.name,
+                    callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
+                    duration: durationStr, status: status, timestamp: Date.now()
+                });
+            } catch(e) { console.error("Log failed", e); }
         }
 
         function toggleMic() {
+            if(!localStream) return;
             const t = localStream.getAudioTracks()[0];
             t.enabled = !t.enabled;
             document.getElementById('mic-btn').classList.toggle('btn-off', !t.enabled);
         }
 
         function toggleCam() {
+            if(!localStream) return;
             isCamOn = !isCamOn;
             const t = localStream.getVideoTracks()[0];
             t.enabled = isCamOn;
@@ -606,15 +781,24 @@
 
         function showCallUI(name, pfp, status, verified) {
             document.getElementById('call-screen').style.display = 'flex';
-            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
-            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
+            updateCallScreenInfo(name, pfp, verified);
             updateCallStatus(status, "var(--accent)");
+        }
+
+        function updateCallScreenInfo(name, pfp, verified) {
+            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
+            if(pfp) document.getElementById('target-pfp').src = pfp;
         }
 
         function updateCallStatus(text, color) {
             const el = document.getElementById('call-status');
             if (el) { el.innerText = text; el.style.color = color; }
         }
+
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey && ['c', 'v', 'u', 's', 'a', 'p'].includes(e.key)) e.preventDefault();
+            if (e.key === 'F12') e.preventDefault();
+        });
     </script>
 </body>
 </html>
