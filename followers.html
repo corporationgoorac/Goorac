@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Followers | Quantum</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <script src="config.js"></script>
+    <script src="components/navbar.js" defer></script>
+
+    <style>
+        :root {
+            --bg: #000;
+            --surface: #0a0a0a;
+            --accent: #00d2ff;
+            --text: #ffffff;
+            --dim: #a8a8a8;
+            --border: #262626;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 0;
+            padding-top: 60px; /* Header space */
+            padding-bottom: 70px; /* Navbar space */
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0; width: 100%;
+            height: 50px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .header h1 { font-size: 1rem; font-weight: 600; }
+
+        /* Follower List */
+        .list-container {
+            padding: 10px 15px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .user-pfp {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border);
+        }
+
+        .username { font-weight: 600; font-size: 0.9rem; }
+        .full-name { color: var(--dim); font-size: 0.85rem; }
+
+        .action-btn {
+            background: #363636;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .mutual-lock {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--dim);
+        }
+
+        .v-badge {
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            display: inline-block;
+            mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center;
+            -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center;
+        }
+
+        #loading { text-align: center; padding: 20px; color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1 id="header-title">Followers</h1>
+</div>
+
+<div id="loading">Synchronizing...</div>
+<div id="content" class="list-container"></div>
+
+<script>
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUsername = urlParams.get('user');
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            window.location.href = "login.html";
+            return;
+        }
+        initFollowersPage(user);
+    });
+
+    async function initFollowersPage(currentUser) {
+        const contentDiv = document.getElementById('content');
+        const loadingDiv = document.getElementById('loading');
+        
+        try {
+            // 1. Resolve Target User
+            let targetUID = currentUser.uid;
+            let isOwnProfile = true;
+
+            if (targetUsername) {
+                const userQuery = await db.collection("users").where("username", "==", targetUsername).get();
+                if (userQuery.empty) {
+                    contentDiv.innerHTML = "<div class='mutual-lock'>User not found.</div>";
+                    loadingDiv.style.display = 'none';
+                    return;
+                }
+                const targetData = userQuery.docs[0].data();
+                targetUID = targetData.uid;
+                isOwnProfile = (targetUID === currentUser.uid);
+                document.getElementById('header-title').innerText = `@${targetData.username}'s Followers`;
+            }
+
+            // 2. Privacy/Mutual Logic
+            if (!isOwnProfile) {
+                const myDoc = await db.collection("users").doc(currentUser.uid).get();
+                const myData = myDoc.data();
+                const targetDoc = await db.collection("users").doc(targetUID).get();
+                const targetData = targetDoc.data();
+
+                const iFollowThem = myData.following && myData.following.includes(targetUID);
+                const theyFollowMe = targetData.following && targetData.following.includes(currentUser.uid);
+
+                if (!(iFollowThem && theyFollowMe)) {
+                    contentDiv.innerHTML = `
+                        <div class="mutual-lock">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
+                            <p>This list is only visible to mutual followers.</p>
+                            <p style="font-size: 0.8rem;">Follow @${targetUsername} and wait for them to follow you back.</p>
+                        </div>`;
+                    loadingDiv.style.display = 'none';
+                    return;
+                }
+            }
+
+            // 3. Fetch and Render Followers
+            db.collection("users").doc(targetUID).onSnapshot(async (doc) => {
+                const userData = doc.data();
+                const followerIDs = userData.followers || [];
+
+                if (followerIDs.length === 0) {
+                    contentDiv.innerHTML = "<div class='mutual-lock'>No followers yet.</div>";
+                } else {
+                    renderUserList(followerIDs, isOwnProfile);
+                }
+                loadingDiv.style.display = 'none';
+            });
+
+        } catch (error) {
+            console.error("Error loading followers:", error);
+            loadingDiv.innerText = "Error syncing data.";
+        }
+    }
+
+    async function renderUserList(uids, isOwnProfile) {
+        const contentDiv = document.getElementById('content');
+        contentDiv.innerHTML = "";
+
+        // Fetch user details for each UID
+        for (const uid of uids) {
+            const userDoc = await db.collection("users").doc(uid).get();
+            if (!userDoc.exists) continue;
+            const u = userDoc.data();
+
+            const userEl = document.createElement('div');
+            userEl.className = 'user-item';
+            userEl.innerHTML = `
+                <a href="userProfile.html?user=${u.username}" class="user-info">
+                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="user-pfp">
+                    <div>
+                        <div class="username">${u.username} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                        <div class="full-name">${u.name}</div>
+                    </div>
+                </a>
+                ${isOwnProfile ? `<button class="action-btn" onclick="removeFollower('${uid}')">Remove</button>` : `<button class="action-btn">View</button>`}
+            `;
+            contentDiv.appendChild(userEl);
+        }
+    }
+
+    async function removeFollower(followerUID) {
+        if (!confirm("Remove this follower?")) return;
+        
+        const myUID = auth.currentUser.uid;
+        const batch = db.batch();
+
+        // Remove from my followers list
+        batch.update(db.collection("users").doc(myUID), {
+            followers: firebase.firestore.FieldValue.arrayRemove(followerUID),
+            followerCount: firebase.firestore.FieldValue.increment(-1)
+        });
+
+        // Remove from their following list
+        batch.update(db.collection("users").doc(followerUID), {
+            following: firebase.firestore.FieldValue.arrayRemove(myUID),
+            followingCount: firebase.firestore.FieldValue.increment(-1)
+        });
+
+        await batch.commit();
+    }
+</script>
+
+<script src="components/call-notifier.js" defer></script>
+<call-notifier></call-notifier>
+
+</body>
+</html>
