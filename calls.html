@@ -475,6 +475,8 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
+                // Initially disable local video track for PFP mode
+                localStream.getVideoTracks()[0].enabled = false;
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -514,7 +516,7 @@
                     }
                     if (data.answer && !pc.currentRemoteDescription) {
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        processQueuedCandidates();
+                        processQueuedCandidates(); // FIX: Process queued candidates
                         document.getElementById('dialtone').pause();
                         startTimer();
                         updateCallStatus("CONNECTED", "#1ebea5");
@@ -591,6 +593,7 @@
 
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
+                localStream.getVideoTracks()[0].enabled = false;
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -602,7 +605,7 @@
                 };
 
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                processQueuedCandidates();
+                processQueuedCandidates(); // FIX: Process queued candidates
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
 
@@ -754,22 +757,27 @@
             if(!localStream) return;
             isCamOn = !isCamOn;
             
+            // FIX: Enable/Disable hardware track
+            const t = localStream.getVideoTracks()[0];
+            if(t) t.enabled = isCamOn;
+
             const overlay = document.getElementById('pfp-area');
             const localVid = document.getElementById('local-video');
+            const remoteVid = document.getElementById('remote-video');
             const camBtn = document.getElementById('cam-btn');
 
             if (isCamOn) {
-                // UI Toggle: Reveal videos
                 overlay.style.opacity = '0';
                 overlay.style.visibility = 'hidden';
                 localVid.style.display = 'block';
+                remoteVid.style.zIndex = "20"; // FIX: Ensure video is on top
                 camBtn.classList.remove('btn-off');
                 updateCallStatus("VIDEO CALL", "var(--accent)");
             } else {
-                // UI Toggle: Hide videos behind PFP
                 overlay.style.visibility = 'visible';
                 overlay.style.opacity = '1';
                 localVid.style.display = 'none';
+                remoteVid.style.zIndex = "1";
                 camBtn.classList.add('btn-off');
                 updateCallStatus("CONNECTED", "#1ebea5");
             }
