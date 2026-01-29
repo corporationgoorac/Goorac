@@ -460,7 +460,7 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = false;
+                localStream.getVideoTracks()[0].enabled = false; // Initially camera off like WhatsApp
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -473,10 +473,11 @@
 
                 pc.ontrack = (event) => {
                     const rv = document.getElementById('remote-video');
+                    const pfpArea = document.getElementById('pfp-area');
                     rv.srcObject = event.streams[0];
-                    rv.style.display = 'block';
+                    rv.style.display = 'block'; // Show remote video
+                    pfpArea.style.display = 'none'; // Hide the pulse animation
                     rv.play().catch(e => console.error("Playback failed", e));
-                    document.getElementById('pfp-area').style.display = 'none';
                 };
 
                 const offer = await pc.createOffer();
@@ -587,12 +588,14 @@
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
                 pc.onicecandidate = (e) => e.candidate && rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(e.candidate.toJSON());
+                
                 pc.ontrack = (e) => {
                     const rv = document.getElementById('remote-video');
+                    const pfpArea = document.getElementById('pfp-area');
                     rv.srcObject = e.streams[0];
-                    rv.style.display = 'block';
+                    rv.style.display = 'block'; // Force show remote video
+                    pfpArea.style.display = 'none'; // Force hide profile pic
                     rv.play().catch(err => console.error("Playback fail", err));
-                    document.getElementById('pfp-area').style.display = 'none';
                 };
 
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
@@ -616,6 +619,8 @@
                 });
 
                 rdb.ref(`signaling/${myUid}`).remove();
+                
+                // Immediately update local UI to Connected state
                 startTimer();
                 updateCallStatus("CONNECTED", "#1ebea5");
                 document.getElementById('ring-animation').style.display = 'none';
@@ -627,7 +632,7 @@
                     }
                 });
 
-            } catch (e) { hangUp(); }
+            } catch (e) { console.error(e); hangUp(); }
         }
 
         async function processQueuedCandidates() {
@@ -646,7 +651,6 @@
             document.getElementById('dialtone').pause();
             
             if (currentCallId) {
-                // Clear all RDB listeners for this call to prevent ghost execution
                 rdb.ref(`calls/${currentCallId}`).off();
                 rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).off();
                 if(currentActiveTarget) rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).off();
@@ -754,12 +758,13 @@
             if(!localStream) return;
             isCamOn = !isCamOn;
             const t = localStream.getVideoTracks()[0];
-            t.enabled = isCamOn;
+            if(t) t.enabled = isCamOn;
             
             document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
             document.getElementById('local-video').style.display = isCamOn ? 'block' : 'none';
             
-            // Logic: Show PFP area only if remote video is ALSO hidden
+            // Note: We don't hide the remote video element here. 
+            // Only hide the profile pic area if someone is showing video.
             const rv = document.getElementById('remote-video');
             if (isCamOn || rv.style.display === 'block') {
                 document.getElementById('pfp-area').style.display = 'none';
