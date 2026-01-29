@@ -117,11 +117,13 @@
         #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         #local-video { position: absolute; top: 40px; right: 20px; width: 90px; height: 130px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 10; display: none; background: #000; }
         
-        /* New PFP Overlayer logic to hide video */
+        /* Persistent PFP Overlay Logic */
         #pfp-area { 
             position: absolute; inset: 0; z-index: 15; background: #0b141a;
             display: flex; align-items: center; justify-content: center; width: 100%;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.4s ease, visibility 0.4s;
+            visibility: visible;
+            opacity: 1;
         }
 
         .call-header { z-index: 20; text-align: center; }
@@ -286,7 +288,7 @@
         let isCamOn = false;
         let cachedList = []; 
         let isLoggingInProgress = false;
-        let remoteCandidatesQueue = []; // For new logic
+        let remoteCandidatesQueue = [];
 
         const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }], iceCandidatePoolSize: 10 };
 
@@ -464,14 +466,13 @@
             isLoggingInProgress = false;
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             currentCallId = "call_" + Date.now() + "_" + myUid;
-            remoteCandidatesQueue = []; // Reset queue
-            isCamOn = false; // Default voice
+            remoteCandidatesQueue = [];
+            isCamOn = false;
             
             showCallUI(name, pfp, "DIALING...", isVerified);
             document.getElementById('dialtone').play().catch(() => {});
 
             try {
-                // Get both even if voice, to hide it later
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
 
@@ -758,14 +759,16 @@
             const camBtn = document.getElementById('cam-btn');
 
             if (isCamOn) {
+                // UI Toggle: Reveal videos
                 overlay.style.opacity = '0';
-                overlay.style.pointerEvents = 'none';
+                overlay.style.visibility = 'hidden';
                 localVid.style.display = 'block';
                 camBtn.classList.remove('btn-off');
                 updateCallStatus("VIDEO CALL", "var(--accent)");
             } else {
+                // UI Toggle: Hide videos behind PFP
+                overlay.style.visibility = 'visible';
                 overlay.style.opacity = '1';
-                overlay.style.pointerEvents = 'auto';
                 localVid.style.display = 'none';
                 camBtn.classList.add('btn-off');
                 updateCallStatus("CONNECTED", "#1ebea5");
