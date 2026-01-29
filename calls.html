@@ -270,7 +270,10 @@
                 // Initialize PeerJS
                 peer = new Peer(myUid, { host: '0.peerjs.com', secure: true, port: 443, debug: 1 });
                 
-                peer.on('call', handleIncomingCall);
+                peer.on('call', (call) => {
+                    incomingCallRef = call; // Ensure incomingCallRef is globally stored
+                    handleIncomingCall(call);
+                });
                 
                 loadData();
                 listenForSignaling();
@@ -292,7 +295,7 @@
                     return;
                 }
 
-                if (callData.status === 'ringing' && !currentCall && !incomingCallRef) {
+                if (callData.status === 'ringing' && !currentCall) {
                     const callerId = callData.callerId;
                     const uDoc = await db.collection("users").doc(callerId).get();
                     const uData = uDoc.data() || {};
@@ -304,6 +307,7 @@
                             document.getElementById('ringtone').pause();
                             rdb.ref(`calls_status/${callerId}`).set('declined');
                             rdb.ref(`calls_status/${myUid}`).remove();
+                            if(incomingCallRef) incomingCallRef.close();
                         }
                     );
                 }
@@ -324,7 +328,10 @@
             document.getElementById('dialtone').play().catch(()=>{});
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                // Ensure media access is handled before calling
+                if(!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                }
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
 
@@ -339,40 +346,38 @@
                 
             } catch (e) { 
                 console.error("Stream error:", e);
-                alert("Please enable camera/mic permissions");
+                alert("Please enable camera/mic permissions in your browser settings.");
                 hangUp(); 
             }
         }
 
         function handleIncomingCall(incoming) {
-            incomingCallRef = incoming;
             const callerId = incoming.peer;
             
-            if (!document.querySelector('#notif-banner').classList.contains('active')) {
-                db.collection("users").doc(callerId).get().then(uDoc => {
-                    const uData = uDoc.data() || {};
-                    document.getElementById('ringtone').play().catch(()=>{});
-                    document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
-                        () => triggerAnswer(), 
-                        () => {
-                            document.getElementById('ringtone').pause();
-                            incoming.close();
-                            rdb.ref(`calls_status/${callerId}`).set('declined');
-                        }
-                    );
-                });
-            }
+            // Re-fetch user data for UI
+            db.collection("users").doc(callerId).get().then(uDoc => {
+                const uData = uDoc.data() || {};
+                document.getElementById('ringtone').play().catch(()=>{});
+                document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
+                    () => triggerAnswer(), 
+                    () => {
+                        document.getElementById('ringtone').pause();
+                        incoming.close();
+                        rdb.ref(`calls_status/${callerId}`).set('declined');
+                    }
+                );
+            });
         }
 
         async function triggerAnswer() {
             if (!incomingCallRef) {
-                updateCallStatus("CONNECTING...", "var(--accent)");
+                console.error("No call reference to answer");
                 return;
             }
 
             document.getElementById('ringtone').pause();
             isCaller = false;
-            isLogged = true; // Receiver does not log
+            isLogged = true; 
             
             const callerId = incomingCallRef.peer;
             const uDoc = await db.collection("users").doc(callerId).get();
@@ -380,7 +385,10 @@
             currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                // Pre-check for local stream
+                if(!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                }
                 document.getElementById('local-video').srcObject = localStream;
                 localStream.getVideoTracks()[0].enabled = false;
                 
@@ -388,7 +396,10 @@
                 setupCallEvents(incomingCallRef, uData.name, uData.photoURL, uData.verified);
                 
                 rdb.ref(`calls_status/${myUid}`).set('connected');
-            } catch(e) { hangUp(); }
+            } catch(e) { 
+                console.error("Answer error:", e);
+                hangUp(); 
+            }
         }
 
         function setupCallEvents(call, name, pfp, isVerified) {
@@ -407,7 +418,10 @@
             });
 
             call.on('close', () => executeHangupSequence(false));
-            call.on('error', () => executeHangupSequence(false));
+            call.on('error', (err) => {
+                console.error("Peer Error:", err);
+                executeHangupSequence(false);
+            });
         }
 
         async function hangUp() {
@@ -415,9 +429,8 @@
         }
 
         async function executeHangupSequence(notifyRemote) {
-            // Log only if I am the caller and haven't logged yet
             if (isCaller && !isLogged) {
-                isLogged = true; // Lock logging
+                isLogged = true; 
                 const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
                 await logCall(status);
             }
@@ -464,7 +477,6 @@
         }
 
         async function loadRecent() {
-            // Optimized: Get only 10 recent calls to prevent read/write limits
             const snapshot = await db.collection("call_logs")
                 .where('participants', 'array-contains', myUid)
                 .orderBy('timestamp', 'desc').limit(10).get();
