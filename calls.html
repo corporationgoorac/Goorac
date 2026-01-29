@@ -274,7 +274,7 @@
         let isCamOn = false;
         let cachedList = []; 
         let isLoggingInProgress = false;
-        let remoteCandidatesQueue = []; // Fixed: Stores incoming ICE candidates until handshake is ready
+        let remoteCandidatesQueue = [];
 
         const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
@@ -452,7 +452,7 @@
             isLoggingInProgress = false;
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             currentCallId = "call_" + Date.now() + "_" + myUid;
-            remoteCandidatesQueue = []; // Reset queue for new call
+            remoteCandidatesQueue = [];
             
             showCallUI(name, pfp, "DIALING...", isVerified);
             document.getElementById('dialtone').play().catch(() => {});
@@ -474,7 +474,9 @@
                     const rv = document.getElementById('remote-video');
                     rv.srcObject = event.streams[0];
                     rv.style.display = 'block';
-                    rv.play();
+                    rv.onloadedmetadata = () => {
+                        rv.play().catch(e => console.error("Remote video play error:", e));
+                    };
                 };
 
                 const offer = await pc.createOffer();
@@ -501,7 +503,7 @@
                     }
                     if (data.answer && !pc.currentRemoteDescription) {
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        processQueuedCandidates(); // Process candidates after handshake is ready
+                        processQueuedCandidates();
                         document.getElementById('dialtone').pause();
                         startTimer();
                         updateCallStatus("CONNECTED", "#1ebea5");
@@ -510,11 +512,11 @@
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).on('child_added', snap => {
-                    const candidate = new RTCIceCandidate(snap.val());
+                    const cand = new RTCIceCandidate(snap.val());
                     if (pc.remoteDescription) {
-                        pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        pc.addIceCandidate(cand).catch(e => console.error(e));
                     } else {
-                        remoteCandidatesQueue.push(candidate);
+                        remoteCandidatesQueue.push(cand);
                     }
                 });
 
@@ -584,15 +586,17 @@
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
                 pc.onicecandidate = (e) => e.candidate && rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(e.candidate.toJSON());
-                pc.ontrack = (e) => {
+                pc.ontrack = (event) => {
                     const rv = document.getElementById('remote-video');
-                    rv.srcObject = e.streams[0];
+                    rv.srcObject = event.streams[0];
                     rv.style.display = 'block';
-                    rv.play();
+                    rv.onloadedmetadata = () => {
+                        rv.play().catch(e => console.error("Remote video play error:", e));
+                    };
                 };
 
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                processQueuedCandidates(); // Process any candidates received during setup
+                processQueuedCandidates();
 
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
@@ -603,11 +607,11 @@
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
-                    const candidate = new RTCIceCandidate(snap.val());
+                    const cand = new RTCIceCandidate(snap.val());
                     if (pc.remoteDescription) {
-                        pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        pc.addIceCandidate(cand).catch(e => console.error(e));
                     } else {
-                        remoteCandidatesQueue.push(candidate);
+                        remoteCandidatesQueue.push(cand);
                     }
                 });
 
@@ -627,8 +631,8 @@
         }
 
         function processQueuedCandidates() {
-            remoteCandidatesQueue.forEach(candidate => {
-                pc.addIceCandidate(candidate).catch(e => console.log("Queued candidate error:", e));
+            remoteCandidatesQueue.forEach(cand => {
+                pc.addIceCandidate(cand).catch(e => console.error("ICE candidate error:", e));
             });
             remoteCandidatesQueue = [];
         }
