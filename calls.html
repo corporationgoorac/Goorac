@@ -181,7 +181,7 @@
 
     <script>
         /* -------------------------------------------------------------------------- */
-        /* CONFIG & GLOBALS                                                           */
+        /* FIREBASE & PEER INITIALIZATION                                             */
         /* -------------------------------------------------------------------------- */
         const firebaseConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
@@ -206,7 +206,7 @@
         let isCamOn = false;
         let currentActiveTarget = null;
         let incomingCallRef = null;
-        let isAnswering = false; // Flag to prevent duplicate answering
+        let pendingAutoAnswer = false;
 
         /* -------------------------------------------------------------------------- */
         /* CUSTOM ELEMENT: CALL NOTIFIER                                              */
@@ -263,27 +263,25 @@
         }
         customElements.define('call-notifier', CallNotifier);
 
-        /* -------------------------------------------------------------------------- */
-        /* AUTH & INITIALIZATION                                                      */
-        /* -------------------------------------------------------------------------- */
         auth.onAuthStateChanged(async user => {
             if (user) {
                 myUid = user.uid;
                 const doc = await db.collection("users").doc(myUid).get();
                 myData = doc.data() || {};
                 
+                // Initialize Peer with unique ID
                 peer = new Peer(myUid, { host: '0.peerjs.com', secure: true, port: 443, debug: 1 });
                 
                 peer.on('open', () => {
-                    console.log("Peer ID:", myUid);
-                    checkAutoAnswer();
+                    console.log("Peer connected with ID:", myUid);
+                    checkAutoAnswer(); 
                 });
 
                 peer.on('call', (call) => {
-                    console.log("Incoming call from:", call.peer);
-                    incomingCallRef = call;
-                    if(isAnswering) {
-                        triggerAnswer(); // Auto-answer if we already clicked the button
+                    console.log("Received incoming call from:", call.peer);
+                    incomingCallRef = call; 
+                    if (pendingAutoAnswer) {
+                        triggerAnswer();
                     } else {
                         handleIncomingCall(call);
                     }
@@ -294,11 +292,21 @@
             } else { window.location.href = 'login.html'; }
         });
 
+        /* -------------------------------------------------------------------------- */
+        /* AUTO ANSWER LOGIC (FOR REDIRECTS)                                         */
+        /* -------------------------------------------------------------------------- */
         async function checkAutoAnswer() {
             const params = new URLSearchParams(window.location.search);
             if (params.get('autoAnswer') === 'true') {
-                isAnswering = true;
+                pendingAutoAnswer = true;
                 showCallUI("Loading...", "", "PREPARING...", false);
+                
+                // Clean URL
+                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.pushState({path:newurl},'',newurl);
+
+                // If the call hasn't arrived yet, we wait. PeerJS fires 'call' event when ready.
+                if (incomingCallRef) triggerAnswer();
             }
         }
 
@@ -316,8 +324,7 @@
                     return;
                 }
 
-                // Handle incoming ringing state
-                if (callData.status === 'ringing' && !currentCall && !isAnswering) {
+                if (callData.status === 'ringing' && !currentCall && !pendingAutoAnswer) {
                     const callerId = callData.callerId;
                     const uDoc = await db.collection("users").doc(callerId).get();
                     const uData = uDoc.data() || {};
@@ -326,10 +333,10 @@
                     document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                         () => triggerAnswer(), 
                         () => {
+                            document.getElementById('ringtone').pause();
                             rdb.ref(`calls_status/${callerId}`).set('declined');
                             rdb.ref(`calls_status/${myUid}`).remove();
                             if(incomingCallRef) incomingCallRef.close();
-                            document.getElementById('ringtone').pause();
                         }
                     );
                 }
@@ -337,7 +344,7 @@
         }
 
         /* -------------------------------------------------------------------------- */
-        /* CALL LOGIC                                                                 */
+        /* CALL HANDLING LOGIC                                                        */
         /* -------------------------------------------------------------------------- */
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCall) return;
@@ -350,8 +357,11 @@
             document.getElementById('dialtone').play().catch(()=>{});
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                if(!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                }
                 document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('local-video').style.display = 'block';
                 localStream.getVideoTracks()[0].enabled = false;
 
                 rdb.ref(`calls_status/${targetUid}`).set({
@@ -362,38 +372,45 @@
 
                 const call = peer.call(targetUid, localStream);
                 setupCallEvents(call, name, pfp, isVerified);
+                
             } catch (e) { 
-                alert("Camera/Mic access denied.");
+                console.error("Stream error:", e);
+                alert("Please enable camera/mic permissions.");
                 hangUp(); 
             }
         }
 
         function handleIncomingCall(incoming) {
+            incomingCallRef = incoming;
             const callerId = incoming.peer;
+            
             db.collection("users").doc(callerId).get().then(uDoc => {
                 const uData = uDoc.data() || {};
                 document.getElementById('ringtone').play().catch(()=>{});
                 document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
                     () => triggerAnswer(), 
                     () => {
+                        document.getElementById('ringtone').pause();
                         incoming.close();
                         rdb.ref(`calls_status/${callerId}`).set('declined');
-                        document.getElementById('ringtone').pause();
                     }
                 );
             });
         }
 
         async function triggerAnswer() {
-            isAnswering = true;
-            document.getElementById('ringtone').pause();
-            
-            // If the peer object hasn't arrived yet, show UI and wait
             if (!incomingCallRef) {
-                showCallUI("Waiting...", "", "CONNECTING...", false);
-                return; 
+                console.log("Answer triggered but no call ref yet...");
+                updateCallStatus("WAITING FOR PEER...", "var(--accent)");
+                pendingAutoAnswer = true;
+                return;
             }
 
+            document.getElementById('ringtone').pause();
+            isCaller = false;
+            isLogged = true; 
+            pendingAutoAnswer = false;
+            
             const callerId = incomingCallRef.peer;
             const uDoc = await db.collection("users").doc(callerId).get();
             const uData = uDoc.data() || {};
@@ -404,6 +421,7 @@
                     localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 }
                 document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('local-video').style.display = 'block';
                 localStream.getVideoTracks()[0].enabled = false;
                 
                 incomingCallRef.answer(localStream);
@@ -412,7 +430,7 @@
                 rdb.ref(`calls_status/${myUid}`).set('connected');
                 rdb.ref(`calls_status/${callerId}`).set('connected');
             } catch(e) { 
-                console.error(e);
+                console.error("Answer error:", e);
                 hangUp(); 
             }
         }
@@ -433,17 +451,21 @@
             });
 
             call.on('close', () => executeHangupSequence(false));
-            call.on('error', () => executeHangupSequence(false));
+            call.on('error', (err) => {
+                console.error("Peer Error:", err);
+                executeHangupSequence(false);
+            });
         }
 
-        function hangUp() {
+        async function hangUp() {
             executeHangupSequence(true);
         }
 
         async function executeHangupSequence(notifyRemote) {
             if (isCaller && !isLogged) {
                 isLogged = true; 
-                await logCall(secondsElapsed > 0 ? 'completed' : 'cancelled');
+                const status = secondsElapsed > 0 ? 'completed' : 'cancelled';
+                await logCall(status);
             }
 
             if (notifyRemote && currentActiveTarget) {
@@ -451,18 +473,29 @@
                 rdb.ref(`calls_status/${myUid}`).remove();
             }
 
-            if (currentCall) currentCall.close();
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
             
             document.getElementById('ringtone').pause();
             document.getElementById('dialtone').pause();
             document.getElementById('call-screen').style.display = 'none';
             
-            setTimeout(() => window.location.reload(), 500);
+            incomingCallRef = null;
+            setTimeout(() => window.location.reload(), 600);
         }
 
         /* -------------------------------------------------------------------------- */
-        /* UI HELPERS                                                                 */
+        /* UI RENDERING & DATA                                                        */
         /* -------------------------------------------------------------------------- */
         function switchTab(tab) {
             activeTab = tab;
@@ -473,78 +506,96 @@
 
         async function loadData() {
             showSkeleton();
-            activeTab === 'recent' ? loadRecent() : loadContacts();
+            if (activeTab === 'recent') await loadRecent(); else await loadContacts();
         }
 
         async function loadRecent() {
-            const snap = await db.collection("call_logs").where('participants', 'array-contains', myUid).orderBy('timestamp', 'desc').limit(15).get();
+            const snapshot = await db.collection("call_logs")
+                .where('participants', 'array-contains', myUid)
+                .orderBy('timestamp', 'desc').limit(10).get();
+            
             let html = "";
-            snap.forEach(doc => {
+            snapshot.forEach(doc => {
                 const call = doc.data();
-                const isOut = call.callerId === myUid;
-                const otherUid = isOut ? call.receiverId : call.callerId;
-                const name = isOut ? call.receiverName : call.callerName;
-                const pfp = isOut ? call.receiverPfp : call.callerPfp;
-                const statusClass = (call.status === 'missed' || call.status === 'cancelled') ? 'status-missed' : (isOut ? 'status-outgoing' : 'status-incoming');
-                html += `<div class="call-item">
-                    <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
-                    <div class="call-info">
-                        <div class="u-name">${name}</div>
-                        <div class="call-meta ${statusClass}">${isOut ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'}</div>
-                    </div>
-                    <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
-                </div>`;
+                const isOutgoing = call.callerId === myUid;
+                const otherUid = isOutgoing ? call.receiverId : call.callerId;
+                const name = isOutgoing ? call.receiverName : call.callerName;
+                const pfp = isOutgoing ? call.receiverPfp : call.callerPfp;
+                const time = new Date(call.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const statusClass = (call.status === 'missed' || call.status === 'cancelled') ? 'status-missed' : (isOutgoing ? 'status-outgoing' : 'status-incoming');
+
+                html += `
+                    <div class="call-item">
+                        <img src="${pfp || 'https://via.placeholder.com/150'}" class="call-pfp">
+                        <div class="call-info">
+                            <div class="u-name">${name}</div>
+                            <div class="call-meta ${statusClass}">${isOutgoing ? 'Outgoing' : 'Incoming'} • ${call.duration || '0s'} • ${time}</div>
+                        </div>
+                        <button class="btn-call" onclick="startCall('${otherUid}', '${name}', '${pfp}', false)">📞</button>
+                    </div>`;
             });
-            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center;margin-top:20px;opacity:0.5;'>No history</p>";
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No call history</p>";
         }
 
         async function loadContacts() {
             const following = myData.following || [];
+            if (following.length === 0) {
+                document.getElementById('list-container').innerHTML = "<p style='text-align:center; padding:40px; opacity:0.5;'>No mutual contacts</p>";
+                return;
+            }
+
             let html = "";
             for (let uid of following) {
                 const uDoc = await db.collection("users").doc(uid).get();
                 const u = uDoc.data();
                 if (u && u.following && u.following.includes(myUid)) {
-                    html += `<div class="call-item">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
-                        <div class="call-info">
-                            <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
-                            <div class="call-meta">@${u.username || 'user'}</div>
-                        </div>
-                        <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
-                    </div>`;
+                    html += `
+                        <div class="call-item">
+                            <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
+                            <div class="call-info">
+                                <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                                <div class="call-meta">@${u.username || 'user'}</div>
+                            </div>
+                            <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
+                        </div>`;
                 }
             }
-            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center;margin-top:20px;opacity:0.5;'>No mutual contacts</p>";
+            document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
         }
 
         function showSkeleton() {
             let html = '';
-            for(let i=0; i<5; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
+            for(let i=0; i<6; i++) html += `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
             document.getElementById('list-container').innerHTML = html;
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* CALL CONTROLS & UTILS                                                      */
+        /* -------------------------------------------------------------------------- */
         function startTimer() {
-            const el = document.getElementById('call-timer');
-            el.style.display = 'block';
+            secondsElapsed = 0;
+            const timerEl = document.getElementById('call-timer');
+            timerEl.style.display = 'block';
             timerInterval = setInterval(() => {
                 secondsElapsed++;
-                const m = String(Math.floor(secondsElapsed/60)).padStart(2,'0');
-                const s = String(secondsElapsed%60).padStart(2,'0');
-                el.innerText = `${m}:${s}`;
+                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+                const secs = String(secondsElapsed % 60).padStart(2, '0');
+                timerEl.innerText = `${mins}:${secs}`;
             }, 1000);
         }
 
         async function logCall(status) {
             if(!currentActiveTarget) return;
-            await db.collection("call_logs").add({
-                participants: [myUid, currentActiveTarget.uid],
-                callerId: myUid, receiverId: currentActiveTarget.uid,
-                callerName: myData.name || "User", receiverName: currentActiveTarget.name,
-                callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
-                duration: Math.floor(secondsElapsed/60) + "m " + (secondsElapsed%60) + "s",
-                status: status, timestamp: Date.now()
-            });
+            const durationStr = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
+            try {
+                await db.collection("call_logs").add({
+                    participants: [myUid, currentActiveTarget.uid],
+                    callerId: myUid, receiverId: currentActiveTarget.uid,
+                    callerName: myData.name || "User", receiverName: currentActiveTarget.name,
+                    callerPfp: myData.photoURL || "", receiverPfp: currentActiveTarget.pfp || "",
+                    duration: durationStr, status: status, timestamp: Date.now()
+                });
+            } catch(e) { console.error("Log failed", e); }
         }
 
         function toggleMic() {
@@ -574,7 +625,7 @@
         function showCallUI(name, pfp, status, verified) {
             document.getElementById('call-screen').style.display = 'flex';
             document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
-            if(pfp) document.getElementById('target-pfp').src = pfp;
+            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
             updateCallStatus(status, "var(--accent)");
         }
 
