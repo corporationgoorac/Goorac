@@ -186,15 +186,70 @@
         class CallNotifier extends HTMLElement {
             constructor() { super(); }
             connectedCallback() {
+                // IMPORTANT: Do not show notifier if we are on calls.html and already handling a call
+                const currentPath = window.location.pathname;
+                const params = new URLSearchParams(window.location.search);
+                if (currentPath.endsWith('calls.html') && (params.has('callId') || params.has('autoAnswer'))) {
+                    this.style.display = 'none'; // Completely hide it
+                    return;
+                }
+
+                this.loadDependencies().then(() => {
+                    this.render();
+                    this.init();
+                    this.initSwipe();
+                    this.unlockAudio(); 
+                });
+            }
+
+            unlockAudio() {
+                const unlock = () => {
+                    const tone = this.querySelector('#n-tone');
+                    if (tone) {
+                        tone.muted = true;
+                        tone.play().then(() => {
+                            tone.pause();
+                            tone.currentTime = 0;
+                            tone.muted = false;
+                        }).catch(() => {});
+                    }
+                    document.removeEventListener('touchstart', unlock);
+                    document.removeEventListener('click', unlock);
+                };
+                document.addEventListener('touchstart', unlock);
+                document.addEventListener('click', unlock);
+            }
+
+            async loadDependencies() {
+                const scripts = [
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js',
+                    'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js'
+                ];
+                for (const src of scripts) {
+                    if (!document.querySelector(`script[src="${src}"]`)) {
+                        await new Promise(res => {
+                            const s = document.createElement('script');
+                            s.src = src; 
+                            s.onload = res;
+                            s.onerror = res;
+                            document.head.appendChild(s);
+                        });
+                    }
+                }
+            }
+
+            render() {
                 this.innerHTML = `
                 <style>
                     #notif-banner {
                         position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
                         width: calc(100% - 30px); max-width: 400px;
-                        background: rgba(10, 15, 20, 0.98); backdrop-filter: blur(20px);
+                        background: rgba(28, 39, 46, 0.98); backdrop-filter: blur(20px);
                         border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 24px;
                         padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-                        z-index: 100000; box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+                        z-index: 999999; box-shadow: 0 15px 40px rgba(0,0,0,0.8);
                         transition: top 0.5s cubic-bezier(0.16, 1, 0.3, 1);
                     }
                     #notif-banner.active { top: 20px; }
@@ -216,20 +271,109 @@
                         <button class="nb-btn nb-dec" id="nb-decline">Decline</button>
                         <button class="nb-btn nb-acc" id="nb-answer">Answer</button>
                     </div>
+                    <audio id="n-tone" loop preload="auto"><source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg"></audio>
                 </div>`;
             }
-            show(name, pfp, onAccept, onDecline) {
-                const b = this.querySelector('#notif-banner');
-                this.querySelector('#nb-user').innerText = name;
-                this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
-                b.classList.add('active');
-                this.querySelector('#nb-answer').onclick = () => { b.classList.remove('active'); onAccept(); };
-                this.querySelector('#nb-decline').onclick = () => { b.classList.remove('active'); onDecline(); };
+
+            init() {
+                const check = setInterval(() => {
+                    if (typeof firebase !== 'undefined' && firebase.apps.length > 0 && firebase.auth().currentUser) {
+                        clearInterval(check);
+                        this.listen();
+                    }
+                }, 1000);
             }
-            hide() { 
-                const b = this.querySelector('#notif-banner');
-                if(b) b.classList.remove('active'); 
-                document.getElementById('ringtone').pause();
+
+            initSwipe() {
+                const banner = this.querySelector('#notif-banner');
+                let startY = 0, currentY = 0;
+                if(!banner) return;
+                banner.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; banner.style.transition = 'none'; }, { passive: true });
+                banner.addEventListener('touchmove', (e) => {
+                    currentY = e.touches[0].clientY - startY;
+                    if (currentY < 0) {
+                        banner.style.transform = `translateX(-50%) translateY(${currentY}px)`;
+                        banner.style.opacity = 1 - Math.abs(currentY) / 120;
+                    }
+                }, { passive: true });
+                banner.addEventListener('touchend', () => {
+                    banner.style.transition = 'all 0.6s';
+                    if (currentY < -50) this.hide();
+                    else { banner.style.transform = `translateX(-50%)`; banner.style.opacity = '1'; }
+                    currentY = 0;
+                });
+            }
+
+            listen() {
+                const uid = firebase.auth().currentUser.uid;
+                this.signalRef = firebase.database().ref(`calls_status/${uid}`);
+                
+                this.signalRef.on('value', async snap => {
+                    const data = snap.val();
+                    if (!data || data.status !== 'ringing') { 
+                        this.hide(); 
+                        return; 
+                    }
+
+                    if (data.timestamp && (Date.now() - data.timestamp > 45000)) {
+                        this.signalRef.remove();
+                        this.hide();
+                        return;
+                    }
+
+                    // Explicit check to prevent popup on the call screen itself
+                    if (window.location.pathname.endsWith('calls.html')) return;
+
+                    // Fetch user details for the popup
+                    const userDoc = await firebase.firestore().collection("users").doc(data.callerId).get();
+                    const userData = userDoc.exists ? userDoc.data() : {};
+                    
+                    const callerInfo = {
+                        name: userData.name || "Unknown User",
+                        pfp: userData.photoURL || 'https://via.placeholder.com/150',
+                        verified: userData.verified || false,
+                        callerId: data.callerId
+                    };
+
+                    this.show(callerInfo);
+
+                    this.querySelector('#n-dec').onclick = (e) => {
+                        e.preventDefault();
+                        firebase.database().ref(`calls_status/${data.callerId}`).set('declined');
+                        this.signalRef.remove();
+                        this.hide();
+                    };
+
+                    this.querySelector('#n-ans').onclick = (e) => {
+                        e.preventDefault();
+                        this.hide();
+                        const url = new URL('calls.html', window.location.href);
+                        url.searchParams.set('targetUid', data.callerId);
+                        url.searchParams.set('autoAnswer', 'true');
+                        window.location.href = url.href;
+                    };
+                });
+            }
+
+            show(caller) {
+                const banner = this.querySelector('#notif-banner');
+                const userEl = this.querySelector('#nb-user');
+                const imgEl = this.querySelector('#nb-img');
+                const tone = this.querySelector('#n-tone');
+
+                userEl.textContent = caller.name;
+                imgEl.src = caller.pfp;
+                banner.classList.add('active');
+
+                tone.muted = false;
+                tone.play().catch(() => {});
+            }
+
+            hide() {
+                const banner = this.querySelector('#notif-banner');
+                const audio = this.querySelector('#n-tone');
+                if (banner) banner.classList.remove('active');
+                if (audio) { audio.pause(); audio.currentTime = 0; }
             }
         }
         customElements.define('call-notifier', CallNotifier);
@@ -299,17 +443,19 @@
             if (autoAnswer === 'true' && targetUid) {
                 pendingAutoAnswer = true;
                 
-                // Fetch details so screen isn't blank
+                // 1. Fetch details immediately so screen isn't blank
                 db.collection("users").doc(targetUid).get().then(doc => {
-                    const d = doc.data();
+                    const d = doc.exists ? doc.data() : {};
+                    // Manually populate active target so logCall works if it connects fast
+                    currentActiveTarget = { uid: targetUid, name: d.name || "User", pfp: d.photoURL };
                     showCallUI(d.name || "User", d.photoURL, "CONNECTING...", d.verified);
                 });
 
-                // Clear URL
+                // 2. Clean URL so we don't auto-answer on refresh
                 const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.pushState({path:newurl},'',newurl);
+                window.history.replaceState({path:newurl},'',newurl);
 
-                // If PeerJS call already arrived before 'open', trigger now
+                // 3. Check if PeerJS already received the call object
                 if(incomingCallRef) triggerAnswer();
             }
         }
@@ -329,21 +475,28 @@
                     return;
                 }
 
+                // If remote says connected, stop ringing sound locally
+                if (callData === 'connected') {
+                    document.getElementById('ringtone').pause();
+                }
+
                 if (callData.status === 'ringing' && !currentCall && !pendingAutoAnswer) {
                     const callerId = callData.callerId;
                     const uDoc = await db.collection("users").doc(callerId).get();
                     const uData = uDoc.data() || {};
                     
                     document.getElementById('ringtone').play().catch(()=>{});
-                    document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
-                        () => triggerAnswer(), 
-                        () => {
-                            document.getElementById('ringtone').pause();
-                            rdb.ref(`calls_status/${callerId}`).set('declined');
-                            rdb.ref(`calls_status/${myUid}`).remove();
-                            if(incomingCallRef) incomingCallRef.close();
-                        }
-                    );
+                    
+                    // Trigger the custom element notification
+                    const notifier = document.querySelector('call-notifier');
+                    if(notifier) {
+                        notifier.show({
+                            name: uData.name || "User",
+                            pfp: uData.photoURL,
+                            verified: uData.verified,
+                            callerId: callerId
+                        });
+                    }
                 }
             });
         }
@@ -377,24 +530,22 @@
                 // RETRY LOOP: Keeps trying to connect in case user reloads page to answer
                 let attempts = 0;
                 const connect = () => {
-                    if (currentCall || attempts > 20) return; // Stop if connected or timeout
+                    if (currentCall || attempts > 25) return; 
                     const call = peer.call(targetUid, localStream);
                     
-                    // Listen to this specific attempt
                     call.on('stream', (rs) => {
-                        clearInterval(connectionRetry); // Stop retrying
+                        clearInterval(connectionRetry); 
                         handleStream(call, rs); 
                     });
                     
-                    // Cleanup failed attempts silently
                     call.on('close', () => { if(!currentCall) call.close(); });
                     call.on('error', () => { });
                     
                     attempts++;
                 };
 
-                connect(); // First attempt
-                connectionRetry = setInterval(connect, 750); // Retry every 750ms
+                connect(); 
+                connectionRetry = setInterval(connect, 800); 
                 
             } catch (e) { 
                 console.error("Stream error:", e);
@@ -415,14 +566,9 @@
             db.collection("users").doc(callerId).get().then(uDoc => {
                 const uData = uDoc.data() || {};
                 document.getElementById('ringtone').play().catch(()=>{});
-                document.querySelector('call-notifier').show(uData.name, uData.photoURL, 
-                    () => triggerAnswer(), 
-                    () => {
-                        document.getElementById('ringtone').pause();
-                        incoming.close();
-                        rdb.ref(`calls_status/${callerId}`).set('declined');
-                    }
-                );
+                
+                // Show notification manually if needed, or rely on RTDB signaling listener
+                // In this case, we rely on RTDB mainly, but this is a failsafe
             });
         }
 
@@ -444,6 +590,7 @@
                 const uDoc = await db.collection("users").doc(callerId).get();
                 const uData = uDoc.data() || {};
                 currentActiveTarget = { uid: callerId, name: uData.name, pfp: uData.photoURL };
+                showCallUI(uData.name, uData.photoURL, "CONNECTING...", uData.verified);
             }
 
             try {
@@ -467,7 +614,7 @@
         }
 
         function handleStream(call, remoteStream) {
-            if(currentCall) return; // Prevent double binding
+            if(currentCall) return; 
             currentCall = call;
             
             if(connectionRetry) clearInterval(connectionRetry);
@@ -483,7 +630,6 @@
             document.getElementById('ring-animation').style.display = 'none';
             if (!timerInterval) startTimer();
 
-            // Set global close handler
             call.on('close', () => executeHangupSequence(false));
             call.on('error', (err) => {
                 console.error("Peer Error:", err);
