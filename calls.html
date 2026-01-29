@@ -472,7 +472,8 @@
                 pc.ontrack = (event) => {
                     const rv = document.getElementById('remote-video');
                     rv.srcObject = event.streams[0];
-                    rv.style.display = 'block';
+                    if (isCamOn) rv.style.display = 'block';
+                    rv.play().catch(e => console.warn("Remote video auto-play blocked", e));
                 };
 
                 const offer = await pc.createOffer();
@@ -498,7 +499,12 @@
                         handleHangUpEffectively(false);
                     }
                     if (data.answer && !pc.currentRemoteDescription) {
-                        pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
+                             // Process queued candidates if any
+                             rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).once('value', cSnap => {
+                                 cSnap.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => {}));
+                             });
+                        });
                         document.getElementById('dialtone').pause();
                         startTimer();
                         updateCallStatus("CONNECTED", "#1ebea5");
@@ -549,7 +555,6 @@
 
                     rdb.ref(`calls/${data.callId}`).on('value', s => {
                         const val = s.val();
-                        // Fix: Receiver now correctly hangs up when status changes to 'ended', 'cancelled', or 'declined'
                         if (val?.status === 'cancelled' || val?.status === 'ended' || val?.status === 'declined') {
                             notifier.hide();
                             handleHangUpEffectively(false);
@@ -582,7 +587,8 @@
                 pc.ontrack = (e) => {
                     const rv = document.getElementById('remote-video');
                     rv.srcObject = e.streams[0];
-                    rv.style.display = 'block';
+                    if (isCamOn) rv.style.display = 'block';
+                    rv.play().catch(err => console.warn("Remote stream play blocked", err));
                 };
 
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
@@ -595,7 +601,9 @@
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
-                    pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                    if (pc.remoteDescription) {
+                        pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                    }
                 });
 
                 rdb.ref(`signaling/${myUid}`).remove();
@@ -603,7 +611,6 @@
                 updateCallStatus("CONNECTED", "#1ebea5");
                 document.getElementById('ring-animation').style.display = 'none';
 
-                // Monitor call status for hang-up
                 rdb.ref(`calls/${currentCallId}`).on('value', snap => {
                     const data = snap.val();
                     if (data && (data.status === 'ended' || data.status === 'cancelled' || data.status === 'declined')) {
@@ -728,9 +735,15 @@
             const t = localStream.getVideoTracks()[0];
             t.enabled = isCamOn;
             document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
-            document.getElementById('remote-video').style.display = isCamOn ? 'block' : 'none';
-            document.getElementById('local-video').style.display = isCamOn ? 'block' : 'none';
-            document.getElementById('pfp-area').style.display = isCamOn ? 'none' : 'flex';
+            
+            // Only show video elements if cam is on
+            const rv = document.getElementById('remote-video');
+            const lv = document.getElementById('local-video');
+            const pfp = document.getElementById('pfp-area');
+            
+            rv.style.display = isCamOn ? 'block' : 'none';
+            lv.style.display = isCamOn ? 'block' : 'none';
+            pfp.style.display = isCamOn ? 'none' : 'flex';
         }
     </script>
 </body>
