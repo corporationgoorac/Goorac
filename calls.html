@@ -274,6 +274,7 @@
         let isCamOn = false;
         let cachedList = []; 
         let isLoggingInProgress = false;
+        let remoteCandidatesQueue = []; // Fixed: Stores incoming ICE candidates until handshake is ready
 
         const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
@@ -451,6 +452,7 @@
             isLoggingInProgress = false;
             currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
             currentCallId = "call_" + Date.now() + "_" + myUid;
+            remoteCandidatesQueue = []; // Reset queue for new call
             
             showCallUI(name, pfp, "DIALING...", isVerified);
             document.getElementById('dialtone').play().catch(() => {});
@@ -458,7 +460,6 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = false;
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -472,8 +473,8 @@
                 pc.ontrack = (event) => {
                     const rv = document.getElementById('remote-video');
                     rv.srcObject = event.streams[0];
-                    if (isCamOn) rv.style.display = 'block';
-                    rv.play().catch(e => console.warn("Remote video auto-play blocked", e));
+                    rv.style.display = 'block';
+                    rv.play();
                 };
 
                 const offer = await pc.createOffer();
@@ -491,7 +492,7 @@
                     pfp: myData.photoURL || "", timestamp: Date.now() 
                 });
 
-                rdb.ref(`calls/${currentCallId}`).on('value', snap => {
+                rdb.ref(`calls/${currentCallId}`).on('value', async snap => {
                     const data = snap.val();
                     if (!data) return;
                     
@@ -499,12 +500,8 @@
                         handleHangUpEffectively(false);
                     }
                     if (data.answer && !pc.currentRemoteDescription) {
-                        pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
-                             // Process queued candidates if any
-                             rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).once('value', cSnap => {
-                                 cSnap.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => {}));
-                             });
-                        });
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        processQueuedCandidates(); // Process candidates after handshake is ready
                         document.getElementById('dialtone').pause();
                         startTimer();
                         updateCallStatus("CONNECTED", "#1ebea5");
@@ -513,8 +510,11 @@
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).on('child_added', snap => {
+                    const candidate = new RTCIceCandidate(snap.val());
                     if (pc.remoteDescription) {
-                        pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                        pc.addIceCandidate(candidate).catch(e => console.error(e));
+                    } else {
+                        remoteCandidatesQueue.push(candidate);
                     }
                 });
 
@@ -571,6 +571,7 @@
             document.getElementById('answer-btn').style.display = 'none';
             document.getElementById('hangup-btn').style.transform = 'none';
             updateCallStatus("CONNECTING...", "var(--accent)");
+            remoteCandidatesQueue = [];
 
             try {
                 const snap = await rdb.ref(`calls/${currentCallId}`).get();
@@ -578,7 +579,6 @@
 
                 localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 document.getElementById('local-video').srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = false;
 
                 pc = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -587,11 +587,13 @@
                 pc.ontrack = (e) => {
                     const rv = document.getElementById('remote-video');
                     rv.srcObject = e.streams[0];
-                    if (isCamOn) rv.style.display = 'block';
-                    rv.play().catch(err => console.warn("Remote stream play blocked", err));
+                    rv.style.display = 'block';
+                    rv.play();
                 };
 
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+                processQueuedCandidates(); // Process any candidates received during setup
+
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
 
@@ -601,8 +603,11 @@
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
+                    const candidate = new RTCIceCandidate(snap.val());
                     if (pc.remoteDescription) {
-                        pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(e => console.error(e));
+                        pc.addIceCandidate(candidate).catch(e => console.error(e));
+                    } else {
+                        remoteCandidatesQueue.push(candidate);
                     }
                 });
 
@@ -619,6 +624,13 @@
                 });
 
             } catch (e) { hangUp(); }
+        }
+
+        function processQueuedCandidates() {
+            remoteCandidatesQueue.forEach(candidate => {
+                pc.addIceCandidate(candidate).catch(e => console.log("Queued candidate error:", e));
+            });
+            remoteCandidatesQueue = [];
         }
 
         async function hangUp() {
@@ -735,15 +747,9 @@
             const t = localStream.getVideoTracks()[0];
             t.enabled = isCamOn;
             document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
-            
-            // Only show video elements if cam is on
-            const rv = document.getElementById('remote-video');
-            const lv = document.getElementById('local-video');
-            const pfp = document.getElementById('pfp-area');
-            
-            rv.style.display = isCamOn ? 'block' : 'none';
-            lv.style.display = isCamOn ? 'block' : 'none';
-            pfp.style.display = isCamOn ? 'none' : 'flex';
+            document.getElementById('remote-video').style.display = isCamOn ? 'block' : 'none';
+            document.getElementById('local-video').style.display = isCamOn ? 'block' : 'none';
+            document.getElementById('pfp-area').style.display = isCamOn ? 'none' : 'flex';
         }
     </script>
 </body>
