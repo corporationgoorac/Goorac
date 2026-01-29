@@ -21,16 +21,12 @@
             --ig-blue: #0095f6;
         }
 
-        /* Anti-Copy CSS */
         body {
             background: #000; color: white; margin: 0;
             font-family: -apple-system, system-ui, sans-serif;
             height: 100vh; overflow: hidden;
             display: flex; flex-direction: column;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
+            -webkit-user-select: none; user-select: none;
         }
 
         input { -webkit-user-select: text; user-select: text; }
@@ -45,18 +41,15 @@
 
         #list-container { flex: 1; overflow-y: auto; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
 
-        .skeleton {
-            background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-            border-radius: 4px;
-        }
+        /* Skeleton UI */
+        .skeleton { background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 4px; }
         @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .skeleton-item { display: flex; align-items: center; padding: 15px 20px; gap: 15px; }
         .sk-pfp { width: 50px; height: 50px; border-radius: 50%; }
         .sk-text { height: 12px; width: 60%; margin-bottom: 8px; }
         .sk-meta { height: 10px; width: 40%; }
 
+        /* List Items */
         .call-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .call-pfp { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 1.5px solid var(--border); }
         .call-info { flex: 1; }
@@ -76,14 +69,14 @@
         .status-missed { color: var(--danger); font-weight: bold; }
         .status-incoming { color: var(--success); }
         .status-outgoing { color: var(--accent); }
-        .time-stamp { font-size: 0.7rem; opacity: 0.6; margin-left: 5px; }
         .btn-call { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0, 210, 255, 0.1); color: var(--accent); cursor: pointer; }
 
+        /* Call Screen */
         #call-screen {
             position: fixed; inset: 0; background: linear-gradient(to bottom, #0b141a, #121b22); z-index: 9999;
             display: none; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 40px;
         }
-        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; }
+        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; background: #000; }
         #local-video { position: absolute; top: 40px; right: 20px; width: 90px; height: 130px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 10; display: none; background: #000; }
         .call-header { z-index: 5; text-align: center; }
         .call-header h2 { font-size: 1.8rem; margin: 0 0 8px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px; }
@@ -94,12 +87,13 @@
         #target-pfp { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); }
         .pulse { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); animation: pulse-ring 2s infinite; }
         @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
+        
         .call-controls { display: flex; flex-direction: column; gap: 30px; z-index: 20; width: 100%; align-items: center; }
         .control-row { display: flex; gap: 25px; align-items: center; justify-content: center; }
         .ctrl-btn { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; background: rgba(255,255,255,0.15); }
         .btn-end { width: 65px; height: 65px; background: var(--danger) !important; }
         .btn-accept { width: 65px; height: 65px; background: var(--success) !important; }
-        .btn-off { background: rgba(255,255,255,0.5); color: black; }
+        .btn-off { background: rgba(255,255,255,0.5); color: #000; }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -148,6 +142,7 @@
     <call-notifier></call-notifier>
 
     <script>
+        // Custom Element Notifier
         class CallNotifier extends HTMLElement {
             constructor() { super(); }
             connectedCallback() {
@@ -188,14 +183,14 @@
                 this.querySelector('#nb-user').innerText = name;
                 this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
                 b.classList.add('active');
-                this.querySelector('#nb-answer').onclick = () => { b.classList.remove('active'); document.getElementById('ringtone').pause(); onAccept(); };
-                this.querySelector('#nb-decline').onclick = () => { b.classList.remove('active'); document.getElementById('ringtone').pause(); onDecline(); };
+                this.querySelector('#nb-answer').onclick = () => { b.classList.remove('active'); onAccept(); };
+                this.querySelector('#nb-decline').onclick = () => { b.classList.remove('active'); onDecline(); };
             }
-            hide() { const b = this.querySelector('#notif-banner'); if(b) b.classList.remove('active'); document.getElementById('ringtone').pause(); }
+            hide() { this.querySelector('#notif-banner').classList.remove('active'); }
         }
         customElements.define('call-notifier', CallNotifier);
 
-        // Firebase Config
+        // Firebase Setup
         const firebaseConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
             authDomain: "goorac-c3b59.firebaseapp.com",
@@ -210,16 +205,14 @@
         const rdb = firebase.database();
         const auth = firebase.auth();
 
+        // Global State
         let myUid, myData, pc, localStream, timerInterval;
         let currentCallId = null;
         let isCaller = false;
         let secondsElapsed = 0;
-        let currentActiveTarget = null; 
-        let activeTab = 'recent';
+        let currentActiveTarget = null;
         let isCamOn = false;
-        let cachedList = []; 
-        let isLoggingInProgress = false;
-        let remoteCandidatesQueue = []; // Fixed: Candidate queueing
+        let remoteCandidatesQueue = [];
 
         const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
@@ -230,164 +223,193 @@
                 myData = doc.data() || {};
                 loadData();
                 listenForPings();
-                checkAutoAnswer();
             } else { window.location.href = 'login.html'; }
         });
+
+        // --- NEW WEBRTC LOGIC ---
+
+        async function initWebRTC() {
+            pc = new RTCPeerConnection(servers);
+            remoteCandidatesQueue = [];
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate && currentCallId) {
+                    rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(event.candidate.toJSON());
+                }
+            };
+
+            pc.ontrack = (event) => {
+                const rv = document.getElementById('remote-video');
+                rv.srcObject = event.streams[0];
+                rv.style.display = 'block';
+                document.getElementById('pfp-area').style.display = 'none';
+            };
+
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('local-video').srcObject = localStream;
+            localStream.getVideoTracks()[0].enabled = false; // Default camera off
+
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
 
         async function processQueuedCandidates() {
             while (remoteCandidatesQueue.length > 0) {
                 const candidate = remoteCandidatesQueue.shift();
-                await pc.addIceCandidate(candidate).catch(e => console.error("Candidate error:", e));
+                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } 
+                catch (e) { console.warn("ICE candidate failed", e); }
             }
         }
 
         async function startCall(targetUid, name, pfp, isVerified) {
             if (currentCallId) return;
-            isCaller = true; secondsElapsed = 0; isLoggingInProgress = false;
-            currentActiveTarget = { uid: targetUid, name: name, pfp: pfp, verified: isVerified };
-            currentCallId = "call_" + Date.now() + "_" + myUid;
-            remoteCandidatesQueue = [];
-            
+            isCaller = true;
+            currentCallId = `call_${Date.now()}_${myUid}`;
+            currentActiveTarget = { uid: targetUid, name, pfp };
+
             showCallUI(name, pfp, "DIALING...", isVerified);
-            document.getElementById('dialtone').play().catch(() => {});
+            document.getElementById('dialtone').play();
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-                document.getElementById('local-video').srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = false;
-
-                pc = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(event.candidate.toJSON());
-                };
-
-                pc.ontrack = (event) => {
-                    const rv = document.getElementById('remote-video');
-                    rv.srcObject = event.streams[0];
-                    rv.style.display = 'block';
-                    document.getElementById('pfp-area').style.display = 'none';
-                };
-
+                await initWebRTC();
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
                 const callPayload = {
                     offer: { sdp: offer.sdp, type: offer.type },
-                    callerId: myUid, callerName: myData.name || "User", callerPfp: myData.photoURL || "",
+                    callerId: myUid, callerName: myData.name || "User",
                     receiverId: targetUid, status: 'ringing', timestamp: Date.now()
                 };
 
                 await rdb.ref(`calls/${currentCallId}`).set(callPayload);
-                await rdb.ref(`signaling/${targetUid}`).set({ from: myUid, callId: currentCallId, name: myData.name || "User", pfp: myData.photoURL || "", timestamp: Date.now() });
+                await rdb.ref(`signaling/${targetUid}`).set({ from: myUid, callId: currentCallId, name: myData.name, pfp: myData.photoURL, timestamp: Date.now() });
 
+                // Watch for answer and candidates
                 rdb.ref(`calls/${currentCallId}`).on('value', async snap => {
                     const data = snap.val();
                     if (!data) return;
-                    if (['declined', 'cancelled', 'ended'].includes(data.status)) handleHangUpEffectively(false);
+                    if (['declined', 'cancelled', 'ended'].includes(data.status)) hangUp(false);
                     if (data.answer && !pc.currentRemoteDescription) {
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        processQueuedCandidates(); // Process queued candidates
-                        document.getElementById('dialtone').pause();
-                        startTimer();
-                        updateCallStatus("CONNECTED", "#1ebea5");
+                        await processQueuedCandidates();
+                        onConnected();
                     }
                 });
 
                 rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).on('child_added', snap => {
-                    const cand = new RTCIceCandidate(snap.val());
-                    if (pc.remoteDescription) pc.addIceCandidate(cand).catch(e => console.error(e));
-                    else remoteCandidatesQueue.push(cand);
+                    if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val()));
+                    else remoteCandidatesQueue.push(snap.val());
                 });
 
-            } catch (e) { alert("Permissions Denied"); hangUp(); }
+            } catch (e) { console.error(e); hangUp(true); }
         }
 
         async function answerCall() {
             document.getElementById('ringtone').pause();
-            document.getElementById('answer-btn').style.display = 'none';
             updateCallStatus("CONNECTING...", "var(--accent)");
-            remoteCandidatesQueue = [];
 
             try {
                 const snap = await rdb.ref(`calls/${currentCallId}`).get();
                 const callData = snap.val();
 
-                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-                document.getElementById('local-video').srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = false;
-
-                pc = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-                pc.onicecandidate = (e) => e.candidate && rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(e.candidate.toJSON());
-                pc.ontrack = (e) => {
-                    const rv = document.getElementById('remote-video');
-                    rv.srcObject = e.streams[0];
-                    rv.style.display = 'block';
-                    document.getElementById('pfp-area').style.display = 'none';
-                };
-
+                await initWebRTC();
                 await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                processQueuedCandidates(); 
-                
+                await processQueuedCandidates();
+
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
 
                 await rdb.ref(`calls/${currentCallId}`).update({ answer: { sdp: answer.sdp, type: answer.type }, status: 'connected' });
+                await rdb.ref(`signaling/${myUid}`).remove();
 
                 rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
-                    const cand = new RTCIceCandidate(snap.val());
-                    if (pc.remoteDescription) pc.addIceCandidate(cand).catch(e => console.error(e));
-                    else remoteCandidatesQueue.push(cand);
+                    if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val()));
+                    else remoteCandidatesQueue.push(snap.val());
                 });
 
-                rdb.ref(`signaling/${myUid}`).remove();
-                startTimer();
-                updateCallStatus("CONNECTED", "#1ebea5");
-            } catch (e) { hangUp(); }
+                onConnected();
+            } catch (e) { console.error(e); hangUp(true); }
+        }
+
+        function onConnected() {
+            document.getElementById('dialtone').pause();
+            document.getElementById('ringtone').pause();
+            updateCallStatus("CONNECTED", "#1ebea5");
+            document.getElementById('answer-btn').style.display = 'none';
+            startTimer();
         }
 
         function listenForPings() {
             rdb.ref(`signaling/${myUid}`).on('value', snap => {
                 const data = snap.val();
-                if (!data) return;
-                if (!currentCallId && (Date.now() - data.timestamp < 30000)) {
-                    document.querySelector('call-notifier').show(data.name, data.pfp, 
-                        () => { 
-                            isCaller = false; currentCallId = data.callId; 
-                            currentActiveTarget = { uid: data.from, name: data.name, pfp: data.pfp };
-                            showCallUI(data.name, data.pfp, "INCOMING...", false);
-                            answerCall(); 
-                        },
-                        () => { rdb.ref(`calls/${data.callId}`).update({ status: 'declined' }); rdb.ref(`signaling/${myUid}`).remove(); }
-                    );
-                    document.getElementById('ringtone').play().catch(() => {});
-                }
+                if (!data || currentCallId) return;
+                
+                document.querySelector('call-notifier').show(data.name, data.pfp, 
+                    () => { // Accept
+                        currentCallId = data.callId;
+                        currentActiveTarget = { uid: data.from, name: data.name, pfp: data.pfp };
+                        showCallUI(data.name, data.pfp, "INCOMING...", false);
+                        document.getElementById('answer-btn').style.display = 'flex';
+                        document.getElementById('ringtone').pause();
+                    },
+                    () => { // Decline
+                        rdb.ref(`calls/${data.callId}`).update({ status: 'declined' });
+                        rdb.ref(`signaling/${myUid}`).remove();
+                        document.getElementById('ringtone').pause();
+                    }
+                );
+                document.getElementById('ringtone').play().catch(()=>{});
             });
         }
 
-        async function handleHangUpEffectively(shouldNotifyRemote) {
-            document.getElementById('ringtone').pause();
-            document.getElementById('dialtone').pause();
+        async function hangUp(shouldNotifyRemote = true) {
+            if (shouldNotifyRemote && currentCallId) {
+                const status = secondsElapsed > 0 ? 'ended' : (isCaller ? 'cancelled' : 'declined');
+                await rdb.ref(`calls/${currentCallId}`).update({ status });
+                if (isCaller) logCall(status);
+            }
+
             if (currentCallId) {
                 rdb.ref(`calls/${currentCallId}`).off();
-                if (shouldNotifyRemote) {
-                    let rdbStatus = (secondsElapsed > 0) ? 'ended' : (isCaller ? 'cancelled' : 'declined');
-                    await rdb.ref(`calls/${currentCallId}`).update({ status: rdbStatus });
-                }
-                if (isCaller && !isLoggingInProgress) { isLoggingInProgress = true; await logCall(secondsElapsed > 0 ? 'completed' : 'cancelled'); }
+                rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).off();
+                if(currentActiveTarget) rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).off();
             }
+
             if (timerInterval) clearInterval(timerInterval);
             if (localStream) localStream.getTracks().forEach(t => t.stop());
             if (pc) pc.close();
+
             document.getElementById('call-screen').style.display = 'none';
+            document.getElementById('ringtone').pause();
+            document.getElementById('dialtone').pause();
+            
             setTimeout(() => window.location.reload(), 500);
         }
 
+        // UI Helpers
+        function showCallUI(name, pfp, status, verified) {
+            document.getElementById('call-screen').style.display = 'flex';
+            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
+            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
+            updateCallStatus(status, "var(--accent)");
+        }
+
+        function updateCallStatus(t, c) {
+            const el = document.getElementById('call-status');
+            el.innerText = t; el.style.color = c;
+        }
+
+        function startTimer() {
+            document.getElementById('call-timer').style.display = 'block';
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                const m = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+                const s = String(secondsElapsed % 60).padStart(2, '0');
+                document.getElementById('call-timer').innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
         function toggleCam() {
-            if(!localStream) return;
+            if (!localStream) return;
             isCamOn = !isCamOn;
             localStream.getVideoTracks()[0].enabled = isCamOn;
             document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
@@ -395,44 +417,79 @@
         }
 
         function toggleMic() {
-            if(!localStream) return;
+            if (!localStream) return;
             const t = localStream.getAudioTracks()[0];
             t.enabled = !t.enabled;
             document.getElementById('mic-btn').classList.toggle('btn-off', !t.enabled);
         }
 
-        function hangUp() { handleHangUpEffectively(true); }
-        function showCallUI(name, pfp, status, verified) {
-            document.getElementById('call-screen').style.display = 'flex';
-            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
-            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
-            updateCallStatus(status, "var(--accent)");
-        }
-        function updateCallStatus(t, c) { const el = document.getElementById('call-status'); el.innerText = t; el.style.color = c; }
-        function startTimer() {
-            const timerEl = document.getElementById('call-timer');
-            timerEl.style.display = 'block';
-            timerInterval = setInterval(() => {
-                secondsElapsed++;
-                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-                const secs = String(secondsElapsed % 60).padStart(2, '0');
-                timerEl.innerText = `${mins}:${secs}`;
-            }, 1000);
-        }
-        
-        // UI helper functions (Skeletons/Tabs) remain largely same as original...
-        function switchTab(tab) {
-            if (activeTab === tab) return;
-            activeTab = tab;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`tab-${tab}`).classList.add('active');
-            loadData();
-        }
+        // Data Loading (History/Contacts)
+        let cachedList = [];
         async function loadData() {
             const list = document.getElementById('list-container');
-            list.innerHTML = '<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div class="sk-text skeleton"></div></div>';
-            // Implementation of loadRecent and loadContacts remains as provided in your snippet
+            list.innerHTML = `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
+            const tab = document.querySelector('.tab.active').id;
+            if (tab === 'tab-recent') await loadRecent(); else await loadContacts();
         }
+
+        async function loadRecent() {
+            const snap = await db.collection("call_logs").where('participants', 'array-contains', myUid).orderBy('timestamp', 'desc').limit(15).get();
+            const list = document.getElementById('list-container');
+            list.innerHTML = "";
+            snap.forEach(doc => {
+                const data = doc.data();
+                const isOutgoing = data.callerId === myUid;
+                const otherName = isOutgoing ? data.receiverName : data.callerName;
+                const otherPfp = isOutgoing ? data.receiverPfp : data.callerPfp;
+                const otherId = isOutgoing ? data.receiverId : data.callerId;
+                
+                list.innerHTML += `
+                <div class="call-item">
+                    <img src="${otherPfp || 'https://via.placeholder.com/150'}" class="call-pfp">
+                    <div class="call-info">
+                        <div class="u-name">${otherName}</div>
+                        <div class="call-meta">${isOutgoing ? '↗ Outgoing' : '↙ Incoming'} • ${data.duration}</div>
+                    </div>
+                    <button class="btn-call" onclick="startCall('${otherId}', '${otherName}', '${otherPfp}', false)">📞</button>
+                </div>`;
+            });
+        }
+
+        async function loadContacts() {
+            const following = myData.following || [];
+            const list = document.getElementById('list-container');
+            list.innerHTML = "";
+            for (let uid of following) {
+                const uDoc = await db.collection("users").doc(uid).get();
+                const u = uDoc.data();
+                if (u) {
+                    list.innerHTML += `
+                    <div class="call-item">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
+                        <div class="call-info"><div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div><div class="call-meta">@${u.username}</div></div>
+                        <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
+                    </div>`;
+                }
+            }
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-'+t).classList.add('active');
+            loadData();
+        }
+
+        async function logCall(status) {
+            if (!currentActiveTarget) return;
+            const dur = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
+            await db.collection("call_logs").add({
+                participants: [myUid, currentActiveTarget.uid],
+                callerId: myUid, callerName: myData.name, callerPfp: myData.photoURL,
+                receiverId: currentActiveTarget.uid, receiverName: currentActiveTarget.name, receiverPfp: currentActiveTarget.pfp,
+                status, duration: dur, timestamp: Date.now()
+            });
+        }
+
     </script>
 </body>
 </html>
