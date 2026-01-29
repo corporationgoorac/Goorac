@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac Profile</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -23,7 +23,32 @@
         
         body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; padding-bottom: 100px; }
 
-        #loader { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        /* Skeleton Animation */
+        .skeleton {
+            position: relative;
+            overflow: hidden;
+            background: #111 !important;
+            border-color: transparent !important;
+            color: transparent !important;
+        }
+
+        .skeleton::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        #loader { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; justify-content: center; align-items: center; transition: 0.3s; }
         .spin { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: s 0.6s linear infinite; }
         @keyframes s { to { transform: rotate(360deg); } }
 
@@ -37,18 +62,20 @@
         .pfp-box { width: 110px; height: 110px; border-radius: 35px; margin: 0 auto; position: relative; padding: 3px; background: linear-gradient(var(--accent), transparent); }
         .pfp-img { width: 100%; height: 100%; border-radius: 32px; object-fit: cover; background: #111; border: 3px solid #000; }
         
-        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.6rem; font-weight: 800; margin-top: 15px; }
+        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.6rem; font-weight: 800; margin-top: 15px; min-height: 32px; }
         .v-tick { width: 20px; height: 20px; }
-        .handle { color: var(--accent); font-size: 0.9rem; font-weight: 600; }
+        .handle { color: var(--accent); font-size: 0.9rem; font-weight: 600; min-height: 20px; margin-bottom: 5px; }
         
-        .g-num { display: inline-block; background: #111; padding: 5px 15px; border-radius: 20px; color: var(--dim); font-size: 0.75rem; margin-top: 10px; border: 1px solid var(--border); }
+        .g-num { display: inline-block; background: #111; padding: 5px 15px; border-radius: 20px; color: var(--dim); font-size: 0.75rem; margin-top: 10px; border: 1px solid var(--border); cursor: pointer; transition: 0.2s; }
+        .g-num:active { transform: scale(0.95); opacity: 0.7; }
 
-        .bio { margin: 20px 0; color: #bbb; font-size: 0.95rem; line-height: 1.5; }
+        .bio { margin: 20px 0; color: #bbb; font-size: 0.95rem; line-height: 1.5; min-height: 40px; }
 
         .stats { display: flex; gap: 10px; margin-bottom: 25px; }
-        .stat-card { flex: 1; background: var(--surface); border: 1px solid var(--border); padding: 15px; border-radius: 20px; text-align: center; }
-        .s-val { display: block; font-size: 1.2rem; font-weight: 800; }
-        .s-lbl { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; }
+        .stat-card { flex: 1; background: var(--surface); border: 1px solid var(--border); padding: 15px; border-radius: 20px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .stat-card:active { background: #151515; transform: scale(0.98); }
+        .s-val { display: block; font-size: 1.2rem; font-weight: 800; pointer-events: none; }
+        .s-lbl { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; pointer-events: none; }
 
         .actions { display: flex; gap: 10px; }
         .btn { flex: 1; height: 52px; border-radius: 16px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; }
@@ -56,6 +83,23 @@
         .btn-f { background: var(--accent); color: #000; }
         .btn-following { background: #1a1a1a; color: #666; border: 1px solid var(--border); }
         .btn:active { transform: scale(0.96); }
+
+        /* Toast Styling */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: none;
+            z-index: 2000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -70,36 +114,41 @@
     </header>
 
     <div class="profile-hero">
-        <div class="pfp-box">
-            <img id="pfp" src="" class="pfp-img">
+        <div class="pfp-box skeleton" id="pfp-wrap">
+            <img id="pfp" src="" class="pfp-img" style="opacity:0;">
         </div>
 
         <div class="name-row">
-            <span id="d-name">...</span>
+            <span id="d-name" class="skeleton">User Name Loading</span>
             <img id="res-v" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="v-tick" style="display:none;">
         </div>
-        <div class="handle" id="d-handle">@...</div>
-        <div class="g-num">ID: <span id="d-gn">----------</span></div>
+        <div class="handle skeleton" id="d-handle" style="width:100px; margin: 0 auto 10px auto;">@username</div>
+        
+        <div id="g-num-wrap" class="skeleton" style="border-radius: 20px; display: inline-block;">
+             <div class="g-num" onclick="copyID()">ID: <span id="d-gn">----------</span></div>
+        </div>
 
-        <div class="bio" id="d-bio">...</div>
+        <div class="bio skeleton" id="d-bio">Bio loading from the Goorac database servers...</div>
 
         <div class="stats">
-            <div class="stat-card">
-                <span class="s-val" id="c-followers">0</span>
+            <div class="stat-card" id="go-followers">
+                <span class="s-val skeleton" id="c-followers">00</span>
                 <span class="s-lbl">Followers</span>
             </div>
-            <div class="stat-card">
-                <span class="s-val" id="c-following">0</span>
+            <div class="stat-card" id="go-following">
+                <span class="s-val skeleton" id="c-following">00</span>
                 <span class="s-lbl">Following</span>
             </div>
         </div>
 
         <div class="actions">
-            <button class="btn btn-msg" id="msg-btn">Message</button>
-            <button class="btn btn-f" id="follow-action-btn">Follow</button>
+            <button class="btn btn-msg skeleton" id="msg-btn">Message</button>
+            <button class="btn btn-f skeleton" id="follow-action-btn">Follow</button>
         </div>
     </div>
 </div>
+
+<div id="toast">ID Copied</div>
 
 <script>
     const firebaseConfig = {
@@ -120,6 +169,11 @@
     let currentUserUID = "";
     let targetUserUID = "";
 
+    // Show app immediately to reveal skeletons
+    document.getElementById('main').classList.add('show');
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+
     auth.onAuthStateChanged(user => {
         if (user) { 
             currentUserUID = user.uid; 
@@ -132,30 +186,59 @@
     async function loadProfileData() {
         if(!targetUsername) return;
 
-        // Use onSnapshot for real-time updates to counts and bio
         db.collection("users").where("username", "==", targetUsername).onSnapshot(async (snap) => {
             if (snap.empty) return;
             const doc = snap.docs[0];
             const userData = doc.data();
             targetUserUID = doc.id;
 
-            // Update UI fields
-            document.getElementById('pfp').src = userData.photoURL || 'https://via.placeholder.com/150';
-            document.getElementById('d-name').innerText = userData.name || userData.username;
-            document.getElementById('d-handle').innerText = `@${userData.username}`;
-            document.getElementById('d-gn').innerText = userData.gooracNumber;
-            document.getElementById('d-bio').innerText = userData.bio || "No bio available.";
-            document.getElementById('c-followers').innerText = userData.followerCount || 0;
-            document.getElementById('c-following').innerText = userData.followingCount || 0;
+            const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
+
+            // Image Loading Logic
+            const pfp = document.getElementById('pfp');
+            const pfpWrap = document.getElementById('pfp-wrap');
+            pfp.src = userData.photoURL || 'https://via.placeholder.com/150';
+            pfp.onload = () => {
+                pfpWrap.classList.remove('skeleton');
+                pfp.style.opacity = '1';
+            };
+
+            // Text Data Logic
+            const nameEl = document.getElementById('d-name');
+            nameEl.innerText = userData.name || userData.username;
+            nameEl.classList.remove('skeleton');
+
+            const handleEl = document.getElementById('d-handle');
+            handleEl.innerText = `@${userData.username}`;
+            handleEl.classList.remove('skeleton');
+            handleEl.style.width = 'auto';
+
+            document.getElementById('d-gn').innerText = userData.gooracNumber || "----------";
+            removeSkeleton('g-num-wrap');
+
+            const bioEl = document.getElementById('d-bio');
+            bioEl.innerText = userData.bio || "No bio available.";
+            bioEl.classList.remove('skeleton');
+
+            const fers = document.getElementById('c-followers');
+            fers.innerText = userData.followerCount || 0;
+            fers.classList.remove('skeleton');
+
+            const fing = document.getElementById('c-following');
+            fing.innerText = userData.followingCount || 0;
+            fing.classList.remove('skeleton');
+
             document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
 
+            // Buttons Logic
+            removeSkeleton('msg-btn');
+            removeSkeleton('follow-action-btn');
+
+            document.getElementById('go-followers').onclick = () => window.location.href = `followers.html?user=${userData.username}`;
+            document.getElementById('go-following').onclick = () => window.location.href = `following.html?user=${userData.username}`;
             document.getElementById('msg-btn').onclick = () => window.location.href = `chat.html?user=${userData.username}`;
 
-            // Check following status for the button
             await updateFollowButton();
-
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('main').classList.add('show');
         });
     }
 
@@ -180,10 +263,11 @@
 
     document.getElementById('follow-action-btn').onclick = async () => {
         const btn = document.getElementById('follow-action-btn');
+        if(btn.classList.contains('skeleton')) return;
+        
         const isCurrentlyFollowing = btn.innerText === "Following";
 
         if (!isCurrentlyFollowing) {
-            // FOLLOW LOGIC
             await db.collection("users").doc(currentUserUID).update({
                 following: firebase.firestore.FieldValue.arrayUnion(targetUserUID),
                 followingCount: firebase.firestore.FieldValue.increment(1)
@@ -193,7 +277,6 @@
                 followerCount: firebase.firestore.FieldValue.increment(1)
             });
         } else {
-            // UNFOLLOW LOGIC
             await db.collection("users").doc(currentUserUID).update({
                 following: firebase.firestore.FieldValue.arrayRemove(targetUserUID),
                 followingCount: firebase.firestore.FieldValue.increment(-1)
@@ -203,8 +286,20 @@
                 followerCount: firebase.firestore.FieldValue.increment(-1)
             });
         }
-        // Button will auto-update because loadProfileData uses onSnapshot
     };
+
+    function copyID() {
+        if(document.getElementById('g-num-wrap').classList.contains('skeleton')) return;
+        const idText = document.getElementById('d-gn').innerText;
+        if (idText.includes("-")) return;
+
+        navigator.clipboard.writeText(idText).then(() => {
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            if (navigator.vibrate) navigator.vibrate(50);
+            setTimeout(() => { toast.style.display = 'none'; }, 2000);
+        });
+    }
 </script>
 
 <script src="components/call-notifier.js" defer></script>
