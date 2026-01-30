@@ -420,6 +420,7 @@
         
         const targetData = snap.docs[0].data();
         
+        // Remove shimmer and update content
         const pfp = document.getElementById('h-pfp');
         pfp.classList.remove('loading-shimmer');
         pfp.src = targetData.photoURL || 'https://via.placeholder.com/150';
@@ -675,12 +676,34 @@
         if(!activeMenuId) return;
         const idToDelete = activeMenuId;
         closeMenu();
+        
+        // Remove from local map first for immediate UI feedback
+        messagesMap.delete(idToDelete);
+        renderAll();
+
+        // Perform deletion in Firestore
         await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
         
-        // Update inbox preview if it was the last message
-        const remaining = Array.from(messagesMap.values()).sort((a,b) => b.timestamp - a.timestamp);
-        const newLast = remaining.length > 0 ? remaining[0].text : "Message unsent";
-        await db.collection("chats").doc(chatId).update({ lastMessage: newLast });
+        // Update the 'lastMessage' in the chat document
+        const remaining = Array.from(messagesMap.values())
+            .filter(m => m.timestamp)
+            .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+        
+        let newLastMsg = "No messages";
+        let newLastSender = "";
+        let newLastTime = firebase.firestore.FieldValue.serverTimestamp();
+
+        if (remaining.length > 0) {
+            newLastMsg = remaining[0].text;
+            newLastSender = remaining[0].sender;
+            newLastTime = remaining[0].timestamp;
+        }
+
+        await db.collection("chats").doc(chatId).update({
+            lastMessage: newLastMsg,
+            lastSender: newLastSender,
+            lastTimestamp: newLastTime
+        }).catch(e => console.error("Update fail:", e));
     }
 
     mInput.oninput = () => rdb.ref(`typing/${chatId}/${myUid}`).set(mInput.value.trim().length > 0);
