@@ -87,18 +87,18 @@
             flex-shrink: 0;
         }
 
-        /* FIXED: Raised z-index to 9999 and added safe-area padding to beat the navbar */
+        /* FIXED: Maxed out z-index and added smooth transition for navbar hiding */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: #111; border-top: 1px solid var(--border);
-            z-index: 9999; border-radius: 20px 20px 0 0;
+            z-index: 100000; border-radius: 20px 20px 0 0;
             transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); box-sizing: border-box;
         }
         #delete-menu.active { bottom: 0; }
         .menu-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            z-index: 9998; display: none; backdrop-filter: blur(4px);
+            z-index: 99999; display: none; backdrop-filter: blur(4px);
         }
         .del-btn-big {
             width: 100%; background: var(--danger); color: white; border: none;
@@ -117,6 +117,10 @@
 
 
         #search-results { display: none; background: #000; min-height: 100vh; }
+
+        /* Animation class for hiding navbar */
+        .hide-nav { opacity: 0 !important; pointer-events: none !important; }
+        main-navbar { transition: opacity 0.3s ease; }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -285,6 +289,11 @@
         
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
+        
+        // Hide navbar to prevent overlap
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.add('hide-nav');
+
         if (window.navigator.vibrate) window.navigator.vibrate(50);
     }
 
@@ -306,6 +315,10 @@
         activeChatId = null;
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
+        
+        // Show navbar again
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.remove('hide-nav');
     }
 
     document.getElementById('confirm-delete').onclick = async () => {
