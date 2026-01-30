@@ -73,13 +73,14 @@
         .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; }
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
 
-        /* Neet Pin Icon: Minimal Bolt */
+        /* Neet Pin Icon: Minimal Neon Bolt */
         .pin-indicator { 
-            width: 12px; height: 12px; 
+            width: 14px; height: 14px; 
             background: var(--accent);
             clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
             display: inline-block;
             filter: drop-shadow(0 0 5px var(--accent));
+            margin-left: 4px;
         }
 
         .follow-btn { 
@@ -152,8 +153,8 @@
 <div id="delete-menu">
     <div style="text-align: center; margin-bottom: 18px; color: #444; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px;">ACTION TERMINAL</div>
     <button class="pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
-    <button class="del-btn-big" id="confirm-delete">Erase History</button>
-    <button class="cancel-btn" onclick="closeDeleteMenu()">Close</button>
+    <button class="del-btn-big" id="confirm-delete">Erase History For Both</button>
+    <button class="cancel-btn" onclick="closeDeleteMenu()">Close Terminal</button>
 </div>
 
 <script src="components/navbar.js" defer></script>
@@ -184,7 +185,7 @@
     let myPinnedChats = [];
     let longPressTimer;
     let activeChatId = null;
-    let userCache = {};
+    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
     let inboxListener = null;
 
     auth.onAuthStateChanged(user => {
@@ -192,13 +193,13 @@
             myUid = user.uid;
             // First time fetch
             fetchUserData();
-            // Start the Real-time Settings Listener (This is the fix for real-time pinning)
+            // Real-time Settings Listener for Pins and Follows
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 const data = doc.data();
                 myFollowingList = data?.following || [];
                 myFollowersList = data?.followers || [];
                 myPinnedChats = data?.pinnedChats || [];
-                // Re-run the inbox logic with the new pin data
+                // Re-sync inbox immediately on pin/unpin
                 listenToInbox();
             });
         } else { window.location.href = 'login.html'; }
@@ -213,7 +214,6 @@
 
     function listenToInbox() {
         if(!myUid) return;
-        // Kill existing listener before starting a new one to prevent memory leaks
         if(inboxListener) inboxListener();
 
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
@@ -227,6 +227,7 @@
                 if (!userCache[otherUid]) {
                     const otherDoc = await db.collection("users").doc(otherUid).get();
                     userCache[otherUid] = otherDoc.data();
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
@@ -252,7 +253,7 @@
                 }
                 const amIFollowing = myFollowingList.includes(otherUid);
                 const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
-                const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">History cleared</span>`;
+                const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
