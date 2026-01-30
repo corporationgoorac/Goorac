@@ -13,7 +13,7 @@
         :root { 
             /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
-            --header-bg: rgba(0,0,0,0.94);
+            --header-bg: rgba(0,0,0,0.96); /* High opacity to cover content scrolling behind */
             --accent: #0095f6; 
             --border: #262626; 
             /* SENDER BUBBLE: Deep Orange Gradient */
@@ -37,14 +37,14 @@
             background: var(--bg);
             position: fixed; 
             left: 0; top: 0;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         body { 
             -webkit-user-select: none; user-select: none; 
             color: var(--text); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            /* Fix for gap issue */
-            margin: 0; padding: 0;
         }
 
         /* --- STRICT COPY PASTE CONTROL --- */
@@ -80,6 +80,14 @@
             100% { opacity: 1; transform: translateY(0); }
         }
 
+        /* SHAKE ANIMATION (New Feature) */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+        .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff3b00 !important; }
+
         .loading-shimmer {
             background: var(--shimmer);
             background-size: 400px 100%;
@@ -97,22 +105,22 @@
             overflow: hidden;
         }
 
-        /* --- HEADER FIXED (Gap Fix) --- */
+        /* --- HEADER FIXED (Mobile Toolbar Gap Fix) --- */
         header { 
             position: fixed; 
             top: 0; left: 0; right: 0;
             padding: 0 16px;
-            /* Precise padding to avoid gap but handle notch */
-            padding-top: env(safe-area-inset-top); 
-            height: calc(60px + env(safe-area-inset-top));
+            /* Ensure padding accounts for status bar/notch + minimal spacing */
+            padding-top: calc(env(safe-area-inset-top) + 10px); 
+            height: calc(64px + env(safe-area-inset-top)); 
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; 
             align-items: center; 
             gap: 12px; 
             z-index: 2000; 
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
         }
 
         .back-btn {
@@ -163,7 +171,7 @@
             font-size: 0.75rem; 
             color: var(--text-secondary); 
             font-weight: 400; 
-            animation: fadeStatus 0.3s ease; /* Smooth transition for status change */
+            animation: fadeStatus 0.3s ease; 
         }
         .v-badge { width: 14px; height: 14px; display: none; }
 
@@ -197,8 +205,8 @@
             overscroll-behavior-y: contain; 
             position: relative;
             
-            /* PUSH DOWN to compensate for fixed header */
-            margin-top: calc(60px + env(safe-area-inset-top)); 
+            /* PUSH DOWN logic matched to header height */
+            padding-top: calc(70px + env(safe-area-inset-top)); 
 
             /* Hide Scrollbar */
             -ms-overflow-style: none;
@@ -206,7 +214,7 @@
             
             /* INITIAL LOAD VISIBILITY */
             opacity: 0; 
-            transition: opacity 0.3s ease-in;
+            transition: opacity 0.25s ease-in;
         }
 
         #chat-flow::-webkit-scrollbar { display: none; }
@@ -250,7 +258,6 @@
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
-        /* Sticky Date Divider Feature */
         .date-divider {
             text-align: center; margin: 10px 0; font-size: 0.75rem;
             color: #fff; font-weight: 600; 
@@ -260,7 +267,7 @@
             border-radius: 12px;
             align-self: center;
             width: fit-content;
-            position: sticky; /* Feature: Sticky Date */
+            position: sticky; 
             top: 10px;
             z-index: 5;
             backdrop-filter: blur(4px);
@@ -351,15 +358,6 @@
             text-align: center;
             pointer-events: none;
         }
-
-        /* --- TAP REVEAL TIMESTAMP --- */
-        .tap-time {
-            font-size: 0.65rem; color: #888; margin-top: 2px;
-            display: none; 
-            animation: fadeIn 0.2s;
-        }
-        .sent .tap-time { text-align: right; margin-right: 4px; }
-        .received .tap-time { text-align: left; margin-left: 4px; }
 
         .reaction-badge { 
             position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; 
@@ -466,6 +464,7 @@
             flex: 1; background: #121212; border-radius: 22px; 
             padding: 4px 14px; border: 1px solid #333;
             display: flex; align-items: center; min-height: 42px;
+            transition: border-color 0.2s;
         }
         
         .msg-input { 
@@ -621,7 +620,7 @@
 
         <div class="input-area">
             <div class="plus-btn" onclick="toggleEmojiTray()">+</div>
-            <div class="input-box">
+            <div class="input-box" id="msg-input-box">
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
             <button id="send-btn" class="send-btn" onclick="sendMsg()">Send</button>
@@ -662,6 +661,7 @@
     const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
 
     const mInput = document.getElementById('m-input');
+    const inputBox = document.getElementById('msg-input-box');
     const chatFlow = document.getElementById('chat-flow');
     const container = document.getElementById('messages-container');
     const bottomTyping = document.getElementById('typing-indicator-bottom');
@@ -1002,6 +1002,8 @@
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
         
+        // CAPTURE SCROLL POS
+        chatFlow.style.scrollBehavior = 'auto'; // Disable smooth for instant jump
         const oldScrollHeight = chatFlow.scrollHeight;
         
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
@@ -1015,8 +1017,12 @@
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
             
-            // Adjust scroll position instantly
+            // ADJUST SCROLL POSITION INSTANTLY
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
+            
+            // Re-enable smooth after a tick
+            setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
+            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -1054,6 +1060,7 @@
                 lastDateLabel = dateLabel;
             }
 
+            // --- SMART PROFILE PICTURE LOGIC ---
             let isLastInGroup = true;
             if (index + 1 < sorted.length) {
                 const nextMsg = sorted[index + 1][1];
@@ -1097,13 +1104,6 @@
         }
     }
 
-    function toggleTime(id) {
-        const timeEl = document.getElementById(`time-${id}`);
-        if(timeEl) {
-            timeEl.style.display = timeEl.style.display === 'block' ? 'none' : 'block';
-        }
-    }
-
     function renderMessage(m, id, isLastSeen, isLastInGroup) {
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
@@ -1132,8 +1132,7 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        const timeHtml = `<div id="time-${id}" class="tap-time">${formatTime12(date)}</div>`;
-
+        // --- HTML ASSEMBLY ---
         let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -1147,7 +1146,6 @@
                             <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                             <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                         </div>
-                        ${timeHtml}
                     </div>
                 </div>`;
         } else {
@@ -1158,7 +1156,6 @@
                         <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                     </div>
-                    ${timeHtml}
                 </div>`;
         }
 
@@ -1171,8 +1168,6 @@
 
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
         if(bubbleEl) {
-            bubbleEl.addEventListener('click', () => { toggleTime(id); });
-
             bubbleEl.addEventListener('dblclick', (e) => {
                 e.preventDefault(); e.stopPropagation(); vibrate(40);
                 triggerHeartAnimation();
@@ -1229,7 +1224,12 @@
 
     async function sendMsg() {
         const text = mInput.value.trim();
-        if (!text) return;
+        if (!text) {
+            // New Feature: Input Shake on Empty Send
+            inputBox.classList.add('shake-anim');
+            setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
+            return;
+        }
 
         popSound.play().catch(e => {});
 
