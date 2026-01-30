@@ -67,6 +67,7 @@
         @keyframes fadeStatus { 0% { opacity: 0; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }
         
+        /* Modal Slide Up Animation */
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
@@ -170,6 +171,10 @@
         #scroll-down-btn.new-msg { background: var(--accent); color: #fff; animation: bounce 1s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
+        /* RIPPLE EFFECT */
+        @keyframes ripple-effect { to { transform: scale(4); opacity: 0; } }
+        .ripple { position: absolute; background: rgba(255, 255, 255, 0.3); border-radius: 50%; transform: scale(0); animation: ripple-effect 0.6s linear; pointer-events: none; }
+
         #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 3000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
 
@@ -183,8 +188,8 @@
 
         #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
         
-        /* Ensure component fills the tray */
-        emoji-picker { display: block; width: 100%; height: 100%; }
+        /* THIS FIXES THE "WEIRD THING" - COMPONENT FILLING SPACE */
+        emoji-picker { width: 100%; height: 100%; display: flex; flex-direction: column; }
 
         #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
@@ -927,27 +932,24 @@
                 applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
             });
 
-            // --- FIXED LONG PRESS LOGIC ---
-            let startX = 0, currentX = 0, menuTimer = null, isScrolling = false;
+            let startX = 0, currentX = 0, menuTimer = null, isScrolling = false, swipeTriggered = false;
 
             bubbleEl.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
+                const startY = e.touches[0].clientY;
                 isScrolling = false; 
+                swipeTriggered = false;
                 
-                // LONG PRESS TRIGGER
                 menuTimer = setTimeout(() => {
-                    if (!isScrolling) { 
-                        vibrate(70); 
-                        openMenu(id, m.sender, m.text); 
-                        e.preventDefault(); // Stop magnifier
-                    }
+                    if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
                 }, 500);
-            }, {passive: false}); // Non-passive to allow preventDefault
+            }, {passive: true});
 
             bubbleEl.addEventListener('touchmove', (e) => {
                 currentX = e.touches[0].clientX;
-                // If moved more than 10px, cancel long press
-                if (Math.abs(currentX - startX) > 10) { 
+                const currentY = e.touches[0].clientY;
+                
+                if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { 
                      clearTimeout(menuTimer);
                      isScrolling = true;
                 }
@@ -956,16 +958,17 @@
                 if (diff > 0 && diff < 80) {
                     bubbleEl.style.transform = `translateX(${diff}px)`;
                     bubbleEl.style.transition = "none";
+                    if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
                 }
             }, {passive: true});
 
             bubbleEl.addEventListener('touchend', () => {
                 clearTimeout(menuTimer);
+                let diff = currentX - startX;
                 bubbleEl.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
                 bubbleEl.style.transform = `translateX(0px)`;
-                
-                let diff = currentX - startX;
-                if (diff > 50 && !isScrolling) triggerReply(m.text);
+                if (diff > 50 && swipeTriggered) triggerReply(m.text);
+                startX = 0; currentX = 0;
             });
         }
     }
@@ -1090,25 +1093,21 @@
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
 
     function expandEmojiMenu() {
-        closeMenu();
-        const reactionModal = document.getElementById('reaction-picker-modal');
-        const container = document.getElementById('reaction-picker-container');
-        container.innerHTML = ''; 
-        
-        const reactionPicker = document.createElement('emoji-picker');
-        reactionPicker.style.width = "100%";
-        reactionPicker.style.height = "100%";
-        reactionPicker.addEventListener('emoji-click', event => {
-             const emoji = event.detail.emoji || event.detail.unicode;
-             applyReaction(emoji);
-             closeReactionPicker(); 
-        });
-        container.appendChild(reactionPicker);
-        reactionModal.style.display = 'flex';
-    }
-
-    function closeReactionPicker() {
-        document.getElementById('reaction-picker-modal').style.display = 'none';
+        const grid = document.getElementById('menu-emoji-grid');
+        if (grid.style.display === 'grid') {
+            grid.style.display = 'none';
+        } else {
+            grid.style.display = 'grid';
+            if (grid.innerHTML === "") {
+                emojis.forEach(e => {
+                    const span = document.createElement('span');
+                    span.className = 'menu-grid-emoji';
+                    span.innerText = e;
+                    span.onclick = () => applyReaction(e);
+                    grid.appendChild(span);
+                });
+            }
+        }
     }
 
     function initReplyFromActive() {
