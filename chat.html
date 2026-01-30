@@ -87,7 +87,7 @@
             padding: 0 16px;
             padding-top: max(12px, env(safe-area-inset-top)); /* Handle notch correctly */
             height: 60px;
-            box-sizing: content-box; 
+            box-sizing: content-box; /* Adds padding to height */
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; align-items: center; gap: 12px; 
@@ -146,7 +146,7 @@
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
 
-        .bubble { padding: 12px 16px; border-radius: 20px; font-size: 1rem; line-height: 1.45; position: relative; word-wrap: break-word; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.15); overflow: hidden; }
+        .bubble { padding: 12px 16px; border-radius: 20px; font-size: 1rem; line-height: 1.45; position: relative; word-wrap: break-word; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
         .sent .bubble { background: var(--sent-bg); color: #fff; border-top-right-radius: 18px; border-top-left-radius: 18px; border-bottom-left-radius: 18px; border-bottom-right-radius: 4px; text-align: left; }
         .received .bubble { background: var(--received-bg); color: #fff; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom-right-radius: 18px; border-bottom-left-radius: 4px; text-align: left; }
 
@@ -745,7 +745,8 @@
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
         
-        chatFlow.style.scrollBehavior = 'auto'; 
+        // CAPTURE SCROLL POS
+        chatFlow.style.scrollBehavior = 'auto'; // Disable smooth for instant jump
         const oldScrollHeight = chatFlow.scrollHeight;
         
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
@@ -758,8 +759,13 @@
             snapshot.forEach(doc => { messagesMap.set(doc.id, doc.data()); });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
+            
+            // ADJUST SCROLL POSITION INSTANTLY
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
+            
+            // Re-enable smooth after a tick
             setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
+            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -775,6 +781,7 @@
 
         let lastDateLabel = "";
 
+        // Logic for Last Seen
         let lastSeenMsgId = null;
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
@@ -796,6 +803,7 @@
                 lastDateLabel = dateLabel;
             }
 
+            // --- SMART PROFILE PICTURE LOGIC ---
             let isLastInGroup = true;
             if (index + 1 < sorted.length) {
                 const nextMsg = sorted[index + 1][1];
@@ -803,6 +811,7 @@
                     isLastInGroup = false;
                 }
             }
+
             renderMessage(data, id, id === lastSeenMsgId, isLastInGroup); 
         });
     }
@@ -866,6 +875,7 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
+        // --- HTML ASSEMBLY ---
         let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -958,6 +968,7 @@
     async function sendMsg() {
         const text = mInput.value.trim();
         if (!text) {
+            // New Feature: Input Shake on Empty Send
             inputBox.classList.add('shake-anim');
             setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
             return;
@@ -1044,6 +1055,7 @@
 
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
+            // FIX: Use stored myUserData for my PFP
             const pfpSrc = isMe ? (myUserData ? myUserData.photoURL : 'https://via.placeholder.com/40') : chatTargetData.photoURL;
             const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
             const timeStr = formatTime12(new Date(rData.timestamp));
@@ -1064,6 +1076,24 @@
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
+
+    function expandEmojiMenu() {
+        const grid = document.getElementById('menu-emoji-grid');
+        if (grid.style.display === 'grid') {
+            grid.style.display = 'none';
+        } else {
+            grid.style.display = 'grid';
+            if (grid.innerHTML === "") {
+                emojis.forEach(e => {
+                    const span = document.createElement('span');
+                    span.className = 'menu-grid-emoji';
+                    span.innerText = e;
+                    span.onclick = () => applyReaction(e);
+                    grid.appendChild(span);
+                });
+            }
+        }
+    }
 
     function initReplyFromActive() {
         triggerReply(document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim());
