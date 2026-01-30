@@ -9,212 +9,289 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
         :root { 
             --bg: #000000; 
+            --header-bg: rgba(0,0,0,0.92);
             --accent: #0095f6; 
             --border: #262626; 
-            --sent-grad: linear-gradient(135deg, #a43ff2 0%, #0095f6 100%);
+            --sent: #3797f0; 
             --received: #262626; 
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
-            --shimmer: linear-gradient(90deg, #121212 25%, #1a1a1a 50%, #121212 75%);
+            /* Improved Shimmer Gradient */
+            --shimmer: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
         }
 
         * { 
             box-sizing: border-box; -webkit-tap-highlight-color: transparent; 
             margin: 0; padding: 0; -webkit-touch-callout: none; 
+            -webkit-font-smoothing: antialiased;
         }
         
         html, body {
-            height: 100%; width: 100%; overflow: hidden;
-            background: var(--bg); position: fixed; left: 0; top: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            position: fixed; 
+            left: 0; top: 0;
         }
 
-        body { -webkit-user-select: none; user-select: none; color: var(--text); }
-        input { -webkit-user-select: text !important; user-select: text !important; outline: none; font-size: 16px !important; }
+        body { 
+            -webkit-user-select: none; user-select: none; 
+            color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        }
 
-        /* Shimmer Animation */
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        .loading-shimmer { background: var(--shimmer); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        input { 
+            -webkit-user-select: text !important; 
+            user-select: text !important; 
+            outline: none; 
+            font-size: 16px !important; 
+        }
+
+        /* --- UPDATED SHIMMER --- */
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+
+        .loading-shimmer {
+            background: var(--shimmer);
+            background-size: 400px 100%;
+            animation: shimmer 1.2s ease-in-out infinite;
+        }
 
         .app-container { 
-            display: flex; flex-direction: column; height: 100vh; height: 100dvh;
-            width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+            height: 100dvh;
+            width: 100%; 
+            position: absolute;
+            top: 0; left: 0;
+            overflow: hidden;
         }
 
-        /* --- UPDATED HEADER (Fixed UI/UX) --- */
+        /* --- UPDATED HEADER --- */
         header { 
-            padding: 0 10px; height: 60px;
-            background: rgba(0,0,0,0.85); 
+            /* Fix for top spacing */
+            padding: 12px 16px;
+            padding-top: calc(env(safe-area-inset-top) + 10px); 
+            height: calc(60px + env(safe-area-inset-top));
+            background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
-            display: flex; align-items: center; gap: 5px; 
-            z-index: 1000; flex-shrink: 0; 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            padding-top: env(safe-area-inset-top, 10px);
-        }
-
-        .back-btn {
-            font-size: 28px; color: var(--text); padding: 10px 5px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-        }
-
-        .h-profile-group { 
-            display: flex; align-items: center; gap: 12px; cursor: pointer; 
-            flex: 1; overflow: hidden; padding: 5px;
-        }
-        
-        .h-pfp { 
-            width: 38px; height: 38px; border-radius: 50%; object-fit: cover; 
-            background: #121212; border: 1px solid #333; flex-shrink: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .h-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.2; }
-        
-        .h-name { 
-            font-weight: 600; font-size: 16px; color: #fff; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .h-name:empty::before { content: ""; display: block; height: 14px; width: 100px; border-radius: 4px; background: var(--shimmer); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-        .h-username-sub { font-size: 12px; color: var(--text-secondary); font-weight: 400; }
-        .v-badge { width: 14px; height: 14px; display: none; }
-
-        /* --- CHAT AREA --- */
-        #chat-flow { 
-            flex: 1; overflow-y: auto; padding: 10px 0; /* Padding moved to container for swipe */
-            display: flex; flex-direction: column; 
-            -webkit-overflow-scrolling: touch; background: #000;
-            position: relative; overflow-x: hidden;
-        }
-        
-        /* Container that moves on swipe */
-        #messages-container { 
-            display: flex; flex-direction: column; 
-            padding: 0 12px; 
-            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            z-index: 1000;
+            flex-shrink: 0; 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             width: 100%;
         }
 
-        #typing-indicator-bottom { padding: 5px 15px; font-size: 12px; color: var(--text-secondary); display: none; margin-bottom: 15px; font-weight: 500; animation: pulse 1.2s infinite; }
+        .back-btn {
+            font-size: 1.6rem; 
+            color: #fff; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            height: 40px; width: 30px;
+        }
+
+        .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
+        
+        .h-pfp { 
+            width: 40px; height: 40px; border-radius: 50%; object-fit: cover; 
+            background: #121212; border: 1px solid #222; flex-shrink: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .h-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
+        .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1; }
+        
+        .h-name { 
+            font-weight: 700; font-size: 1rem; color: #fff; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* Skeleton Loading for Name */
+        .h-name:empty {
+            height: 16px; width: 120px; border-radius: 4px; 
+            background: var(--shimmer); background-size: 400px 100%; 
+            animation: shimmer 1.2s infinite;
+        }
+
+        .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
+        .v-badge { width: 14px; height: 14px; display: none; }
+
+        /* --- CHAT AREA & TIMESTAMPS --- */
+        #chat-flow { 
+            flex: 1; 
+            overflow-y: auto; 
+            overflow-x: hidden; /* Prevent horizontal scrollbar, handled by JS transform */
+            padding: 15px 0; 
+            display: flex; 
+            flex-direction: column; 
+            -webkit-overflow-scrolling: touch;
+            background: #000;
+            overscroll-behavior-y: contain; 
+            position: relative;
+        }
+        
+        /* Container that moves left to reveal time */
+        #messages-container { 
+            display: flex; 
+            flex-direction: column; 
+            padding: 0 15px;
+            transition: transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform;
+            width: 100%;
+        }
+
+        #typing-indicator-bottom {
+            padding: 5px 25px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: none;
+            margin-bottom: 15px;
+            animation: pulse 1.2s infinite;
+        }
+
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
-        .date-divider { text-align: center; margin: 24px 0 12px; font-size: 11px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .date-divider {
+            text-align: center; margin: 24px 0 12px 0; font-size: 0.7rem;
+            color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+        }
 
-        /* --- MESSAGES --- */
         .msg-wrap { 
             display: flex; flex-direction: column; max-width: 75%; margin-bottom: 2px; 
-            position: relative; min-width: 60px;
+            position: relative; 
         }
         .sent { align-self: flex-end; align-items: flex-end; }
         .received { align-self: flex-start; align-items: flex-start; }
 
-        /* Grouping Radius Logic */
-        .sent + .sent .bubble { border-top-right-radius: 4px; }
-        .sent .bubble:last-child { border-bottom-right-radius: 18px; }
-        .received + .received .bubble { border-top-left-radius: 4px; }
-
+        /* The Bubble */
         .bubble { 
-            padding: 8px 14px; border-radius: 20px; font-size: 15px; line-height: 1.4; 
-            position: relative; word-wrap: break-word; 
-            transition: transform 0.1s;
+            padding: 10px 16px; 
+            border-radius: 22px; 
+            font-size: 1rem; 
+            line-height: 1.4; 
+            position: relative; 
+            word-wrap: break-word; 
+            transition: transform 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+            z-index: 2;
         }
-        .sent .bubble { background: var(--sent-grad); color: #fff; }
-        .received .bubble { background: var(--received); color: #fff; }
+        .sent .bubble { background: linear-gradient(135deg, #a43ff2 0%, #3797f0 100%); color: #fff; border-bottom-right-radius: 4px; }
+        .received .bubble { background: var(--received); color: #fff; border-bottom-left-radius: 4px; }
+
+        /* Instagram Style Timestamp (Hidden initially) */
+        .sliding-timestamp {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            right: -70px; /* Off screen to the right */
+            font-size: 0.7rem;
+            color: #666;
+            font-weight: 500;
+            width: 60px;
+            text-align: left;
+            pointer-events: none;
+        }
 
         .reaction-badge { 
             position: absolute; bottom: -8px; background: #1a1a1a; border: 2px solid #000; 
-            border-radius: 20px; padding: 2px 6px; font-size: 12px; z-index: 10; display: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5); cursor: pointer;
-            animation: popFast 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.4);
+            border-radius: 20px; padding: 2px 6px; font-size: 0.8rem; z-index: 10; display: none;
+            cursor: pointer;
         }
-        @keyframes popFast { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        /* --- HIDDEN TIMESTAMP (INSTAGRAM STYLE) --- */
-        .timestamp-reveal {
-            position: absolute;
-            right: -65px; /* Hidden off screen */
-            top: 50%; transform: translateY(-50%);
-            width: 50px; text-align: center;
-            font-size: 11px; color: #666; font-weight: 500;
+        /* Meta is now only used for "Seen" status under sent messages, time is handled by swipe */
+        .meta { 
+            display: flex; justify-content: flex-end; margin-top: 2px; margin-right: 2px;
+            font-size: 0.65rem; color: var(--text-secondary); height: 12px;
         }
-
-        /* --- SEEN STATUS (LAST MESSAGE) --- */
-        .seen-status-container {
-            align-self: flex-end; font-size: 11px; color: #666; 
-            margin: 2px 4px 10px 0; font-weight: 400; opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .seen-status-container.visible { opacity: 1; }
 
         .reply-box-ui { 
             background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 8px; 
-            margin-bottom: 2px; font-size: 12px; border-left: 2px solid rgba(255,255,255,0.5); 
-            color: rgba(255,255,255,0.8); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            margin-bottom: 2px; font-size: 0.75rem; border-left: 3px solid var(--accent); color: #ccc;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9;
         }
 
-        .input-area-container { background: #000; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 10px); flex-shrink: 0; width: 100%; z-index: 20;}
-        .input-area { padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
-        .input-box { flex: 1; background: #121212; border-radius: 22px; padding: 0 15px; border: 1px solid #333; display: flex; align-items: center; }
-        .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 10px 0; font-size: 15px; }
-        .plus-btn { font-size: 24px; color: var(--accent); cursor: pointer; padding: 5px; }
-        .send-btn { background: transparent; color: var(--accent); border: none; font-weight: 600; font-size: 15px; cursor: pointer; padding: 5px 10px; }
+        .input-area-container {
+            background: #000;
+            border-top: 1px solid var(--border);
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+            flex-shrink: 0;
+            width: 100%;
+            z-index: 1000;
+        }
 
-        #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 250px; overflow-y: auto; padding: 15px; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-        .emoji-item { font-size: 28px; cursor: pointer; text-align: center; }
+        .input-area { padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+        
+        .input-box { 
+            flex: 1; background: #121212; border-radius: 24px; 
+            padding: 0 16px; border: 1px solid #333;
+            display: flex; align-items: center; min-height: 44px;
+        }
+        .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 10px 0; font-size: 16px; }
+        
+        .plus-btn { font-size: 24px; color: #fff; cursor: pointer; padding: 5px; }
+        .send-btn { 
+            background: transparent; color: var(--accent); border: none; 
+            font-weight: 600; font-size: 1rem; cursor: pointer; padding: 5px; 
+        }
 
-        /* --- MENUS --- */
+        #emoji-tray {
+            display: none; background: #000; border-top: 1px solid var(--border);
+            height: 250px; overflow-y: auto; padding: 15px;
+            grid-template-columns: repeat(7, 1fr); gap: 10px;
+        }
+        .emoji-item { font-size: 1.8rem; cursor: pointer; text-align: center; }
+
         #menu-overlay, #reaction-details-overlay { 
-            display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 2000; 
-            justify-content: center; align-items: flex-end; backdrop-filter: none;
+            display: none; position: fixed; inset: 0; 
+            background: rgba(0, 0, 0, 0.6); z-index: 2000; 
+            justify-content: center; align-items: center; backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
         }
-        #reaction-details-overlay { align-items: center; }
+        .menu-card { background: #1c1c1c; border-radius: 16px; width: 280px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        .menu-card { 
-            background: #1c1c1e; border-top-left-radius: 16px; border-top-right-radius: 16px; 
-            width: 100%; overflow: hidden; animation: slideUp 0.2s ease-out; padding-bottom: env(safe-area-inset-bottom, 10px);
+        .reaction-bar { display: flex; justify-content: space-evenly; padding: 16px 10px; border-bottom: 1px solid #333; }
+        .reaction-bar span { font-size: 2rem; cursor: pointer; transition: transform 0.1s; }
+        .reaction-bar span:active { transform: scale(1.3); }
+        .more-emoji-trigger { background: #333; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
+
+        #menu-emoji-grid { display: none; max-height: 220px; overflow-y: auto; grid-template-columns: repeat(6, 1fr); padding: 15px; gap: 8px; background: #1c1c1c; }
+        .menu-grid-emoji { font-size: 1.6rem; cursor: pointer; text-align: center; }
+
+        .menu-opt { padding: 16px; text-align: center; font-size: 1rem; border-bottom: 1px solid #333; color: #fff; }
+        .menu-opt:active { background: #333; }
+        
+        #reply-dock { 
+            display: none; background: #111; padding: 12px 16px; 
+            border-top: 1px solid var(--border); justify-content: space-between; align-items: center;
         }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-        .reaction-bar { display: flex; justify-content: space-around; padding: 20px 10px; border-bottom: 1px solid #2c2c2e; }
-        .reaction-bar span { font-size: 32px; transition: transform 0.1s; }
-        .reaction-bar span:active { transform: scale(1.4); }
-        .more-emoji-trigger { background: #333; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
-
-        #menu-emoji-grid { display: none; max-height: 250px; overflow-y: auto; grid-template-columns: repeat(6, 1fr); padding: 15px; gap: 10px; background: #1c1c1e; border-bottom: 1px solid #2c2c2e; }
-
-        .menu-opt { padding: 16px; text-align: center; font-size: 16px; border-bottom: 1px solid #2c2c2e; color: #fff; background: #1c1c1e; }
-        .menu-opt:active { background: #2c2c2e; }
-        
-        #reply-dock { display: none; background: #121212; padding: 10px 15px; border-top: 1px solid #333; justify-content: space-between; align-items: center; }
 
         .react-list-container {
-            width: 85%; max-width: 320px; background: #1c1c1e; border-radius: 16px; 
+            width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 16px; 
             overflow: hidden; display: flex; flex-direction: column; max-height: 50vh;
         }
-        .react-list-header { padding: 15px; text-align: center; font-weight: 600; border-bottom: 1px solid #2c2c2e; position: relative; }
-        .react-list-close { position: absolute; right: 15px; top: 15px; cursor: pointer; color: #888; }
-        .reactor-item { display: flex; align-items: center; padding: 12px 15px; gap: 12px; border-bottom: 1px solid #2c2c2e; }
-        .reactor-pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
-        .reactor-info { flex: 1; } 
-        .reactor-name { font-weight: 600; font-size: 14px; }
-        .reactor-time { font-size: 11px; color: #888; margin-top: 2px;}
-
-        /* Scroll Bottom Button */
-        #scroll-btn {
-            position: fixed; bottom: 80px; right: 15px; width: 40px; height: 40px;
-            background: #262626; border-radius: 50%; border: 1px solid #333; display: none;
-            justify-content: center; align-items: center; color: var(--accent); 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 50; cursor: pointer;
-        }
+        .react-list-header { padding: 16px; text-align: center; font-weight: 600; font-size: 1.1rem; border-bottom: 1px solid #333; position: relative; color: white;}
+        .react-list-close { position: absolute; right: 16px; top: 16px; cursor: pointer; color: #888; }
+        .reactor-item { display: flex; align-items: center; padding: 12px 16px; gap: 12px; border-bottom: 1px solid #2a2a2a; }
+        .reactor-pfp { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #333; }
+        .reactor-info { flex: 1; }
+        .reactor-name { font-weight: 600; font-size: 0.9rem; color: #fff; }
+        .reactor-time { font-size: 0.7rem; color: #888; margin-top: 2px; }
+        .reactor-emoji { font-size: 1.4rem; }
     </style>
 </head>
 <body>
@@ -242,7 +319,7 @@
         <div id="menu-emoji-grid"></div>
         <div class="menu-opt" onclick="initReplyFromActive()">Reply</div>
         <div id="edit-btn" class="menu-opt" onclick="initEdit()">Edit</div>
-        <div id="unsend-btn" class="menu-opt" style="color:#ff453a; font-weight: 600;" onclick="unsendMsg()">Unsend</div>
+        <div id="unsend-btn" class="menu-opt" style="color:#ff3b30; font-weight: 600;" onclick="unsendMsg()">Unsend</div>
         <div class="menu-opt" onclick="closeMenu()" style="border-bottom:none; color: #888">Cancel</div>
     </div>
 </div>
@@ -257,26 +334,21 @@
                     <div class="h-name" id="h-display-name"></div>
                     <img id="v-badge" src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">
                 </div>
-                <div class="h-username-sub" id="h-username-label">...</div>
+                <div class="h-username-sub" id="h-username-label"></div>
             </div>
         </div>
     </header>
 
     <div id="chat-flow">
-        <div id="scroll-trigger">● ● ●</div>
+        <div id="scroll-trigger"></div>
         <div id="messages-container"></div>
-        <div id="last-seen-status" class="seen-status-container"></div>
         <div id="typing-indicator-bottom">typing...</div>
-        <div id="scroll-btn" onclick="scrollToBottom(true)">↓</div>
     </div>
 
     <div class="input-area-container">
         <div id="reply-dock">
-            <div style="flex:1">
-                <div style="font-size:10px; color:var(--accent); font-weight:600; margin-bottom:2px;">Replying to</div>
-                <div id="reply-text" style="font-size:12px; color:#ccc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
-            </div>
-            <div onclick="cancelReply()" style="color:#aaa; font-weight:bold; padding:5px; font-size:18px;">✕</div>
+            <div id="reply-text" style="font-size:0.8rem; color:#aaa; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div onclick="cancelReply()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
         </div>
 
         <div id="emoji-tray"></div>
@@ -302,7 +374,9 @@
         databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.firestore();
     const rdb = firebase.database();
     const auth = firebase.auth();
@@ -314,41 +388,23 @@
     let lastVisible = null; 
     let messagesMap = new Map(); 
     let chatTargetData = null; 
-    let myUserData = null; // Store my own Firestore data
 
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
     const container = document.getElementById('messages-container');
     const bottomTyping = document.getElementById('typing-indicator-bottom');
     const emojiTray = document.getElementById('emoji-tray');
-    const lastSeenEl = document.getElementById('last-seen-status');
 
-    const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌"];
+    const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","💍","💄","💋","👄","🦷","👅","👂","👃","👣","👁️","👀","🧠","🗣️","👤","👥"];
 
-    // Utility: Format Time
     function formatTime12(date) {
         let hours = date.getHours();
         let minutes = date.getMinutes();
         let ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12; hours = hours ? hours : 12;
+        hours = hours % 12;
+        hours = hours ? hours : 12;
         minutes = minutes < 10 ? '0'+minutes : minutes;
         return hours + ':' + minutes + ' ' + ampm;
-    }
-
-    // Utility: Calculate Time Ago
-    function timeAgo(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + "y ago";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + "mo ago";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + "d ago";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + "h ago";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m ago";
-        return "just now";
     }
 
     function getDateDivider(date) {
@@ -357,7 +413,7 @@
         yesterday.setDate(today.getDate() - 1);
         if (date.toDateString() === today.toDateString()) return "Today";
         if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
     function toggleEmojiTray() {
@@ -389,7 +445,10 @@
 
     window.oncontextmenu = (e) => { e.preventDefault(); return false; };
     function vibrate(ms = 50) { if (navigator.vibrate) navigator.vibrate(ms); }
-    function goToProfile() { if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`; }
+
+    function goToProfile() {
+        if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
+    }
 
     mInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") { e.preventDefault(); sendMsg(); }
@@ -397,25 +456,8 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
 
-    // Scroll Bottom Button Logic
-    chatFlow.addEventListener('scroll', () => {
-        const btn = document.getElementById('scroll-btn');
-        if(chatFlow.scrollTop + chatFlow.clientHeight < chatFlow.scrollHeight - 300) {
-            btn.style.display = 'flex';
-        } else {
-            btn.style.display = 'none';
-        }
-    });
-
-    auth.onAuthStateChanged(async user => {
-        if (user) { 
-            myUid = user.uid; 
-            // FETCH MY PROFILE DATA FOR REACTIONS
-            const mySnap = await db.collection("users").doc(myUid).get();
-            if(mySnap.exists) myUserData = mySnap.data();
-
-            initChat(); 
-        }
+    auth.onAuthStateChanged(user => {
+        if (user) { myUid = user.uid; initChat(); }
         else { window.location.href = 'login.html'; }
     });
 
@@ -434,23 +476,52 @@
         
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
         document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
+        
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-        // Update Seen Status
-        db.collection("chats").doc(chatId).update({ 
-            [`unreadCount.${myUid}`]: 0, 
-            seen: true,
-            seenAt: firebase.firestore.FieldValue.serverTimestamp() 
-        }).catch(e => {});
+        db.collection("chats").doc(chatId).update({ [`unreadCount.${myUid}`]: 0, seen: true }).catch(e => {});
 
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
             bottomTyping.style.display = s.val() ? 'block' : 'none';
-            if(s.val()) scrollToBottom();
         });
 
         startListener(); 
         setupObserver();
-        setupSwipeGestures(); // Init Swipe Logic
+        setupGlobalSlide(); // Initialize the Instagram-style time reveal
+    }
+
+    // --- INSTAGRAM STYLE TIME REVEAL LOGIC ---
+    function setupGlobalSlide() {
+        let startX = 0, currentX = 0, isDragging = false;
+        const container = document.getElementById('messages-container');
+
+        chatFlow.addEventListener('touchstart', (e) => {
+            // Only trigger if we aren't replying to a specific message
+            startX = e.touches[0].clientX;
+            isDragging = false;
+        }, {passive: true});
+
+        chatFlow.addEventListener('touchmove', (e) => {
+            currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+            
+            // If dragging LEFT (negative diff) and user is intentionally pulling
+            if (diff < -10) { 
+                isDragging = true;
+                // Cap the drag at -70px
+                const translate = Math.max(diff, -70);
+                container.style.transform = `translateX(${translate}px)`;
+                container.style.transition = 'none';
+            }
+        }, {passive: true});
+
+        chatFlow.addEventListener('touchend', (e) => {
+            if (isDragging) {
+                container.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                container.style.transform = `translateX(0px)`;
+            }
+            startX = 0; currentX = 0; isDragging = false;
+        });
     }
 
     function setupObserver() {
@@ -483,24 +554,14 @@
                         messagesMap.delete(msgId);
                     }
                     
-                    // Mark received messages as seen and update timestamp
-                    if(change.type === "added" && msgData.sender !== myUid && !msgData.seen) {
-                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ 
-                            seen: true,
-                            seenAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        db.collection("chats").doc(chatId).update({ 
-                            seen: true,
-                            seenAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                    if(msgData.sender !== myUid && !msgData.seen) {
+                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ seen: true });
                     }
                 });
 
-                const isNearBottom = chatFlow.scrollTop + chatFlow.clientHeight >= chatFlow.scrollHeight - 150;
+                const isNearBottom = chatFlow.scrollTop + chatFlow.clientHeight >= chatFlow.scrollHeight - 100;
                 renderAll();
-                if (isNearBottom || snapshot.docChanges().some(c => c.type === 'added' && c.doc.data().sender === myUid)) {
-                    scrollToBottom();
-                }
+                if (isNearBottom) scrollToBottom();
             });
     }
 
@@ -524,7 +585,6 @@
         } else {
             isLoadingMore = false;
             lastVisible = null; 
-            document.getElementById('scroll-trigger').innerText = "";
         }
     }
 
@@ -535,7 +595,6 @@
             .sort((a, b) => a[1].timestamp.toMillis() - b[1].timestamp.toMillis());
 
         let lastDateLabel = "";
-        let lastMyMsg = null;
 
         sorted.forEach(([id, data]) => { 
             const msgDate = data.timestamp.toDate();
@@ -549,19 +608,7 @@
                 lastDateLabel = dateLabel;
             }
             renderMessage(data, id); 
-            if(data.sender === myUid) lastMyMsg = data;
         });
-
-        // Update Last Seen Status Logic
-        if(lastMyMsg) {
-            lastSeenEl.classList.add('visible');
-            if(lastMyMsg.seen) {
-                const seenTime = lastMyMsg.seenAt ? timeAgo(lastMyMsg.seenAt.toDate()) : "";
-                lastSeenEl.innerText = seenTime ? `Seen ${seenTime}` : "Seen";
-            } else {
-                lastSeenEl.innerText = "Sent";
-            }
-        }
     }
 
     function renderMessage(m, id) {
@@ -581,58 +628,58 @@
         
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
-        // Double tap
-        let tapCount = 0;
-        div.addEventListener('click', () => {
-            tapCount++; setTimeout(() => tapCount = 0, 300);
-            if(tapCount === 2) { vibrate(40); applyReactionToId(id, myReaction === '❤️' ? '' : '❤️'); }
+        div.addEventListener('dblclick', (e) => {
+            e.preventDefault(); vibrate(40);
+            applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
         });
 
-        // Long Press Menu
-        let pressTimer;
+        // --- SWIPE TO REPLY (BUBBLE ONLY) ---
+        let startX = 0, currentX = 0, menuTimer = null, isMoving = false, swipeTriggered = false;
+
         div.addEventListener('touchstart', (e) => {
-            pressTimer = setTimeout(() => { vibrate(70); openMenu(id, m.sender, m.text); }, 600);
+            startX = e.touches[0].clientX;
+            isMoving = false; swipeTriggered = false;
+            menuTimer = setTimeout(() => {
+                if (!isMoving) { vibrate(70); openMenu(id, m.sender, m.text); }
+            }, 500);
         }, {passive: true});
-        div.addEventListener('touchend', () => clearTimeout(pressTimer));
-        div.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+        div.addEventListener('touchmove', (e) => {
+            currentX = e.touches[0].clientX;
+            let diff = currentX - startX;
+            if (Math.abs(diff) > 10) isMoving = true;
+            
+            // Only allow Right swipe for Reply
+            if (diff > 0 && diff < 80) {
+                const b = div.querySelector('.bubble');
+                b.style.transform = `translateX(${diff}px)`;
+                b.style.transition = "none";
+                if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
+            }
+            // If diff < 0, let the Global Swipe (setupGlobalSlide) handle the time reveal
+        }, {passive: true});
+
+        div.addEventListener('touchend', () => {
+            clearTimeout(menuTimer);
+            let diff = currentX - startX;
+            const bubble = div.querySelector('.bubble');
+            bubble.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            bubble.style.transform = `translateX(0px)`;
+            if (diff > 50) triggerReply(m.text);
+            startX = 0; currentX = 0;
+        });
 
         div.innerHTML = `
             ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
             <div class="bubble">
-                <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.6;font-size:10px">(edited)</small>' : ''}</span>
+                <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>
-            <div class="timestamp-reveal">${formatTime12(date)}</div>
+            <div class="sliding-timestamp">${formatTime12(date)}</div>
+            
+            ${side === 'sent' ? `<div class="meta"><span class="seen">${m.seen ? 'Seen' : 'Sent'}</span></div>` : '<div class="meta"></div>'}
         `;
         container.appendChild(div);
-    }
-
-    /* --- INSTAGRAM STYLE SWIPE LOGIC --- */
-    function setupSwipeGestures() {
-        let touchStartX = 0;
-        let isSwiping = false;
-
-        chatFlow.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-            isSwiping = false;
-        }, {passive: true});
-
-        chatFlow.addEventListener('touchmove', (e) => {
-            const currentX = e.touches[0].clientX;
-            const diff = touchStartX - currentX; // Positive when dragging LEFT
-
-            // If dragging left (diff > 0)
-            if (diff > 0 && diff < 80) {
-                isSwiping = true;
-                // Move container left to reveal timestamps on right
-                container.style.transform = `translateX(${-diff}px)`;
-            }
-        }, {passive: true});
-
-        chatFlow.addEventListener('touchend', (e) => {
-            container.style.transform = `translateX(0px)`;
-            touchStartX = 0;
-        });
     }
 
     function triggerReply(text) {
@@ -670,10 +717,7 @@
         scrollToBottom();
     }
 
-    function scrollToBottom(smooth = false) { 
-        if(smooth) chatFlow.scrollTo({ top: chatFlow.scrollHeight, behavior: 'smooth' });
-        else chatFlow.scrollTop = chatFlow.scrollHeight; 
-    }
+    function scrollToBottom() { chatFlow.scrollTop = chatFlow.scrollHeight; }
 
     function openMenu(id, sender, text) {
         activeMenuId = id;
@@ -711,11 +755,15 @@
         const listContainer = document.getElementById('react-list-items');
         listContainer.innerHTML = '';
 
+        // Get current user details securely or fall back to defaults
+        const currentUser = firebase.auth().currentUser;
+        const myPhoto = currentUser ? currentUser.photoURL : 'https://via.placeholder.com/40';
+
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
-            // FIX: Use stored myUserData for me, chatTargetData for other
-            const pfpSrc = isMe ? (myUserData?.photoURL) : (chatTargetData?.photoURL);
-            const name = isMe ? "You" : chatTargetData.name;
+            // FIX: Use Auth photoURL for self, ChatTarget photoURL for other
+            const pfpSrc = isMe ? myPhoto : chatTargetData.photoURL;
+            const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
             const timeStr = formatTime12(new Date(rData.timestamp));
 
             const el = document.createElement('div');
@@ -737,15 +785,19 @@
 
     function expandEmojiMenu() {
         const grid = document.getElementById('menu-emoji-grid');
-        grid.style.display = grid.style.display === 'grid' ? 'none' : 'grid';
-        if (grid.innerHTML === "") {
-            emojis.forEach(e => {
-                const span = document.createElement('span');
-                span.className = 'menu-grid-emoji';
-                span.innerText = e;
-                span.onclick = () => applyReaction(e);
-                grid.appendChild(span);
-            });
+        if (grid.style.display === 'grid') {
+            grid.style.display = 'none';
+        } else {
+            grid.style.display = 'grid';
+            if (grid.innerHTML === "") {
+                emojis.forEach(e => {
+                    const span = document.createElement('span');
+                    span.className = 'menu-grid-emoji';
+                    span.innerText = e;
+                    span.onclick = () => applyReaction(e);
+                    grid.appendChild(span);
+                });
+            }
         }
     }
 
