@@ -15,7 +15,8 @@
             --header-bg: rgba(0,0,0,0.85);
             --accent: #0095f6; 
             --border: #262626; 
-            --sent-bg: linear-gradient(135deg, #a43ff2 0%, #3797f0 100%);
+            /* Updated Gradients to match the purple/blue vibe in image */
+            --sent-bg: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
             --received-bg: #262626; 
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
@@ -43,7 +44,10 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
 
-        /* --- ENABLE COPY PASTE ONLY IN INPUTS --- */
+        /* --- STRICT COPY PASTE CONTROL --- */
+        /* Disable selection everywhere */
+        div, span, p, img { -webkit-user-select: none; user-select: none; }
+        /* Enable selection ONLY in inputs/textareas */
         input, textarea { 
             -webkit-user-select: text !important; 
             user-select: text !important; 
@@ -83,7 +87,7 @@
             border-bottom: 1px solid var(--border); 
             display: flex; 
             align-items: center; 
-            gap: 15px; 
+            gap: 12px; 
             z-index: 1000;
             flex-shrink: 0; 
             backdrop-filter: blur(20px);
@@ -126,6 +130,22 @@
         .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
         .v-badge { width: 14px; height: 14px; display: none; }
 
+        /* --- HEADER ACTIONS (CALLS) --- */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-left: auto;
+        }
+        .header-icon {
+            font-size: 1.5rem;
+            cursor: pointer;
+            filter: grayscale(100%);
+            transition: filter 0.3s;
+        }
+        .header-icon:active { filter: grayscale(0%); transform: scale(0.95); }
+
+
         /* --- CHAT AREA --- */
         #chat-flow { 
             flex: 1; 
@@ -144,16 +164,15 @@
             display: flex; 
             flex-direction: column; 
             padding: 0 12px;
-            transition: transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000); /* Smooth spring slide */
+            transition: transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000); 
             will-change: transform;
             width: 100%;
             padding-bottom: 20px;
         }
 
-        /* --- NEW ANIMATED TYPING INDICATOR --- */
         #typing-indicator-bottom {
             display: none;
-            margin-left: 15px;
+            margin-left: 52px; /* Aligned with bubbles (avatar width + gap) */
             margin-bottom: 15px;
             background: #262626;
             width: 50px;
@@ -190,36 +209,54 @@
         .msg-row {
             display: flex;
             width: 100%;
-            margin-bottom: 6px; /* Increased Gap for professional look */
+            margin-bottom: 2px; 
             position: relative;
-            flex-direction: column; 
         }
-        .msg-row.sent { align-items: flex-end; }
-        .msg-row.received { align-items: flex-start; }
+        
+        /* Flex Alignment for Sent vs Received */
+        .msg-row.sent { 
+            justify-content: flex-end; 
+            padding-right: 4px;
+        }
+        .msg-row.received { 
+            justify-content: flex-start; 
+            align-items: flex-end; /* Align avatar to bottom */
+            gap: 8px; /* Gap between avatar and bubble */
+        }
+
+        /* --- AVATAR IN CHAT --- */
+        .msg-avatar {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            margin-bottom: 2px; /* Align with bottom of bubble */
+            background: #121212;
+        }
 
         /* --- BUBBLE UI --- */
         .msg-bubble-box {
             position: relative;
-            max-width: 72%; /* Optimal width */
+            max-width: 70%;
             display: flex;
             flex-direction: column;
-            transition: margin-bottom 0.2s; /* Smooth spacing adjustment */
+            transition: margin-bottom 0.2s;
         }
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
 
         .bubble { 
             padding: 12px 16px; 
-            border-radius: 22px; 
+            border-radius: 20px; 
             font-size: 0.98rem; 
             line-height: 1.45; 
             position: relative; 
             word-wrap: break-word; 
             z-index: 2;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15); /* Better shadow */
+            /* Subtle shadow for depth */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2); 
         }
         
-        /* Rounded corners logic */
         .sent .bubble { 
             background: var(--sent-bg); 
             color: #fff; 
@@ -234,7 +271,7 @@
         /* --- HIDDEN TIMESTAMP (Right Side) --- */
         .sliding-timestamp {
             position: absolute;
-            top: 14px;
+            top: 50%; transform: translateY(-50%);
             right: -65px; 
             font-size: 0.7rem;
             color: #666;
@@ -256,15 +293,13 @@
         /* --- SEEN STATUS (Relative Time) --- */
         .seen-status {
             font-size: 0.65rem; color: var(--text-secondary);
-            margin-top: 2px; margin-right: 4px;
+            margin-top: 2px; margin-right: 2px;
             text-align: right;
             font-weight: 500;
             height: 14px;
             opacity: 0;
             animation: fadeIn 0.3s forwards;
-            /* Ensures it clears reactions properly */
-            position: relative; 
-            z-index: 1;
+            position: relative; z-index: 1;
         }
         @keyframes fadeIn { to { opacity: 1; } }
 
@@ -274,7 +309,7 @@
             max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.95;
         }
 
-        /* --- SCROLL TO BOTTOM BUTTON (NEW FEATURE) --- */
+        /* --- SCROLL TO BOTTOM BUTTON --- */
         #scroll-down-btn {
             position: fixed;
             bottom: 80px;
@@ -295,7 +330,7 @@
         }
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
 
-        /* --- HEART ANIMATION OVERLAY (NEW FEATURE) --- */
+        /* --- HEART ANIMATION OVERLAY --- */
         #heart-overlay {
             position: fixed;
             top: 50%; left: 50%;
@@ -335,7 +370,7 @@
             width: 100%; background: transparent; border: none; color: white; 
             padding: 8px 0; font-size: 16px; 
             resize: none; 
-            max-height: 120px; /* Limit to ~5 lines */
+            max-height: 120px;
             overflow-y: auto;
             line-height: 1.35;
         }
@@ -443,6 +478,10 @@
                 <div class="h-username-sub" id="h-username-label"></div>
             </div>
         </div>
+        <div class="header-actions">
+            <span class="header-icon" onclick="window.location.href='calls.html'">📞</span>
+            <span class="header-icon" onclick="window.location.href='calls.html'">📹</span>
+        </div>
     </header>
 
     <div id="chat-flow">
@@ -500,7 +539,7 @@
     let chatTargetData = null; 
 
     // Custom Feature: Sound Effect (Base64 Pop)
-    const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); // Short placeholder for sound capability
+    const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
 
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
@@ -551,8 +590,6 @@
         this.style.height = 'auto'; 
         this.style.height = (this.scrollHeight) + 'px';
         if(this.value === '') this.style.height = 'auto';
-        
-        // Typing indicator trigger
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
     });
 
@@ -633,7 +670,6 @@
         
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-        // When entering chat, update with timestamp to support "Seen 1m ago"
         db.collection("chats").doc(chatId).update({ 
             [`unreadCount.${myUid}`]: 0, 
             seen: true 
@@ -662,8 +698,6 @@
         chatFlow.addEventListener('touchmove', (e) => {
             currentX = e.touches[0].clientX;
             const diff = currentX - startX;
-            
-            // Drag LEFT to reveal time
             if (diff < -10) { 
                 isDragging = true;
                 const translate = Math.max(diff, -70);
@@ -700,7 +734,6 @@
                 if (snapshot.empty) return;
                 
                 if (!lastVisible) lastVisible = snapshot.docs[snapshot.docs.length - 1];
-
                 let isNewIncoming = false;
 
                 snapshot.docChanges().forEach(change => {
@@ -716,7 +749,6 @@
                         messagesMap.delete(msgId);
                     }
                     
-                    // Logic to mark incoming as seen with timestamp
                     if(msgData.sender !== myUid && !msgData.seen) {
                         db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ 
                             seen: true,
@@ -764,7 +796,7 @@
 
         let lastDateLabel = "";
 
-        // Logic to find the LAST seen message by the other user
+        // Logic for Last Seen
         let lastSeenMsgId = null;
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
@@ -774,7 +806,7 @@
             }
         }
 
-        sorted.forEach(([id, data]) => { 
+        sorted.forEach(([id, data], index) => { 
             const msgDate = data.timestamp.toDate();
             const dateLabel = getDateDivider(msgDate);
             
@@ -785,23 +817,32 @@
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
             }
-            // Pass true if this is the specific last seen message
-            renderMessage(data, id, id === lastSeenMsgId); 
+
+            // --- SMART PROFILE PICTURE LOGIC ---
+            // Check if this is the last message in a consecutive group from the same sender
+            let isLastInGroup = true;
+            if (index + 1 < sorted.length) {
+                const nextMsg = sorted[index + 1][1];
+                if (nextMsg.sender === data.sender) {
+                    isLastInGroup = false;
+                }
+            }
+
+            renderMessage(data, id, id === lastSeenMsgId, isLastInGroup); 
         });
     }
 
     function triggerHeartAnimation() {
         const h = document.getElementById('heart-overlay');
         h.style.animation = 'none';
-        h.offsetHeight; /* trigger reflow */
+        h.offsetHeight; 
         h.style.animation = 'heartPop 0.8s ease-out';
     }
 
-    function renderMessage(m, id, isLastSeen) {
+    function renderMessage(m, id, isLastSeen, isLastInGroup) {
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
 
-        // WRAPPER ROW for layout alignment
         const rowDiv = document.createElement('div');
         rowDiv.id = id;
         rowDiv.className = `msg-row ${side}`;
@@ -815,14 +856,13 @@
         
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
-        // Double click reaction: Like + Heart Animation
         rowDiv.addEventListener('dblclick', (e) => {
             e.preventDefault(); vibrate(40);
             triggerHeartAnimation();
             applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
         });
 
-        // Swipe Right to Reply (Bubble only logic)
+        // Swipe Right to Reply
         let startX = 0, currentX = 0, menuTimer = null, isMoving = false, swipeTriggered = false;
 
         rowDiv.addEventListener('touchstart', (e) => {
@@ -838,7 +878,6 @@
             let diff = currentX - startX;
             if (Math.abs(diff) > 10) isMoving = true;
             
-            // Only allow Right swipe for Reply
             if (diff > 0 && diff < 80) {
                 const b = rowDiv.querySelector('.bubble');
                 b.style.transform = `translateX(${diff}px)`;
@@ -859,31 +898,61 @@
             startX = 0; currentX = 0;
         });
 
-        // Calculate Seen Text
         let seenText = "";
         if (isLastSeen && side === 'sent') {
             if (m.seenAt) {
                 seenText = "Seen " + timeAgo(m.seenAt.toDate());
             } else {
-                seenText = "Seen"; // Fallback
+                seenText = "Seen"; 
             }
         }
         
-        // FIX: Add extra bottom margin to bubble box if reaction is present
-        // This prevents the reaction badge from overlapping the seen status
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
 
-        rowDiv.innerHTML = `
-            <div class="msg-bubble-box" ${boxStyle}>
-                ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
-                <div class="bubble">
-                    <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                    <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+        // --- AVATAR HTML ---
+        // Only show if received. 
+        // If last in group -> Show Image. 
+        // If NOT last -> Show invisible image to keep alignment (spacer).
+        let avatarHtml = '';
+        if (side === 'received') {
+            const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
+            const visibility = isLastInGroup ? 'visible' : 'hidden';
+            avatarHtml = `<img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">`;
+        }
+
+        // --- HTML ASSEMBLY ---
+        // Received: Avatar + Bubble
+        // Sent: Bubble
+        
+        let innerContent = '';
+        if (side === 'received') {
+             innerContent = `
+                ${avatarHtml}
+                <div class="msg-bubble-box" ${boxStyle}>
+                    ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
+                    <div class="bubble">
+                        <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                        <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                    </div>
                 </div>
+             `;
+        } else {
+            innerContent = `
+                <div class="msg-bubble-box" ${boxStyle}>
+                    ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
+                    <div class="bubble">
+                        <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                        <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        rowDiv.innerHTML = `
+            <div style="display:flex; align-items:flex-end; gap:8px;">
+                ${innerContent}
             </div>
-            
             ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
-            
             <div class="sliding-timestamp">${formatTime12(date)}</div>
         `;
         container.appendChild(rowDiv);
@@ -901,7 +970,7 @@
         if (!text) return;
 
         mInput.value = "";
-        mInput.style.height = 'auto'; // Reset height
+        mInput.style.height = 'auto'; 
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
