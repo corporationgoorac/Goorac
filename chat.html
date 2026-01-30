@@ -15,8 +15,8 @@
             --header-bg: rgba(0,0,0,0.85);
             --accent: #0095f6; 
             --border: #262626; 
-            /* Updated Gradients to match the purple/blue vibe in image */
-            --sent-bg: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+            /* SENDER BUBBLE: Dark Orange Gradient */
+            --sent-bg: linear-gradient(135deg, #ff6b00 0%, #ff3b00 100%);
             --received-bg: #262626; 
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
@@ -46,7 +46,7 @@
 
         /* --- STRICT COPY PASTE CONTROL --- */
         /* Disable selection everywhere */
-        div, span, p, img { -webkit-user-select: none; user-select: none; }
+        div, span, p, img, svg { -webkit-user-select: none; user-select: none; }
         /* Enable selection ONLY in inputs/textareas */
         input, textarea { 
             -webkit-user-select: text !important; 
@@ -134,16 +134,19 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 22px;
             margin-left: auto;
+            padding-right: 5px;
         }
         .header-icon {
-            font-size: 1.5rem;
+            width: 26px;
+            height: 26px;
             cursor: pointer;
-            filter: grayscale(100%);
-            transition: filter 0.3s;
+            fill: #ffffff;
+            opacity: 0.9;
+            transition: transform 0.2s, opacity 0.2s;
         }
-        .header-icon:active { filter: grayscale(0%); transform: scale(0.95); }
+        .header-icon:active { opacity: 0.6; transform: scale(0.9); }
 
 
         /* --- CHAT AREA --- */
@@ -163,7 +166,7 @@
         #messages-container { 
             display: flex; 
             flex-direction: column; 
-            padding: 0 12px;
+            padding: 0 14px;
             transition: transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000); 
             will-change: transform;
             width: 100%;
@@ -172,12 +175,12 @@
 
         #typing-indicator-bottom {
             display: none;
-            margin-left: 52px; /* Aligned with bubbles (avatar width + gap) */
+            margin-left: 56px; /* Aligned with bubbles (avatar width + gap) */
             margin-bottom: 15px;
             background: #262626;
-            width: 50px;
-            height: 30px;
-            border-radius: 15px;
+            width: 54px;
+            height: 32px;
+            border-radius: 16px;
             border-bottom-left-radius: 4px;
             align-items: center;
             justify-content: center;
@@ -187,7 +190,7 @@
         }
         
         .typing-dot {
-            width: 5px; height: 5px; background: #888; border-radius: 50%;
+            width: 6px; height: 6px; background: #888; border-radius: 50%;
             animation: dotJump 1.4s infinite ease-in-out both;
         }
         .typing-dot:nth-child(1) { animation-delay: -0.32s; }
@@ -201,8 +204,8 @@
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
         .date-divider {
-            text-align: center; margin: 24px 0 12px 0; font-size: 0.7rem;
-            color: #555; font-weight: 500;
+            text-align: center; margin: 24px 0 16px 0; font-size: 0.75rem;
+            color: #666; font-weight: 500;
         }
 
         /* --- MESSAGE ROW STRUCTURE --- */
@@ -216,7 +219,7 @@
         /* Flex Alignment for Sent vs Received */
         .msg-row.sent { 
             justify-content: flex-end; 
-            padding-right: 4px;
+            padding-right: 0px;
         }
         .msg-row.received { 
             justify-content: flex-start; 
@@ -226,12 +229,13 @@
 
         /* --- AVATAR IN CHAT --- */
         .msg-avatar {
-            width: 28px; height: 28px;
+            width: 30px; height: 30px;
             border-radius: 50%;
             object-fit: cover;
             flex-shrink: 0;
-            margin-bottom: 2px; /* Align with bottom of bubble */
+            margin-bottom: 4px; /* Align with bottom of bubble */
             background: #121212;
+            border: 1px solid #222;
         }
 
         /* --- BUBBLE UI --- */
@@ -246,26 +250,33 @@
         .received .msg-bubble-box { align-items: flex-start; }
 
         .bubble { 
-            padding: 12px 16px; 
+            padding: 11px 16px; 
             border-radius: 20px; 
-            font-size: 0.98rem; 
-            line-height: 1.45; 
+            font-size: 1rem; 
+            line-height: 1.4; 
             position: relative; 
             word-wrap: break-word; 
             z-index: 2;
             /* Subtle shadow for depth */
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2); 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
         }
         
+        /* Rounded corners logic: Classic Messenger Style */
         .sent .bubble { 
             background: var(--sent-bg); 
             color: #fff; 
-            border-bottom-right-radius: 4px; 
+            border-top-right-radius: 18px;
+            border-top-left-radius: 18px;
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 4px; /* Sharp corner for sender */
         }
         .received .bubble { 
             background: var(--received-bg); 
             color: #fff; 
-            border-bottom-left-radius: 4px; 
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+            border-bottom-right-radius: 18px;
+            border-bottom-left-radius: 4px; /* Sharp corner for receiver */
         }
 
         /* --- HIDDEN TIMESTAMP (Right Side) --- */
@@ -283,7 +294,7 @@
 
         .reaction-badge { 
             position: absolute; bottom: -10px; background: #1a1a1a; border: 2px solid #000; 
-            border-radius: 20px; padding: 3px 7px; font-size: 0.85rem; z-index: 10; display: none;
+            border-radius: 20px; padding: 3px 6px; font-size: 0.85rem; z-index: 10; display: none;
             cursor: pointer;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
@@ -368,7 +379,7 @@
         /* Auto-growing Textarea */
         .msg-input { 
             width: 100%; background: transparent; border: none; color: white; 
-            padding: 8px 0; font-size: 16px; 
+            padding: 9px 0; font-size: 16px; 
             resize: none; 
             max-height: 120px;
             overflow-y: auto;
@@ -479,8 +490,12 @@
             </div>
         </div>
         <div class="header-actions">
-            <span class="header-icon" onclick="window.location.href='calls.html'">📞</span>
-            <span class="header-icon" onclick="window.location.href='calls.html'">📹</span>
+            <svg class="header-icon" onclick="window.location.href='calls.html'" viewBox="0 0 24 24">
+                <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.44-5.15-3.75-6.59-6.59l1.97-1.57c.22-.22.3-.54.24-1.01a11.36 11.36 0 0 1-.56-3.53c0-.55-.45-1-1-1H4.39c-.55 0-1 .45-1 1c0 9.39 7.61 17 17 17c.55 0 1-.45 1-1v-3.56c0-.55-.45-1-1-1z"/>
+            </svg>
+            <svg class="header-icon" onclick="window.location.href='calls.html'" viewBox="0 0 24 24">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+            </svg>
         </div>
     </header>
 
@@ -910,9 +925,6 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
 
         // --- AVATAR HTML ---
-        // Only show if received. 
-        // If last in group -> Show Image. 
-        // If NOT last -> Show invisible image to keep alignment (spacer).
         let avatarHtml = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -920,10 +932,6 @@
             avatarHtml = `<img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">`;
         }
 
-        // --- HTML ASSEMBLY ---
-        // Received: Avatar + Bubble
-        // Sent: Bubble
-        
         let innerContent = '';
         if (side === 'received') {
              innerContent = `
