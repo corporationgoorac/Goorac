@@ -15,7 +15,7 @@
             --header-bg: rgba(0,0,0,0.85);
             --accent: #0095f6; 
             --border: #262626; 
-            /* SENDER BUBBLE: Dark Orange Gradient */
+            /* SENDER BUBBLE: Deep Orange Gradient */
             --sent-bg: linear-gradient(135deg, #ff6b00 0%, #ff3b00 100%);
             --received-bg: #262626; 
             --text: #ffffff; 
@@ -45,9 +45,7 @@
         }
 
         /* --- STRICT COPY PASTE CONTROL --- */
-        /* Disable selection everywhere */
         div, span, p, img, svg { -webkit-user-select: none; user-select: none; }
-        /* Enable selection ONLY in inputs/textareas */
         input, textarea { 
             -webkit-user-select: text !important; 
             user-select: text !important; 
@@ -55,10 +53,17 @@
             font-family: inherit;
         }
 
-        /* --- UPDATED SHIMMER --- */
+        /* --- ANIMATIONS --- */
         @keyframes shimmer {
             0% { background-position: -200px 0; }
             100% { background-position: 200px 0; }
+        }
+
+        /* Flash animation for finding a replied message */
+        @keyframes flashMessage {
+            0% { background-color: rgba(255, 255, 255, 0.2); transform: scale(1.02); }
+            50% { background-color: rgba(255, 255, 255, 0.2); transform: scale(1.02); }
+            100% { background-color: transparent; transform: scale(1); }
         }
 
         .loading-shimmer {
@@ -130,7 +135,7 @@
         .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
         .v-badge { width: 14px; height: 14px; display: none; }
 
-        /* --- HEADER ACTIONS (CALLS) --- */
+        /* --- HEADER ACTIONS --- */
         .header-actions {
             display: flex;
             align-items: center;
@@ -147,7 +152,6 @@
             transition: transform 0.2s, opacity 0.2s;
         }
         .header-icon:active { opacity: 0.6; transform: scale(0.9); }
-
 
         /* --- CHAT AREA --- */
         #chat-flow { 
@@ -170,12 +174,12 @@
             transition: transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000); 
             will-change: transform;
             width: 100%;
-            padding-bottom: 20px;
+            padding-bottom: 30px;
         }
 
         #typing-indicator-bottom {
             display: none;
-            margin-left: 56px; /* Aligned with bubbles (avatar width + gap) */
+            margin-left: 56px; 
             margin-bottom: 15px;
             background: #262626;
             width: 54px;
@@ -212,28 +216,34 @@
         .msg-row {
             display: flex;
             width: 100%;
-            margin-bottom: 2px; 
+            margin-bottom: 6px; 
             position: relative;
+            flex-direction: column; /* Stack bubble and status vertical */
         }
         
-        /* Flex Alignment for Sent vs Received */
         .msg-row.sent { 
-            justify-content: flex-end; 
+            align-items: flex-end; /* Force right alignment */
             padding-right: 0px;
         }
+        
         .msg-row.received { 
-            justify-content: flex-start; 
-            align-items: flex-end; /* Align avatar to bottom */
-            gap: 8px; /* Gap between avatar and bubble */
+            align-items: flex-start; /* Force left alignment */
         }
 
-        /* --- AVATAR IN CHAT --- */
+        /* Internal container for Received to hold Avatar + Bubble side-by-side */
+        .received-inner-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            max-width: 100%;
+        }
+
         .msg-avatar {
             width: 30px; height: 30px;
             border-radius: 50%;
             object-fit: cover;
             flex-shrink: 0;
-            margin-bottom: 4px; /* Align with bottom of bubble */
+            margin-bottom: 2px;
             background: #121212;
             border: 1px solid #222;
         }
@@ -241,34 +251,34 @@
         /* --- BUBBLE UI --- */
         .msg-bubble-box {
             position: relative;
-            max-width: 70%;
+            max-width: 75%;
             display: flex;
             flex-direction: column;
             transition: margin-bottom 0.2s;
         }
+        /* Ensure bubble contents align correctly inside the box */
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
 
         .bubble { 
-            padding: 11px 16px; 
+            padding: 12px 16px; 
             border-radius: 20px; 
             font-size: 1rem; 
             line-height: 1.4; 
             position: relative; 
             word-wrap: break-word; 
             z-index: 2;
-            /* Subtle shadow for depth */
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
         }
         
-        /* Rounded corners logic: Classic Messenger Style */
+        /* Rounded corners */
         .sent .bubble { 
             background: var(--sent-bg); 
             color: #fff; 
             border-top-right-radius: 18px;
             border-top-left-radius: 18px;
             border-bottom-left-radius: 18px;
-            border-bottom-right-radius: 4px; /* Sharp corner for sender */
+            border-bottom-right-radius: 4px;
         }
         .received .bubble { 
             background: var(--received-bg); 
@@ -276,7 +286,7 @@
             border-top-left-radius: 18px;
             border-top-right-radius: 18px;
             border-bottom-right-radius: 18px;
-            border-bottom-left-radius: 4px; /* Sharp corner for receiver */
+            border-bottom-left-radius: 4px;
         }
 
         /* --- HIDDEN TIMESTAMP (Right Side) --- */
@@ -293,8 +303,8 @@
         }
 
         .reaction-badge { 
-            position: absolute; bottom: -10px; background: #1a1a1a; border: 2px solid #000; 
-            border-radius: 20px; padding: 3px 6px; font-size: 0.85rem; z-index: 10; display: none;
+            position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; 
+            border-radius: 20px; padding: 4px 7px; font-size: 0.85rem; z-index: 10; display: none;
             cursor: pointer;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
@@ -303,30 +313,46 @@
 
         /* --- SEEN STATUS (Relative Time) --- */
         .seen-status {
-            font-size: 0.65rem; color: var(--text-secondary);
-            margin-top: 2px; margin-right: 2px;
-            text-align: right;
+            font-size: 0.65rem; 
+            color: var(--text-secondary);
+            margin-top: 4px; 
+            margin-right: 2px;
+            text-align: right; /* Explicitly right aligned */
             font-weight: 500;
             height: 14px;
+            width: 100%; /* Take full width to respect text-align */
             opacity: 0;
             animation: fadeIn 0.3s forwards;
-            position: relative; z-index: 1;
+            position: relative; 
+            z-index: 1;
         }
         @keyframes fadeIn { to { opacity: 1; } }
 
+        /* --- IMPROVED REPLY HIGHLIGHT UI --- */
         .reply-box-ui { 
-            background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 10px; 
-            margin-bottom: 3px; font-size: 0.75rem; border-left: 3px solid var(--accent); color: #ccc;
-            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.95;
+            background: rgba(0, 0, 0, 0.25); 
+            padding: 8px 12px; 
+            border-radius: 12px; 
+            margin-bottom: 6px; 
+            font-size: 0.85rem; 
+            border-left: 4px solid rgba(255, 255, 255, 0.6); 
+            color: #e0e0e0;
+            max-width: 100%; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap; 
+            cursor: pointer;
+            transition: opacity 0.2s;
         }
+        .reply-box-ui:active { opacity: 0.7; }
 
         /* --- SCROLL TO BOTTOM BUTTON --- */
         #scroll-down-btn {
             position: fixed;
             bottom: 80px;
             right: 20px;
-            width: 40px;
-            height: 40px;
+            width: 45px;
+            height: 45px;
             background: #262626;
             border-radius: 50%;
             display: none;
@@ -337,6 +363,7 @@
             border: 1px solid #333;
             z-index: 900;
             cursor: pointer;
+            font-size: 1.2rem;
             animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
@@ -376,7 +403,6 @@
             display: flex; align-items: center; min-height: 42px;
         }
         
-        /* Auto-growing Textarea */
         .msg-input { 
             width: 100%; background: transparent; border: none; color: white; 
             padding: 9px 0; font-size: 16px; 
@@ -854,6 +880,34 @@
         h.style.animation = 'heartPop 0.8s ease-out';
     }
 
+    // SCROLL AND FLASH HIGHLIGHT
+    function scrollToAndFlash(textSnippet) {
+        // Simple search for the text in current DOM
+        const bubbles = document.querySelectorAll('.bubble span');
+        let targetId = null;
+        
+        for(let span of bubbles) {
+            // Check if span text contains the snippet (ignoring "edited")
+            if(span.innerText.includes(textSnippet)) {
+                targetId = span.id.replace('text-', '');
+                break;
+            }
+        }
+
+        if(targetId) {
+            const el = document.getElementById(targetId);
+            if(el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const bubble = el.querySelector('.bubble') || el.closest('.bubble');
+                if(bubble) {
+                    bubble.style.animation = 'none';
+                    bubble.offsetHeight; // Trigger reflow
+                    bubble.style.animation = 'flashMessage 1s ease';
+                }
+            }
+        }
+    }
+
     function renderMessage(m, id, isLastSeen, isLastInGroup) {
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
@@ -933,21 +987,29 @@
         }
 
         let innerContent = '';
+        
+        // Reply Box Click Handler
+        const replyHtml = m.replyTo ? 
+            `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` 
+            : '';
+
         if (side === 'received') {
              innerContent = `
-                ${avatarHtml}
-                <div class="msg-bubble-box" ${boxStyle}>
-                    ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
-                    <div class="bubble">
-                        <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                        <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                <div class="received-inner-row">
+                    ${avatarHtml}
+                    <div class="msg-bubble-box" ${boxStyle}>
+                        ${replyHtml}
+                        <div class="bubble">
+                            <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                            <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                        </div>
                     </div>
                 </div>
              `;
         } else {
             innerContent = `
                 <div class="msg-bubble-box" ${boxStyle}>
-                    ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
+                    ${replyHtml}
                     <div class="bubble">
                         <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
@@ -957,9 +1019,7 @@
         }
 
         rowDiv.innerHTML = `
-            <div style="display:flex; align-items:flex-end; gap:8px;">
-                ${innerContent}
-            </div>
+            ${innerContent}
             ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
             <div class="sliding-timestamp">${formatTime12(date)}</div>
         `;
