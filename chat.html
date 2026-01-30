@@ -13,7 +13,7 @@
         :root { 
             /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
-            --header-bg: rgba(0,0,0,0.92); /* Slightly darker for better contrast */
+            --header-bg: rgba(0,0,0,0.94);
             --accent: #0095f6; 
             --border: #262626; 
             /* SENDER BUBBLE: Deep Orange Gradient */
@@ -43,6 +43,8 @@
             -webkit-user-select: none; user-select: none; 
             color: var(--text); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            /* Fix for gap issue */
+            margin: 0; padding: 0;
         }
 
         /* --- STRICT COPY PASTE CONTROL --- */
@@ -54,13 +56,6 @@
             user-select: text !important; 
             outline: none; 
             font-family: inherit;
-        }
-
-        /* Link styling */
-        .bubble a {
-            color: #fff;
-            text-decoration: underline;
-            pointer-events: auto; /* Allow clicking links */
         }
 
         /* --- ANIMATIONS --- */
@@ -75,15 +70,14 @@
             100% { background-color: transparent; transform: scale(1); }
         }
 
-        /* Pop In Animation */
         @keyframes scaleIn {
             from { transform: scale(0); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Fade In for Chat Load */
-        @keyframes fadeInPage {
-            to { opacity: 1; }
+        @keyframes fadeStatus {
+            0% { opacity: 0; transform: translateY(2px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
         .loading-shimmer {
@@ -103,23 +97,20 @@
             overflow: hidden;
         }
 
-        /* --- HEADER FIXED --- */
+        /* --- HEADER FIXED (Gap Fix) --- */
         header { 
-            position: absolute; /* Stick to top absolutely */
-            top: 0; left: 0; width: 100%;
+            position: fixed; 
+            top: 0; left: 0; right: 0;
             padding: 0 16px;
-            /* Use MAX to ensure at least 10px, or the notch size */
-            padding-top: max(10px, env(safe-area-inset-top)); 
-            padding-bottom: 10px;
-            height: auto;
-            min-height: 60px;
+            /* Precise padding to avoid gap but handle notch */
+            padding-top: env(safe-area-inset-top); 
+            height: calc(60px + env(safe-area-inset-top));
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; 
             align-items: center; 
             gap: 12px; 
-            z-index: 1000;
-            flex-shrink: 0; 
+            z-index: 2000; 
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
@@ -140,7 +131,7 @@
 
         .h-pfp { 
             width: 100%; height: 100%; border-radius: 50%; object-fit: cover; 
-            background: #121212; border: 1px solid #222; 
+            background: #121212; border: 1px solid #333; 
             transition: opacity 0.3s ease;
         }
 
@@ -150,14 +141,15 @@
             background: #00e676;
             border-radius: 50%;
             border: 2px solid #000;
-            display: block; 
+            display: none; 
+            box-shadow: 0 0 4px rgba(0,230,118,0.5);
         }
         
-        .h-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
-        .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1; }
+        .h-info { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+        .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.1; }
         
         .h-name { 
-            font-weight: 600; font-size: 1rem; color: #fff; 
+            font-weight: 700; font-size: 1rem; color: #fff; 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
@@ -167,13 +159,18 @@
             animation: shimmer 1.2s infinite;
         }
 
-        .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
+        .h-username-sub { 
+            font-size: 0.75rem; 
+            color: var(--text-secondary); 
+            font-weight: 400; 
+            animation: fadeStatus 0.3s ease; /* Smooth transition for status change */
+        }
         .v-badge { width: 14px; height: 14px; display: none; }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 22px;
+            gap: 20px;
             margin-left: auto;
             padding-right: 5px;
         }
@@ -200,16 +197,16 @@
             overscroll-behavior-y: contain; 
             position: relative;
             
-            /* PUSH CONTENT DOWN TO AVOID HEADER OVERLAP */
-            margin-top: 70px; 
+            /* PUSH DOWN to compensate for fixed header */
+            margin-top: calc(60px + env(safe-area-inset-top)); 
 
             /* Hide Scrollbar */
             -ms-overflow-style: none;
             scrollbar-width: none;
             
-            /* INSTANT LOAD FIX: Hide initially, fade in after scroll set */
-            opacity: 0;
-            transition: opacity 0.25s ease-in;
+            /* INITIAL LOAD VISIBILITY */
+            opacity: 0; 
+            transition: opacity 0.3s ease-in;
         }
 
         #chat-flow::-webkit-scrollbar { display: none; }
@@ -253,9 +250,20 @@
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
+        /* Sticky Date Divider Feature */
         .date-divider {
-            text-align: center; margin: 24px 0 16px 0; font-size: 0.75rem;
-            color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+            text-align: center; margin: 10px 0; font-size: 0.75rem;
+            color: #fff; font-weight: 600; 
+            text-transform: capitalize;
+            background: rgba(40,40,40,0.6);
+            padding: 4px 10px;
+            border-radius: 12px;
+            align-self: center;
+            width: fit-content;
+            position: sticky; /* Feature: Sticky Date */
+            top: 10px;
+            z-index: 5;
+            backdrop-filter: blur(4px);
         }
 
         .msg-row {
@@ -343,6 +351,15 @@
             text-align: center;
             pointer-events: none;
         }
+
+        /* --- TAP REVEAL TIMESTAMP --- */
+        .tap-time {
+            font-size: 0.65rem; color: #888; margin-top: 2px;
+            display: none; 
+            animation: fadeIn 0.2s;
+        }
+        .sent .tap-time { text-align: right; margin-right: 4px; }
+        .received .tap-time { text-align: left; margin-left: 4px; }
 
         .reaction-badge { 
             position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; 
@@ -564,7 +581,7 @@
         <div class="h-profile-group" onclick="goToProfile()">
             <div class="pfp-container">
                 <img id="h-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="h-pfp loading-shimmer">
-                <div class="online-dot"></div>
+                <div class="online-dot" id="h-online-dot"></div>
             </div>
             <div class="h-info">
                 <div class="h-name-wrapper">
@@ -638,10 +655,11 @@
     let messagesMap = new Map(); 
     let chatTargetData = null; 
     let isFirstLoad = true;
+    let statusTimeout = null;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
-    const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); // Placeholder for like
+    const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
 
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
@@ -650,6 +668,8 @@
     const emojiTray = document.getElementById('emoji-tray');
     const scrollBtn = document.getElementById('scroll-down-btn');
     const sendBtnUI = document.getElementById('send-btn');
+    const onlineDot = document.getElementById('h-online-dot');
+    const headerSubLabel = document.getElementById('h-username-label');
 
     const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","💍","💄","💋","👄","🦷","👅","👂","👃","👣","👁️","👀","🧠","🗣️","👤","👥"];
 
@@ -663,7 +683,7 @@
         return hours + ':' + minutes + ' ' + ampm;
     }
 
-    // Helper for "Seen 1m ago"
+    // Helper for "Seen 1m ago" & Active status
     function timeAgo(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
         let interval = seconds / 31536000;
@@ -677,6 +697,14 @@
         interval = seconds / 60;
         if (interval > 1) return Math.floor(interval) + "m ago";
         return "Just now";
+    }
+
+    function formatActiveTime(timestamp) {
+        if (!timestamp) return "";
+        const now = Date.now();
+        const diff = now - timestamp;
+        if (diff < 60000) return "Active now";
+        return "Active " + timeAgo(new Date(timestamp));
     }
 
     function getDateDivider(date) {
@@ -694,7 +722,6 @@
         this.style.height = (this.scrollHeight) + 'px';
         if(this.value === '') this.style.height = 'auto';
         
-        // Send Button Logic
         if(this.value.trim().length > 0) {
             sendBtnUI.classList.add('active');
         } else {
@@ -704,7 +731,7 @@
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
     });
 
-    // Handle Enter key (Shift+Enter for newline, Enter to send)
+    // Handle Enter key
     mInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -719,17 +746,13 @@
             scrollBtn.style.display = 'flex';
         } else {
             scrollBtn.style.display = 'none';
-            // Reset Badge when at bottom
             scrollBtn.classList.remove('new-msg');
         }
     });
 
     // --- FIX: ALLOW PASTE BUT DISABLE RIGHT CLICK ELSEWHERE ---
     window.oncontextmenu = (e) => { 
-        // Allow context menu only on inputs/textareas
-        if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            return true;
-        }
+        if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
         e.preventDefault(); 
         return false; 
     };
@@ -769,8 +792,55 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
 
+    // --- REALTIME PRESENCE SYSTEM ---
+    function setupMyPresence() {
+        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
+        rdb.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() == false) return;
+            userStatusDatabaseRef.onDisconnect().set({
+                state: 'offline',
+                last_changed: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                userStatusDatabaseRef.set({
+                    state: 'online',
+                    last_changed: firebase.database.ServerValue.TIMESTAMP
+                });
+            });
+        });
+    }
+
+    function monitorTargetStatus() {
+        if (!targetUid) return;
+        rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
+            const data = snapshot.val();
+            
+            // Show username initially
+            if (statusTimeout) clearTimeout(statusTimeout);
+            headerSubLabel.innerText = `@${chatTargetData.username}`;
+            headerSubLabel.style.color = "var(--text-secondary)";
+
+            // Wait 3 seconds, then show status
+            statusTimeout = setTimeout(() => {
+                if (!data) return;
+                if (data.state === 'online') {
+                    onlineDot.style.display = 'block';
+                    headerSubLabel.innerText = "Active now";
+                    headerSubLabel.style.color = "#00e676";
+                } else {
+                    onlineDot.style.display = 'none';
+                    headerSubLabel.innerText = formatActiveTime(data.last_changed);
+                    headerSubLabel.style.color = "var(--text-secondary)";
+                }
+            }, 3000); // 3-second delay logic
+        });
+    }
+
     auth.onAuthStateChanged(user => {
-        if (user) { myUid = user.uid; initChat(); }
+        if (user) { 
+            myUid = user.uid; 
+            setupMyPresence();
+            initChat(); 
+        }
         else { window.location.href = 'login.html'; }
     });
 
@@ -788,9 +858,12 @@
         pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
         
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
+        // Set initial label to username
         document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
         
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+
+        monitorTargetStatus();
 
         db.collection("chats").doc(chatId).update({ 
             [`unreadCount.${myUid}`]: 0, 
@@ -798,8 +871,27 @@
         }).catch(e => {});
 
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
-            bottomTyping.style.display = s.val() ? 'flex' : 'none';
-            if(s.val()) scrollToBottom();
+            const isTyping = s.val();
+            bottomTyping.style.display = isTyping ? 'flex' : 'none';
+            if(isTyping) {
+                if (statusTimeout) clearTimeout(statusTimeout);
+                headerSubLabel.innerText = "Typing...";
+                headerSubLabel.style.color = "#00e676";
+                scrollToBottom();
+            } else {
+                // Refresh status logic on typing stop
+                rdb.ref('/status/' + targetUid).once('value', (snapshot) => {
+                    // Quick check to restore "Active now" immediately if online
+                    const d = snapshot.val();
+                    if(d && d.state === 'online') {
+                        headerSubLabel.innerText = "Active now";
+                        headerSubLabel.style.color = "#00e676";
+                    } else {
+                         headerSubLabel.innerText = `@${chatTargetData.username}`;
+                         headerSubLabel.style.color = "var(--text-secondary)";
+                    }
+                });
+            }
         });
 
         startListener(); 
@@ -881,26 +973,24 @@
 
                 if(isNewIncoming) { 
                     vibrate(20);
-                    // Badge Logic for Scroll Button
                     if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight > 250) {
                         scrollBtn.classList.add('new-msg');
                     }
                 }
 
-                // Initial Load Logic
+                // Initial Load Instant Jump
                 if (isFirstLoad) {
                     renderAll();
-                    // Instant jump to bottom without animation
+                    // Instant jump, no animation
                     chatFlow.scrollTop = chatFlow.scrollHeight;
-                    // Fade in after jump
-                    requestAnimationFrame(() => {
+                    // Reveal content after jump
+                    setTimeout(() => {
                         chatFlow.style.opacity = '1';
                         isFirstLoad = false;
-                    });
+                    }, 50);
                 } else {
                     const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
                     renderAll();
-                    // Only scroll if near bottom or new msg
                     if (isNearBottom || isNewIncoming && isNearBottom) {
                         scrollToBottom();
                     }
@@ -925,9 +1015,8 @@
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
             
-            // Adjust scroll position instantly to maintain view
+            // Adjust scroll position instantly
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
-            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -965,7 +1054,6 @@
                 lastDateLabel = dateLabel;
             }
 
-            // --- SMART PROFILE PICTURE LOGIC ---
             let isLastInGroup = true;
             if (index + 1 < sorted.length) {
                 const nextMsg = sorted[index + 1][1];
@@ -983,21 +1071,18 @@
         h.style.animation = 'none';
         h.offsetHeight; 
         h.style.animation = 'heartPop 0.8s ease-out';
-        likeSound.play().catch(e => {}); // Play Like Sound
+        likeSound.play().catch(e => {}); 
     }
 
-    // SCROLL AND FLASH HIGHLIGHT (Smoother)
     function scrollToAndFlash(textSnippet) {
         const bubbles = document.querySelectorAll('.bubble span');
         let targetId = null;
-        
         for(let span of bubbles) {
             if(span.innerText.includes(textSnippet)) {
                 targetId = span.id.replace('text-', '');
                 break;
             }
         }
-
         if(targetId) {
             const el = document.getElementById(targetId);
             if(el) {
@@ -1009,6 +1094,13 @@
                     bubble.style.animation = 'flashMessage 1s ease';
                 }
             }
+        }
+    }
+
+    function toggleTime(id) {
+        const timeEl = document.getElementById(`time-${id}`);
+        if(timeEl) {
+            timeEl.style.display = timeEl.style.display === 'block' ? 'none' : 'block';
         }
     }
 
@@ -1026,11 +1118,7 @@
             reactionsList = Object.values(m.reactions);
             if (m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
         }
-        
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
-
-        // --- BIND EVENTS STRICTLY TO THE BUBBLE ELEMENT ---
-        // (Listeners attached later to 'bubbleEl')
 
         let seenText = "";
         if (isLastSeen && side === 'sent') {
@@ -1044,7 +1132,8 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // --- HTML ASSEMBLY ---
+        const timeHtml = `<div id="time-${id}" class="tap-time">${formatTime12(date)}</div>`;
+
         let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -1058,6 +1147,7 @@
                             <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                             <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                         </div>
+                        ${timeHtml}
                     </div>
                 </div>`;
         } else {
@@ -1068,6 +1158,7 @@
                         <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                     </div>
+                    ${timeHtml}
                 </div>`;
         }
 
@@ -1080,8 +1171,10 @@
 
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
         if(bubbleEl) {
+            bubbleEl.addEventListener('click', () => { toggleTime(id); });
+
             bubbleEl.addEventListener('dblclick', (e) => {
-                e.preventDefault(); vibrate(40);
+                e.preventDefault(); e.stopPropagation(); vibrate(40);
                 triggerHeartAnimation();
                 applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
             });
@@ -1090,11 +1183,10 @@
 
             bubbleEl.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
-                const startY = e.touches[0].clientY; // Track Y for scroll
+                const startY = e.touches[0].clientY;
                 isScrolling = false; 
                 swipeTriggered = false;
                 
-                // LONG PRESS
                 menuTimer = setTimeout(() => {
                     if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
                 }, 500);
@@ -1104,7 +1196,6 @@
                 currentX = e.touches[0].clientX;
                 const currentY = e.touches[0].clientY;
                 
-                // If scrolling vertically, cancel menu
                 if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { 
                      clearTimeout(menuTimer);
                      isScrolling = true;
@@ -1140,7 +1231,6 @@
         const text = mInput.value.trim();
         if (!text) return;
 
-        // PLAY SOUND ON SEND
         popSound.play().catch(e => {});
 
         mInput.value = "";
@@ -1170,7 +1260,6 @@
     }
 
     function scrollToBottom() { 
-        // No Smooth Scroll here for manual triggers to feel snappy
         chatFlow.scrollTop = chatFlow.scrollHeight; 
     }
 
