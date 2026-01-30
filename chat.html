@@ -164,7 +164,7 @@
         .reaction-badge { 
             position: absolute; bottom: -8px; background: #1a1a1a; border: 1px solid #333; 
             border-radius: 20px; padding: 2px 6px; font-size: 0.75rem; z-index: 10; display: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
             animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
@@ -227,7 +227,7 @@
         }
         .emoji-item { font-size: 1.8rem; cursor: pointer; padding: 5px; }
 
-        #menu-overlay { 
+        #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
             background: rgba(0, 0, 0, 0.8); z-index: 2000; 
             justify-content: center; align-items: center; backdrop-filter: blur(8px);
@@ -268,9 +268,38 @@
             display: none; background: #121212; padding: 10px 15px; 
             border-top: 1px solid var(--border); justify-content: space-between; align-items: center;
         }
+
+        /* React Modal Styles */
+        .react-list-container {
+            width: 320px; background: #262626; border-radius: 16px; 
+            overflow: hidden; display: flex; flex-direction: column; max-height: 400px;
+        }
+        .react-list-header { 
+            padding: 15px; text-align: center; font-weight: 600; border-bottom: 1px solid #363636; position: relative;
+        }
+        .react-list-close { position: absolute; right: 15px; top: 15px; cursor: pointer; color: #ccc; }
+        .react-list-content { overflow-y: auto; padding: 0; }
+        .reactor-item { 
+            display: flex; align-items: center; padding: 12px 15px; gap: 10px; border-bottom: 1px solid #333; 
+        }
+        .reactor-pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
+        .reactor-info { flex: 1; display: flex; flex-direction: column; }
+        .reactor-name { font-weight: 600; font-size: 0.9rem; }
+        .reactor-time { font-size: 0.7rem; color: #888; }
+        .reactor-emoji { font-size: 1.5rem; }
     </style>
 </head>
 <body>
+
+<div id="reaction-details-overlay" onclick="closeReactionDetails()">
+    <div class="react-list-container" onclick="event.stopPropagation()">
+        <div class="react-list-header">
+            Reactions
+            <div class="react-list-close" onclick="closeReactionDetails()">✕</div>
+        </div>
+        <div class="react-list-content" id="react-list-items"></div>
+    </div>
+</div>
 
 <div id="menu-overlay" onclick="closeMenu()">
     <div class="menu-card" id="main-menu-card" onclick="event.stopPropagation()">
@@ -351,6 +380,7 @@
     let activeMenuId = null, unsubscribe = null, isLoadingMore = false;
     let lastVisible = null; 
     let messagesMap = new Map(); 
+    let chatTargetData = null; // Store target info for modals
 
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
@@ -418,17 +448,17 @@
         targetUid = snap.docs[0].id;
         chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        const targetData = snap.docs[0].data();
+        chatTargetData = snap.docs[0].data(); // Save for Modal
         
         // Remove shimmer and update content
         const pfp = document.getElementById('h-pfp');
         pfp.classList.remove('loading-shimmer');
-        pfp.src = targetData.photoURL || 'https://via.placeholder.com/150';
+        pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
         
-        document.getElementById('h-display-name').innerText = targetData.name || targetData.username;
-        document.getElementById('h-username-label').innerText = `@${targetData.username}`;
+        document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
+        document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
         
-        if(targetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+        if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
         db.collection("chats").doc(chatId).update({ [`unreadCount.${myUid}`]: 0, seen: true }).catch(e => {});
 
@@ -526,9 +556,22 @@
         div.id = id;
         div.className = `msg-wrap ${side}`;
         
+        // Extract reactions from object
+        let reactionsList = [];
+        let myReaction = null;
+        if (m.reactions) {
+            reactionsList = Object.values(m.reactions);
+            if (m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
+        } else if (m.reaction) {
+            // Legacy support
+            reactionsList = [{ emoji: m.reaction }];
+        }
+        
+        const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
+
         div.addEventListener('dblclick', (e) => {
             e.preventDefault(); vibrate(40);
-            applyReactionToId(id, m.reaction === '❤️' ? '' : '❤️');
+            applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
         });
 
         let startX = 0, currentX = 0, menuTimer = null, isMoving = false, swipeTriggered = false;
@@ -567,7 +610,7 @@
             ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
             <div class="bubble">
                 <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.5;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                <div id="react-${id}" class="reaction-badge" style="${m.reaction ? 'display:block' : ''}">${m.reaction || ''}</div>
+                <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>
             <div class="meta">
                 ${date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
@@ -587,16 +630,24 @@
     async function sendMsg() {
         const text = mInput.value.trim();
         if (!text) return;
+
+        // FIX: Clear input immediately to prevent lag
+        mInput.value = "";
+        
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
+        
         if (editModeId) {
-            await db.collection("chats").doc(chatId).collection("messages").doc(editModeId).update({ text, edited: true });
+            const idToEdit = editModeId;
             editModeId = null;
+            await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
         } else {
             const rText = replyingTo; cancelReply();
+            scrollToBottom();
+            
             await db.collection("chats").doc(chatId).collection("messages").add({
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                replyTo: rText, seen: false, reaction: ""
+                replyTo: rText, seen: false, reactions: {}
             });
             await db.collection("chats").doc(chatId).set({
                 lastMessage: text, lastSender: myUid,
@@ -605,7 +656,6 @@
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
         }
-        mInput.value = "";
         scrollToBottom();
     }
 
@@ -627,14 +677,78 @@
         if (!activeMenuId) return;
         const msgId = activeMenuId;
         closeMenu(); 
-        const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(msgId);
-        const doc = await msgRef.get();
-        const currentReaction = doc.data().reaction;
-        await msgRef.update({ reaction: currentReaction === emoji ? "" : emoji });
+        await applyReactionToId(msgId, emoji);
     }
 
     async function applyReactionToId(id, emoji) {
-        await db.collection("chats").doc(chatId).collection("messages").doc(id).update({ reaction: emoji });
+        const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(id);
+        const doc = await msgRef.get();
+        const data = doc.data();
+        
+        // Check current user reaction in the map
+        let currentReaction = null;
+        if (data.reactions && data.reactions[myUid]) {
+            currentReaction = data.reactions[myUid].emoji;
+        }
+
+        if (currentReaction === emoji) {
+            // Remove reaction if same
+            await msgRef.update({
+                [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete()
+            });
+        } else {
+            // Add/Update reaction with timestamp
+            await msgRef.update({
+                [`reactions.${myUid}`]: {
+                    emoji: emoji,
+                    timestamp: Date.now()
+                }
+            });
+        }
+    }
+
+    function showReactionDetails(msgId, event) {
+        event.stopPropagation();
+        const msgData = messagesMap.get(msgId);
+        if (!msgData || (!msgData.reactions && !msgData.reaction)) return;
+
+        const listContainer = document.getElementById('react-list-items');
+        listContainer.innerHTML = '';
+
+        let items = [];
+        if (msgData.reactions) {
+            Object.entries(msgData.reactions).forEach(([uid, rData]) => {
+                items.push({ uid, ...rData });
+            });
+        } else if (msgData.reaction) {
+            // Legacy handling
+            items.push({ uid: 'unknown', emoji: msgData.reaction, timestamp: 0 });
+        }
+
+        items.forEach(item => {
+            const isMe = item.uid === myUid;
+            const pfpSrc = isMe ? firebase.auth().currentUser.photoURL : (chatTargetData ? chatTargetData.photoURL : '');
+            const name = isMe ? "You" : (chatTargetData ? chatTargetData.name : "User");
+            const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+
+            const el = document.createElement('div');
+            el.className = 'reactor-item';
+            el.innerHTML = `
+                <img src="${pfpSrc || 'https://via.placeholder.com/40'}" class="reactor-pfp">
+                <div class="reactor-info">
+                    <div class="reactor-name">${name}</div>
+                    <div class="reactor-time">${timeStr}</div>
+                </div>
+                <div class="reactor-emoji">${item.emoji}</div>
+            `;
+            listContainer.appendChild(el);
+        });
+
+        document.getElementById('reaction-details-overlay').style.display = 'flex';
+    }
+
+    function closeReactionDetails() {
+        document.getElementById('reaction-details-overlay').style.display = 'none';
     }
 
     function expandEmojiMenu() {
@@ -673,16 +787,16 @@
         const idToDelete = activeMenuId;
         closeMenu();
         
-        // 1. Delete the message document
-        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-        
-        // 2. Immediately remove from local map to avoid visual delay
+        // FIX: Remove from UI immediately before DB call to prevent lag
         if (messagesMap.has(idToDelete)) {
             messagesMap.delete(idToDelete);
             renderAll();
         }
 
-        // 3. Update the 'Last Message' preview in messages.html (Chat list)
+        // 1. Delete the message document
+        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
+
+        // 2. Update the 'Last Message' preview in messages.html (Chat list)
         // Retrieve the new latest message to update the parent document
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
             .orderBy("timestamp", "desc")
