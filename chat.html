@@ -456,13 +456,9 @@
             .orderBy("timestamp", "desc")
             .limit(15)
             .onSnapshot(snapshot => {
-                if (snapshot.empty) {
-                    messagesMap.clear();
-                    renderAll();
-                    return;
-                }
+                if (snapshot.empty && messagesMap.size === 0) return;
                 
-                if (!lastVisible) {
+                if (!lastVisible && !snapshot.empty) {
                     lastVisible = snapshot.docs[snapshot.docs.length - 1];
                 }
 
@@ -476,7 +472,7 @@
                         messagesMap.delete(msgId);
                     }
                     
-                    if(msgData.sender !== myUid && !msgData.seen && change.type !== "removed") {
+                    if(msgData && msgData.sender !== myUid && !msgData.seen) {
                         db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ seen: true });
                     }
                 });
@@ -516,7 +512,7 @@
     function renderAll() {
         container.innerHTML = '';
         const sorted = Array.from(messagesMap.entries())
-            .filter(([id, data]) => data.timestamp) 
+            .filter(([id, data]) => data && data.timestamp) 
             .sort((a, b) => a[1].timestamp.toMillis() - b[1].timestamp.toMillis());
 
         sorted.forEach(([id, data]) => { renderMessage(data, id); });
@@ -677,33 +673,31 @@
         const idToDelete = activeMenuId;
         closeMenu();
         
-        // Remove from local map first for immediate UI feedback
+        // Remove from Firestore
+        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
+        
+        // Local Map fix (ensure it's gone even before the listener triggers)
         messagesMap.delete(idToDelete);
         renderAll();
 
-        // Perform deletion in Firestore
-        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-        
-        // Update the 'lastMessage' in the chat document
-        const remaining = Array.from(messagesMap.values())
-            .filter(m => m.timestamp)
-            .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-        
-        let newLastMsg = "No messages";
-        let newLastSender = "";
-        let newLastTime = firebase.firestore.FieldValue.serverTimestamp();
-
-        if (remaining.length > 0) {
-            newLastMsg = remaining[0].text;
-            newLastSender = remaining[0].sender;
-            newLastTime = remaining[0].timestamp;
+        // Update Chat Preview if this was the last message
+        const lastMsgSnap = await db.collection("chats").doc(chatId).collection("messages")
+            .orderBy("timestamp", "desc").limit(1).get();
+            
+        if (!lastMsgSnap.empty) {
+            const last = lastMsgSnap.docs[0].data();
+            await db.collection("chats").doc(chatId).update({
+                lastMessage: last.text,
+                lastSender: last.sender,
+                lastTimestamp: last.timestamp
+            });
+        } else {
+            await db.collection("chats").doc(chatId).update({
+                lastMessage: "No messages yet",
+                lastSender: "",
+                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
         }
-
-        await db.collection("chats").doc(chatId).update({
-            lastMessage: newLastMsg,
-            lastSender: newLastSender,
-            lastTimestamp: newLastTime
-        }).catch(e => console.error("Update fail:", e));
     }
 
     mInput.oninput = () => rdb.ref(`typing/${chatId}/${myUid}`).set(mInput.value.trim().length > 0);
