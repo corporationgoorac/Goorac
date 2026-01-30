@@ -13,12 +13,10 @@
 
     <style>
         :root { 
-            /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
-            --header-bg: rgba(0,0,0,0.96); /* High opacity */
+            --header-bg: rgba(0,0,0,0.96);
             --accent: #0095f6; 
             --border: #262626; 
-            /* SENDER BUBBLE: Deep Orange Gradient */
             --sent-bg: linear-gradient(135deg, #ff6b00 0%, #ff3b00 100%);
             --received-bg: #262626; 
             --text: #ffffff; 
@@ -33,14 +31,9 @@
         }
         
         html, body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background: var(--bg);
-            position: fixed; 
-            left: 0; top: 0;
-            margin: 0 !important;
-            padding: 0 !important;
+            height: 100%; width: 100%; overflow: hidden;
+            background: var(--bg); position: fixed; left: 0; top: 0;
+            margin: 0 !important; padding: 0 !important;
         }
 
         body { 
@@ -49,88 +42,72 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
 
-        /* --- STRICT COPY PASTE CONTROL --- */
+        /* Strict Selection Rules */
         div, span, p, img, svg { -webkit-user-select: none; user-select: none; }
-        
-        /* ENABLE selection ONLY in inputs/textareas for Copy/Paste */
-        input, textarea { 
-            -webkit-user-select: text !important; 
-            user-select: text !important; 
-            outline: none; 
-            font-family: inherit;
-        }
+        input, textarea { -webkit-user-select: text !important; user-select: text !important; outline: none; font-family: inherit; }
 
-        /* --- ANIMATIONS --- */
-        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+        /* Animations */
         @keyframes flashMessage { 0% { background-color: rgba(255, 165, 0, 0.3); transform: scale(1.02); } 100% { background-color: transparent; transform: scale(1); } }
         @keyframes scaleIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes fadeStatus { 0% { opacity: 0; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }
-        
-        /* Modal Slide Up Animation */
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
+        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
 
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff3b00 !important; }
+        .loading-shimmer { background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite; }
 
-        .loading-shimmer {
-            background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite;
-        }
+        .app-container { display: flex; flex-direction: column; height: 100%; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden; }
 
-        .app-container { 
-            display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
-        }
-
-        /* --- HEADER FIXED (GAP FIX) --- */
+        /* HEADER */
         header { 
-            position: fixed; 
-            top: 0; left: 0; right: 0;
+            position: fixed; top: 0; left: 0; right: 0;
             padding: 0 16px;
-            /* Using max ensures it never collapses below 10px even if safe-area is 0 */
-            padding-top: max(10px, env(safe-area-inset-top)); 
-            /* Fixed height for content, padding handles status bar */
-            height: 60px;
-            box-sizing: content-box; 
+            /* Fix for gap: Ensure it pushes against top edge */
+            padding-top: max(12px, env(safe-area-inset-top)); 
+            height: auto; min-height: 60px;
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; align-items: center; gap: 12px; 
             z-index: 2000; 
-            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         }
 
         .back-btn { font-size: 1.8rem; color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; height: 40px; width: 30px; }
-
         .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
-        
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
         .h-pfp { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #121212; border: 1px solid #333; transition: opacity 0.3s ease; }
         .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); }
-        
         .h-info { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
         .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.1; }
         .h-name { font-weight: 700; font-size: 1rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .h-name:empty { height: 16px; width: 120px; border-radius: 4px; background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s infinite; }
         .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); font-weight: 400; animation: fadeStatus 0.3s ease; }
         .v-badge { width: 14px; height: 14px; display: none; }
-
         .header-actions { display: flex; align-items: center; gap: 20px; margin-left: auto; padding-right: 5px; }
         .header-icon { width: 26px; height: 26px; cursor: pointer; fill: #ffffff; opacity: 0.9; transition: transform 0.2s, opacity 0.2s; }
         .header-icon:active { opacity: 0.6; transform: scale(0.9); }
 
-        /* --- CHAT AREA --- */
+        /* CHAT AREA */
         #chat-flow { 
             flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px 0; 
-            display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
-            background: transparent; overscroll-behavior-y: contain; position: relative;
-            /* Match Header Height + Padding */
-            padding-top: calc(70px + env(safe-area-inset-top)); 
+            display: flex; flex-direction: column; 
+            -webkit-overflow-scrolling: touch; /* Momentum scrolling */
+            background: transparent; overscroll-behavior-y: contain; 
+            position: relative;
+            /* Header height offset */
+            padding-top: calc(75px + env(safe-area-inset-top)); 
+            
+            /* Hide scrollbar */
             -ms-overflow-style: none; scrollbar-width: none;
-            opacity: 0; transition: opacity 0.25s ease-in;
+            
+            /* Initial State */
+            opacity: 0; 
+            transition: opacity 0.2s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
-        
+
         #messages-container { display: flex; flex-direction: column; padding: 0 14px; will-change: transform; width: 100%; padding-bottom: 30px; }
 
         #typing-indicator-bottom { display: none; margin-left: 56px; margin-bottom: 15px; background: #262626; width: 54px; height: 32px; border-radius: 16px; border-bottom-left-radius: 4px; align-items: center; justify-content: center; gap: 4px; padding: 0 12px; align-self: flex-start; }
@@ -162,7 +139,6 @@
         .received .reaction-badge { left: 0; }
 
         .seen-status { font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px; margin-right: 2px; text-align: right; font-weight: 500; height: 14px; width: 100%; opacity: 0; animation: fadeIn 0.3s forwards; position: relative; z-index: 1; }
-        @keyframes fadeIn { to { opacity: 1; } }
 
         .reply-box-ui { background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 12px; margin-bottom: 6px; font-size: 0.88rem; border-left: 4px solid rgba(255, 255, 255, 0.5); color: #e0e0e0; max-width: 100%; cursor: pointer; transition: opacity 0.2s; white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
         .reply-box-ui:active { opacity: 0.7; }
@@ -171,12 +147,11 @@
         #scroll-down-btn.new-msg { background: var(--accent); color: #fff; animation: bounce 1s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
-        /* RIPPLE EFFECT */
+        /* Ripple */
         @keyframes ripple-effect { to { transform: scale(4); opacity: 0; } }
         .ripple { position: absolute; background: rgba(255, 255, 255, 0.3); border-radius: 50%; transform: scale(0); animation: ripple-effect 0.6s linear; pointer-events: none; }
 
         #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 3000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
 
         .input-area-container { background: #000; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 10px); flex-shrink: 0; width: 100%; z-index: 1000; }
         .input-area { padding: 10px 12px; display: flex; align-items: flex-end; gap: 10px; }
@@ -188,9 +163,10 @@
 
         #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
         
-        /* Ensure component fills the tray */
-        emoji-picker { display: block; width: 100%; height: 100%; }
+        /* Ensures the web component takes full space */
+        emoji-picker { width: 100%; height: 100%; display: flex; flex-direction: column; }
 
+        /* MENUS */
         #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
             background: rgba(0, 0, 0, 0.6); z-index: 2000; 
@@ -216,7 +192,7 @@
         .reactor-time { font-size: 0.7rem; color: #888; margin-top: 2px; }
         .reactor-emoji { font-size: 1.4rem; }
 
-        /* REACTION HALF-SCREEN MODAL (Instagram Style) */
+        /* REACTION HALF-SCREEN MODAL */
         #reaction-picker-modal {
             display: none; position: fixed; inset: 0; z-index: 3000;
             background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
@@ -238,8 +214,7 @@
             width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto;
         }
         
-        /* Ensure picker fills modal body */
-        #reaction-picker-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        #reaction-picker-container { flex: 1; width: 100%; height: 100%; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -330,7 +305,7 @@
         </div>
 
         <div id="emoji-tray">
-             <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
+             <emoji-picker id="main-picker"></emoji-picker>
         </div>
 
         <div class="input-area">
@@ -368,11 +343,10 @@
     let lastVisible = null; 
     let messagesMap = new Map(); 
     let chatTargetData = null; 
-    let myUserData = null; // Store current user data
+    let myUserData = null;
     let isFirstLoad = true;
     let statusTimeout = null;
 
-    // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
     const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
 
@@ -417,9 +391,9 @@
         return hours + ':' + minutes + ' ' + ampm;
     }
 
-    // Helper for "Seen 1m ago" & Active status
     function timeAgo(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return "Just now";
         let interval = seconds / 31536000;
         if (interval > 1) return Math.floor(interval) + "y ago";
         interval = seconds / 2592000;
@@ -429,8 +403,7 @@
         interval = seconds / 3600;
         if (interval > 1) return Math.floor(interval) + "h ago";
         interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m ago";
-        return "Just now";
+        return Math.floor(interval) + "m ago";
     }
 
     function formatActiveTime(timestamp) {
@@ -450,7 +423,6 @@
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
-    // Auto-resize textarea & Send Button Animation
     mInput.addEventListener('input', function() {
         this.style.height = 'auto'; 
         this.style.height = (this.scrollHeight) + 'px';
@@ -461,11 +433,9 @@
         } else {
             sendBtnUI.classList.remove('active');
         }
-
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
     });
 
-    // Handle Enter key
     mInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -473,7 +443,6 @@
         }
     });
     
-    // --- SCROLL BUTTON VISIBILITY LOGIC ---
     chatFlow.addEventListener('scroll', () => {
         const diff = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight;
         if (diff > 250) {
@@ -484,14 +453,12 @@
         }
     });
 
-    // --- FIX: ALLOW PASTE BUT DISABLE RIGHT CLICK ELSEWHERE ---
     window.oncontextmenu = (e) => { 
         if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
         e.preventDefault(); 
         return false; 
     };
     
-    // --- COMPONENT INTEGRATION ---
     const mainPicker = document.getElementById('main-picker');
     if(mainPicker) {
         mainPicker.addEventListener('emoji-click', event => {
@@ -511,21 +478,22 @@
         scrollToBottom();
     }
     
-    // Reaction Picker Logic (Half Screen)
+    // REACTION MODAL LOGIC
     function expandEmojiMenu() {
         closeMenu();
         const reactionModal = document.getElementById('reaction-picker-modal');
         const container = document.getElementById('reaction-picker-container');
-        container.innerHTML = ''; // Clear prev
+        container.innerHTML = ''; // Clear previous
         
-        // Create new picker instance for reaction
         const reactionPicker = document.createElement('emoji-picker');
+        // Force picker to fill modal body
         reactionPicker.style.width = "100%";
         reactionPicker.style.height = "100%";
+        
         reactionPicker.addEventListener('emoji-click', event => {
              const emoji = event.detail.emoji || event.detail.unicode;
              applyReaction(emoji);
-             closeReactionPicker(); // Auto-close on selection (Fast Interaction)
+             closeReactionPicker(); // Auto-close for fast reaction
         });
         container.appendChild(reactionPicker);
         reactionModal.style.display = 'flex';
@@ -552,7 +520,7 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
 
-    // --- REALTIME PRESENCE SYSTEM ---
+    // --- REALTIME PRESENCE ---
     function setupMyPresence() {
         const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
         rdb.ref('.info/connected').on('value', (snapshot) => {
@@ -657,7 +625,6 @@
         setupGlobalSlide(); 
     }
 
-    // --- INSTAGRAM STYLE TIME REVEAL LOGIC ---
     function setupGlobalSlide() {
         let startX = 0, currentX = 0, isDragging = false;
         const container = document.getElementById('messages-container');
@@ -711,7 +678,6 @@
                 snapshot.docChanges().forEach(change => {
                     const msgData = change.doc.data();
                     const msgId = change.doc.id;
-                    
                     if (change.type === "added") {
                         messagesMap.set(msgId, msgData);
                         if(msgData.sender !== myUid) isNewIncoming = true;
@@ -720,11 +686,9 @@
                     } else if (change.type === "removed") {
                         messagesMap.delete(msgId);
                     }
-                    
                     if(msgData.sender !== myUid && !msgData.seen) {
                         db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ 
-                            seen: true,
-                            seenAt: firebase.firestore.FieldValue.serverTimestamp() 
+                            seen: true, seenAt: firebase.firestore.FieldValue.serverTimestamp() 
                         });
                     }
                 });
@@ -736,7 +700,6 @@
                     }
                 }
 
-                // Initial Load Instant Jump
                 if (isFirstLoad) {
                     renderAll();
                     chatFlow.scrollTop = chatFlow.scrollHeight;
@@ -757,28 +720,18 @@
     async function loadMoreMessages() {
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
-        
-        // CAPTURE SCROLL POS
-        chatFlow.style.scrollBehavior = 'auto'; // Disable smooth for instant jump
+        chatFlow.style.scrollBehavior = 'auto'; 
         const oldScrollHeight = chatFlow.scrollHeight;
         
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
-            .orderBy("timestamp", "desc")
-            .startAfter(lastVisible)
-            .limit(15)
-            .get();
+            .orderBy("timestamp", "desc").startAfter(lastVisible).limit(15).get();
 
         if (!snapshot.empty) {
             snapshot.forEach(doc => { messagesMap.set(doc.id, doc.data()); });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
-            
-            // ADJUST SCROLL POSITION INSTANTLY
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
-            
-            // Re-enable smooth after a tick
             setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
-            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -793,21 +746,17 @@
             .sort((a, b) => a[1].timestamp.toMillis() - b[1].timestamp.toMillis());
 
         let lastDateLabel = "";
-
-        // Logic for Last Seen
         let lastSeenMsgId = null;
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
             if (data.sender === myUid && data.seen === true) {
-                lastSeenMsgId = id;
-                break; 
+                lastSeenMsgId = id; break; 
             }
         }
 
         sorted.forEach(([id, data], index) => { 
             const msgDate = data.timestamp.toDate();
             const dateLabel = getDateDivider(msgDate);
-            
             if (dateLabel !== lastDateLabel) {
                 const div = document.createElement('div');
                 div.className = "date-divider";
@@ -815,16 +764,11 @@
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
             }
-
-            // --- SMART PROFILE PICTURE LOGIC ---
             let isLastInGroup = true;
             if (index + 1 < sorted.length) {
                 const nextMsg = sorted[index + 1][1];
-                if (nextMsg.sender === data.sender) {
-                    isLastInGroup = false;
-                }
+                if (nextMsg.sender === data.sender) isLastInGroup = false;
             }
-
             renderMessage(data, id, id === lastSeenMsgId, isLastInGroup); 
         });
     }
@@ -841,10 +785,7 @@
         const bubbles = document.querySelectorAll('.bubble span');
         let targetId = null;
         for(let span of bubbles) {
-            if(span.innerText.includes(textSnippet)) {
-                targetId = span.id.replace('text-', '');
-                break;
-            }
+            if(span.innerText.includes(textSnippet)) { targetId = span.id.replace('text-', ''); break; }
         }
         if(targetId) {
             const el = document.getElementById(targetId);
@@ -875,20 +816,15 @@
             if (m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
         }
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
-
         let seenText = "";
         if (isLastSeen && side === 'sent') {
-            if (m.seenAt) {
-                seenText = "Seen " + timeAgo(m.seenAt.toDate());
-            } else {
-                seenText = "Seen"; 
-            }
+            if (m.seenAt) seenText = "Seen " + timeAgo(m.seenAt.toDate());
+            else seenText = "Seen"; 
         }
         
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // --- HTML ASSEMBLY ---
         let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -922,6 +858,7 @@
         `;
         container.appendChild(rowDiv);
 
+        // ATTACH LISTENERS DIRECTLY
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
         if(bubbleEl) {
             bubbleEl.addEventListener('dblclick', (e) => {
@@ -946,7 +883,6 @@
             bubbleEl.addEventListener('touchmove', (e) => {
                 currentX = e.touches[0].clientX;
                 const currentY = e.touches[0].clientY;
-                
                 if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { 
                      clearTimeout(menuTimer);
                      isScrolling = true;
@@ -981,7 +917,6 @@
     async function sendMsg() {
         const text = mInput.value.trim();
         if (!text) {
-            // New Feature: Input Shake on Empty Send
             inputBox.classList.add('shake-anim');
             setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
             return;
@@ -1068,7 +1003,6 @@
 
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
-            // FIX: Use stored myUserData for my PFP
             const pfpSrc = isMe ? (myUserData ? myUserData.photoURL : 'https://via.placeholder.com/40') : chatTargetData.photoURL;
             const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
             const timeStr = formatTime12(new Date(rData.timestamp));
@@ -1089,24 +1023,6 @@
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
-
-    function expandEmojiMenu() {
-        const grid = document.getElementById('menu-emoji-grid');
-        if (grid.style.display === 'grid') {
-            grid.style.display = 'none';
-        } else {
-            grid.style.display = 'grid';
-            if (grid.innerHTML === "") {
-                emojis.forEach(e => {
-                    const span = document.createElement('span');
-                    span.className = 'menu-grid-emoji';
-                    span.innerText = e;
-                    span.onclick = () => applyReaction(e);
-                    grid.appendChild(span);
-                });
-            }
-        }
-    }
 
     function initReplyFromActive() {
         triggerReply(document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim());
