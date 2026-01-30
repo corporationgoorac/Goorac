@@ -13,7 +13,7 @@
         :root { 
             /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
-            --header-bg: rgba(0,0,0,0.9);
+            --header-bg: rgba(0,0,0,0.92); /* Slightly darker for better contrast */
             --accent: #0095f6; 
             --border: #262626; 
             /* SENDER BUBBLE: Deep Orange Gradient */
@@ -46,7 +46,6 @@
         }
 
         /* --- STRICT COPY PASTE CONTROL --- */
-        /* Disable selection everywhere by default */
         div, span, p, img, svg { -webkit-user-select: none; user-select: none; }
         
         /* ENABLE selection ONLY in inputs/textareas for Copy/Paste */
@@ -57,13 +56,19 @@
             font-family: inherit;
         }
 
+        /* Link styling */
+        .bubble a {
+            color: #fff;
+            text-decoration: underline;
+            pointer-events: auto; /* Allow clicking links */
+        }
+
         /* --- ANIMATIONS --- */
         @keyframes shimmer {
             0% { background-position: -200px 0; }
             100% { background-position: 200px 0; }
         }
 
-        /* Flash animation for finding a replied message - Gold Flash */
         @keyframes flashMessage {
             0% { background-color: rgba(255, 165, 0, 0.3); transform: scale(1.02); }
             50% { background-color: rgba(255, 165, 0, 0.3); transform: scale(1.02); }
@@ -74,6 +79,11 @@
         @keyframes scaleIn {
             from { transform: scale(0); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Fade In for Chat Load */
+        @keyframes fadeInPage {
+            to { opacity: 1; }
         }
 
         .loading-shimmer {
@@ -93,11 +103,16 @@
             overflow: hidden;
         }
 
-        /* --- HEADER --- */
+        /* --- HEADER FIXED --- */
         header { 
-            padding: 10px 16px;
-            padding-top: calc(env(safe-area-inset-top) + 10px); 
-            height: calc(64px + env(safe-area-inset-top));
+            position: absolute; /* Stick to top absolutely */
+            top: 0; left: 0; width: 100%;
+            padding: 0 16px;
+            /* Use MAX to ensure at least 10px, or the notch size */
+            padding-top: max(10px, env(safe-area-inset-top)); 
+            padding-bottom: 10px;
+            height: auto;
+            min-height: 60px;
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; 
@@ -107,7 +122,6 @@
             flex-shrink: 0; 
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            width: 100%;
         }
 
         .back-btn {
@@ -122,13 +136,21 @@
 
         .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
         
-        /* Profile Pic Container */
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
 
         .h-pfp { 
             width: 100%; height: 100%; border-radius: 50%; object-fit: cover; 
             background: #121212; border: 1px solid #222; 
             transition: opacity 0.3s ease;
+        }
+
+        .online-dot {
+            position: absolute; bottom: 0; right: 0;
+            width: 10px; height: 10px;
+            background: #00e676;
+            border-radius: 50%;
+            border: 2px solid #000;
+            display: block; 
         }
         
         .h-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
@@ -148,7 +170,6 @@
         .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
         .v-badge { width: 14px; height: 14px; display: none; }
 
-        /* --- HEADER ACTIONS --- */
         .header-actions {
             display: flex;
             align-items: center;
@@ -179,18 +200,19 @@
             overscroll-behavior-y: contain; 
             position: relative;
             
-            /* Enable smooth scroll primarily */
-            scroll-behavior: smooth;
+            /* PUSH CONTENT DOWN TO AVOID HEADER OVERLAP */
+            margin-top: 70px; 
 
-            /* HIDE SCROLLBAR BUT KEEP SCROLL FUNCTIONALITY */
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            /* Hide Scrollbar */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            
+            /* INSTANT LOAD FIX: Hide initially, fade in after scroll set */
+            opacity: 0;
+            transition: opacity 0.25s ease-in;
         }
 
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        #chat-flow::-webkit-scrollbar {
-            display: none;
-        }
+        #chat-flow::-webkit-scrollbar { display: none; }
         
         #messages-container { 
             display: flex; 
@@ -217,7 +239,6 @@
             align-self: flex-start;
         }
         
-        /* Improved Wave Animation for Typing */
         .typing-dot {
             width: 6px; height: 6px; background: #999; border-radius: 50%;
             animation: typingWave 1.3s linear infinite;
@@ -234,10 +255,9 @@
 
         .date-divider {
             text-align: center; margin: 24px 0 16px 0; font-size: 0.75rem;
-            color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+            color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* --- MESSAGE ROW STRUCTURE --- */
         .msg-row {
             display: flex;
             width: 100%;
@@ -247,7 +267,7 @@
         }
         
         .msg-row.sent { 
-            align-items: flex-end; /* Force right alignment for Sender */
+            align-items: flex-end; 
             padding-right: 0px;
         }
         
@@ -255,7 +275,6 @@
             align-items: flex-start; 
         }
 
-        /* Internal container for Received to hold Avatar + Bubble side-by-side */
         .received-inner-row {
             display: flex;
             align-items: flex-end;
@@ -273,7 +292,6 @@
             border: 1px solid #222;
         }
 
-        /* --- BUBBLE UI --- */
         .msg-bubble-box {
             position: relative;
             max-width: 78%; 
@@ -302,7 +320,7 @@
             border-top-left-radius: 18px;
             border-bottom-left-radius: 18px;
             border-bottom-right-radius: 4px;
-            text-align: left; /* Text always left aligned inside bubble */
+            text-align: left; 
         }
         .received .bubble { 
             background: var(--received-bg); 
@@ -314,7 +332,6 @@
             text-align: left;
         }
 
-        /* --- HIDDEN TIMESTAMP (Right Side) --- */
         .sliding-timestamp {
             position: absolute;
             top: 50%; transform: translateY(-50%);
@@ -336,7 +353,6 @@
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        /* --- SEEN STATUS (Relative Time) --- */
         .seen-status {
             font-size: 0.65rem; 
             color: var(--text-secondary);
@@ -353,7 +369,6 @@
         }
         @keyframes fadeIn { to { opacity: 1; } }
 
-        /* --- IMPROVED REPLY HIGHLIGHT UI (Multi-line Support) --- */
         .reply-box-ui { 
             background: rgba(0, 0, 0, 0.25); 
             padding: 10px 14px; 
@@ -365,18 +380,15 @@
             max-width: 100%; 
             cursor: pointer;
             transition: opacity 0.2s;
-            
-            /* Multi-line clamp logic */
-            white-space: normal; /* Allow wrap */
+            white-space: normal;
             display: -webkit-box;
-            -webkit-line-clamp: 4; /* Limit to 4 lines */
+            -webkit-line-clamp: 4; 
             -webkit-box-orient: vertical;
             overflow: hidden;
             line-height: 1.35;
         }
         .reply-box-ui:active { opacity: 0.7; }
 
-        /* --- SCROLL TO BOTTOM BUTTON --- */
         #scroll-down-btn {
             position: fixed;
             bottom: 85px;
@@ -406,7 +418,6 @@
             50% { transform: translateY(-5px); }
         }
 
-        /* --- HEART ANIMATION OVERLAY --- */
         #heart-overlay {
             position: fixed;
             top: 50%; left: 50%;
@@ -423,7 +434,6 @@
             100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
         }
 
-        /* --- INPUT AREA --- */
         .input-area-container {
             background: #000;
             border-top: 1px solid var(--border);
@@ -458,12 +468,10 @@
             background: transparent; border: none; 
             font-weight: 600; font-size: 1rem; 
             padding: 0 5px; height: 44px; display: flex; align-items: center;
-            /* Default Dull Color */
             color: #444; 
             pointer-events: none;
             transition: color 0.2s ease, text-shadow 0.2s ease;
         }
-        /* Active State (Glow) */
         .send-btn.active { 
             color: var(--accent); 
             cursor: pointer;
@@ -478,7 +486,6 @@
         }
         .emoji-item { font-size: 1.8rem; cursor: pointer; text-align: center; }
 
-        /* --- MENUS --- */
         #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
             background: rgba(0, 0, 0, 0.6); z-index: 2000; 
@@ -557,6 +564,7 @@
         <div class="h-profile-group" onclick="goToProfile()">
             <div class="pfp-container">
                 <img id="h-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="h-pfp loading-shimmer">
+                <div class="online-dot"></div>
             </div>
             <div class="h-info">
                 <div class="h-name-wrapper">
@@ -629,6 +637,7 @@
     let lastVisible = null; 
     let messagesMap = new Map(); 
     let chatTargetData = null; 
+    let isFirstLoad = true;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -878,12 +887,23 @@
                     }
                 }
 
-                const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
-                renderAll();
-                
-                // Only scroll to bottom if user is already near bottom OR on initial load
-                if (isNearBottom || isNewIncoming && isNearBottom) {
-                    scrollToBottom();
+                // Initial Load Logic
+                if (isFirstLoad) {
+                    renderAll();
+                    // Instant jump to bottom without animation
+                    chatFlow.scrollTop = chatFlow.scrollHeight;
+                    // Fade in after jump
+                    requestAnimationFrame(() => {
+                        chatFlow.style.opacity = '1';
+                        isFirstLoad = false;
+                    });
+                } else {
+                    const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
+                    renderAll();
+                    // Only scroll if near bottom or new msg
+                    if (isNearBottom || isNewIncoming && isNearBottom) {
+                        scrollToBottom();
+                    }
                 }
             });
     }
@@ -892,8 +912,6 @@
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
         
-        // CAPTURE SCROLL POS
-        chatFlow.style.scrollBehavior = 'auto'; // Disable smooth for instant jump
         const oldScrollHeight = chatFlow.scrollHeight;
         
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
@@ -907,11 +925,8 @@
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
             
-            // ADJUST SCROLL POSITION INSTANTLY
+            // Adjust scroll position instantly to maintain view
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
-            
-            // Re-enable smooth after a tick
-            setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
             
             isLoadingMore = false;
         } else {
@@ -1154,7 +1169,10 @@
         scrollToBottom();
     }
 
-    function scrollToBottom() { chatFlow.scrollTop = chatFlow.scrollHeight; }
+    function scrollToBottom() { 
+        // No Smooth Scroll here for manual triggers to feel snappy
+        chatFlow.scrollTop = chatFlow.scrollHeight; 
+    }
 
     function openMenu(id, sender, text) {
         activeMenuId = id;
