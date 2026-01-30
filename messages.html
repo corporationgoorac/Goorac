@@ -71,7 +71,7 @@
         .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
 
-        .pin-indicator { font-size: 0.8rem; color: var(--accent); margin-left: 5px; }
+        .pin-indicator { font-size: 0.8rem; color: var(--accent); margin-left: 5px; filter: drop-shadow(0 0 5px var(--accent)); }
 
         .follow-btn { 
             background: transparent; color: var(--accent); border: 1px solid var(--accent); 
@@ -181,6 +181,7 @@
     let myPinnedChats = [];
     let longPressTimer;
     let activeChatId = null;
+    let userCache = {}; // Global cache for maximum speed
 
     document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -207,20 +208,28 @@
     }
 
     function listenToInbox() {
+        if(!myUid) return;
         db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
+            
+            // Speed optimization: Fetch all profiles in parallel using the cache
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
-                const otherDoc = await db.collection("users").doc(otherUid).get();
+                
+                // If user not in cache, fetch it. If they are, it's instant.
+                if (!userCache[otherUid]) {
+                    const otherDoc = await db.collection("users").doc(otherUid).get();
+                    userCache[otherUid] = otherDoc.data();
+                }
+                
                 const isPinned = myPinnedChats.includes(d.id);
-                return { id: d.id, chat, u: otherDoc.data(), otherUid, isPinned };
+                return { id: d.id, chat, u: userCache[otherUid], otherUid, isPinned };
             });
 
             const results = await Promise.all(chatPromises);
             
-            // Sorting: Pinned first, then by timestamp
             results.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -290,7 +299,6 @@
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
         
-        // Hide navbar to prevent overlap
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
 
@@ -316,7 +324,6 @@
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
         
-        // Show navbar again
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
     }
@@ -327,24 +334,16 @@
         closeDeleteMenu();
         
         try {
-            // FIXED: Explicitly only delete messages and the chat doc
-            // This prevents triggers from accidentally touching user profiles
             const messagesRef = db.collection("chats").doc(cid).collection("messages");
             const snapshot = await messagesRef.get();
             const batch = db.batch();
             
-            // Delete all messages in the subcollection
             snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-            
-            // Delete the main chat document
             batch.delete(db.collection("chats").doc(cid));
             
             await batch.commit();
-            
-            // Clean up Realtime Database typing indicator
             await rdb.ref(`typing/${cid}`).remove();
 
-            // Clean up from pins if deleted
             db.collection("users").doc(myUid).update({
                 pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid)
             });
