@@ -71,7 +71,23 @@
         .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
 
-        .pin-indicator { font-size: 0.8rem; color: var(--accent); margin-left: 5px; filter: drop-shadow(0 0 5px var(--accent)); }
+        /* Updated Pin Icon: Sleek Neon Needle */
+        .pin-indicator { 
+            font-size: 0.7rem; 
+            color: var(--accent); 
+            margin-left: 5px; 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 210, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 0.5px solid var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 900;
+            box-shadow: 0 0 8px rgba(0, 210, 255, 0.3);
+        }
 
         .follow-btn { 
             background: transparent; color: var(--accent); border: 1px solid var(--accent); 
@@ -87,7 +103,6 @@
             flex-shrink: 0;
         }
 
-        /* FIXED: Maxed out z-index and added smooth transition for navbar hiding */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: #111; border-top: 1px solid var(--border);
@@ -115,10 +130,7 @@
             padding: 16px; border-radius: 14px; font-weight: 600; cursor: pointer;
         }
 
-
         #search-results { display: none; background: #000; min-height: 100vh; }
-
-        /* Animation class for hiding navbar */
         .hide-nav { opacity: 0 !important; pointer-events: none !important; }
         main-navbar { transition: opacity 0.3s ease; }
     </style>
@@ -151,12 +163,8 @@
 </div>
 <script src="components/navbar.js" defer></script>
 <main-navbar></main-navbar>
-
-
-
 <script src="components/call-notifier.js" defer></script>
 <call-notifier></call-notifier>
-
 
 <script>
     const firebaseConfig = {
@@ -181,32 +189,25 @@
     let myPinnedChats = [];
     let longPressTimer;
     let activeChatId = null;
-    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache') || '{}');
+    let userCache = JSON.parse(localStorage.getItem('goorac_user_cache') || '{}');
+    let inboxUnsubscribe = null;
 
     document.addEventListener('contextmenu', event => event.preventDefault());
 
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            initInboxSystem();
+            // High-speed real-time binding for User Settings (Pins/Follows)
+            db.collection("users").doc(myUid).onSnapshot(doc => {
+                const data = doc.data();
+                myFollowingList = data?.following || [];
+                myFollowersList = data?.followers || [];
+                myPinnedChats = data?.pinnedChats || [];
+                // Refresh inbox immediately when pins change
+                listenToInbox();
+            });
         } else { window.location.href = 'login.html'; }
     });
-
-    async function initInboxSystem() {
-        // Step 1: Real-time listener for user data (following/pins)
-        db.collection("users").doc(myUid).onSnapshot(doc => {
-            const data = doc.data();
-            if(!data) return;
-            myFollowingList = data.following || [];
-            myFollowersList = data.followers || [];
-            myPinnedChats = data.pinnedChats || [];
-            
-            // Re-trigger inbox listener to ensure real-time pinning updates
-            listenToInbox();
-        });
-    }
-
-    let inboxUnsubscribe = null;
 
     function listenToInbox() {
         if(!myUid) return;
@@ -216,7 +217,7 @@
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
             
-            // Parallel Profile Fetching + Cache Logic
+            // Parallel Profile Fetching with LocalStorage Caching
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
@@ -224,7 +225,7 @@
                 if (!userCache[otherUid]) {
                     const otherDoc = await db.collection("users").doc(otherUid).get();
                     userCache[otherUid] = otherDoc.data();
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                    localStorage.setItem('goorac_user_cache', JSON.stringify(userCache));
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
@@ -233,7 +234,7 @@
 
             const results = await Promise.all(chatPromises);
             
-            // Maximum Speed Sorting
+            // Real-time sorting: Pin priority + Timestamp
             results.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -252,9 +253,9 @@
                 const amIFollowing = myFollowingList.includes(otherUid);
                 const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
                 const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Message unsent</span>`;
-                
                 const item = document.createElement('div');
                 item.className = 'chat-item';
+                
                 const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id, isPinned), 600); };
                 const handleEnd = () => { clearTimeout(longPressTimer); };
                 item.ontouchstart = handleStart; item.ontouchend = handleEnd;
@@ -268,7 +269,7 @@
                             <span class="u-name">
                                 ${finalDisplayName} 
                                 ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
-                                ${isPinned ? `<span class="pin-indicator">📍</span>` : ''}
+                                ${isPinned ? `<span class="pin-indicator">PINNED</span>` : ''}
                             </span>
                             <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
                         </div>
@@ -284,7 +285,6 @@
                     </div>
                 `;
                 list.appendChild(item);
-                
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
@@ -306,7 +306,6 @@
         document.getElementById('overlay').style.display = 'block';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
-
         if (window.navigator.vibrate) window.navigator.vibrate(50);
     }
 
@@ -318,7 +317,6 @@
         } else {
             await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
         }
-        // Real-time update happens automatically via userSnapshot listener
     }
 
     function closeDeleteMenu() {
@@ -381,6 +379,9 @@
                         </div>
                     </div>`;
             }).join('');
+            if(results.innerHTML === "") {
+                results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No matching followers/following.</p>";
+            }
         });
     }
 
