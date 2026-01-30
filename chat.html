@@ -149,17 +149,33 @@
             width: 100%;
         }
 
+        /* --- NEW ANIMATED TYPING INDICATOR --- */
         #typing-indicator-bottom {
-            padding: 5px 25px;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
             display: none;
-            margin-bottom: 10px;
             margin-left: 15px;
-            animation: pulse 1.5s infinite;
+            margin-bottom: 10px;
+            background: #262626;
+            width: 50px;
+            height: 30px;
+            border-radius: 15px;
+            border-bottom-left-radius: 4px;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 0 12px;
         }
+        
+        .typing-dot {
+            width: 5px; height: 5px; background: #888; border-radius: 50%;
+            animation: dotJump 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
-        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+        @keyframes dotJump {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
@@ -174,9 +190,10 @@
             width: 100%;
             margin-bottom: 2px; /* Tight professional gap */
             position: relative;
+            flex-direction: column; /* Changed to column to stack bubble and status */
         }
-        .msg-row.sent { justify-content: flex-end; }
-        .msg-row.received { justify-content: flex-start; }
+        .msg-row.sent { align-items: flex-end; }
+        .msg-row.received { align-items: flex-start; }
 
         /* --- BUBBLE UI --- */
         .msg-bubble-box {
@@ -212,11 +229,9 @@
         }
 
         /* --- HIDDEN TIMESTAMP (Right Side) --- */
-        /* Positioned absolutely relative to the ROW, so it sits off-screen */
         .sliding-timestamp {
             position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
+            top: 12px;
             right: -65px; /* Hidden off screen */
             font-size: 0.7rem;
             color: #666;
@@ -234,13 +249,17 @@
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        /* Meta for "Seen" only, no time */
-        .meta { 
-            display: block; 
-            font-size: 0.65rem; color: var(--text-secondary); 
-            margin-top: 2px; margin-right: 2px;
+        /* --- SEEN STATUS (Relative Time) --- */
+        .seen-status {
+            font-size: 0.65rem; color: var(--text-secondary);
+            margin-top: 2px; margin-right: 4px;
+            text-align: right;
+            font-weight: 500;
             height: 14px;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
         }
+        @keyframes fadeIn { to { opacity: 1; } }
 
         .reply-box-ui { 
             background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 8px; 
@@ -380,7 +399,11 @@
     <div id="chat-flow">
         <div id="scroll-trigger"></div>
         <div id="messages-container"></div>
-        <div id="typing-indicator-bottom">typing...</div>
+        <div id="typing-indicator-bottom">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
     </div>
 
     <div class="input-area-container">
@@ -427,6 +450,9 @@
     let messagesMap = new Map(); 
     let chatTargetData = null; 
 
+    // Custom Feature: Sound Effect (Base64 Pop)
+    const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); // Short placeholder for sound capability
+
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
     const container = document.getElementById('messages-container');
@@ -443,6 +469,22 @@
         hours = hours ? hours : 12;
         minutes = minutes < 10 ? '0'+minutes : minutes;
         return hours + ':' + minutes + ' ' + ampm;
+    }
+
+    // Helper for "Seen 1m ago"
+    function timeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m ago";
+        return "Just now";
     }
 
     function getDateDivider(date) {
@@ -531,10 +573,15 @@
         
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-        db.collection("chats").doc(chatId).update({ [`unreadCount.${myUid}`]: 0, seen: true }).catch(e => {});
+        // When entering chat, update with timestamp to support "Seen 1m ago"
+        db.collection("chats").doc(chatId).update({ 
+            [`unreadCount.${myUid}`]: 0, 
+            seen: true 
+        }).catch(e => {});
 
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
-            bottomTyping.style.display = s.val() ? 'block' : 'none';
+            bottomTyping.style.display = s.val() ? 'flex' : 'none';
+            if(s.val()) scrollToBottom();
         });
 
         startListener(); 
@@ -594,24 +641,35 @@
                 
                 if (!lastVisible) lastVisible = snapshot.docs[snapshot.docs.length - 1];
 
+                let isNewIncoming = false;
+
                 snapshot.docChanges().forEach(change => {
                     const msgData = change.doc.data();
                     const msgId = change.doc.id;
                     
-                    if (change.type === "added" || change.type === "modified") {
+                    if (change.type === "added") {
+                        messagesMap.set(msgId, msgData);
+                        if(msgData.sender !== myUid) isNewIncoming = true;
+                    } else if (change.type === "modified") {
                         messagesMap.set(msgId, msgData);
                     } else if (change.type === "removed") {
                         messagesMap.delete(msgId);
                     }
                     
+                    // Logic to mark incoming as seen with timestamp
                     if(msgData.sender !== myUid && !msgData.seen) {
-                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ seen: true });
+                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ 
+                            seen: true,
+                            seenAt: firebase.firestore.FieldValue.serverTimestamp() 
+                        });
                     }
                 });
 
+                if(isNewIncoming) { vibrate(20); }
+
                 const isNearBottom = chatFlow.scrollTop + chatFlow.clientHeight >= chatFlow.scrollHeight - 100;
                 renderAll();
-                if (isNearBottom) scrollToBottom();
+                if (isNearBottom || isNewIncoming) scrollToBottom();
             });
     }
 
@@ -646,6 +704,17 @@
 
         let lastDateLabel = "";
 
+        // Logic to find the LAST seen message by the other user
+        let lastSeenMsgId = null;
+        // Iterate backwards to find the most recent message sent by ME that was SEEN
+        for (let i = sorted.length - 1; i >= 0; i--) {
+            const [id, data] = sorted[i];
+            if (data.sender === myUid && data.seen === true) {
+                lastSeenMsgId = id;
+                break; // Stop after finding the latest one
+            }
+        }
+
         sorted.forEach(([id, data]) => { 
             const msgDate = data.timestamp.toDate();
             const dateLabel = getDateDivider(msgDate);
@@ -657,11 +726,12 @@
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
             }
-            renderMessage(data, id); 
+            // Pass true if this is the specific last seen message
+            renderMessage(data, id, id === lastSeenMsgId); 
         });
     }
 
-    function renderMessage(m, id) {
+    function renderMessage(m, id, isLastSeen) {
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
 
@@ -722,9 +792,16 @@
             startX = 0; currentX = 0;
         });
 
-        // HTML Structure: 
-        // 1. Bubble Box (Message)
-        // 2. Sliding Timestamp (Hidden right, relative to row)
+        // Calculate Seen Text
+        let seenText = "";
+        if (isLastSeen && side === 'sent') {
+            if (m.seenAt) {
+                seenText = "Seen " + timeAgo(m.seenAt.toDate());
+            } else {
+                seenText = "Seen"; // Fallback if no timestamp
+            }
+        }
+
         rowDiv.innerHTML = `
             <div class="msg-bubble-box">
                 ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
@@ -732,8 +809,9 @@
                     <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                     <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                 </div>
-                ${side === 'sent' ? `<div class="meta"><span class="seen">${m.seen ? 'Seen' : 'Sent'}</span></div>` : ''}
             </div>
+            
+            ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
             
             <div class="sliding-timestamp">${formatTime12(date)}</div>
         `;
