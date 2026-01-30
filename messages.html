@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
     <title>Goorac | Quantum Inbox</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -70,6 +71,8 @@
         .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
 
+        .pin-indicator { font-size: 0.8rem; color: var(--accent); margin-left: 5px; }
+
         .follow-btn { 
             background: transparent; color: var(--accent); border: 1px solid var(--accent); 
             padding: 5px 10px; border-radius: 15px; font-size: 0.65rem; font-weight: 800; cursor: pointer;
@@ -84,20 +87,26 @@
             flex-shrink: 0;
         }
 
+        /* FIXED: Raised z-index to 9999 and added safe-area padding to beat the navbar */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: #111; border-top: 1px solid var(--border);
-            z-index: 3000; border-radius: 20px 20px 0 0;
+            z-index: 9999; border-radius: 20px 20px 0 0;
             transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px; box-sizing: border-box;
+            padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); box-sizing: border-box;
         }
         #delete-menu.active { bottom: 0; }
         .menu-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            z-index: 2999; display: none; backdrop-filter: blur(4px);
+            z-index: 9998; display: none; backdrop-filter: blur(4px);
         }
         .del-btn-big {
             width: 100%; background: var(--danger); color: white; border: none;
+            padding: 16px; border-radius: 14px; font-weight: 800; font-size: 1rem;
+            margin-bottom: 10px; cursor: pointer;
+        }
+        .pin-btn-big {
+            width: 100%; background: #222; color: var(--accent); border: 1px solid var(--accent);
             padding: 16px; border-radius: 14px; font-weight: 800; font-size: 1rem;
             margin-bottom: 10px; cursor: pointer;
         }
@@ -132,6 +141,7 @@
 <div class="menu-overlay" id="overlay" onclick="closeDeleteMenu()"></div>
 <div id="delete-menu">
     <div style="text-align: center; margin-bottom: 15px; color: #666; font-size: 0.8rem; font-weight: 600;">CHAT OPTIONS</div>
+    <button class="pin-btn-big" id="pin-chat-btn">Pin Chat</button>
     <button class="del-btn-big" id="confirm-delete">Delete For Both</button>
     <button class="cancel-btn" onclick="closeDeleteMenu()">Cancel</button>
 </div>
@@ -164,6 +174,7 @@
     let myUid = "";
     let myFollowingList = [];
     let myFollowersList = [];
+    let myPinnedChats = [];
     let longPressTimer;
     let activeChatId = null;
 
@@ -173,6 +184,7 @@
         if (user) {
             myUid = user.uid;
             fetchUserData();
+            listenToPinnedChats();
             listenToInbox();
         } else { window.location.href = 'login.html'; }
     });
@@ -184,6 +196,12 @@
         myFollowersList = data?.followers || [];
     }
 
+    function listenToPinnedChats() {
+        db.collection("users").doc(myUid).onSnapshot(doc => {
+            myPinnedChats = doc.data()?.pinnedChats || [];
+        });
+    }
+
     function listenToInbox() {
         db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
@@ -192,14 +210,21 @@
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
                 const otherDoc = await db.collection("users").doc(otherUid).get();
-                return { id: d.id, chat, u: otherDoc.data(), otherUid };
+                const isPinned = myPinnedChats.includes(d.id);
+                return { id: d.id, chat, u: otherDoc.data(), otherUid, isPinned };
             });
 
             const results = await Promise.all(chatPromises);
-            results.sort((a,b) => (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0));
+            
+            // Sorting: Pinned first, then by timestamp
+            results.sort((a,b) => {
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+                return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
+            });
 
             list.innerHTML = "";
-            results.forEach(({id, chat, u, otherUid}) => {
+            results.forEach(({id, chat, u, otherUid, isPinned}) => {
                 if(!u) return;
                 const isUnread = (chat.lastSender !== myUid && chat.seen === false);
                 let displayCount = "";
@@ -212,7 +237,7 @@
                 const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Message unsent</span>`;
                 const item = document.createElement('div');
                 item.className = 'chat-item';
-                const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id), 600); };
+                const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id, isPinned), 600); };
                 const handleEnd = () => { clearTimeout(longPressTimer); };
                 item.ontouchstart = handleStart; item.ontouchend = handleEnd;
                 item.onmousedown = handleStart; item.onmouseup = handleEnd;
@@ -225,6 +250,7 @@
                             <span class="u-name">
                                 ${finalDisplayName} 
                                 ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                                ${isPinned ? `<span class="pin-indicator">📍</span>` : ''}
                             </span>
                             <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
                         </div>
@@ -251,11 +277,29 @@
         });
     }
 
-    function openDeleteMenu(chatId) {
+    function openDeleteMenu(chatId, isPinned) {
         activeChatId = chatId;
+        const pinBtn = document.getElementById('pin-chat-btn');
+        pinBtn.innerText = isPinned ? "Unpin Chat" : "Pin Chat";
+        pinBtn.onclick = () => togglePin(chatId, isPinned);
+        
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
         if (window.navigator.vibrate) window.navigator.vibrate(50);
+    }
+
+    async function togglePin(chatId, isPinned) {
+        closeDeleteMenu();
+        const userRef = db.collection("users").doc(myUid);
+        if (isPinned) {
+            await userRef.update({
+                pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId)
+            });
+        } else {
+            await userRef.update({
+                pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId)
+            });
+        }
     }
 
     function closeDeleteMenu() {
@@ -286,6 +330,12 @@
             
             // Clean up Realtime Database typing indicator
             await rdb.ref(`typing/${cid}`).remove();
+
+            // Clean up from pins if deleted
+            db.collection("users").doc(myUid).update({
+                pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid)
+            });
+
         } catch(e) { 
             console.error("Strict deletion failed:", e); 
         }
