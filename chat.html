@@ -12,14 +12,13 @@
     <style>
         :root { 
             --bg: #000000; 
-            --header-bg: rgba(0,0,0,0.92);
+            --header-bg: rgba(0,0,0,0.85);
             --accent: #0095f6; 
             --border: #262626; 
-            --sent: #3797f0; 
-            --received: #262626; 
+            --sent-bg: linear-gradient(135deg, #a43ff2 0%, #3797f0 100%);
+            --received-bg: #262626; 
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
-            /* Improved Shimmer Gradient */
             --shimmer: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
         }
 
@@ -44,11 +43,12 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
 
-        input { 
+        /* --- ENABLE COPY PASTE ONLY IN INPUTS --- */
+        input, textarea { 
             -webkit-user-select: text !important; 
             user-select: text !important; 
             outline: none; 
-            font-size: 16px !important; 
+            font-family: inherit;
         }
 
         /* --- UPDATED SHIMMER --- */
@@ -74,12 +74,11 @@
             overflow: hidden;
         }
 
-        /* --- UPDATED HEADER --- */
+        /* --- HEADER --- */
         header { 
-            /* Fix for top spacing */
-            padding: 12px 16px;
+            padding: 10px 16px;
             padding-top: calc(env(safe-area-inset-top) + 10px); 
-            height: calc(60px + env(safe-area-inset-top));
+            height: calc(64px + env(safe-area-inset-top));
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; 
@@ -93,8 +92,8 @@
         }
 
         .back-btn {
-            font-size: 1.6rem; 
-            color: #fff; 
+            font-size: 1.8rem; 
+            color: var(--accent); 
             cursor: pointer; 
             display: flex; 
             align-items: center; 
@@ -105,7 +104,7 @@
         .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
         
         .h-pfp { 
-            width: 40px; height: 40px; border-radius: 50%; object-fit: cover; 
+            width: 38px; height: 38px; border-radius: 50%; object-fit: cover; 
             background: #121212; border: 1px solid #222; flex-shrink: 0;
             transition: opacity 0.3s ease;
         }
@@ -114,11 +113,10 @@
         .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1; }
         
         .h-name { 
-            font-weight: 700; font-size: 1rem; color: #fff; 
+            font-weight: 600; font-size: 1rem; color: #fff; 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        /* Skeleton Loading for Name */
         .h-name:empty {
             height: 16px; width: 120px; border-radius: 4px; 
             background: var(--shimmer); background-size: 400px 100%; 
@@ -128,11 +126,11 @@
         .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); }
         .v-badge { width: 14px; height: 14px; display: none; }
 
-        /* --- CHAT AREA & TIMESTAMPS --- */
+        /* --- CHAT AREA --- */
         #chat-flow { 
             flex: 1; 
             overflow-y: auto; 
-            overflow-x: hidden; /* Prevent horizontal scrollbar, handled by JS transform */
+            overflow-x: hidden; 
             padding: 15px 0; 
             display: flex; 
             flex-direction: column; 
@@ -142,66 +140,89 @@
             position: relative;
         }
         
-        /* Container that moves left to reveal time */
         #messages-container { 
             display: flex; 
             flex-direction: column; 
-            padding: 0 15px;
-            transition: transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            padding: 0 12px;
+            transition: transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000); /* Smooth spring slide */
             will-change: transform;
             width: 100%;
         }
 
         #typing-indicator-bottom {
             padding: 5px 25px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
             display: none;
-            margin-bottom: 15px;
-            animation: pulse 1.2s infinite;
+            margin-bottom: 10px;
+            margin-left: 15px;
+            animation: pulse 1.5s infinite;
         }
 
-        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
         .date-divider {
-            text-align: center; margin: 24px 0 12px 0; font-size: 0.7rem;
-            color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+            text-align: center; margin: 20px 0 10px 0; font-size: 0.7rem;
+            color: #555; font-weight: 500;
         }
 
-        .msg-wrap { 
-            display: flex; flex-direction: column; max-width: 75%; margin-bottom: 2px; 
-            position: relative; 
+        /* --- MESSAGE ROW STRUCTURE --- */
+        .msg-row {
+            display: flex;
+            width: 100%;
+            margin-bottom: 2px; /* Tight professional gap */
+            position: relative;
         }
-        .sent { align-self: flex-end; align-items: flex-end; }
-        .received { align-self: flex-start; align-items: flex-start; }
+        .msg-row.sent { justify-content: flex-end; }
+        .msg-row.received { justify-content: flex-start; }
 
-        /* The Bubble */
+        /* --- BUBBLE UI --- */
+        .msg-bubble-box {
+            position: relative;
+            max-width: 75%;
+            display: flex;
+            flex-direction: column;
+        }
+        .sent .msg-bubble-box { align-items: flex-end; }
+        .received .msg-bubble-box { align-items: flex-start; }
+
         .bubble { 
-            padding: 10px 16px; 
-            border-radius: 22px; 
-            font-size: 1rem; 
+            padding: 10px 15px; 
+            border-radius: 20px; 
+            font-size: 0.96rem; 
             line-height: 1.4; 
             position: relative; 
             word-wrap: break-word; 
-            transition: transform 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
             z-index: 2;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        .sent .bubble { background: linear-gradient(135deg, #a43ff2 0%, #3797f0 100%); color: #fff; border-bottom-right-radius: 4px; }
-        .received .bubble { background: var(--received); color: #fff; border-bottom-left-radius: 4px; }
+        
+        /* Rounded corners logic */
+        .sent .bubble { 
+            background: var(--sent-bg); 
+            color: #fff; 
+            border-bottom-right-radius: 4px; 
+        }
+        .received .bubble { 
+            background: var(--received-bg); 
+            color: #fff; 
+            border-bottom-left-radius: 4px; 
+        }
 
-        /* Instagram Style Timestamp (Hidden initially) */
+        /* --- HIDDEN TIMESTAMP (Right Side) --- */
+        /* Positioned absolutely relative to the ROW, so it sits off-screen */
         .sliding-timestamp {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            right: -70px; /* Off screen to the right */
+            right: -65px; /* Hidden off screen */
             font-size: 0.7rem;
             color: #666;
             font-weight: 500;
-            width: 60px;
-            text-align: left;
+            width: 50px;
+            text-align: center;
             pointer-events: none;
         }
 
@@ -213,10 +234,12 @@
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        /* Meta is now only used for "Seen" status under sent messages, time is handled by swipe */
+        /* Meta for "Seen" only, no time */
         .meta { 
-            display: flex; justify-content: flex-end; margin-top: 2px; margin-right: 2px;
-            font-size: 0.65rem; color: var(--text-secondary); height: 12px;
+            display: block; 
+            font-size: 0.65rem; color: var(--text-secondary); 
+            margin-top: 2px; margin-right: 2px;
+            height: 14px;
         }
 
         .reply-box-ui { 
@@ -225,6 +248,7 @@
             max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9;
         }
 
+        /* --- INPUT AREA --- */
         .input-area-container {
             background: #000;
             border-top: 1px solid var(--border);
@@ -234,19 +258,32 @@
             z-index: 1000;
         }
 
-        .input-area { padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+        .input-area { padding: 8px 10px; display: flex; align-items: flex-end; gap: 8px; }
         
         .input-box { 
-            flex: 1; background: #121212; border-radius: 24px; 
-            padding: 0 16px; border: 1px solid #333;
+            flex: 1; background: #121212; border-radius: 22px; 
+            padding: 2px 12px; border: 1px solid #333;
             display: flex; align-items: center; min-height: 44px;
         }
-        .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 10px 0; font-size: 16px; }
         
-        .plus-btn { font-size: 24px; color: #fff; cursor: pointer; padding: 5px; }
+        /* Auto-growing Textarea */
+        .msg-input { 
+            width: 100%; background: transparent; border: none; color: white; 
+            padding: 10px 0; font-size: 16px; 
+            resize: none; 
+            max-height: 100px; /* Limit to ~4 lines */
+            overflow-y: auto;
+            line-height: 1.3;
+        }
+        
+        .plus-btn { 
+            font-size: 26px; color: var(--accent); cursor: pointer; 
+            padding: 0 5px; height: 44px; display: flex; align-items: center; 
+        }
         .send-btn { 
             background: transparent; color: var(--accent); border: none; 
-            font-weight: 600; font-size: 1rem; cursor: pointer; padding: 5px; 
+            font-weight: 600; font-size: 1rem; cursor: pointer; 
+            padding: 0 5px; height: 44px; display: flex; align-items: center;
         }
 
         #emoji-tray {
@@ -256,6 +293,7 @@
         }
         .emoji-item { font-size: 1.8rem; cursor: pointer; text-align: center; }
 
+        /* --- MENUS --- */
         #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
             background: rgba(0, 0, 0, 0.6); z-index: 2000; 
@@ -356,7 +394,7 @@
         <div class="input-area">
             <div class="plus-btn" onclick="toggleEmojiTray()">+</div>
             <div class="input-box">
-                <input type="text" id="m-input" class="msg-input" placeholder="Message..." autocomplete="off">
+                <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
             <button class="send-btn" onclick="sendMsg()">Send</button>
         </div>
@@ -416,6 +454,24 @@
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
+    // Auto-resize textarea function
+    mInput.addEventListener('input', function() {
+        this.style.height = 'auto'; 
+        this.style.height = (this.scrollHeight) + 'px';
+        if(this.value === '') this.style.height = 'auto';
+        
+        // Typing indicator trigger
+        rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
+    });
+
+    // Handle Enter key (Shift+Enter for newline, Enter to send)
+    mInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMsg();
+        }
+    });
+
     function toggleEmojiTray() {
         if (emojiTray.style.display === 'grid') {
             emojiTray.style.display = 'none';
@@ -449,10 +505,6 @@
     function goToProfile() {
         if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
     }
-
-    mInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); sendMsg(); }
-    });
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
 
@@ -487,7 +539,7 @@
 
         startListener(); 
         setupObserver();
-        setupGlobalSlide(); // Initialize the Instagram-style time reveal
+        setupGlobalSlide(); 
     }
 
     // --- INSTAGRAM STYLE TIME REVEAL LOGIC ---
@@ -496,7 +548,6 @@
         const container = document.getElementById('messages-container');
 
         chatFlow.addEventListener('touchstart', (e) => {
-            // Only trigger if we aren't replying to a specific message
             startX = e.touches[0].clientX;
             isDragging = false;
         }, {passive: true});
@@ -505,10 +556,9 @@
             currentX = e.touches[0].clientX;
             const diff = currentX - startX;
             
-            // If dragging LEFT (negative diff) and user is intentionally pulling
+            // Drag LEFT to reveal time
             if (diff < -10) { 
                 isDragging = true;
-                // Cap the drag at -70px
                 const translate = Math.max(diff, -70);
                 container.style.transform = `translateX(${translate}px)`;
                 container.style.transition = 'none';
@@ -517,7 +567,7 @@
 
         chatFlow.addEventListener('touchend', (e) => {
             if (isDragging) {
-                container.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                container.style.transition = 'transform 0.2s cubic-bezier(0.215, 0.610, 0.355, 1.000)';
                 container.style.transform = `translateX(0px)`;
             }
             startX = 0; currentX = 0; isDragging = false;
@@ -615,9 +665,10 @@
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
 
-        const div = document.createElement('div');
-        div.id = id;
-        div.className = `msg-wrap ${side}`;
+        // WRAPPER ROW for layout alignment
+        const rowDiv = document.createElement('div');
+        rowDiv.id = id;
+        rowDiv.className = `msg-row ${side}`;
         
         let reactionsList = [];
         let myReaction = null;
@@ -628,15 +679,16 @@
         
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
-        div.addEventListener('dblclick', (e) => {
+        // Double click reaction on the Bubble box
+        rowDiv.addEventListener('dblclick', (e) => {
             e.preventDefault(); vibrate(40);
             applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
         });
 
-        // --- SWIPE TO REPLY (BUBBLE ONLY) ---
+        // Swipe Right to Reply (Bubble only logic)
         let startX = 0, currentX = 0, menuTimer = null, isMoving = false, swipeTriggered = false;
 
-        div.addEventListener('touchstart', (e) => {
+        rowDiv.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
             isMoving = false; swipeTriggered = false;
             menuTimer = setTimeout(() => {
@@ -644,42 +696,48 @@
             }, 500);
         }, {passive: true});
 
-        div.addEventListener('touchmove', (e) => {
+        rowDiv.addEventListener('touchmove', (e) => {
             currentX = e.touches[0].clientX;
             let diff = currentX - startX;
             if (Math.abs(diff) > 10) isMoving = true;
             
             // Only allow Right swipe for Reply
             if (diff > 0 && diff < 80) {
-                const b = div.querySelector('.bubble');
+                const b = rowDiv.querySelector('.bubble');
                 b.style.transform = `translateX(${diff}px)`;
                 b.style.transition = "none";
                 if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
             }
-            // If diff < 0, let the Global Swipe (setupGlobalSlide) handle the time reveal
         }, {passive: true});
 
-        div.addEventListener('touchend', () => {
+        rowDiv.addEventListener('touchend', () => {
             clearTimeout(menuTimer);
             let diff = currentX - startX;
-            const bubble = div.querySelector('.bubble');
-            bubble.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-            bubble.style.transform = `translateX(0px)`;
+            const bubble = rowDiv.querySelector('.bubble');
+            if(bubble) {
+                bubble.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                bubble.style.transform = `translateX(0px)`;
+            }
             if (diff > 50) triggerReply(m.text);
             startX = 0; currentX = 0;
         });
 
-        div.innerHTML = `
-            ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
-            <div class="bubble">
-                <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+        // HTML Structure: 
+        // 1. Bubble Box (Message)
+        // 2. Sliding Timestamp (Hidden right, relative to row)
+        rowDiv.innerHTML = `
+            <div class="msg-bubble-box">
+                ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
+                <div class="bubble">
+                    <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                    <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                </div>
+                ${side === 'sent' ? `<div class="meta"><span class="seen">${m.seen ? 'Seen' : 'Sent'}</span></div>` : ''}
             </div>
-            <div class="sliding-timestamp">${formatTime12(date)}</div>
             
-            ${side === 'sent' ? `<div class="meta"><span class="seen">${m.seen ? 'Seen' : 'Sent'}</span></div>` : '<div class="meta"></div>'}
+            <div class="sliding-timestamp">${formatTime12(date)}</div>
         `;
-        container.appendChild(div);
+        container.appendChild(rowDiv);
     }
 
     function triggerReply(text) {
@@ -694,6 +752,7 @@
         if (!text) return;
 
         mInput.value = "";
+        mInput.style.height = 'auto'; // Reset height
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
@@ -755,13 +814,11 @@
         const listContainer = document.getElementById('react-list-items');
         listContainer.innerHTML = '';
 
-        // Get current user details securely or fall back to defaults
         const currentUser = firebase.auth().currentUser;
         const myPhoto = currentUser ? currentUser.photoURL : 'https://via.placeholder.com/40';
 
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
-            // FIX: Use Auth photoURL for self, ChatTarget photoURL for other
             const pfpSrc = isMe ? myPhoto : chatTargetData.photoURL;
             const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
             const timeStr = formatTime12(new Date(rData.timestamp));
@@ -811,6 +868,7 @@
     
     function initEdit() {
         mInput.value = document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim();
+        mInput.style.height = 'auto'; mInput.style.height = mInput.scrollHeight + 'px';
         editModeId = activeMenuId; closeMenu(); mInput.focus();
     }
 
@@ -824,8 +882,6 @@
             await db.collection("chats").doc(chatId).update({ lastMessage: lastMsg.text, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
         }
     }
-
-    mInput.oninput = () => rdb.ref(`typing/${chatId}/${myUid}`).set(mInput.value.trim().length > 0);
 </script>
 
 <script src="components/call-notifier.js" defer></script>
