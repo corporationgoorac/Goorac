@@ -67,6 +67,7 @@
         @keyframes fadeStatus { 0% { opacity: 0; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }
         
+        /* Modal Slide Up Animation */
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
@@ -170,6 +171,10 @@
         #scroll-down-btn.new-msg { background: var(--accent); color: #fff; animation: bounce 1s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
+        /* RIPPLE EFFECT */
+        @keyframes ripple-effect { to { transform: scale(4); opacity: 0; } }
+        .ripple { position: absolute; background: rgba(255, 255, 255, 0.3); border-radius: 50%; transform: scale(0); animation: ripple-effect 0.6s linear; pointer-events: none; }
+
         #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 3000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
 
@@ -211,7 +216,7 @@
         .reactor-time { font-size: 0.7rem; color: #888; margin-top: 2px; }
         .reactor-emoji { font-size: 1.4rem; }
 
-        /* REACTION HALF-SCREEN MODAL */
+        /* REACTION HALF-SCREEN MODAL (Instagram Style) */
         #reaction-picker-modal {
             display: none; position: fixed; inset: 0; z-index: 3000;
             background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
@@ -232,6 +237,9 @@
         .picker-drag-handle {
             width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto;
         }
+        
+        /* Ensure picker fills modal body */
+        #reaction-picker-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
     </style>
 </head>
 <body>
@@ -257,7 +265,7 @@
             <span onclick="closeReactionPicker()" style="font-size:1.2rem; cursor:pointer;">✕</span>
             React
         </div>
-        <div id="reaction-picker-container" style="flex:1; overflow:hidden;"></div>
+        <div id="reaction-picker-container"></div>
     </div>
 </div>
 
@@ -322,7 +330,7 @@
         </div>
 
         <div id="emoji-tray">
-             <emoji-picker id="main-picker"></emoji-picker>
+             <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
         </div>
 
         <div class="input-area">
@@ -360,7 +368,7 @@
     let lastVisible = null; 
     let messagesMap = new Map(); 
     let chatTargetData = null; 
-    let myUserData = null;
+    let myUserData = null; // Store current user data
     let isFirstLoad = true;
     let statusTimeout = null;
 
@@ -508,8 +516,9 @@
         closeMenu();
         const reactionModal = document.getElementById('reaction-picker-modal');
         const container = document.getElementById('reaction-picker-container');
-        container.innerHTML = ''; 
+        container.innerHTML = ''; // Clear prev
         
+        // Create new picker instance for reaction
         const reactionPicker = document.createElement('emoji-picker');
         reactionPicker.style.width = "100%";
         reactionPicker.style.height = "100%";
@@ -1080,6 +1089,24 @@
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
+
+    function expandEmojiMenu() {
+        const grid = document.getElementById('menu-emoji-grid');
+        if (grid.style.display === 'grid') {
+            grid.style.display = 'none';
+        } else {
+            grid.style.display = 'grid';
+            if (grid.innerHTML === "") {
+                emojis.forEach(e => {
+                    const span = document.createElement('span');
+                    span.className = 'menu-grid-emoji';
+                    span.innerText = e;
+                    span.onclick = () => applyReaction(e);
+                    grid.appendChild(span);
+                });
+            }
+        }
+    }
 
     function initReplyFromActive() {
         triggerReply(document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim());
