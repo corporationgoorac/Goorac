@@ -9,17 +9,18 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
         :root { 
             --bg: #000000; 
             --accent: #0095f6; 
             --border: #262626; 
-            --sent: #3797f0; 
+            --sent-grad: linear-gradient(135deg, #a43ff2 0%, #0095f6 100%);
             --received: #262626; 
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
             --shimmer: linear-gradient(90deg, #121212 25%, #1a1a1a 50%, #121212 75%);
-            --quantum-glow: 0 0 15px rgba(0, 149, 246, 0.3);
         }
 
         * { 
@@ -28,313 +29,191 @@
         }
         
         html, body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background: var(--bg);
-            position: fixed; 
-            left: 0; top: 0;
+            height: 100%; width: 100%; overflow: hidden;
+            background: var(--bg); position: fixed; left: 0; top: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        body { 
-            -webkit-user-select: none; user-select: none; 
-            color: var(--text); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-        }
-
-        input { 
-            -webkit-user-select: text !important; 
-            user-select: text !important; 
-            outline: none; 
-            font-size: 16px !important; 
-        }
+        body { -webkit-user-select: none; user-select: none; color: var(--text); }
+        input { -webkit-user-select: text !important; user-select: text !important; outline: none; font-size: 16px !important; }
 
         /* Shimmer Animation */
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-
-        .loading-shimmer {
-            background: var(--shimmer);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .loading-shimmer { background: var(--shimmer); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
 
         .app-container { 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh;
-            height: 100dvh;
-            width: 100%; 
-            position: absolute;
-            top: 0; left: 0;
-            overflow: hidden;
+            display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+            width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
         }
 
+        /* --- UPDATED HEADER (Fixed UI/UX) --- */
         header { 
-            padding: 12px 16px; 
-            background: rgba(0,0,0,0.8); 
+            padding: 0 10px; height: 60px;
+            background: rgba(0,0,0,0.85); 
             border-bottom: 1px solid var(--border); 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-            z-index: 1000;
-            flex-shrink: 0; 
-            backdrop-filter: blur(30px);
-            -webkit-backdrop-filter: blur(30px);
-            padding-top: env(safe-area-inset-top, 12px);
+            display: flex; align-items: center; gap: 5px; 
+            z-index: 1000; flex-shrink: 0; 
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            padding-top: env(safe-area-inset-top, 10px);
+        }
+
+        .back-btn {
+            font-size: 28px; color: var(--text); padding: 10px 5px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
 
         .h-profile-group { 
-            display: flex; 
-            align-items: center; 
-            gap: 14px; 
-            cursor: pointer; 
-            flex: 1; 
-            overflow: hidden; 
+            display: flex; align-items: center; gap: 12px; cursor: pointer; 
+            flex: 1; overflow: hidden; padding: 5px;
         }
         
         .h-pfp { 
-            width: 40px; height: 40px; border-radius: 50%; object-fit: cover; 
-            background: #121212; border: 1.5px solid #333; flex-shrink: 0;
-            transition: transform 0.2s ease;
+            width: 38px; height: 38px; border-radius: 50%; object-fit: cover; 
+            background: #121212; border: 1px solid #333; flex-shrink: 0;
+            transition: opacity 0.3s ease;
         }
-        .h-pfp:active { transform: scale(0.95); }
         
         .h-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .h-name-wrapper { display: flex; align-items: center; gap: 6px; line-height: 1.2; }
+        .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.2; }
         
         .h-name { 
-            font-weight: 700; font-size: 1rem; color: #fff; 
+            font-weight: 600; font-size: 16px; color: #fff; 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            letter-spacing: -0.2px;
         }
+        .h-name:empty::before { content: ""; display: block; height: 14px; width: 100px; border-radius: 4px; background: var(--shimmer); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        .h-username-sub { font-size: 12px; color: var(--text-secondary); font-weight: 400; }
+        .v-badge { width: 14px; height: 14px; display: none; }
 
-        .h-name:empty::before {
-            content: ""; display: block; height: 14px; width: 100px; 
-            border-radius: 4px; background: var(--shimmer); background-size: 200% 100%; animation: shimmer 1.5s infinite;
-        }
-
-        .h-username-sub { font-size: 0.75rem; color: var(--text-secondary); font-weight: 400; margin-top: 1px; }
-        .v-badge { width: 15px; height: 15px; display: none; }
-
+        /* --- CHAT AREA --- */
         #chat-flow { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding: 10px 0; 
-            display: flex; 
-            flex-direction: column; 
-            -webkit-overflow-scrolling: touch;
-            background: #000;
-            overscroll-behavior-y: contain; 
-            position: relative;
+            flex: 1; overflow-y: auto; padding: 10px 0; /* Padding moved to container for swipe */
+            display: flex; flex-direction: column; 
+            -webkit-overflow-scrolling: touch; background: #000;
+            position: relative; overflow-x: hidden;
         }
         
+        /* Container that moves on swipe */
         #messages-container { 
-            display: flex; 
-            flex-direction: column; 
-            content-visibility: auto; 
-            transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1);
+            display: flex; flex-direction: column; 
+            padding: 0 12px; 
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
             width: 100%;
-            padding: 0 15px;
         }
 
-        #typing-indicator-bottom {
-            padding: 5px 15px;
-            font-size: 0.8rem;
-            color: var(--accent);
-            display: none;
-            margin-bottom: 15px;
-            font-weight: 500;
-            animation: pulse 1.2s infinite;
-        }
+        #typing-indicator-bottom { padding: 5px 15px; font-size: 12px; color: var(--text-secondary); display: none; margin-bottom: 15px; font-weight: 500; animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
 
-        @keyframes pulse {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
-        }
+        #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
 
-        #scroll-trigger {
-            text-align: center; padding: 20px; color: #262626; 
-            font-size: 0.7rem;
-            order: -1; 
-        }
+        .date-divider { text-align: center; margin: 24px 0 12px; font-size: 11px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .date-divider {
-            text-align: center;
-            margin: 25px 0 15px 0;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            font-weight: 600;
-            text-transform: capitalize;
-        }
-
+        /* --- MESSAGES --- */
         .msg-wrap { 
-            display: flex; flex-direction: column; max-width: 82%; margin-bottom: 4px; 
-            position: relative; will-change: transform;
+            display: flex; flex-direction: column; max-width: 75%; margin-bottom: 2px; 
+            position: relative; min-width: 60px;
         }
-        .sent { align-self: flex-end; }
-        .received { align-self: flex-start; }
+        .sent { align-self: flex-end; align-items: flex-end; }
+        .received { align-self: flex-start; align-items: flex-start; }
+
+        /* Grouping Radius Logic */
+        .sent + .sent .bubble { border-top-right-radius: 4px; }
+        .sent .bubble:last-child { border-bottom-right-radius: 18px; }
+        .received + .received .bubble { border-top-left-radius: 4px; }
 
         .bubble { 
-            padding: 10px 14px; border-radius: 20px; font-size: 0.95rem; line-height: 1.4; 
+            padding: 8px 14px; border-radius: 20px; font-size: 15px; line-height: 1.4; 
             position: relative; word-wrap: break-word; 
-            transition: transform 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
-            z-index: 2;
+            transition: transform 0.1s;
         }
-        .sent .bubble { background: linear-gradient(135deg, #a43ff2 0%, #3797f0 100%); color: #fff; border-bottom-right-radius: 4px; }
-        .received .bubble { background: var(--received); color: #fff; border-bottom-left-radius: 4px; border: 1px solid #262626; }
-
-        /* Instagram Swipe Timestamp */
-        .swipe-time {
-            position: absolute;
-            right: -70px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            font-weight: 500;
-            pointer-events: none;
-        }
+        .sent .bubble { background: var(--sent-grad); color: #fff; }
+        .received .bubble { background: var(--received); color: #fff; }
 
         .reaction-badge { 
-            position: absolute; bottom: -10px; background: #1a1a1a; border: 1px solid #333; 
-            border-radius: 20px; padding: 2px 7px; font-size: 0.8rem; z-index: 10; display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); cursor: pointer;
-            animation: popFast 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.4);
-            transform-origin: center;
+            position: absolute; bottom: -8px; background: #1a1a1a; border: 2px solid #000; 
+            border-radius: 20px; padding: 2px 6px; font-size: 12px; z-index: 10; display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); cursor: pointer;
+            animation: popFast 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.4);
         }
         @keyframes popFast { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .sent .reaction-badge { right: 8px; }
-        .received .reaction-badge { left: 8px; }
+        .sent .reaction-badge { right: 0; }
+        .received .reaction-badge { left: 0; }
 
-        .meta { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 0.7rem; color: var(--text-secondary); }
-        .sent .meta { justify-content: flex-end; text-align: right; }
-        .seen-status { font-weight: 500; color: var(--text-secondary); font-size: 0.68rem; margin-top: 2px; }
+        /* --- HIDDEN TIMESTAMP (INSTAGRAM STYLE) --- */
+        .timestamp-reveal {
+            position: absolute;
+            right: -65px; /* Hidden off screen */
+            top: 50%; transform: translateY(-50%);
+            width: 50px; text-align: center;
+            font-size: 11px; color: #666; font-weight: 500;
+        }
+
+        /* --- SEEN STATUS (LAST MESSAGE) --- */
+        .seen-status-container {
+            align-self: flex-end; font-size: 11px; color: #666; 
+            margin: 2px 4px 10px 0; font-weight: 400; opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .seen-status-container.visible { opacity: 1; }
 
         .reply-box-ui { 
-            background: rgba(255,255,255,0.08); padding: 5px 10px; border-radius: 10px; 
-            margin-bottom: 2px; font-size: 0.72rem; border-left: 2px solid #fff; color: var(--text-secondary);
-            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 8px; 
+            margin-bottom: 2px; font-size: 12px; border-left: 2px solid rgba(255,255,255,0.5); 
+            color: rgba(255,255,255,0.8); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
-        .input-area-container {
-            background: #000;
-            border-top: 1px solid var(--border);
-            padding-bottom: env(safe-area-inset-bottom, 10px);
-            flex-shrink: 0;
-            width: 100%;
-        }
+        .input-area-container { background: #000; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 10px); flex-shrink: 0; width: 100%; z-index: 20;}
+        .input-area { padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
+        .input-box { flex: 1; background: #121212; border-radius: 22px; padding: 0 15px; border: 1px solid #333; display: flex; align-items: center; }
+        .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 10px 0; font-size: 15px; }
+        .plus-btn { font-size: 24px; color: var(--accent); cursor: pointer; padding: 5px; }
+        .send-btn { background: transparent; color: var(--accent); border: none; font-weight: 600; font-size: 15px; cursor: pointer; padding: 5px 10px; }
 
-        .input-area { 
-            padding: 10px 14px; 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-        }
-        
-        .input-box { 
-            flex: 1; background: #121212; border-radius: 22px; 
-            padding: 0 16px; border: 1px solid var(--border);
-            display: flex; align-items: center;
-        }
-        .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 12px 0; font-size: 15px; }
-        
-        .plus-btn {
-            font-size: 28px; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
-        }
+        #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 250px; overflow-y: auto; padding: 15px; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+        .emoji-item { font-size: 28px; cursor: pointer; text-align: center; }
 
-        .send-btn { 
-            background: transparent; color: var(--accent); border: none; 
-            font-weight: 700; font-size: 1rem; cursor: pointer;
-            padding: 5px; transition: opacity 0.2s;
-        }
-        .send-btn:active { opacity: 0.5; }
-
-        #emoji-tray {
-            display: none;
-            background: #000;
-            border-top: 1px solid var(--border);
-            height: 220px;
-            overflow-y: auto;
-            padding: 10px;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 10px;
-            text-align: center;
-        }
-        .emoji-item { font-size: 1.8rem; cursor: pointer; padding: 5px; }
-
+        /* --- MENUS --- */
         #menu-overlay, #reaction-details-overlay { 
-            display: none; position: fixed; inset: 0; 
-            background: rgba(0, 0, 0, 0.8); z-index: 2000; 
-            justify-content: center; align-items: center; backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 2000; 
+            justify-content: center; align-items: flex-end; backdrop-filter: none;
         }
-        .menu-card { background: #262626; border-radius: 18px; width: 85%; max-width: 320px; overflow: hidden; }
+        #reaction-details-overlay { align-items: center; }
         
-        .reaction-bar { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 18px; 
-            border-bottom: 1px solid #363636; 
-            align-items: center;
+        .menu-card { 
+            background: #1c1c1e; border-top-left-radius: 16px; border-top-right-radius: 16px; 
+            width: 100%; overflow: hidden; animation: slideUp 0.2s ease-out; padding-bottom: env(safe-area-inset-bottom, 10px);
         }
-        .reaction-bar span { font-size: 1.8rem; cursor: pointer; transition: transform 0.1s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .reaction-bar { display: flex; justify-content: space-around; padding: 20px 10px; border-bottom: 1px solid #2c2c2e; }
+        .reaction-bar span { font-size: 32px; transition: transform 0.1s; }
         .reaction-bar span:active { transform: scale(1.4); }
-        .more-emoji-trigger { 
-            background: #363636; border-radius: 50%; width: 34px; height: 34px; 
-            display: flex; align-items: center; justify-content: center; font-size: 18px; 
-            color: #fff; cursor: pointer;
-        }
+        .more-emoji-trigger { background: #333; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
 
-        #menu-emoji-grid {
-            display: none;
-            max-height: 250px;
-            overflow-y: auto;
-            grid-template-columns: repeat(6, 1fr);
-            padding: 15px;
-            gap: 10px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #363636;
-        }
-        .menu-grid-emoji { font-size: 1.6rem; cursor: pointer; text-align: center; }
+        #menu-emoji-grid { display: none; max-height: 250px; overflow-y: auto; grid-template-columns: repeat(6, 1fr); padding: 15px; gap: 10px; background: #1c1c1e; border-bottom: 1px solid #2c2c2e; }
 
-        .menu-opt { padding: 16px; text-align: center; font-size: 0.95rem; border-bottom: 1px solid #363636; color: #fff; font-weight: 500; }
-        .menu-opt:active { background: #333; }
+        .menu-opt { padding: 16px; text-align: center; font-size: 16px; border-bottom: 1px solid #2c2c2e; color: #fff; background: #1c1c1e; }
+        .menu-opt:active { background: #2c2c2e; }
         
-        #reply-dock { 
-            display: none; background: #0a0a0a; padding: 10px 16px; 
-            border-top: 1px solid var(--border); justify-content: space-between; align-items: center;
-        }
+        #reply-dock { display: none; background: #121212; padding: 10px 15px; border-top: 1px solid #333; justify-content: space-between; align-items: center; }
 
         .react-list-container {
-            width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 20px; 
+            width: 85%; max-width: 320px; background: #1c1c1e; border-radius: 16px; 
             overflow: hidden; display: flex; flex-direction: column; max-height: 50vh;
-            border: 1px solid #333;
         }
-        .react-list-header { 
-            padding: 18px; text-align: center; font-weight: 700; font-size: 1rem; border-bottom: 1px solid #333; position: relative;
-        }
-        .react-list-close { position: absolute; right: 18px; top: 18px; cursor: pointer; color: #888; font-size: 1.2rem; }
-        .react-list-content { overflow-y: auto; }
-        .reactor-item { 
-            display: flex; align-items: center; padding: 14px 18px; gap: 14px; border-bottom: 1px solid #262626; 
-        }
-        .reactor-pfp { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #111; border: 1px solid #333; }
-        .reactor-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-        .reactor-name { font-weight: 600; font-size: 0.9rem; color: #fff; }
-        .reactor-time { font-size: 0.7rem; color: #888; }
-        .reactor-emoji { font-size: 1.5rem; }
+        .react-list-header { padding: 15px; text-align: center; font-weight: 600; border-bottom: 1px solid #2c2c2e; position: relative; }
+        .react-list-close { position: absolute; right: 15px; top: 15px; cursor: pointer; color: #888; }
+        .reactor-item { display: flex; align-items: center; padding: 12px 15px; gap: 12px; border-bottom: 1px solid #2c2c2e; }
+        .reactor-pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
+        .reactor-info { flex: 1; } 
+        .reactor-name { font-weight: 600; font-size: 14px; }
+        .reactor-time { font-size: 11px; color: #888; margin-top: 2px;}
 
-        /* Custom Feature: Quantum Scroll Bottom */
-        #scroll-bottom-btn {
-            position: absolute; bottom: 85px; right: 20px; 
-            background: var(--accent); color: white; width: 35px; height: 35px;
-            border-radius: 50%; display: none; align-items: center; justify-content: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 100; font-weight: bold;
+        /* Scroll Bottom Button */
+        #scroll-btn {
+            position: fixed; bottom: 80px; right: 15px; width: 40px; height: 40px;
+            background: #262626; border-radius: 50%; border: 1px solid #333; display: none;
+            justify-content: center; align-items: center; color: var(--accent); 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 50; cursor: pointer;
         }
     </style>
 </head>
@@ -363,14 +242,14 @@
         <div id="menu-emoji-grid"></div>
         <div class="menu-opt" onclick="initReplyFromActive()">Reply</div>
         <div id="edit-btn" class="menu-opt" onclick="initEdit()">Edit</div>
-        <div id="unsend-btn" class="menu-opt" style="color:#ed4956; font-weight: 700;" onclick="unsendMsg()">Unsend</div>
-        <div class="menu-opt" onclick="closeMenu()" style="border-bottom:none; color: #a8a8a8">Cancel</div>
+        <div id="unsend-btn" class="menu-opt" style="color:#ff453a; font-weight: 600;" onclick="unsendMsg()">Unsend</div>
+        <div class="menu-opt" onclick="closeMenu()" style="border-bottom:none; color: #888">Cancel</div>
     </div>
 </div>
 
 <div class="app-container" id="main-app">
     <header id="chat-header">
-        <div onclick="history.back()" style="font-size: 2.2rem; margin-right:4px; cursor:pointer; color: var(--accent); font-weight: 300;">‹</div>
+        <div class="back-btn" onclick="history.back()">‹</div>
         <div class="h-profile-group" onclick="goToProfile()">
             <img id="h-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="h-pfp loading-shimmer">
             <div class="h-info">
@@ -386,14 +265,18 @@
     <div id="chat-flow">
         <div id="scroll-trigger">● ● ●</div>
         <div id="messages-container"></div>
+        <div id="last-seen-status" class="seen-status-container"></div>
         <div id="typing-indicator-bottom">typing...</div>
-        <div id="scroll-bottom-btn" onclick="scrollToBottom()">↓</div>
+        <div id="scroll-btn" onclick="scrollToBottom(true)">↓</div>
     </div>
 
     <div class="input-area-container">
         <div id="reply-dock">
-            <div id="reply-text" style="font-size:0.75rem; color:#8e8e8e; overflow:hidden; text-overflow:ellipsis;"></div>
-            <div onclick="cancelReply()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
+            <div style="flex:1">
+                <div style="font-size:10px; color:var(--accent); font-weight:600; margin-bottom:2px;">Replying to</div>
+                <div id="reply-text" style="font-size:12px; color:#ccc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+            </div>
+            <div onclick="cancelReply()" style="color:#aaa; font-weight:bold; padding:5px; font-size:18px;">✕</div>
         </div>
 
         <div id="emoji-tray"></div>
@@ -431,36 +314,41 @@
     let lastVisible = null; 
     let messagesMap = new Map(); 
     let chatTargetData = null; 
-    let myData = null;
+    let myUserData = null; // Store my own Firestore data
 
     const mInput = document.getElementById('m-input');
     const chatFlow = document.getElementById('chat-flow');
     const container = document.getElementById('messages-container');
     const bottomTyping = document.getElementById('typing-indicator-bottom');
     const emojiTray = document.getElementById('emoji-tray');
-    const scrollBottomBtn = document.getElementById('scroll-bottom-btn');
+    const lastSeenEl = document.getElementById('last-seen-status');
 
-    const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","💍","💄","💋","👄","🦷","👅","👂","👃","👣","👁️","👀","🧠","🗣️","👤","👥"];
+    const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌"];
 
+    // Utility: Format Time
     function formatTime12(date) {
-        if (!date) return "";
         let hours = date.getHours();
         let minutes = date.getMinutes();
         let ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
+        hours = hours % 12; hours = hours ? hours : 12;
         minutes = minutes < 10 ? '0'+minutes : minutes;
         return hours + ':' + minutes + ' ' + ampm;
     }
 
+    // Utility: Calculate Time Ago
     function timeAgo(date) {
-        if (!date) return "";
-        const now = new Date();
-        const diff = Math.floor((now - date) / 1000);
-        if (diff < 60) return "now";
-        if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-        if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-        return Math.floor(diff / 86400) + "d ago";
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m ago";
+        return "just now";
     }
 
     function getDateDivider(date) {
@@ -469,7 +357,7 @@
         yesterday.setDate(today.getDate() - 1);
         if (date.toDateString() === today.toDateString()) return "Today";
         if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     function toggleEmojiTray() {
@@ -500,12 +388,8 @@
     }
 
     window.oncontextmenu = (e) => { e.preventDefault(); return false; };
-
     function vibrate(ms = 50) { if (navigator.vibrate) navigator.vibrate(ms); }
-
-    function goToProfile() {
-        if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
-    }
+    function goToProfile() { if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`; }
 
     mInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") { e.preventDefault(); sendMsg(); }
@@ -513,16 +397,23 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
 
+    // Scroll Bottom Button Logic
     chatFlow.addEventListener('scroll', () => {
-        const isUp = chatFlow.scrollHeight - chatFlow.scrollTop > 1000;
-        scrollBottomBtn.style.display = isUp ? 'flex' : 'none';
+        const btn = document.getElementById('scroll-btn');
+        if(chatFlow.scrollTop + chatFlow.clientHeight < chatFlow.scrollHeight - 300) {
+            btn.style.display = 'flex';
+        } else {
+            btn.style.display = 'none';
+        }
     });
 
-    auth.onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged(async user => {
         if (user) { 
             myUid = user.uid; 
-            const userSnap = await db.collection("users").doc(myUid).get();
-            if (userSnap.exists) myData = userSnap.data();
+            // FETCH MY PROFILE DATA FOR REACTIONS
+            const mySnap = await db.collection("users").doc(myUid).get();
+            if(mySnap.exists) myUserData = mySnap.data();
+
             initChat(); 
         }
         else { window.location.href = 'login.html'; }
@@ -543,32 +434,23 @@
         
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
         document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
-        
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-        db.collection("chats").doc(chatId).update({ [`unreadCount.${myUid}`]: 0, seen: true }).catch(e => {});
+        // Update Seen Status
+        db.collection("chats").doc(chatId).update({ 
+            [`unreadCount.${myUid}`]: 0, 
+            seen: true,
+            seenAt: firebase.firestore.FieldValue.serverTimestamp() 
+        }).catch(e => {});
 
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
             bottomTyping.style.display = s.val() ? 'block' : 'none';
+            if(s.val()) scrollToBottom();
         });
 
         startListener(); 
         setupObserver();
-        setupSwipeReveal();
-    }
-
-    function setupSwipeReveal() {
-        let touchStartX = 0;
-        chatFlow.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; }, {passive:true});
-        chatFlow.addEventListener('touchmove', (e) => {
-            let diff = touchStartX - e.touches[0].clientX;
-            if (diff > 0 && diff < 80) {
-                container.style.transform = `translateX(-${diff}px)`;
-            }
-        }, {passive:true});
-        chatFlow.addEventListener('touchend', () => {
-            container.style.transform = `translateX(0px)`;
-        });
+        setupSwipeGestures(); // Init Swipe Logic
     }
 
     function setupObserver() {
@@ -601,14 +483,24 @@
                         messagesMap.delete(msgId);
                     }
                     
-                    if(msgData.sender !== myUid && !msgData.seen) {
-                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ seen: true });
+                    // Mark received messages as seen and update timestamp
+                    if(change.type === "added" && msgData.sender !== myUid && !msgData.seen) {
+                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).update({ 
+                            seen: true,
+                            seenAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        db.collection("chats").doc(chatId).update({ 
+                            seen: true,
+                            seenAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
                     }
                 });
 
-                const isNearBottom = chatFlow.scrollTop + chatFlow.clientHeight >= chatFlow.scrollHeight - 200;
+                const isNearBottom = chatFlow.scrollTop + chatFlow.clientHeight >= chatFlow.scrollHeight - 150;
                 renderAll();
-                if (isNearBottom) scrollToBottom();
+                if (isNearBottom || snapshot.docChanges().some(c => c.type === 'added' && c.doc.data().sender === myUid)) {
+                    scrollToBottom();
+                }
             });
     }
 
@@ -632,7 +524,7 @@
         } else {
             isLoadingMore = false;
             lastVisible = null; 
-            document.getElementById('scroll-trigger').innerText = "End of Conversation";
+            document.getElementById('scroll-trigger').innerText = "";
         }
     }
 
@@ -643,9 +535,9 @@
             .sort((a, b) => a[1].timestamp.toMillis() - b[1].timestamp.toMillis());
 
         let lastDateLabel = "";
-        const totalCount = sorted.length;
+        let lastMyMsg = null;
 
-        sorted.forEach(([id, data], index) => { 
+        sorted.forEach(([id, data]) => { 
             const msgDate = data.timestamp.toDate();
             const dateLabel = getDateDivider(msgDate);
             
@@ -656,12 +548,23 @@
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
             }
-            const isLastSent = (index === totalCount - 1 && data.sender === myUid);
-            renderMessage(data, id, isLastSent); 
+            renderMessage(data, id); 
+            if(data.sender === myUid) lastMyMsg = data;
         });
+
+        // Update Last Seen Status Logic
+        if(lastMyMsg) {
+            lastSeenEl.classList.add('visible');
+            if(lastMyMsg.seen) {
+                const seenTime = lastMyMsg.seenAt ? timeAgo(lastMyMsg.seenAt.toDate()) : "";
+                lastSeenEl.innerText = seenTime ? `Seen ${seenTime}` : "Seen";
+            } else {
+                lastSeenEl.innerText = "Sent";
+            }
+        }
     }
 
-    function renderMessage(m, id, isLastSent) {
+    function renderMessage(m, id) {
         const side = m.sender === myUid ? 'sent' : 'received';
         const date = m.timestamp ? m.timestamp.toDate() : new Date();
 
@@ -678,55 +581,58 @@
         
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
-        div.addEventListener('dblclick', (e) => {
-            e.preventDefault(); vibrate(40);
-            applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
+        // Double tap
+        let tapCount = 0;
+        div.addEventListener('click', () => {
+            tapCount++; setTimeout(() => tapCount = 0, 300);
+            if(tapCount === 2) { vibrate(40); applyReactionToId(id, myReaction === '❤️' ? '' : '❤️'); }
         });
 
-        let startX = 0, currentX = 0, menuTimer = null, isMoving = false, swipeTriggered = false;
-
+        // Long Press Menu
+        let pressTimer;
         div.addEventListener('touchstart', (e) => {
-            startX = e.touches[0].clientX;
-            isMoving = false; swipeTriggered = false;
-            menuTimer = setTimeout(() => {
-                if (!isMoving) { vibrate(70); openMenu(id, m.sender, m.text); }
-            }, 550);
+            pressTimer = setTimeout(() => { vibrate(70); openMenu(id, m.sender, m.text); }, 600);
         }, {passive: true});
-
-        div.addEventListener('touchmove', (e) => {
-            currentX = e.touches[0].clientX;
-            let diff = currentX - startX;
-            if (Math.abs(diff) > 10) isMoving = true;
-            if (diff > 0 && diff < 80) {
-                const b = div.querySelector('.bubble');
-                b.style.transform = `translateX(${diff}px)`;
-                b.style.transition = "none";
-                if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
-            }
-        }, {passive: true});
-
-        div.addEventListener('touchend', () => {
-            clearTimeout(menuTimer);
-            let diff = currentX - startX;
-            const bubble = div.querySelector('.bubble');
-            bubble.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-            bubble.style.transform = `translateX(0px)`;
-            if (diff > 50) triggerReply(m.text);
-            startX = 0; currentX = 0;
-        });
-
-        const seenText = m.seen ? `Seen ${timeAgo(date)}` : 'Delivered';
+        div.addEventListener('touchend', () => clearTimeout(pressTimer));
+        div.addEventListener('touchmove', () => clearTimeout(pressTimer));
 
         div.innerHTML = `
             ${m.replyTo ? `<div class="reply-box-ui">⤴ ${m.replyTo}</div>` : ''}
             <div class="bubble">
-                <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.6;font-size:10px">(edited)</small>' : ''}</span>
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
-                <div class="swipe-time">${formatTime12(date)}</div>
             </div>
-            ${isLastSent ? `<div class="seen-status">${seenText}</div>` : ''}
+            <div class="timestamp-reveal">${formatTime12(date)}</div>
         `;
         container.appendChild(div);
+    }
+
+    /* --- INSTAGRAM STYLE SWIPE LOGIC --- */
+    function setupSwipeGestures() {
+        let touchStartX = 0;
+        let isSwiping = false;
+
+        chatFlow.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            isSwiping = false;
+        }, {passive: true});
+
+        chatFlow.addEventListener('touchmove', (e) => {
+            const currentX = e.touches[0].clientX;
+            const diff = touchStartX - currentX; // Positive when dragging LEFT
+
+            // If dragging left (diff > 0)
+            if (diff > 0 && diff < 80) {
+                isSwiping = true;
+                // Move container left to reveal timestamps on right
+                container.style.transform = `translateX(${-diff}px)`;
+            }
+        }, {passive: true});
+
+        chatFlow.addEventListener('touchend', (e) => {
+            container.style.transform = `translateX(0px)`;
+            touchStartX = 0;
+        });
     }
 
     function triggerReply(text) {
@@ -749,6 +655,7 @@
             await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
         } else {
             const rText = replyingTo; cancelReply();
+            scrollToBottom();
             await db.collection("chats").doc(chatId).collection("messages").add({
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
@@ -759,11 +666,14 @@
                 participants: [myUid, targetUid], seen: false,
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
-            setTimeout(scrollToBottom, 100);
         }
+        scrollToBottom();
     }
 
-    function scrollToBottom() { chatFlow.scrollTo({ top: chatFlow.scrollHeight, behavior: 'smooth' }); }
+    function scrollToBottom(smooth = false) { 
+        if(smooth) chatFlow.scrollTo({ top: chatFlow.scrollHeight, behavior: 'smooth' });
+        else chatFlow.scrollTop = chatFlow.scrollHeight; 
+    }
 
     function openMenu(id, sender, text) {
         activeMenuId = id;
@@ -803,7 +713,8 @@
 
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
-            const pfpSrc = isMe ? (myData?.photoURL || '') : chatTargetData.photoURL;
+            // FIX: Use stored myUserData for me, chatTargetData for other
+            const pfpSrc = isMe ? (myUserData?.photoURL) : (chatTargetData?.photoURL);
             const name = isMe ? "You" : chatTargetData.name;
             const timeStr = formatTime12(new Date(rData.timestamp));
 
@@ -826,7 +737,7 @@
 
     function expandEmojiMenu() {
         const grid = document.getElementById('menu-emoji-grid');
-        grid.style.display = (grid.style.display === 'grid') ? 'none' : 'grid';
+        grid.style.display = grid.style.display === 'grid' ? 'none' : 'grid';
         if (grid.innerHTML === "") {
             emojis.forEach(e => {
                 const span = document.createElement('span');
