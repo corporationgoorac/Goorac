@@ -13,6 +13,7 @@
 
     <style>
         :root { 
+            /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
             --header-bg: rgba(0,0,0,0.96);
             --accent: #0095f6; 
@@ -80,14 +81,13 @@
             display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
         }
 
-        /* --- HEADER FIXED (GAP FIX) --- */
+        /* --- HEADER ABSOLUTE (WEBVIEW FIX) --- */
         header { 
-            position: fixed; 
+            position: absolute; /* Request: Absolute positioning */
             top: 0; left: 0; right: 0;
             padding: 0 16px;
-            padding-top: max(12px, env(safe-area-inset-top)); /* Handle notch correctly */
-            height: 60px;
-            box-sizing: content-box; /* Adds padding to height */
+            padding-top: calc(env(safe-area-inset-top) + 10px);
+            height: calc(60px + env(safe-area-inset-top));
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
             display: flex; align-items: center; gap: 12px; 
@@ -119,9 +119,14 @@
             flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px 0; 
             display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
             background: transparent; overscroll-behavior-y: contain; position: relative;
-            padding-top: calc(70px + env(safe-area-inset-top)); 
+            /* PADDING TOP to clear absolute header */
+            padding-top: calc(75px + env(safe-area-inset-top)); 
+            
+            /* Hide Scrollbar */
             -ms-overflow-style: none; scrollbar-width: none;
-            opacity: 0; transition: opacity 0.25s ease-in;
+            
+            /* Initial State Hidden */
+            opacity: 0; transition: opacity 0.2s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
         
@@ -164,10 +169,6 @@
         #scroll-down-btn { position: fixed; bottom: 85px; right: 20px; width: 42px; height: 42px; background: #262626; border-radius: 50%; display: none; align-items: center; justify-content: center; color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #333; z-index: 900; cursor: pointer; font-size: 1.2rem; transition: all 0.3s ease; }
         #scroll-down-btn.new-msg { background: var(--accent); color: #fff; animation: bounce 1s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-
-        /* RIPPLE EFFECT */
-        @keyframes ripple-effect { to { transform: scale(4); opacity: 0; } }
-        .ripple { position: absolute; background: rgba(255, 255, 255, 0.3); border-radius: 50%; transform: scale(0); animation: ripple-effect 0.6s linear; pointer-events: none; }
 
         #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 3000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
@@ -267,6 +268,7 @@
             <span onclick="applyReaction('👍')">👍</span>
             <div class="more-emoji-trigger" onclick="expandEmojiMenu()">+</div>
         </div>
+        <div id="menu-emoji-grid"></div>
         <div class="menu-opt" onclick="copyMessageText()">Copy Text</div>
         <div class="menu-opt" onclick="initReplyFromActive()">Reply</div>
         <div id="edit-btn" class="menu-opt" onclick="initEdit()">Edit</div>
@@ -374,6 +376,8 @@
     const sendBtnUI = document.getElementById('send-btn');
     const onlineDot = document.getElementById('h-online-dot');
     const headerSubLabel = document.getElementById('h-username-label');
+
+    const emojis = ["❤️","😂","😮","🔥","👍","😢","🙏","👏","🙌","✨","😍","🤔","😎","😭","✅","❌","🚀","💯","😂","🤣","😊","🥰","😘","😜","🤪","🤩","🥳","🙄","😴","🥱","💩","👻","💀","👽","🤖","🎃","😺","🤲","🤝","👎","👊","✊","✌️","🤟","🤘","👌","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","💍","💄","💋","👄","🦷","👅","👂","👃","👣","👁️","👀","🧠","🗣️","👤","👥"];
 
     // NEW: Double Tap on Background to Scroll Down
     document.addEventListener('dblclick', (e) => {
@@ -1076,6 +1080,24 @@
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
+
+    function expandEmojiMenu() {
+        const grid = document.getElementById('menu-emoji-grid');
+        if (grid.style.display === 'grid') {
+            grid.style.display = 'none';
+        } else {
+            grid.style.display = 'grid';
+            if (grid.innerHTML === "") {
+                emojis.forEach(e => {
+                    const span = document.createElement('span');
+                    span.className = 'menu-grid-emoji';
+                    span.innerText = e;
+                    span.onclick = () => applyReaction(e);
+                    grid.appendChild(span);
+                });
+            }
+        }
+    }
 
     function initReplyFromActive() {
         triggerReply(document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim());
