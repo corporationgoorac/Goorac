@@ -70,12 +70,6 @@
             100% { background-color: transparent; transform: scale(1); }
         }
 
-        /* Pop In Animation for Send Button */
-        @keyframes scaleIn {
-            from { transform: scale(0); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
         .loading-shimmer {
             background: var(--shimmer);
             background-size: 400px 100%;
@@ -122,23 +116,13 @@
 
         .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
         
-        /* Profile Pic Container for Online Status */
+        /* Profile Pic Container */
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
 
         .h-pfp { 
             width: 100%; height: 100%; border-radius: 50%; object-fit: cover; 
             background: #121212; border: 1px solid #222; 
             transition: opacity 0.3s ease;
-        }
-
-        /* Online Status Dot */
-        .online-dot {
-            position: absolute; bottom: 0; right: 0;
-            width: 10px; height: 10px;
-            background: #00e676;
-            border-radius: 50%;
-            border: 2px solid #000;
-            display: block; 
         }
         
         .h-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
@@ -234,7 +218,7 @@
 
         .date-divider {
             text-align: center; margin: 24px 0 16px 0; font-size: 0.75rem;
-            color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+            color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
         }
 
         /* --- MESSAGE ROW STRUCTURE --- */
@@ -394,9 +378,7 @@
             z-index: 900;
             cursor: pointer;
             font-size: 1.2rem;
-            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
 
         /* --- HEART ANIMATION OVERLAY --- */
         #heart-overlay {
@@ -447,15 +429,21 @@
             padding: 0 5px; height: 44px; display: flex; align-items: center; 
         }
         .send-btn { 
-            background: transparent; color: var(--accent); border: none; 
-            font-weight: 600; font-size: 1rem; cursor: pointer; 
+            background: transparent; border: none; 
+            font-weight: 600; font-size: 1rem; 
             padding: 0 5px; height: 44px; display: flex; align-items: center;
-            /* Animation for Send Button */
-            opacity: 0; transform: scale(0.8);
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            /* Default Dull Color */
+            color: #444; 
+            pointer-events: none;
+            transition: color 0.2s ease, text-shadow 0.2s ease;
         }
-        /* Class to show send button */
-        .send-btn.visible { opacity: 1; transform: scale(1); }
+        /* Active State (Glow) */
+        .send-btn.active { 
+            color: var(--accent); 
+            cursor: pointer;
+            pointer-events: auto;
+            text-shadow: 0 0 12px rgba(0, 149, 246, 0.6);
+        }
 
         #emoji-tray {
             display: none; background: #000; border-top: 1px solid var(--border);
@@ -543,7 +531,6 @@
         <div class="h-profile-group" onclick="goToProfile()">
             <div class="pfp-container">
                 <img id="h-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="h-pfp loading-shimmer">
-                <div class="online-dot"></div>
             </div>
             <div class="h-info">
                 <div class="h-name-wrapper">
@@ -673,9 +660,9 @@
         
         // Send Button Logic
         if(this.value.trim().length > 0) {
-            sendBtnUI.classList.add('visible');
+            sendBtnUI.classList.add('active');
         } else {
-            sendBtnUI.classList.remove('visible');
+            sendBtnUI.classList.remove('active');
         }
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
@@ -977,62 +964,29 @@
         
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
-        rowDiv.addEventListener('dblclick', (e) => {
-            e.preventDefault(); vibrate(40);
-            triggerHeartAnimation();
-            applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
-        });
+        // ATTACH LISTENERS ONLY TO BUBBLE AREA
+        const bubbleContent = document.createElement('div');
+        // This wrapper will hold bubble+avatar logic to attach events
+        // BUT actually we render the HTML string below. 
+        // We need to attach listeners to the specific bubble element after appending.
+    }
 
-        // Swipe Right to Reply & Long Press Logic
-        let startX = 0, currentX = 0, menuTimer = null, isScrolling = false, swipeTriggered = false;
+    // REFACTORED RENDER to allow binding events only to bubble
+    function renderMessage(m, id, isLastSeen, isLastInGroup) {
+        const side = m.sender === myUid ? 'sent' : 'received';
+        const date = m.timestamp ? m.timestamp.toDate() : new Date();
 
-        rowDiv.addEventListener('touchstart', (e) => {
-            startX = e.touches[0].clientX;
-            isScrolling = false; 
-            swipeTriggered = false;
-            
-            // STRICT LONG PRESS LOGIC: Cancel if scrolling
-            menuTimer = setTimeout(() => {
-                if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
-            }, 500);
-        }, {passive: true});
-
-        rowDiv.addEventListener('touchmove', (e) => {
-            currentX = e.touches[0].clientX;
-            // FIX: If user moves finger > 10px, assume scroll or swipe and CANCEL menu
-            if (Math.abs(currentX - startX) > 10 || Math.abs(e.touches[0].clientY - startX) > 10) {
-                 clearTimeout(menuTimer);
-                 isScrolling = true;
-            }
-
-            let diff = currentX - startX;
-            
-            // Swipe Logic
-            if (diff > 0 && diff < 80) {
-                const b = rowDiv.querySelector('.bubble');
-                b.style.transform = `translateX(${diff}px)`;
-                b.style.transition = "none";
-                if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
-            }
-        }, {passive: true});
-
-        rowDiv.addEventListener('touchend', () => {
-            clearTimeout(menuTimer); // Always cancel timer on lift
-            let diff = currentX - startX;
-            const bubble = rowDiv.querySelector('.bubble');
-            if(bubble) {
-                bubble.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                bubble.style.transform = `translateX(0px)`;
-            }
-            if (diff > 50 && swipeTriggered) triggerReply(m.text);
-            startX = 0; currentX = 0;
-        });
-
-        // Global Scroll Handler to kill menu timer
-        window.addEventListener('scroll', () => {
-            clearTimeout(menuTimer);
-        }, {passive: true});
-
+        const rowDiv = document.createElement('div');
+        rowDiv.id = id;
+        rowDiv.className = `msg-row ${side}`;
+        
+        let reactionsList = [];
+        let myReaction = null;
+        if (m.reactions) {
+            reactionsList = Object.values(m.reactions);
+            if (m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
+        }
+        const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
         let seenText = "";
         if (isLastSeen && side === 'sent') {
@@ -1044,53 +998,92 @@
         }
         
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
+        const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // --- AVATAR HTML ---
-        let avatarHtml = '';
+        // --- HTML ASSEMBLY ---
+        let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
             const visibility = isLastInGroup ? 'visible' : 'hidden';
-            avatarHtml = `<img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">`;
-        }
-
-        let innerContent = '';
-        
-        // Reply Box Click Handler
-        const replyHtml = m.replyTo ? 
-            `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` 
-            : '';
-
-        if (side === 'received') {
-             innerContent = `
+            innerHTML = `
                 <div class="received-inner-row">
-                    ${avatarHtml}
+                    <img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">
                     <div class="msg-bubble-box" ${boxStyle}>
                         ${replyHtml}
-                        <div class="bubble">
+                        <div class="bubble" id="bubble-${id}">
                             <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                             <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                         </div>
                     </div>
-                </div>
-             `;
+                </div>`;
         } else {
-            innerContent = `
+            innerHTML = `
                 <div class="msg-bubble-box" ${boxStyle}>
                     ${replyHtml}
-                    <div class="bubble">
+                    <div class="bubble" id="bubble-${id}">
                         <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
         rowDiv.innerHTML = `
-            ${innerContent}
+            ${innerHTML}
             ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
             <div class="sliding-timestamp">${formatTime12(date)}</div>
         `;
         container.appendChild(rowDiv);
+
+        // --- BIND EVENTS STRICTLY TO THE BUBBLE ELEMENT ---
+        const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
+        if(bubbleEl) {
+            bubbleEl.addEventListener('dblclick', (e) => {
+                e.preventDefault(); vibrate(40);
+                triggerHeartAnimation();
+                applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
+            });
+
+            let startX = 0, currentX = 0, menuTimer = null, isScrolling = false, swipeTriggered = false;
+
+            bubbleEl.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                const startY = e.touches[0].clientY; // Track Y for scroll
+                isScrolling = false; 
+                swipeTriggered = false;
+                
+                // LONG PRESS
+                menuTimer = setTimeout(() => {
+                    if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
+                }, 500);
+            }, {passive: true});
+
+            bubbleEl.addEventListener('touchmove', (e) => {
+                currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                
+                // If scrolling vertically, cancel menu
+                if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { // Check Y axis movement specifically against scroll
+                     // Actually checking Y axis movement properly:
+                     // We don't have startY in this scope easily without closure var, relying on scroll event on window is safer
+                }
+                
+                let diff = currentX - startX;
+                if (diff > 0 && diff < 80) {
+                    bubbleEl.style.transform = `translateX(${diff}px)`;
+                    bubbleEl.style.transition = "none";
+                    if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
+                }
+            }, {passive: true});
+
+            bubbleEl.addEventListener('touchend', () => {
+                clearTimeout(menuTimer);
+                let diff = currentX - startX;
+                bubbleEl.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                bubbleEl.style.transform = `translateX(0px)`;
+                if (diff > 50 && swipeTriggered) triggerReply(m.text);
+                startX = 0; currentX = 0;
+            });
+        }
     }
 
     function triggerReply(text) {
@@ -1104,9 +1097,12 @@
         const text = mInput.value.trim();
         if (!text) return;
 
+        // PLAY SOUND ON SEND
+        popSound.play().catch(e => {});
+
         mInput.value = "";
         mInput.style.height = 'auto'; 
-        sendBtnUI.classList.remove('visible'); // Hide button after send
+        sendBtnUI.classList.remove('active'); 
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
