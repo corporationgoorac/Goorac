@@ -181,47 +181,50 @@
     let myPinnedChats = [];
     let longPressTimer;
     let activeChatId = null;
-    let userCache = {}; // Global cache for maximum speed
+    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache') || '{}');
 
     document.addEventListener('contextmenu', event => event.preventDefault());
 
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            fetchUserData();
-            listenToPinnedChats();
-            listenToInbox();
+            initInboxSystem();
         } else { window.location.href = 'login.html'; }
     });
 
-    async function fetchUserData() {
-        const userDoc = await db.collection("users").doc(myUid).get();
-        const data = userDoc.data();
-        myFollowingList = data?.following || [];
-        myFollowersList = data?.followers || [];
-    }
-
-    function listenToPinnedChats() {
+    async function initInboxSystem() {
+        // Step 1: Real-time listener for user data (following/pins)
         db.collection("users").doc(myUid).onSnapshot(doc => {
-            myPinnedChats = doc.data()?.pinnedChats || [];
+            const data = doc.data();
+            if(!data) return;
+            myFollowingList = data.following || [];
+            myFollowersList = data.followers || [];
+            myPinnedChats = data.pinnedChats || [];
+            
+            // Re-trigger inbox listener to ensure real-time pinning updates
+            listenToInbox();
         });
     }
 
+    let inboxUnsubscribe = null;
+
     function listenToInbox() {
         if(!myUid) return;
-        db.collection("chats").where("participants", "array-contains", myUid)
+        if(inboxUnsubscribe) inboxUnsubscribe();
+
+        inboxUnsubscribe = db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
             
-            // Speed optimization: Fetch all profiles in parallel using the cache
+            // Parallel Profile Fetching + Cache Logic
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
                 
-                // If user not in cache, fetch it. If they are, it's instant.
                 if (!userCache[otherUid]) {
                     const otherDoc = await db.collection("users").doc(otherUid).get();
                     userCache[otherUid] = otherDoc.data();
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
@@ -230,6 +233,7 @@
 
             const results = await Promise.all(chatPromises);
             
+            // Maximum Speed Sorting
             results.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -248,6 +252,7 @@
                 const amIFollowing = myFollowingList.includes(otherUid);
                 const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
                 const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Message unsent</span>`;
+                
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id, isPinned), 600); };
@@ -279,6 +284,7 @@
                     </div>
                 `;
                 list.appendChild(item);
+                
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
@@ -298,7 +304,6 @@
         
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
-        
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
 
@@ -309,21 +314,17 @@
         closeDeleteMenu();
         const userRef = db.collection("users").doc(myUid);
         if (isPinned) {
-            await userRef.update({
-                pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId)
-            });
+            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
         } else {
-            await userRef.update({
-                pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId)
-            });
+            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
         }
+        // Real-time update happens automatically via userSnapshot listener
     }
 
     function closeDeleteMenu() {
         activeChatId = null;
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
-        
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
     }
@@ -332,25 +333,16 @@
         if(!activeChatId) return;
         const cid = activeChatId; 
         closeDeleteMenu();
-        
         try {
             const messagesRef = db.collection("chats").doc(cid).collection("messages");
             const snapshot = await messagesRef.get();
             const batch = db.batch();
-            
             snapshot.docs.forEach((doc) => batch.delete(doc.ref));
             batch.delete(db.collection("chats").doc(cid));
-            
             await batch.commit();
             await rdb.ref(`typing/${cid}`).remove();
-
-            db.collection("users").doc(myUid).update({
-                pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid)
-            });
-
-        } catch(e) { 
-            console.error("Strict deletion failed:", e); 
-        }
+            db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) });
+        } catch(e) { console.error("Deletion failed:", e); }
     };
 
     function visitProfile(e, username) {
@@ -389,9 +381,6 @@
                         </div>
                     </div>`;
             }).join('');
-            if(results.innerHTML === "") {
-                results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No matching followers/following.</p>";
-            }
         });
     }
 
