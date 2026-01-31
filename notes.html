@@ -386,42 +386,47 @@
         validateShare();
     });
 
-    // Fetch Mutual Friends (Followers who follow back)
-    async function getMutuals(uid) {
-        const following = await db.collection("users").doc(uid).collection("following").get();
-        const followingIds = following.docs.map(doc => doc.id);
+    // Helper to get mutual followers
+    async function getMutualFollowers(uid) {
+        // 1. Get people I follow
+        const followingSnap = await db.collection("users").doc(uid).collection("following").get();
+        const followingIds = followingSnap.docs.map(doc => doc.id);
         
+        if (followingIds.length === 0) return [];
+
+        // 2. Check which of those people also follow me
         const mutuals = [];
-        for (const targetId of followingIds) {
-            const check = await db.collection("users").doc(targetId).collection("following").doc(uid).get();
-            if (check.exists) mutuals.push(targetId);
+        for (const targetUid of followingIds) {
+            const check = await db.collection("users").doc(targetUid).collection("following").doc(uid).get();
+            if (check.exists) {
+                mutuals.push(targetUid);
+            }
         }
         return mutuals;
     }
 
-    // Share & Save (Mutual Only + 24hr Auto-Delete logic)
+    // Share & Save (Updated for Mutual Followers and 24hr Expiry)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
         const user = firebase.auth().currentUser;
-        if(!user) return;
+        if(!user) {
+            alert("You need to be logged in to share.");
+            return;
+        }
 
         shareBtn.innerText = "Sharing...";
         shareBtn.disabled = true;
 
         const now = new Date();
-        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+        const expiryDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 Hours from now
 
         try {
-            // Get mutuals for targeted sharing
-            const mutualFriends = await getMutuals(user.uid);
-            const userDoc = await db.collection("users").doc(user.uid).get();
-            const userData = userDoc.data();
-
+            // Get mutual followers list for visibility targeting
+            const mutualIds = await getMutualFollowers(user.uid);
+            
             const noteData = {
                 uid: user.uid,
-                username: userData.name || "User",
-                pfp: userData.photoURL || "https://via.placeholder.com/150",
                 text: input.value.trim(),
                 bgColor: currentTheme.bg,
                 textColor: currentTheme.text,
@@ -430,19 +435,21 @@
                 songPreview: currentSongData?.previewUrl || null,
                 songArt: currentSongData?.artworkUrl100 || null,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                expiresAt: firebase.Timestamp.fromDate(expiresAt),
-                visibleTo: [...mutualFriends, user.uid], // List of UIDs allowed to see this
-                likes: [],
-                likeCount: 0
+                expiresAt: firebase.Timestamp.fromDate(expiryDate), // Field for auto-delete logic
+                dateString: now.toDateString(), 
+                timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                likes: [],      
+                likeCount: 0,
+                visibleTo: [...mutualIds, user.uid] // Only mutuals and the owner can see
             };
 
             const batch = db.batch();
             
-            // 1. Single document per user for "Active Note" status
+            // 1. Main active notes feed
             const activeNoteRef = db.collection("active_notes").doc(user.uid);
             batch.set(activeNoteRef, noteData);
             
-            // 2. Personal History
+            // 2. User's personal history
             const historyRef = db.collection("users").doc(user.uid).collection("notes_history").doc();
             batch.set(historyRef, noteData);
             
