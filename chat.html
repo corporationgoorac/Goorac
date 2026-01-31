@@ -77,8 +77,11 @@
             background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite;
         }
 
+        /* MODIFIED: Changed height to 100% to rely on JS-calculated Body Height */
         .app-container { 
-            display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
+            display: flex; flex-direction: column; 
+            height: 100%; width: 100%; 
+            position: absolute; top: 0; left: 0; overflow: hidden;
         }
 
         /* --- HEADER ABSOLUTE (WEBVIEW FIX) --- */
@@ -536,6 +539,19 @@
             scrollToBottom();
         });
     }
+
+    // --- WEBVIEW FULLSCREEN FIX (EXACT GAP SOLUTION) ---
+    function fixWebViewHeight() {
+        // Forces the container to match the window height exactly, ignoring browser toolbar gaps
+        const exactHeight = window.innerHeight;
+        document.body.style.height = exactHeight + 'px';
+        document.getElementById('main-app').style.height = exactHeight + 'px';
+    }
+    
+    // Apply fix on load, resize, and orientation change
+    window.addEventListener('resize', fixWebViewHeight);
+    window.addEventListener('orientationchange', () => { setTimeout(fixWebViewHeight, 100); });
+    fixWebViewHeight(); // Initial call
 
     function vibrate(ms = 50) { if (navigator.vibrate) navigator.vibrate(ms); }
 
