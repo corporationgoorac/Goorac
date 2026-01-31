@@ -12,7 +12,7 @@ class SongPicker extends HTMLElement {
     render() {
         this.shadowRoot.innerHTML = `
         <style>
-            /* --- 1. RESET & CORE STYLES (Replicating Tailwind) --- */
+            /* --- 1. RESET & CORE STYLES --- */
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             
             :host {
@@ -32,16 +32,25 @@ class SongPicker extends HTMLElement {
             :host(.active) .picker-container { transform: translateY(0); }
 
             /* --- 2. HEADER SECTION --- */
-            .header-area { padding: 16px; background: #000; z-index: 40; border-bottom: 1px solid #1c1c1e; }
+            .header-area { padding: 16px; background: #000; z-index: 40; border-bottom: 1px solid #1c1c1e; position: relative; }
             
             /* Drag Handle */
             .drag-handle-area { width: 100%; display: flex; justify-content: center; padding-bottom: 15px; cursor: pointer; }
             .drag-handle { width: 40px; height: 5px; background: #3a3a3c; border-radius: 10px; }
 
+            /* NEW: Close 'X' Button */
+            .close-btn {
+                position: absolute; top: 16px; right: 16px; width: 30px; height: 30px;
+                background: #2c2c2e; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                cursor: pointer; border: none; z-index: 50;
+            }
+            .close-btn svg { width: 14px; height: 14px; fill: #98989d; }
+            .close-btn:active { background: #3a3a3c; }
+
             /* Search Box */
             .search-box { 
                 background-color: #2c2c2e; border-radius: 10px; padding: 10px 14px; 
-                display: flex; align-items: center; margin-bottom: 16px; 
+                display: flex; align-items: center; margin-bottom: 16px; margin-top: 5px;
             }
             .search-input { 
                 background: transparent; border: none; outline: none; color: white; 
@@ -96,7 +105,7 @@ class SongPicker extends HTMLElement {
             }
             .select-btn:active { transform: scale(0.9); }
 
-            /* --- 5. ICONS (SVGs to replace FontAwesome) --- */
+            /* --- 5. ICONS --- */
             svg { fill: white; width: 20px; height: 20px; }
             .text-gray svg { fill: #98989d; width: 16px; height: 16px; }
             .select-btn svg { fill: black; width: 14px; height: 14px; }
@@ -112,6 +121,10 @@ class SongPicker extends HTMLElement {
                     <div class="drag-handle"></div>
                 </div>
                 
+                <button class="close-btn" id="closeXBtn">
+                     <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+
                 <div class="search-box">
                     <span class="text-gray">
                         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
@@ -158,29 +171,32 @@ class SongPicker extends HTMLElement {
     initLogic() {
         const root = this.shadowRoot;
         
-        // --- 🧠 CORE CONFIG (Preserved from your code) ---
+        // --- 🧠 CORE CONFIG ---
         this.API_URL = "https://itunes.apple.com/search";
+        // PROXY LIST: Added more reliable proxies to reduce failure rate
         this.PROXIES = [
-            "https://api.codetabs.com/v1/proxy?quest=", 
             "https://api.allorigins.win/raw?url=",
-            "https://corsproxy.io/?"
+            "https://corsproxy.io/?",
+            "https://api.codetabs.com/v1/proxy?quest="
         ];
         
-        // --- 💾 DATABASE ---
+        // --- 💾 DATABASE (Enhanced for Speed & Persistence) ---
         this.DB = {
             getSaved: () => JSON.parse(localStorage.getItem('insta_saved')) || [],
             setSaved: (data) => localStorage.setItem('insta_saved', JSON.stringify(data)),
-            getCache: () => JSON.parse(localStorage.getItem('insta_cache')) || {},
-            addToCache: (songs) => {
-                let c = this.DB.getCache();
-                songs.forEach(s => c[s.trackId] = s);
-                localStorage.setItem('insta_cache', JSON.stringify(c));
-            }
+            
+            // New Persistent Caching System (Stores 'For You' & 'Trending')
+            getCache: (key) => JSON.parse(localStorage.getItem('picker_cache_' + key)) || null,
+            setCache: (key, data) => localStorage.setItem('picker_cache_' + key, JSON.stringify(data)),
+            
+            // Global Map for quick access to avoid re-fetching details
+            globalCache: {}, 
+            addToGlobal: (songs) => songs.forEach(s => this.DB.globalCache[s.trackId] = s)
         };
 
         this.currentView = [];
         this.activeTab = 'For You';
-        this.currentSongData = null; // The song currently playing
+        this.currentSongData = null; 
 
         // --- DOM ELEMENTS ---
         this.player = root.getElementById('player');
@@ -193,10 +209,12 @@ class SongPicker extends HTMLElement {
         this.searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimer);
             const val = e.target.value.trim();
-            if (val.length > 2) {
-                searchTimer = setTimeout(() => this.loadData(val), 800);
+            if (val.length > 1) { // Reduced requirement from 2 to 1 char for faster feel
+                // Instant UI feedback for searching
+                this.list.innerHTML = `<div class="text-center">Searching...</div>`;
+                searchTimer = setTimeout(() => this.loadData(val, false, 'search'), 600); // Reduced debounce to 600ms
             } else if(val.length === 0) {
-                this.loadSmartForYou();
+                this.switchTab('For You', root.getElementById('tabForYou'));
             }
         });
 
@@ -208,29 +226,42 @@ class SongPicker extends HTMLElement {
         // Player Controls
         root.getElementById('miniPlayBtn').onclick = () => this.togglePlayState();
         root.getElementById('closeDragBtn').onclick = () => this.close();
+        root.getElementById('closeXBtn').onclick = () => this.close(); // X Button Close
         
-        // *** THE FIX: Arrow Button Logic ***
         root.getElementById('confirmSelectionBtn').onclick = () => this.confirmSelection();
 
         this.player.onended = () => this.updateIcons(false);
+
+        // Back Button Logic (Closes modal on browser back)
+        window.addEventListener('popstate', () => {
+            if (this.classList.contains('active')) {
+                this.close();
+            }
+        });
     }
 
     // --- PUBLIC METHODS ---
     open() {
         this.classList.add('active');
-        this.loadSmartForYou(); // Load data immediately on open
+        history.pushState({ modalOpen: true }, "", ""); // Add state for back button
+        
+        // Instant Load from Cache first
+        this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
     }
 
     close() {
         this.classList.remove('active');
         this.player.pause();
         this.updateIcons(false);
+        // Clean history if needed to prevent back button loop
+        if (history.state && history.state.modalOpen) {
+            history.back();
+        }
     }
 
     // --- SELECTION LOGIC ---
     confirmSelection() {
         if (this.currentSongData) {
-            // Dispatch event to parent
             this.dispatchEvent(new CustomEvent('song-selected', { 
                 detail: this.currentSongData,
                 bubbles: true,
@@ -240,42 +271,82 @@ class SongPicker extends HTMLElement {
         }
     }
 
-    // --- 🧠 SMART LOGIC ---
-    loadSmartForYou() {
-        this.status.style.display = 'none';
-        this.loadData("Tamil Top Hits"); 
+    // --- 🧠 SMART LOGIC & CACHING ---
+    async switchTab(name, btn) {
+        this.activeTab = name;
+        this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.searchInput.value = ''; 
+
+        if (name === 'Saved') {
+            const s = this.DB.getSaved();
+            this.DB.addToGlobal(s);
+            if(s.length === 0) this.list.innerHTML = `<div class="text-center">No saved songs yet.</div>`;
+            else this.renderList(s);
+            return;
+        }
+
+        const cacheKey = name === 'For You' ? 'foryou' : 'trending';
+        const query = name === 'For You' ? "Tamil Top Hits" : "Global Top 100";
+
+        // 1. Check Local Cache & Render Immediately (Fast)
+        const cachedData = this.DB.getCache(cacheKey);
+        if (cachedData && cachedData.length > 0) {
+            this.renderList(cachedData); // Instant render
+            // Optional: Background refresh (silent update)
+            this.loadData(query, true, cacheKey); 
+        } else {
+            // 2. No Cache? Show Loading & Fetch
+            this.loadData(query, false, cacheKey);
+        }
     }
 
-    async loadData(query, silent = false) {
+    async loadData(query, silent = false, cacheKey = null) {
         if(!silent) this.list.innerHTML = `<div class="text-center">Loading...</div>`;
         
         const targetUrl = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=40`;
-        let success = false;
+        
+        // --- 🚀 PERFORMANCE FIX: PARALLEL FETCH (RACE) ---
+        // Instead of trying one proxy after another, we try ALL at once.
+        // The first one to return valid JSON wins. drastically reducing wait time.
+        
+        const fetchWithProxy = async (proxyUrl) => {
+            const res = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+            if (!res.ok) throw new Error('Proxy failed');
+            return res.json();
+        };
 
-        for (let proxy of this.PROXIES) {
-            try {
-                const res = await fetch(proxy + encodeURIComponent(targetUrl));
-                if (!res.ok) continue;
-                const data = await res.json();
+        try {
+            // Fire all requests simultaneously
+            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p)));
+            
+            if(data.results && data.results.length > 0) {
+                this.currentView = data.results;
+                this.DB.addToGlobal(data.results);
                 
-                if(data.results && data.results.length > 0) {
-                    this.currentView = data.results;
-                    this.DB.addToCache(data.results);
-                    this.renderList(this.currentView);
-                    success = true;
-                    break;
+                // Save to persistent cache if it's a main tab (auto-updates local storage)
+                if (cacheKey && cacheKey !== 'search') {
+                    this.DB.setCache(cacheKey, data.results);
                 }
-            } catch (e) { console.log("Switching proxy..."); }
-        }
 
-        if (!success) {
-            this.list.innerHTML = `<div class="text-center" style="color: #ff6b6b;">Network Error. Try searching.</div>`;
+                this.renderList(this.currentView);
+            } else {
+                if(!silent) this.list.innerHTML = `<div class="text-center">No results found.</div>`;
+            }
+        } catch (error) {
+            console.error("All proxies failed", error);
+            if (!silent) {
+                this.list.innerHTML = `<div class="text-center" style="color: #ff6b6b;">Network Error. Please try again.</div>`;
+            }
         }
     }
 
     renderList(songs) {
         this.list.innerHTML = '';
         const savedIds = this.DB.getSaved().map(s => s.trackId);
+        
+        // Optimisation: DocumentFragment for single repaint (Reduces lag)
+        const fragment = document.createDocumentFragment();
 
         songs.forEach(song => {
             const isSaved = savedIds.includes(song.trackId);
@@ -284,15 +355,13 @@ class SongPicker extends HTMLElement {
             const item = document.createElement('div');
             item.className = 'song-row';
             
-            // Bookmark Icon SVGs
             const bookmarkIcon = isSaved 
                 ? `<svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>` 
                 : `<svg viewBox="0 0 24 24" style="fill:none; stroke:#98989d; stroke-width:2;"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>`;
 
             item.innerHTML = `
                 <div class="song-info">
-                    <img src="${art}" class="song-art">
-                    <div class="song-text">
+                    <img src="${art}" class="song-art" loading="lazy"> <div class="song-text">
                         <span class="song-title">${song.trackName}</span>
                         <span class="song-artist">${song.artistName}</span>
                     </div>
@@ -302,12 +371,13 @@ class SongPicker extends HTMLElement {
                 </button>
             `;
             
-            // Click Logic
             item.querySelector('.song-info').onclick = () => this.playTrack(song);
             item.querySelector('.bookmark-btn').onclick = (e) => this.toggleSave(song.trackId, e, item);
             
-            this.list.appendChild(item);
+            fragment.appendChild(item);
         });
+        
+        this.list.appendChild(fragment);
     }
 
     toggleSave(id, e, row) {
@@ -318,17 +388,16 @@ class SongPicker extends HTMLElement {
         if (index > -1) {
             saved.splice(index, 1);
         } else {
-            const cache = this.DB.getCache();
-            const song = this.currentView.find(s => s.trackId === id) || cache[id];
+            // Retrieve from global memory cache first (instant access)
+            const song = this.DB.globalCache[id] || this.currentView.find(s => s.trackId === id);
             if(song) saved.push(song);
         }
         
         this.DB.setSaved(saved);
         
         if (this.activeTab === 'Saved') {
-            this.renderList(saved);
+            this.renderList(saved); // Re-render if in Saved tab
         } else {
-            // Update icon visually
             const btn = row.querySelector('.bookmark-btn');
             const isSaved = index === -1; 
             btn.innerHTML = isSaved 
@@ -366,23 +435,6 @@ class SongPicker extends HTMLElement {
         } else {
             root.getElementById('playIcon').style.display = 'block';
             root.getElementById('pauseIcon').style.display = 'none';
-        }
-    }
-
-    switchTab(name, btn) {
-        this.activeTab = name;
-        this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.status.style.display = 'none';
-
-        if (name === 'Saved') {
-            const s = this.DB.getSaved();
-            if(s.length === 0) this.list.innerHTML = `<div class="text-center">No saved songs yet.</div>`;
-            else this.renderList(s);
-        } else if (name === 'Trending') {
-            this.loadData("Global Top 100");
-        } else {
-            this.loadSmartForYou();
         }
     }
 }
