@@ -67,7 +67,7 @@ class ViewNotes extends HTMLElement {
                 margin-bottom: 15px; animation: vnFadeIn 0.3s ease;
             }
             .vn-liker-info { display: flex; align-items: center; gap: 12px; }
-            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; }
+            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
 
             .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
             .vn-btn { 
@@ -131,9 +131,10 @@ class ViewNotes extends HTMLElement {
     }
 
     renderOwnNote(note) {
+        // Updated to use photoURL first
         return `
             <div class="vn-header">
-                <img src="${note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
                 <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
                 ${note.songName ? `
                     <div class="vn-song-tag">
@@ -141,7 +142,7 @@ class ViewNotes extends HTMLElement {
                         <span>${note.songName}</span>
                     </div>
                 ` : ''}
-                <div class="vn-timestamp">Shared ${note.timeString || ''}</div>
+                <div class="vn-timestamp">Shared ${note.timeString || 'Recently'}</div>
             </div>
 
             <div class="vn-likers-section">
@@ -170,9 +171,10 @@ class ViewNotes extends HTMLElement {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
 
+        // Updated to use photoURL first
         return `
             <div class="vn-header">
-                <img src="${note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
                 <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
                 <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
                     ${note.text}
@@ -260,3 +262,162 @@ class ViewNotes extends HTMLElement {
 }
 
 customElements.define('view-notes', ViewNotes);
+
+
+// ==========================================
+// NEW: Notes Manager for Fetching & Mutuals
+// ==========================================
+// Paste this below the class or in your main script
+// Ensures "Search and display mutual frnds notes" works.
+
+const NotesManager = {
+    allNotes: [],
+    
+    // Call this function when the page loads
+    init: function() {
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                this.loadMutualNotes(user);
+            }
+        });
+    },
+
+    loadMutualNotes: async function(user) {
+        const db = firebase.firestore();
+        const container = document.getElementById('notes-list-container'); // Ensure you have this DIV in your HTML
+        if(!container) return;
+
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
+
+        try {
+            // 1. Get current user's profile to see who they follow
+            const myProfileDoc = await db.collection("users").doc(user.uid).get();
+            const myData = myProfileDoc.data();
+            const myFollowing = myData?.following || [];
+
+            // 2. Fetch ALL active notes (Realtime listener recommended)
+            db.collection("active_notes").onSnapshot(async (snapshot) => {
+                const rawNotes = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+                
+                // 3. FILTER FOR MUTUALS
+                // Logic: 
+                // A. Note is Mine (uid === user.uid)
+                // B. I follow them (myFollowing.includes(note.uid)) 
+                //    AND They follow me (Requires checking their 'following' list from the note or fetching user)
+                
+                const mutualNotesPromises = rawNotes.map(async (note) => {
+                    // Always show own note
+                    if (note.uid === user.uid) {
+                        return { ...note, isOwn: true, photoURL: user.photoURL }; // Use auth photo
+                    }
+
+                    // Pre-check: Do I follow them?
+                    if (!myFollowing.includes(note.uid)) return null;
+
+                    // Strict Mutual Check: Does this user follow me back?
+                    // We fetch the note author's user profile to check their 'following' array and get 'photoURL'
+                    try {
+                        const authorDoc = await db.collection("users").doc(note.uid).get();
+                        if (!authorDoc.exists) return null;
+                        
+                        const authorData = authorDoc.data();
+                        const authorFollowing = authorData.following || [];
+
+                        // MUTUAL CONDITION: They must follow me back
+                        if (authorFollowing.includes(user.uid)) {
+                            return { 
+                                ...note, 
+                                isOwn: false, 
+                                photoURL: authorData.photoURL, // Get DB Picture
+                                username: authorData.username 
+                            };
+                        }
+                    } catch (e) {
+                        console.error("Error checking mutual:", e);
+                    }
+                    return null;
+                });
+
+                // Resolve all promises and filter out nulls
+                const resolvedNotes = await Promise.all(mutualNotesPromises);
+                this.allNotes = resolvedNotes.filter(n => n !== null);
+
+                // Render the list
+                this.renderList(this.allNotes);
+            });
+
+        } catch (e) {
+            console.error("Error loading notes:", e);
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading updates</div>';
+        }
+    },
+
+    renderList: function(notes) {
+        const container = document.getElementById('notes-list-container');
+        if(!container) return;
+        
+        container.innerHTML = '';
+        
+        if (notes.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No notes from mutuals.</div>';
+            return;
+        }
+
+        // Horizontal Scroll Container
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none;";
+        
+        notes.forEach(note => {
+            const bubble = document.createElement('div');
+            bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
+            
+            // Note Bubble UI
+            bubble.innerHTML = `
+                <div style="position: relative;">
+                    <div style="
+                        width: 70px; height: 70px; border-radius: 50%; 
+                        padding: 3px; border: 2px solid ${note.isOwn ? '#333' : '#00d2ff'};
+                    ">
+                        <img src="${note.photoURL || 'https://via.placeholder.com/70'}" 
+                             style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    </div>
+                    ${note.text ? `
+                        <div style="
+                            position: absolute; top: -10px; right: -10px; 
+                            background: rgba(255,255,255,0.9); color: black; 
+                            padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; 
+                            max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        ">
+                            ${note.text}
+                        </div>
+                    ` : ''}
+                </div>
+                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.username || 'You'}</div>
+            `;
+
+            // Handle Click -> Open ViewNotes Component
+            bubble.onclick = () => {
+                const viewer = document.querySelector('view-notes');
+                if (viewer) viewer.open(note, note.isOwn);
+            };
+
+            scrollWrapper.appendChild(bubble);
+        });
+
+        container.appendChild(scrollWrapper);
+    },
+
+    // Call this from your search input oninput="NotesManager.filter(this.value)"
+    filter: function(query) {
+        const lowerQ = query.toLowerCase();
+        const filtered = this.allNotes.filter(n => 
+            (n.username && n.username.toLowerCase().includes(lowerQ)) ||
+            (n.text && n.text.toLowerCase().includes(lowerQ))
+        );
+        this.renderList(filtered);
+    }
+};
+
+// Initialize
+// document.addEventListener('DOMContentLoaded', () => NotesManager.init());
