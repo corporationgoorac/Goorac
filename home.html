@@ -311,21 +311,9 @@
             100% { background-position: -200% 0; }
         }
 
-        /* --- ADDED FIXES FOR NAVBAR HIDING --- */
-        main-navbar {
-            transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1);
-            z-index: 5000;
-        }
-        main-navbar.nav-hidden {
-            transform: translateY(150%);
-        }
-        view-notes {
-            z-index: 9999 !important; /* Ensure it stays above everything */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        /* Logic to hide navbar when note modal is active */
+        main-navbar.hidden {
+            display: none !important;
         }
     </style>
 </head>
@@ -398,7 +386,7 @@
     const db = firebase.firestore();
     const prog = document.getElementById('progress-bar');
     const viewer = document.getElementById('note-viewer');
-    const nav = document.getElementById('main-nav'); // Reference to navbar
+    const nav = document.getElementById('main-nav');
 
     function formatTime(timestamp) {
         if (!timestamp) return "";
@@ -417,6 +405,32 @@
         interval = seconds / 60;
         if (interval > 1) return Math.floor(interval) + "m ago";
         return "Just now";
+    }
+
+    // Helper to toggle Navbar based on Viewer state
+    function openNoteViewer(data, isMe) {
+        if (nav) nav.classList.add('hidden');
+        viewer.open(data, isMe);
+        
+        // Setup a listener or check periodically to show navbar when closed
+        // This assumes your view-notes component has a way to detect closing, 
+        // usually by clicking an overlay. We'll add a listener to the body for the close event.
+        const checkClosed = setInterval(() => {
+            if (viewer.shadowRoot) {
+                const overlay = viewer.shadowRoot.querySelector('.vn-overlay') || document.querySelector('.vn-overlay');
+                if (overlay && !overlay.classList.contains('open')) {
+                    if (nav) nav.classList.remove('hidden');
+                    clearInterval(checkClosed);
+                }
+            } else {
+                // Fallback for non-shadow DOM
+                const overlay = document.querySelector('.vn-overlay');
+                if (!overlay || !overlay.classList.contains('open')) {
+                    if (nav) nav.classList.remove('hidden');
+                    clearInterval(checkClosed);
+                }
+            }
+        }, 300);
     }
 
     auth.onAuthStateChanged(async (user) => {
@@ -454,17 +468,6 @@
 
     // --- NOTES SYSTEM LOGIC ---
     function initNotesSystem(user) {
-        // Logic to monitor Viewer close state
-        function monitorViewerClose() {
-            const checker = setInterval(() => {
-                // Check if viewer is hidden or inactive
-                if (viewer.style.display === 'none' || !viewer.hasAttribute('active')) {
-                    nav.classList.remove('nav-hidden'); // Show Navbar
-                    clearInterval(checker);
-                }
-            }, 300);
-        }
-
         // 1. My Note Logic
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
             const btn = document.getElementById('my-note-btn');
@@ -481,10 +484,7 @@
             }
 
             btn.onclick = () => {
-                // If data is null, open() will redirect to notes.html automatically
-                nav.classList.add('nav-hidden'); // Hide Navbar
-                viewer.open(data, true);
-                monitorViewerClose();
+                openNoteViewer(data, true);
             };
         });
 
@@ -506,11 +506,7 @@
                       <img src="${note.pfp}" class="note-pfp">
                       <span class="note-username">${note.username.split(' ')[0]}</span>
                   `;
-                  div.onclick = () => {
-                      nav.classList.add('nav-hidden'); // Hide Navbar
-                      viewer.open(note, false);
-                      monitorViewerClose();
-                  };
+                  div.onclick = () => openNoteViewer(note, false);
                   container.appendChild(div);
               });
           });
