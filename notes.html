@@ -260,12 +260,22 @@
     function keepKeyboardOpen() {
         const input = document.getElementById('note-input');
         input.focus();
-        // Prevent keyboard from closing when tapping background
+        
+        // Ensure keyboard doesn't close on accidental taps
         document.body.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON' && !e.target.closest('.color-sheet') && !e.target.closest('song-picker')) {
+            if (e.target.tagName !== 'BUTTON' && !e.target.closest('.color-sheet') && !e.target.closest('song-picker') && !e.target.closest('.color-wheel') && !e.target.closest('.music-btn')) {
                 input.focus();
             }
         });
+
+        // Set interval to catch edge cases where focus is lost
+        setInterval(() => {
+            const sheetOpen = document.getElementById('color-sheet').classList.contains('open');
+            const pickerOpen = document.getElementById('music-picker').getAttribute('open') !== null;
+            if (document.activeElement !== input && !sheetOpen && !pickerOpen) {
+                input.focus();
+            }
+        }, 1000);
     }
 
     // 3. Vibration Utility
@@ -332,7 +342,7 @@
     const shareBtn = document.getElementById('share-btn');
 
     input.oninput = () => {
-        display.innerText = input.value || (currentSongData ? "" : "What's on your mind?");
+        display.innerText = input.value || "What's on your mind?";
         validateShare();
     };
 
@@ -355,7 +365,10 @@
         document.getElementById('music-tag').style.display = 'flex';
         document.getElementById('song-name').innerText = currentSongData.trackName;
         document.getElementById('song-artist').innerText = currentSongData.artistName;
-        if(input.value === "") display.innerText = "";
+        
+        // Keep placeholder text even when song is selected
+        if(input.value === "") display.innerText = "What's on your mind?";
+        
         validateShare();
     });
 
