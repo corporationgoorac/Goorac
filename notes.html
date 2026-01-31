@@ -386,46 +386,63 @@
         validateShare();
     });
 
-    // Share & Save (Updated with Time and Likes)
+    // Fetch Mutual Friends (Followers who follow back)
+    async function getMutuals(uid) {
+        const following = await db.collection("users").doc(uid).collection("following").get();
+        const followingIds = following.docs.map(doc => doc.id);
+        
+        const mutuals = [];
+        for (const targetId of followingIds) {
+            const check = await db.collection("users").doc(targetId).collection("following").doc(uid).get();
+            if (check.exists) mutuals.push(targetId);
+        }
+        return mutuals;
+    }
+
+    // Share & Save (Mutual Only + 24hr Auto-Delete logic)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
         const user = firebase.auth().currentUser;
-        if(!user) {
-            alert("You need to be logged in to share.");
-            return;
-        }
+        if(!user) return;
 
         shareBtn.innerText = "Sharing...";
         shareBtn.disabled = true;
 
         const now = new Date();
-
-        const noteData = {
-            uid: user.uid,
-            text: input.value.trim(),
-            bgColor: currentTheme.bg,
-            textColor: currentTheme.text,
-            songName: currentSongData?.trackName || null,
-            songArtist: currentSongData?.artistName || null,
-            songPreview: currentSongData?.previewUrl || null,
-            songArt: currentSongData?.artworkUrl100 || null,
-            // New Fields for Time and Likes
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dateString: now.toDateString(), 
-            timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            likes: [],      // Array to store UIDs of likers
-            likeCount: 0    // Counter for easy display
-        };
+        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 
         try {
+            // Get mutuals for targeted sharing
+            const mutualFriends = await getMutuals(user.uid);
+            const userDoc = await db.collection("users").doc(user.uid).get();
+            const userData = userDoc.data();
+
+            const noteData = {
+                uid: user.uid,
+                username: userData.name || "User",
+                pfp: userData.photoURL || "https://via.placeholder.com/150",
+                text: input.value.trim(),
+                bgColor: currentTheme.bg,
+                textColor: currentTheme.text,
+                songName: currentSongData?.trackName || null,
+                songArtist: currentSongData?.artistName || null,
+                songPreview: currentSongData?.previewUrl || null,
+                songArt: currentSongData?.artworkUrl100 || null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.Timestamp.fromDate(expiresAt),
+                visibleTo: [...mutualFriends, user.uid], // List of UIDs allowed to see this
+                likes: [],
+                likeCount: 0
+            };
+
             const batch = db.batch();
             
-            // 1. Main active notes feed
+            // 1. Single document per user for "Active Note" status
             const activeNoteRef = db.collection("active_notes").doc(user.uid);
             batch.set(activeNoteRef, noteData);
             
-            // 2. User's personal history
+            // 2. Personal History
             const historyRef = db.collection("users").doc(user.uid).collection("notes_history").doc();
             batch.set(historyRef, noteData);
             
