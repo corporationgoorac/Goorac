@@ -1,581 +1,262 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Quantum Home</title>
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+/**
+ * ViewNotes Component
+ * Handles the Instagram-style bottom sheet for viewing and interacting with notes.
+ * Integrated with Firebase for Like/Delete functionality.
+ */
+class ViewNotes extends HTMLElement {
+    constructor() {
+        super();
+        this.currentNote = null;
+        this.isOwnNote = false;
+        this.audioPlayer = new Audio();
+        this.audioPlayer.loop = true;
+        this.db = firebase.firestore();
+    }
 
-    <script src="components/navbar.js" defer></script>
-    <script src="components/call-notifier.js" defer></script>
-    <script src="components/viewNotes.js" defer></script>
+    connectedCallback() {
+        this.render();
+        this.setupEventListeners();
+    }
 
-    <style>
-        :root {
-            --bg: #000;
-            --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.3);
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
-            --text-main: #ffffff;
-            --text-dim: #a0a0a0;
-            --danger: #ff4444;
-            --danger-glow: rgba(255, 68, 68, 0.2);
-        }
-
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding-bottom: 100px;
-            overflow-x: hidden;
-            background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
-            min-height: 100vh;
-        }
-
-        header {
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            background: rgba(0,0,0,0.7);
-            position: sticky;
-            top: 0;
-            border-bottom: 1px solid var(--border);
-            z-index: 1000;
-        }
-
-        .logo { 
-            font-size: 1.2rem; 
-            font-weight: 900; 
-            color: var(--accent); 
-            letter-spacing: 3px;
-            text-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        .header-pfp { 
-            width: 38px; height: 38px; border-radius: 12px; 
-            object-fit: cover; border: 1px solid var(--border);
-            cursor: pointer; background: #111;
-            transition: transform 0.2s;
-        }
-        .header-pfp:active { transform: scale(0.9); }
-
-        #progress-bar {
-            position: fixed;
-            top: 0; left: 0; height: 2px;
-            background: var(--accent); width: 0%; z-index: 1001;
-            transition: width 0.4s ease, opacity 0.3s;
-            box-shadow: 0 0 10px var(--accent);
-        }
-
-        /* --- NOTES UI SECTION --- */
-        .notes-wrapper {
-            padding: 15px 0 5px 0;
-            overflow-x: auto;
-            display: flex;
-            gap: 15px;
-            padding-left: 20px;
-            scrollbar-width: none;
-        }
-        .notes-wrapper::-webkit-scrollbar { display: none; }
-
-        .note-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 75px;
-            position: relative;
-        }
-
-        .note-bubble {
-            position: absolute;
-            top: -10px;
-            background: #262626;
-            color: white;
-            padding: 6px 10px;
-            border-radius: 15px;
-            font-size: 10px;
-            max-width: 80px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            border: 1px solid var(--border);
-            z-index: 2;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-
-        .note-pfp {
-            width: 65px;
-            height: 65px;
-            border-radius: 50%;
-            padding: 2px;
-            border: 2px solid var(--border);
-            object-fit: cover;
-        }
-        .note-item.has-note .note-pfp { border-color: var(--accent); }
-
-        .note-username {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 8px;
-            text-align: center;
-            width: 70px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        /* ------------------------ */
-
-        .content { 
-            padding: 10px 20px; 
-            max-width: 500px; 
-            margin: 0 auto; 
-        }
-
-        .section-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: var(--text-dim);
-            font-weight: 800;
-            letter-spacing: 2px;
-            margin-bottom: 20px;
-            display: block;
-            opacity: 0.7;
-        }
-
-        .welcome-card {
-            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
-            border: 1px solid var(--border);
-            padding: 30px 25px;
-            border-radius: 32px;
-            margin-bottom: 25px;
-            backdrop-filter: blur(10px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .welcome-card h1 { 
-            margin: 0; font-size: 1.8rem; font-weight: 800; 
-            letter-spacing: -0.5px;
-            background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .welcome-card p { 
-            color: var(--text-dim); margin-top: 12px; 
-            font-size: 0.95rem; line-height: 1.6; font-weight: 400;
-        }
-
-        .activity-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 25px;
-        }
-
-        .activity-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            padding: 18px;
-            border-radius: 24px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            text-align: left;
-            position: relative;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-
-        .activity-card:active {
-            transform: scale(0.96);
-            background: rgba(255,255,255,0.1);
-        }
-
-        .card-icon-area {
-            position: absolute;
-            top: 18px;
-            right: 18px;
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.05);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-
-        .card-icon-area img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .count-num {
-            font-size: 1.1rem;
-            font-weight: 800;
-            display: block;
-            margin-bottom: 2px;
-            color: #fff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .count-label {
-            font-size: 0.65rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            display: block;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .time-badge {
-            font-size: 0.6rem;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-            display: block;
-            opacity: 0.6;
-        }
-
-        .activity-card.has-count { 
-            border-color: var(--accent);
-            background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%);
-        }
-        .has-count .count-num { color: var(--accent); }
-        .has-count .card-icon-area { border-color: var(--accent); }
-        
-        .activity-card.missed-alert {
-            border-color: var(--danger-glow);
-            background: linear-gradient(145deg, rgba(255, 68, 68, 0.05) 0%, transparent 100%);
-        }
-        .missed-alert .count-num { color: var(--danger); }
-        .missed-alert .card-icon-area { border-color: var(--danger); }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0, 210, 255, 0.1);
-            color: var(--accent);
-            padding: 6px 14px;
-            border-radius: 100px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            margin-bottom: 18px;
-            border: 1px solid rgba(0, 210, 255, 0.2);
-        }
-
-        .dot {
-            width: 8px; height: 8px;
-            background: var(--accent);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--accent);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.5; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .skeleton {
-            background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite linear;
-            border-radius: 12px;
-        }
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        /* Logic to hide navbar when note modal is active */
-        main-navbar.hidden {
-            display: none !important;
-        }
-    </style>
-</head>
-<body oncontextmenu="return false;"> 
-
-<div id="progress-bar"></div>
-
-<header>
-    <div class="logo">GOORAC</div>
-    <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
-</header>
-
-<div class="notes-wrapper" id="notes-container">
-    <div class="note-item" id="my-note-btn">
-        <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
-        <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
-        <span class="note-username">Your Note</span>
-    </div>
-</div>
-
-<div class="content">
-    <span class="section-label">Quantum Terminal</span>
-    
-    <div class="welcome-card">
-        <div class="status-badge">
-            <div class="dot"></div> ENCRYPTION ACTIVE
-        </div>
-        
-        <h1 id="welcome-name" class="skeleton" style="height: 35px; width: 70%;"></h1>
-        <p id="welcome-text" class="skeleton" style="height: 50px; width: 100%; margin-top: 15px;"></p>
-        
-        <div class="activity-grid">
-            <div class="activity-card" id="msg-card" onclick="window.location.href='messages.html'">
-                <div class="card-icon-area" id="msg-pfp-area">
-                    <div style="color:var(--text-dim); font-size:10px;">MSG</div>
-                </div>
-                <span id="msg-time" class="time-badge">No active data</span>
-                <span id="msg-header" class="count-num">Recent</span>
-                <span id="msg-subtext" class="count-label">History</span>
-            </div>
+    render() {
+        this.innerHTML = `
+        <style>
+            .vn-overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); display: none; z-index: 2000;
+                justify-content: center; align-items: flex-end;
+                backdrop-filter: blur(4px);
+            }
+            .vn-sheet {
+                background: #1c1c1e; width: 100%; max-width: 500px;
+                border-radius: 20px 20px 0 0; padding: 24px 20px;
+                transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                padding-bottom: max(30px, env(safe-area-inset-bottom));
+            }
+            .vn-overlay.open { display: flex; }
+            .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
-            <div class="activity-card" id="call-card" onclick="window.location.href='calls.html'">
-                <div class="card-icon-area" id="call-pfp-area">
-                    <div style="color:var(--text-dim); font-size:10px;">LOG</div>
-                </div>
-                <span id="call-time" class="time-badge">No active data</span>
-                <span id="call-count" class="count-num">Log</span>
-                <span id="call-label" class="count-label">History</span>
+            .vn-drag-handle { 
+                width: 40px; height: 5px; background: #333; 
+                border-radius: 10px; margin: -10px auto 20px; 
+            }
+
+            .vn-header { text-align: center; margin-bottom: 25px; }
+            .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
+            
+            .vn-song-tag { 
+                display: inline-flex; align-items: center; gap: 6px; 
+                background: rgba(255,255,255,0.1); padding: 6px 14px; 
+                border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            }
+
+            .vn-bubble-text { 
+                font-size: 1.1rem; font-weight: 500; margin: 15px 0; 
+                line-height: 1.4; color: #fff;
+            }
+
+            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 5px; }
+
+            .vn-likers-section { 
+                max-height: 250px; overflow-y: auto; 
+                margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
+            }
+            .vn-liker-item { 
+                display: flex; align-items: center; justify-content: space-between; 
+                margin-bottom: 15px; animation: vnFadeIn 0.3s ease;
+            }
+            .vn-liker-info { display: flex; align-items: center; gap: 12px; }
+            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; }
+
+            .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+            .vn-btn { 
+                width: 100%; padding: 14px; border-radius: 14px; border: none; 
+                font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
+            }
+            .vn-btn:active { opacity: 0.7; }
+            .vn-btn-primary { background: #007aff; color: white; }
+            .vn-btn-danger { background: transparent; color: #ff3b30; }
+
+            .vn-interaction-bar { 
+                display: flex; align-items: center; gap: 12px; margin-top: 20px; 
+                background: #262626; padding: 8px 16px; border-radius: 30px;
+            }
+            .vn-reply-input { 
+                flex: 1; background: none; border: none; color: white; 
+                font-size: 0.95rem; padding: 8px 0; outline: none;
+            }
+            .vn-heart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 5px; }
+
+            @keyframes vnFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        </style>
+
+        <div class="vn-overlay" id="vn-overlay">
+            <div class="vn-sheet">
+                <div class="vn-drag-handle"></div>
+                <div id="vn-content"></div>
             </div>
         </div>
-    </div>
-</div>
-
-<main-navbar id="main-nav"></main-navbar>
-<call-notifier></call-notifier>
-<view-notes id="note-viewer"></view-notes>
-
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
-    };
-
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const prog = document.getElementById('progress-bar');
-    const viewer = document.getElementById('note-viewer');
-    const nav = document.getElementById('main-nav');
-
-    function formatTime(timestamp) {
-        if (!timestamp) return "";
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const seconds = Math.floor((new Date() - date) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + "y ago";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + "mo ago";
-        interval = seconds / 604800;
-        if (interval > 1) return Math.floor(interval) + "w ago";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + "d ago";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + "h ago";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m ago";
-        return "Just now";
+        `;
     }
 
-    function openNoteViewer(data, isMe) {
-        if (nav) nav.classList.add('hidden');
-        viewer.open(data, isMe);
+    setupEventListeners() {
+        this.querySelector('#vn-overlay').onclick = (e) => {
+            if (e.target.id === 'vn-overlay') this.close();
+        };
+    }
+
+    async open(noteData, isOwnNote = false) {
+        if (!noteData && isOwnNote) {
+            window.location.href = 'notes.html';
+            return;
+        }
+
+        this.currentNote = noteData;
+        this.isOwnNote = isOwnNote;
+        const overlay = this.querySelector('#vn-overlay');
+        const content = this.querySelector('#vn-content');
+
+        if (noteData.songPreview) {
+            this.audioPlayer.src = noteData.songPreview;
+            this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
+        }
+
+        content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
+        overlay.classList.add('open');
+        this.vibrate(10);
         
-        const checkClosed = setInterval(() => {
-            if (viewer.shadowRoot) {
-                const overlay = viewer.shadowRoot.querySelector('.vn-overlay');
-                if (overlay && !overlay.classList.contains('open')) {
-                    if (nav) nav.classList.remove('hidden');
-                    clearInterval(checkClosed);
+        // Internal activation of buttons
+        this.handleActions();
+    }
+
+    renderOwnNote(note) {
+        return `
+            <div class="vn-header">
+                <img src="${note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
+                ${note.songName ? `
+                    <div class="vn-song-tag">
+                        <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <span>${note.songName}</span>
+                    </div>
+                ` : ''}
+                <div class="vn-timestamp">Shared ${note.timeString || ''}</div>
+            </div>
+
+            <div class="vn-likers-section">
+                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
+                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
+                    <div class="vn-liker-item">
+                        <div class="vn-liker-info">
+                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
+                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
+                        </div>
+                        <span style="color:#ff3b30;">❤️</span>
+                    </div>
+                `).join('') : `
+                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
+                `}
+            </div>
+
+            <div class="vn-action-group">
+                <button class="vn-btn vn-btn-primary" onclick="window.location.href='notes.html'">Leave a new note</button>
+                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete note</button>
+            </div>
+        `;
+    }
+
+    renderFriendNote(note) {
+        const user = firebase.auth()?.currentUser;
+        const isLiked = note.likes?.some(l => l.uid === user?.uid);
+
+        return `
+            <div class="vn-header">
+                <img src="${note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
+                <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
+                    ${note.text}
+                </div>
+                ${note.songName ? `
+                    <div style="margin-top:10px;">
+                        <div class="vn-song-tag">
+                             <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                             <span>${note.songName} • ${note.songArtist}</span>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="vn-interaction-bar">
+                <input type="text" class="vn-reply-input" placeholder="Reply to ${note.username || 'user'}...">
+                <button class="vn-heart-btn" id="like-toggle-btn">
+                    ${isLiked ? '❤️' : '🤍'}
+                </button>
+            </div>
+        `;
+    }
+
+    close() {
+        this.audioPlayer.pause();
+        this.querySelector('#vn-overlay').classList.remove('open');
+        this.vibrate(5);
+    }
+
+    vibrate(ms) {
+        if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
+    handleActions() {
+        // Delete Functionality
+        const deleteBtn = this.querySelector('#delete-note-btn');
+        if(deleteBtn) {
+            deleteBtn.onclick = async () => {
+                if(confirm("Delete this note?")) {
+                    const user = firebase.auth().currentUser;
+                    try {
+                        await this.db.collection("active_notes").doc(user.uid).delete();
+                        this.close();
+                        window.location.reload();
+                    } catch(e) { console.error("Delete failed", e); }
                 }
-            }
-        }, 300);
+            };
+        }
+
+        // Like/Unlike Functionality
+        const likeBtn = this.querySelector('#like-toggle-btn');
+        if(likeBtn) {
+            likeBtn.onclick = async () => {
+                const user = firebase.auth().currentUser;
+                if(!user) return;
+
+                this.vibrate(15);
+                const isCurrentlyLiked = likeBtn.innerText === '❤️';
+                const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
+
+                // UI feedback
+                likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
+
+                try {
+                    if (!isCurrentlyLiked) {
+                        await noteRef.update({
+                            likes: firebase.firestore.FieldValue.arrayUnion({
+                                uid: user.uid,
+                                displayName: user.displayName || "User",
+                                photoURL: user.photoURL || ""
+                            })
+                        });
+                    } else {
+                        const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
+                        if (likerObj) {
+                            await noteRef.update({
+                                likes: firebase.firestore.FieldValue.arrayRemove(likerObj)
+                            });
+                        }
+                    }
+                } catch (e) { console.error("Like toggle failed", e); }
+            };
+        }
     }
+}
 
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            prog.style.width = '60%';
-            const doc = await db.collection("users").doc(user.uid).get();
-            if (doc.exists) {
-                updateUI(doc.data());
-                startLiveCounters(user.uid);
-                initNotesSystem(user);
-            } else { window.location.href = "setup.html"; }
-        } else { window.location.href = "login.html"; }
-    });
-
-    function updateUI(data) {
-        const nameEl = document.getElementById('welcome-name');
-        const textEl = document.getElementById('welcome-text');
-        const pfpEl = document.getElementById('header-pfp');
-
-        nameEl.classList.remove('skeleton');
-        nameEl.innerText = "Welcome, " + (data.name.split(' ')[0] || "Agent");
-        
-        textEl.classList.remove('skeleton');
-        textEl.innerText = "All neural-links are operational. Your communication is currently isolated and secure.";
-        
-        pfpEl.classList.remove('skeleton');
-        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
-
-        document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
-        
-        prog.style.width = '100%';
-        setTimeout(() => prog.style.opacity = '0', 400);
-    }
-
-    // --- UPDATED NOTES SYSTEM LOGIC ---
-    function initNotesSystem(user) {
-        // 1. My Note Logic
-        db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
-            const btn = document.getElementById('my-note-btn');
-            const preview = document.getElementById('my-note-preview');
-            const data = doc.exists ? doc.data() : null;
-
-            if(data) {
-                preview.style.display = 'block';
-                preview.innerText = data.text;
-                btn.classList.add('has-note');
-            } else {
-                preview.style.display = 'none';
-                btn.classList.remove('has-note');
-            }
-
-            btn.onclick = () => openNoteViewer(data, true);
-        });
-
-        // 2. Mutual Friends Notes Logic
-        // We filter for notes where "visibleTo" array contains our UID
-        db.collection("active_notes")
-          .where("visibleTo", "array-contains", user.uid)
-          .onSnapshot(snap => {
-              const container = document.getElementById('notes-container');
-              const friendNodes = container.querySelectorAll('.friend-note');
-              friendNodes.forEach(n => n.remove());
-
-              snap.forEach(doc => {
-                  const note = doc.data();
-                  // Don't show our own note in the friend list again
-                  if (note.uid === user.uid) return;
-
-                  // Check for expiration (24h)
-                  const now = new Date();
-                  const expiry = note.expiresAt ? note.expiresAt.toDate() : null;
-                  if (expiry && now > expiry) return;
-
-                  const div = document.createElement('div');
-                  div.className = 'note-item friend-note has-note';
-                  div.innerHTML = `
-                      <div class="note-bubble" style="background:${note.bgColor}; color:${note.textColor}">${note.text}</div>
-                      <img src="${note.pfp || 'https://via.placeholder.com/150'}" class="note-pfp">
-                      <span class="note-username">${note.username.split(' ')[0]}</span>
-                  `;
-                  div.onclick = () => openNoteViewer(note, false);
-                  container.appendChild(div);
-              });
-          });
-    }
-
-    function startLiveCounters(uid) {
-        db.collection("chats")
-          .where("participants", "array-contains", uid)
-          .orderBy("lastTimestamp", "desc")
-          .onSnapshot(snap => {
-              let latestUnreadChat = null;
-              for (const doc of snap.docs) {
-                  const d = doc.data();
-                  const isUnread = (d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0);
-                  if (isUnread) { latestUnreadChat = d; break; }
-              }
-
-              const header = document.getElementById('msg-header');
-              const subtext = document.getElementById('msg-subtext');
-              const time = document.getElementById('msg-time');
-              const card = document.getElementById('msg-card');
-              const pfpArea = document.getElementById('msg-pfp-area');
-
-              if (latestUnreadChat) {
-                  header.innerText = "New Message";
-                  subtext.innerText = "From " + (latestUnreadChat.lastSenderName || "User");
-                  time.innerText = formatTime(latestUnreadChat.lastTimestamp);
-                  card.classList.add('has-count');
-                  if (latestUnreadChat.lastSenderPfp) pfpArea.innerHTML = `<img src="${latestUnreadChat.lastSenderPfp}">`;
-              } else {
-                  header.innerText = "Recent";
-                  subtext.innerText = "History";
-                  time.innerText = snap.empty ? "No data" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                  card.classList.remove('has-count');
-                  pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">MSG</div>`;
-              }
-          });
-
-        db.collection("call_logs")
-          .where("participants", "array-contains", uid)
-          .orderBy("timestamp", "desc")
-          .limit(1)
-          .onSnapshot(snap => {
-              const el = document.getElementById('call-count');
-              const label = document.getElementById('call-label');
-              const time = document.getElementById('call-time');
-              const card = document.getElementById('call-card');
-              const pfpArea = document.getElementById('call-pfp-area');
-              
-              if (!snap.empty) {
-                  const call = snap.docs[0].data();
-                  const isReceiver = (call.receiverId === uid);
-                  time.innerText = formatTime(call.timestamp);
-                  
-                  if (isReceiver && (call.status === "missed" || call.status === "cancelled")) {
-                      el.innerText = "Missed";
-                      label.innerText = call.callerName || "Recent Call";
-                      card.classList.add('missed-alert');
-                      if (call.callerPfp) pfpArea.innerHTML = `<img src="${call.callerPfp}">`;
-                  } else {
-                      el.innerText = "Log";
-                      label.innerText = "History";
-                      card.classList.remove('missed-alert');
-                      pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">LOG</div>`;
-                  }
-              }
-          });
-    }
-
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (e) => {
-        const now = (new Date()).getTime();
-        if (now - lastTouchEnd <= 300) e.preventDefault();
-        lastTouchEnd = now;
-    }, false);
-</script>
-</body>
-</html>
+customElements.define('view-notes', ViewNotes);
