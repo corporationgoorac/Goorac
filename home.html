@@ -56,12 +56,6 @@
             top: 0;
             border-bottom: 1px solid var(--border);
             z-index: 1000;
-            transition: transform 0.3s ease-in-out;
-        }
-        
-        /* Class to hide header when modal is open */
-        header.nav-hidden {
-            transform: translateY(-100%);
         }
 
         .logo { 
@@ -317,28 +311,21 @@
             100% { background-position: -200% 0; }
         }
 
-        /* --- Fix for View Notes Modal alignment --- */
+        /* --- ADDED FIXES FOR NAVBAR HIDING --- */
+        main-navbar {
+            transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1);
+            z-index: 5000;
+        }
+        main-navbar.nav-hidden {
+            transform: translateY(150%);
+        }
         view-notes {
+            z-index: 9999 !important; /* Ensure it stays above everything */
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 5000; /* Ensure it's above everything */
-            pointer-events: none; /* Let clicks pass when hidden */
-        }
-        
-        /* When active (handled inside the component usually, but enforcing z-index here) */
-        view-notes[active] {
-            pointer-events: auto;
-        }
-        
-        /* Main Navbar Hide Class */
-        main-navbar {
-            transition: transform 0.3s ease-in-out;
-        }
-        main-navbar.nav-hidden {
-            transform: translateY(150%); /* Slide down out of view */
         }
     </style>
 </head>
@@ -346,7 +333,7 @@
 
 <div id="progress-bar"></div>
 
-<header id="main-header">
+<header>
     <div class="logo">GOORAC</div>
     <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
 </header>
@@ -411,8 +398,7 @@
     const db = firebase.firestore();
     const prog = document.getElementById('progress-bar');
     const viewer = document.getElementById('note-viewer');
-    const header = document.getElementById('main-header');
-    const nav = document.getElementById('main-nav');
+    const nav = document.getElementById('main-nav'); // Reference to navbar
 
     function formatTime(timestamp) {
         if (!timestamp) return "";
@@ -468,30 +454,16 @@
 
     // --- NOTES SYSTEM LOGIC ---
     function initNotesSystem(user) {
-        // Logic to hide/show navbar based on viewer state
-        // We override the open method if possible, or wrap the click
-        const originalOpen = viewer.open;
-        
-        // Function to toggle UI visibility
-        const toggleUI = (hide) => {
-            if (hide) {
-                header.classList.add('nav-hidden');
-                nav.classList.add('nav-hidden');
-            } else {
-                header.classList.remove('nav-hidden');
-                nav.classList.remove('nav-hidden');
-            }
-        };
-
-        // Listen for close event from the component (assuming it emits one)
-        viewer.addEventListener('close', () => toggleUI(false));
-        
-        // Also listen for clicks on the viewer background to restore UI if it closes that way
-        viewer.addEventListener('click', (e) => {
-             // Heuristic: if user clicks strictly outside a modal container inside shadowDOM or regular DOM
-             // This depends on viewNotes.js implementation.
-             // Safer bet: periodically check if viewer is active/visible
-        });
+        // Logic to monitor Viewer close state
+        function monitorViewerClose() {
+            const checker = setInterval(() => {
+                // Check if viewer is hidden or inactive
+                if (viewer.style.display === 'none' || !viewer.hasAttribute('active')) {
+                    nav.classList.remove('nav-hidden'); // Show Navbar
+                    clearInterval(checker);
+                }
+            }, 300);
+        }
 
         // 1. My Note Logic
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
@@ -509,16 +481,10 @@
             }
 
             btn.onclick = () => {
-                toggleUI(true); // Hide nav/header
+                // If data is null, open() will redirect to notes.html automatically
+                nav.classList.add('nav-hidden'); // Hide Navbar
                 viewer.open(data, true);
-                
-                // Add a checker to see when it closes (since we can't edit inner JS easily)
-                const checkClosed = setInterval(() => {
-                    if (viewer.style.display === 'none' || !viewer.hasAttribute('active')) {
-                        toggleUI(false);
-                        clearInterval(checkClosed);
-                    }
-                }, 500);
+                monitorViewerClose();
             };
         });
 
@@ -541,16 +507,9 @@
                       <span class="note-username">${note.username.split(' ')[0]}</span>
                   `;
                   div.onclick = () => {
-                      toggleUI(true); // Hide nav/header
+                      nav.classList.add('nav-hidden'); // Hide Navbar
                       viewer.open(note, false);
-                      
-                      // Add a checker to see when it closes
-                      const checkClosed = setInterval(() => {
-                          if (viewer.style.display === 'none' || !viewer.hasAttribute('active')) {
-                              toggleUI(false);
-                              clearInterval(checkClosed);
-                          }
-                      }, 500);
+                      monitorViewerClose();
                   };
                   container.appendChild(div);
               });
