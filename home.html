@@ -310,6 +310,20 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        /* Fixed ViewNotes Overlap Fixes */
+        #note-viewer {
+            position: relative;
+            z-index: 9999; /* Ensure it's above navbar */
+        }
+        
+        main-navbar {
+            transition: transform 0.3s ease;
+        }
+        
+        body.modal-open main-navbar {
+            transform: translateY(100%); /* Hide navbar when modal opens */
+        }
     </style>
 </head>
 <body oncontextmenu="return false;"> 
@@ -327,7 +341,7 @@
         <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
         <span class="note-username">Your Note</span>
     </div>
-    </div>
+</div>
 
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
@@ -434,6 +448,23 @@
         setTimeout(() => prog.style.opacity = '0', 400);
     }
 
+    // Modal Visibility Helper
+    function openNote(data, isMe) {
+        document.body.classList.add('modal-open');
+        viewer.open(data, isMe);
+        
+        // Listen for close from the component (assuming overlay click or close button)
+        const overlay = viewer.querySelector('.vn-overlay');
+        if (overlay) {
+            const observer = new MutationObserver(() => {
+                if (!overlay.classList.contains('open')) {
+                    document.body.classList.remove('modal-open');
+                }
+            });
+            observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
+
     // --- NOTES SYSTEM LOGIC ---
     function initNotesSystem(user) {
         // 1. My Note Logic
@@ -452,8 +483,7 @@
             }
 
             btn.onclick = () => {
-                // If data is null, open() will redirect to notes.html automatically
-                viewer.open(data, true);
+                openNote(data, true);
             };
         });
 
@@ -462,7 +492,6 @@
           .where("uid", "!=", user.uid)
           .onSnapshot(snap => {
               const container = document.getElementById('notes-container');
-              // Remove old friend nodes
               const friendNodes = container.querySelectorAll('.friend-note');
               friendNodes.forEach(n => n.remove());
 
@@ -475,7 +504,7 @@
                       <img src="${note.pfp}" class="note-pfp">
                       <span class="note-username">${note.username.split(' ')[0]}</span>
                   `;
-                  div.onclick = () => viewer.open(note, false);
+                  div.onclick = () => openNote(note, false);
                   container.appendChild(div);
               });
           });
