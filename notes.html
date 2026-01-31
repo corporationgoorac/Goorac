@@ -49,21 +49,21 @@
             background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
             border: 2px solid #000;
             box-shadow: 0 0 12px rgba(255,255,255,0.1);
-            transition: transform 0.2s active;
         }
 
         .share-btn { 
             background: var(--accent); 
             color: #fff; 
-            padding: 8px 22px; 
+            padding: 8px 24px; 
             border-radius: 25px;
             font-weight: 600; 
             font-size: 0.95rem; 
             opacity: 0.4; 
             pointer-events: none; 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-right: 5px;
         }
-        .share-btn.active { opacity: 1; pointer-events: auto; transform: scale(1.05); }
+        .share-btn.active { opacity: 1; pointer-events: auto; }
 
         /* Creative Canvas */
         .editor-space { 
@@ -87,8 +87,8 @@
             background: var(--bubble-bg); 
             padding: 14px 22px; 
             border-radius: 26px;
-            min-width: 120px; 
-            max-width: 240px; 
+            min-width: 140px; 
+            max-width: 260px; 
             text-align: center; 
             position: relative;
             margin-bottom: 18px; 
@@ -111,7 +111,10 @@
             font-size: 1rem; 
             font-weight: 500;
             line-height: 1.4; 
-            display: block; 
+            display: -webkit-box;
+            -webkit-line-clamp: 4; /* Max 4 lines */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
             word-wrap: break-word; 
         }
         
@@ -119,15 +122,19 @@
             display: none; 
             align-items: center; 
             justify-content: center; 
-            gap: 5px;
+            flex-direction: column;
+            gap: 2px;
             font-size: 0.75rem; 
-            font-weight: 700; 
+            font-weight: 600; 
             margin-top: 8px; 
             opacity: 0.9;
             background: rgba(255,255,255,0.1);
-            padding: 4px 10px;
-            border-radius: 10px;
+            padding: 6px 12px;
+            border-radius: 12px;
         }
+
+        #song-name { font-weight: 800; font-size: 0.8rem; }
+        #song-artist { opacity: 0.8; font-size: 0.7rem; }
 
         .pfp-container {
             width: 110px; 
@@ -140,11 +147,19 @@
         }
         .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Hidden Input Trigger */
-        #note-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        /* Input Trigger */
+        #note-input { 
+            position: absolute; 
+            opacity: 0; 
+            width: 100%; 
+            height: 100%; 
+            top: 0; 
+            left: 0;
+            z-index: 5;
+        }
 
         /* Tool Area */
-        .tools { margin-top: 35px; }
+        .tools { margin-top: 35px; z-index: 10; }
         .music-btn {
             width: 50px; 
             height: 50px; 
@@ -155,9 +170,7 @@
             justify-content: center; 
             border: 1px solid #333;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
         }
-        .music-btn:active { transform: scale(0.9); }
         .music-btn svg { width: 22px; height: 22px; fill: #ff0050; }
 
         /* Color Selection Bottom Sheet */
@@ -167,7 +180,6 @@
             border-radius: 25px 25px 0 0; padding: 30px 20px; 
             transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1); 
             z-index: 200;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
         }
         .color-sheet.open { bottom: 0; }
         
@@ -175,7 +187,6 @@
             display: grid; 
             grid-template-columns: repeat(5, 1fr); 
             gap: 15px; 
-            padding: 10px 0;
         }
 
         .color-dot { 
@@ -183,23 +194,16 @@
             border-radius: 15px; 
             cursor: pointer; 
             border: 3px solid transparent; 
-            transition: transform 0.2s;
         }
         .color-dot.active { border-color: #fff; transform: scale(1.1); }
-
-        .footer-tag { 
-            position: absolute; bottom: 40px; 
-            font-size: 0.85rem; color: #a8a8a8; 
-            display: flex; align-items: center; gap: 6px; 
-        }
     </style>
 </head>
-<body onclick="focusInput()">
+<body onload="keepKeyboardOpen()">
 
 <header>
     <div class="close-btn" onclick="vibrate(); history.back()">✕</div>
     <div class="color-wheel" onclick="vibrate(); toggleColors(event)"></div>
-    <div class="share-btn" id="share-btn" onclick="publishNote(event)">Share</div>
+    <button class="share-btn" id="share-btn" onclick="publishNote(event)">Share</button>
 </header>
 
 <div class="editor-space">
@@ -207,8 +211,11 @@
         <div class="note-bubble" id="preview-bubble">
             <span id="display-text">What's on your mind?</span>
             <div id="music-tag">
-                <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                <span id="song-name"></span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                   <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                   <span id="song-name"></span>
+                </div>
+                <span id="song-artist"></span>
             </div>
         </div>
         
@@ -223,10 +230,6 @@
         <div class="music-btn" onclick="vibrate(); pickMusic(event)">
             <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         </div>
-    </div>
-
-    <div class="footer-tag">
-        Share with friends <svg viewBox="0 0 24 24" style="width:14px; fill:#a8a8a8;"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
     </div>
 </div>
 
@@ -253,7 +256,19 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 2. Vibration Utility
+    // 2. Mobile Keyboard Management
+    function keepKeyboardOpen() {
+        const input = document.getElementById('note-input');
+        input.focus();
+        // Prevent keyboard from closing when tapping background
+        document.body.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && !e.target.closest('.color-sheet') && !e.target.closest('song-picker')) {
+                input.focus();
+            }
+        });
+    }
+
+    // 3. Vibration Utility
     function vibrate() {
         if (navigator.vibrate) navigator.vibrate(15); 
     }
@@ -301,7 +316,7 @@
     });
 
     function toggleColors(e) {
-        e.stopPropagation();
+        if(e) e.stopPropagation();
         document.getElementById('color-sheet').classList.toggle('open');
     }
 
@@ -317,32 +332,42 @@
     const shareBtn = document.getElementById('share-btn');
 
     input.oninput = () => {
-        display.innerText = input.value || "What's on your mind?";
-        shareBtn.classList.toggle('active', input.value.trim().length > 0);
+        display.innerText = input.value || (currentSongData ? "" : "What's on your mind?");
+        validateShare();
     };
 
-    function focusInput() { input.focus(); }
+    function validateShare() {
+        const hasText = input.value.trim().length > 0;
+        const hasSong = currentSongData !== null;
+        shareBtn.classList.toggle('active', hasText || hasSong);
+    }
 
     // Music Integration
     const picker = document.getElementById('music-picker');
-    function pickMusic(e) { e.stopPropagation(); picker.open(); }
+    function pickMusic(e) { 
+        e.stopPropagation(); 
+        picker.open(); 
+    }
 
     picker.addEventListener('song-selected', (e) => {
         vibrate();
         currentSongData = e.detail;
         document.getElementById('music-tag').style.display = 'flex';
         document.getElementById('song-name').innerText = currentSongData.trackName;
+        document.getElementById('song-artist').innerText = currentSongData.artistName;
+        if(input.value === "") display.innerText = "";
+        validateShare();
     });
 
     // Share & Save
     async function publishNote(e) {
-        e.stopPropagation();
+        if(e) e.stopPropagation();
         vibrate();
         const user = firebase.auth().currentUser;
-        if(!user || !input.value.trim()) return;
+        if(!user) return;
 
         shareBtn.innerText = "Sharing...";
-        shareBtn.style.opacity = "0.5";
+        shareBtn.disabled = true;
 
         const noteData = {
             uid: user.uid,
@@ -352,22 +377,21 @@
             songName: currentSongData?.trackName || null,
             songArtist: currentSongData?.artistName || null,
             songPreview: currentSongData?.previewUrl || null,
+            songArt: currentSongData?.artworkUrl100 || null,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         try {
             const batch = db.batch();
-            // Update Active Feed
             batch.set(db.collection("active_notes").doc(user.uid), noteData);
-            // Save to Personal History
             batch.set(db.collection("users").doc(user.uid).collection("notes_history").doc(), noteData);
             
             await batch.commit();
-            // Redirect back on success
             history.back();
         } catch (err) {
             console.error(err);
             shareBtn.innerText = "Error";
+            shareBtn.disabled = false;
         }
     }
 </script>
