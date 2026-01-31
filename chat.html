@@ -37,20 +37,28 @@
             -webkit-font-smoothing: antialiased;
         }
         
-        html, body {
-            /* FIX: Use Dynamic Viewport Height for mobile browsers */
+        /* --- CRITICAL WEBVIEW FULLSCREEN FIXES --- */
+        html {
             height: 100%;
-            height: 100dvh; 
             width: 100%;
             overflow: hidden;
-            background: var(--bg);
-            position: fixed; 
-            left: 0; top: 0;
-            margin: 0 !important;
-            padding: 0 !important;
+            background: var(--bg); /* Moved BG here to fill any potential gaps */
+            -webkit-text-size-adjust: 100%;
         }
 
-        body { 
+        body {
+            /* Force body to fill HTML completely */
+            height: 100%;
+            width: 100%;
+            position: fixed; /* Locks body in place */
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            background: transparent; /* Rely on html background */
             -webkit-user-select: none; user-select: none; 
             color: var(--text); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -86,15 +94,23 @@
         }
 
         .app-container { 
-            display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
+            display: flex; 
+            flex-direction: column; 
+            height: 100%; /* Uses inherited height */
+            width: 100%; 
+            position: absolute; 
+            top: 0; left: 0; 
+            overflow: hidden;
         }
 
         /* --- HEADER ABSOLUTE (WEBVIEW FIX) --- */
         header { 
-            position: absolute; /* Request: Absolute positioning */
+            position: absolute; 
             top: 0; left: 0; right: 0;
+            margin-top: 0 !important; /* Force no top margin */
             padding: 0 16px;
-            padding-top: calc(env(safe-area-inset-top) + 10px);
+            /* Safe Area Logic */
+            padding-top: max(10px, env(safe-area-inset-top)); 
             height: calc(60px + env(safe-area-inset-top));
             background: var(--header-bg); 
             border-bottom: 1px solid var(--border); 
@@ -127,7 +143,7 @@
             flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px 0; 
             display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
             background: transparent; overscroll-behavior-y: contain; position: relative;
-            /* PADDING TOP to clear absolute header */
+            /* PADDING TOP to clear absolute header - Using Max for safety */
             padding-top: calc(75px + env(safe-area-inset-top)); 
             
             /* Hide Scrollbar */
@@ -536,14 +552,27 @@
         document.getElementById('reaction-picker-modal').style.display = 'none';
     }
 
+    // --- WEBVIEW RESIZE HANDLER FIXED ---
+    function resizeApp() {
+        // Force the app container to match the window innerHeight explicitly
+        // This overrides WebView behaviors where 100vh includes obscured areas
+        const height = window.innerHeight;
+        document.body.style.height = height + 'px';
+        document.getElementById('main-app').style.height = height + 'px';
+        // Force scroll to top to prevent "hanging" views
+        window.scrollTo(0, 0);
+    }
+
+    window.addEventListener('resize', resizeApp);
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-            const viewportHeight = window.visualViewport.height;
-            document.getElementById('main-app').style.height = viewportHeight + 'px';
-            document.body.style.top = '0px'; // FIX: Force top to 0 to prevent gap
-            scrollToBottom();
+           resizeApp();
+           scrollToBottom();
         });
     }
+    // Call once on init
+    resizeApp();
+
 
     function vibrate(ms = 50) { if (navigator.vibrate) navigator.vibrate(ms); }
 
