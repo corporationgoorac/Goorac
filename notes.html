@@ -386,26 +386,7 @@
         validateShare();
     });
 
-    // Helper to get mutual followers
-    async function getMutualFollowers(uid) {
-        // 1. Get people I follow
-        const followingSnap = await db.collection("users").doc(uid).collection("following").get();
-        const followingIds = followingSnap.docs.map(doc => doc.id);
-        
-        if (followingIds.length === 0) return [];
-
-        // 2. Check which of those people also follow me
-        const mutuals = [];
-        for (const targetUid of followingIds) {
-            const check = await db.collection("users").doc(targetUid).collection("following").doc(uid).get();
-            if (check.exists) {
-                mutuals.push(targetUid);
-            }
-        }
-        return mutuals;
-    }
-
-    // Share & Save (Updated for Mutual Followers and 24hr Expiry)
+    // Share & Save (Updated with Time and Likes)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
@@ -419,30 +400,25 @@
         shareBtn.disabled = true;
 
         const now = new Date();
-        const expiryDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 Hours from now
+
+        const noteData = {
+            uid: user.uid,
+            text: input.value.trim(),
+            bgColor: currentTheme.bg,
+            textColor: currentTheme.text,
+            songName: currentSongData?.trackName || null,
+            songArtist: currentSongData?.artistName || null,
+            songPreview: currentSongData?.previewUrl || null,
+            songArt: currentSongData?.artworkUrl100 || null,
+            // New Fields for Time and Likes
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dateString: now.toDateString(), 
+            timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            likes: [],      // Array to store UIDs of likers
+            likeCount: 0    // Counter for easy display
+        };
 
         try {
-            // Get mutual followers list for visibility targeting
-            const mutualIds = await getMutualFollowers(user.uid);
-            
-            const noteData = {
-                uid: user.uid,
-                text: input.value.trim(),
-                bgColor: currentTheme.bg,
-                textColor: currentTheme.text,
-                songName: currentSongData?.trackName || null,
-                songArtist: currentSongData?.artistName || null,
-                songPreview: currentSongData?.previewUrl || null,
-                songArt: currentSongData?.artworkUrl100 || null,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                expiresAt: firebase.Timestamp.fromDate(expiryDate), // Field for auto-delete logic
-                dateString: now.toDateString(), 
-                timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                likes: [],      
-                likeCount: 0,
-                visibleTo: [...mutualIds, user.uid] // Only mutuals and the owner can see
-            };
-
             const batch = db.batch();
             
             // 1. Main active notes feed
