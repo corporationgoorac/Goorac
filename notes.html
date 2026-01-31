@@ -17,13 +17,14 @@
             --sheet-bg: #1c1c1e;
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; outline: none; }
         
         body { 
             background: var(--bg); 
             color: #fff; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            height: 100vh; 
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic viewport height for mobile */
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
@@ -37,6 +38,7 @@
             align-items: center;
             padding-top: env(safe-area-inset-top, 15px); 
             z-index: 100;
+            flex-shrink: 0; /* Prevent header from shrinking */
         }
 
         .close-btn { font-size: 26px; font-weight: 300; cursor: pointer; padding: 5px; }
@@ -62,6 +64,7 @@
             pointer-events: none; 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             margin-right: 5px;
+            border: none;
         }
         .share-btn.active { opacity: 1; pointer-events: auto; }
 
@@ -72,7 +75,8 @@
             flex-direction: column; 
             align-items: center; 
             justify-content: center; 
-            margin-top: -40px;
+            position: relative;
+            padding-bottom: 10vh; /* Visual balance */
         }
 
         .thought-wrapper { 
@@ -80,6 +84,10 @@
             flex-direction: column; 
             align-items: center; 
             width: 100%; 
+            position: relative;
+            z-index: 5;
+            /* Added gap for better alignment between bubble and PFP */
+            gap: 15px; 
         }
 
         /* The Instagram-Style Bubble */
@@ -87,14 +95,20 @@
             background: var(--bubble-bg); 
             padding: 14px 22px; 
             border-radius: 26px;
-            min-width: 140px; 
-            max-width: 260px; 
+            min-width: 100px; /* Reduced min-width */
+            max-width: 80%; /* Responsive width */
             text-align: center; 
             position: relative;
-            margin-bottom: 18px; 
             transition: all 0.3s ease;
             box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             z-index: 2;
+            /* Animation for appearance */
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
 
         /* Bubble Tails */
@@ -103,7 +117,7 @@
             width: 14px; height: 14px; background: inherit; border-radius: 50%;
         }
         .note-bubble::before {
-            content: ''; position: absolute; bottom: -18px; left: 42%;
+            content: ''; position: absolute; bottom: -18px; left: 45%;
             width: 7px; height: 7px; background: inherit; border-radius: 50%; opacity: 0.5;
         }
 
@@ -112,10 +126,11 @@
             font-weight: 500;
             line-height: 1.4; 
             display: -webkit-box;
-            -webkit-line-clamp: 4; /* Max 4 lines */
+            -webkit-line-clamp: 4; 
             -webkit-box-orient: vertical;
             overflow: hidden;
             word-wrap: break-word; 
+            min-height: 1.4em; /* Ensure height even when empty */
         }
         
         #music-tag {
@@ -137,17 +152,18 @@
         #song-artist { opacity: 0.8; font-size: 0.7rem; }
 
         .pfp-container {
-            width: 110px; 
-            height: 110px; 
+            width: 90px; /* Slightly adjusted size for better proportion */
+            height: 90px; 
             border-radius: 50%; 
-            border: 3px solid #000;
+            border: 3px solid #111;
             overflow: hidden; 
             background: #111;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            flex-shrink: 0;
         }
         .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Input Trigger */
+        /* Input Trigger - Adjusted to sit directly over the bubble area */
         #note-input { 
             position: absolute; 
             opacity: 0; 
@@ -155,11 +171,12 @@
             height: 100%; 
             top: 0; 
             left: 0;
-            z-index: 5;
+            z-index: 10;
+            cursor: text;
         }
 
         /* Tool Area */
-        .tools { margin-top: 35px; z-index: 10; }
+        .tools { margin-top: 25px; z-index: 10; }
         .music-btn {
             width: 50px; 
             height: 50px; 
@@ -170,6 +187,7 @@
             justify-content: center; 
             border: 1px solid #333;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
         }
         .music-btn svg { width: 22px; height: 22px; fill: #ff0050; }
 
@@ -180,6 +198,7 @@
             border-radius: 25px 25px 0 0; padding: 30px 20px; 
             transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1); 
             z-index: 200;
+            padding-bottom: max(30px, env(safe-area-inset-bottom));
         }
         .color-sheet.open { bottom: 0; }
         
@@ -198,7 +217,7 @@
         .color-dot.active { border-color: #fff; transform: scale(1.1); }
     </style>
 </head>
-<body onload="keepKeyboardOpen()">
+<body>
 
 <header>
     <div class="close-btn" onclick="vibrate(); history.back()">✕</div>
@@ -207,7 +226,7 @@
 </header>
 
 <div class="editor-space">
-    <div class="thought-wrapper">
+    <div class="thought-wrapper" onclick="focusInput()">
         <div class="note-bubble" id="preview-bubble">
             <span id="display-text">What's on your mind?</span>
             <div id="music-tag">
@@ -223,7 +242,7 @@
             <img id="user-pfp" src="https://via.placeholder.com/110" alt="Profile">
         </div>
 
-        <input type="text" id="note-input" maxlength="60" autofocus autocomplete="off">
+        <input type="text" id="note-input" maxlength="60" autocomplete="off" autofocus>
     </div>
 
     <div class="tools">
@@ -236,7 +255,7 @@
 <div class="color-sheet" id="color-sheet">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
         <span style="font-size:1.1rem; font-weight:700;">Bubble Color</span>
-        <div onclick="vibrate(); toggleColors(event)" style="background:#333; padding:8px 16px; border-radius:20px; font-size:0.9rem; font-weight:600;">Done</div>
+        <div onclick="vibrate(); toggleColors(event)" style="background:#333; padding:8px 16px; border-radius:20px; font-size:0.9rem; font-weight:600; cursor:pointer;">Done</div>
     </div>
     <div class="color-grid" id="palette"></div>
 </div>
@@ -256,27 +275,19 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 2. Mobile Keyboard Management
-    function keepKeyboardOpen() {
-        const input = document.getElementById('note-input');
+    // 2. Mobile Keyboard Management (Fixed)
+    const input = document.getElementById('note-input');
+    
+    function focusInput() {
         input.focus();
-        
-        // Ensure keyboard doesn't close on accidental taps
-        document.body.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON' && !e.target.closest('.color-sheet') && !e.target.closest('song-picker') && !e.target.closest('.color-wheel') && !e.target.closest('.music-btn')) {
-                input.focus();
-            }
-        });
-
-        // Set interval to catch edge cases where focus is lost
-        setInterval(() => {
-            const sheetOpen = document.getElementById('color-sheet').classList.contains('open');
-            const pickerOpen = document.getElementById('music-picker').getAttribute('open') !== null;
-            if (document.activeElement !== input && !sheetOpen && !pickerOpen) {
-                input.focus();
-            }
-        }, 1000);
     }
+
+    // Automatically focus on load (Standard method, better for mobile)
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            input.focus();
+        }, 100);
+    });
 
     // 3. Vibration Utility
     function vibrate() {
@@ -302,9 +313,13 @@
     // Load User Profile
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            const userDoc = await db.collection("users").doc(user.uid).get();
-            const pfp = userDoc.exists ? userDoc.data().photoURL : user.photoURL;
-            if(pfp) document.getElementById('user-pfp').src = pfp;
+            try {
+                const userDoc = await db.collection("users").doc(user.uid).get();
+                const pfp = userDoc.exists && userDoc.data().photoURL ? userDoc.data().photoURL : user.photoURL;
+                if(pfp) document.getElementById('user-pfp').src = pfp;
+            } catch(e) {
+                console.log("Error loading PFP", e);
+            }
         }
     });
 
@@ -337,7 +352,6 @@
     }
 
     // Input Management
-    const input = document.getElementById('note-input');
     const display = document.getElementById('display-text');
     const shareBtn = document.getElementById('share-btn');
 
@@ -372,15 +386,20 @@
         validateShare();
     });
 
-    // Share & Save
+    // Share & Save (Updated with Time and Likes)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
         const user = firebase.auth().currentUser;
-        if(!user) return;
+        if(!user) {
+            alert("You need to be logged in to share.");
+            return;
+        }
 
         shareBtn.innerText = "Sharing...";
         shareBtn.disabled = true;
+
+        const now = new Date();
 
         const noteData = {
             uid: user.uid,
@@ -391,13 +410,24 @@
             songArtist: currentSongData?.artistName || null,
             songPreview: currentSongData?.previewUrl || null,
             songArt: currentSongData?.artworkUrl100 || null,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            // New Fields for Time and Likes
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dateString: now.toDateString(), 
+            timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            likes: [],      // Array to store UIDs of likers
+            likeCount: 0    // Counter for easy display
         };
 
         try {
             const batch = db.batch();
-            batch.set(db.collection("active_notes").doc(user.uid), noteData);
-            batch.set(db.collection("users").doc(user.uid).collection("notes_history").doc(), noteData);
+            
+            // 1. Main active notes feed
+            const activeNoteRef = db.collection("active_notes").doc(user.uid);
+            batch.set(activeNoteRef, noteData);
+            
+            // 2. User's personal history
+            const historyRef = db.collection("users").doc(user.uid).collection("notes_history").doc();
+            batch.set(historyRef, noteData);
             
             await batch.commit();
             history.back();
