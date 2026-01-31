@@ -1,205 +1,375 @@
-<style>
-    :root { 
-        --bg: #000; 
-        --accent: #0095f6; 
-        --border: #262626; 
-        --bubble-bg: #262626;
-    }
-    
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-    
-    body { 
-        background: var(--bg); 
-        color: #fff; 
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-        height: 100vh; 
-        display: flex; 
-        flex-direction: column; 
-        overflow: hidden; 
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Goorac | Share Note</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="components/songPicker.js"></script>
 
-    /* Header Styling */
-    header { 
-        padding: 15px 20px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-        z-index: 10;
-        padding-top: env(safe-area-inset-top, 15px);
-    }
-    .close-btn { font-size: 28px; font-weight: 300; cursor: pointer; }
-    .share-btn { 
-        background: #385185; 
-        color: white; 
-        padding: 8px 20px; 
-        border-radius: 20px; 
-        font-weight: 600; 
-        font-size: 0.9rem;
-        opacity: 0.5; 
-        pointer-events: none; 
-        transition: 0.2s;
-    }
-    .share-btn.active { 
-        background: #0095f6;
-        opacity: 1; 
-        pointer-events: auto; 
-    }
+    <style>
+        :root { 
+            --bg: #000; 
+            --accent: #4c68d7; 
+            --bubble-bg: #262626; 
+            --sheet-bg: #1c1c1e;
+        }
 
-    /* Centered Editor Space */
-    .editor-space { 
-        flex: 1; 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-        position: relative;
-    }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+        
+        body { 
+            background: var(--bg); 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
 
-    .note-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        position: relative;
-        width: 100%;
-    }
+        /* Top Navigation */
+        header { 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding-top: env(safe-area-inset-top, 15px); 
+            z-index: 100;
+        }
 
-    /* The Instagram Note Bubble */
-    .note-bubble-preview {
-        background: var(--bubble-bg);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 22px;
-        min-width: 140px;
-        max-width: 220px;
-        text-align: center;
-        position: relative;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        z-index: 2;
-        transition: background 0.3s;
-    }
+        .close-btn { font-size: 26px; font-weight: 300; cursor: pointer; padding: 5px; }
+        
+        .color-wheel { 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            cursor: pointer;
+            background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+            border: 2px solid #000;
+            box-shadow: 0 0 12px rgba(255,255,255,0.1);
+            transition: transform 0.2s active;
+        }
 
-    /* Tail dots for the bubble */
-    .note-bubble-preview::after {
-        content: ''; position: absolute; bottom: -8px; left: 50%;
-        transform: translateX(-50%); width: 14px; height: 14px;
-        background: inherit; border-radius: 50%;
-    }
-    .note-bubble-preview::before {
-        content: ''; position: absolute; bottom: -18px; left: 45%;
-        width: 7px; height: 7px; background: inherit;
-        border-radius: 50%; opacity: 0.7;
-    }
+        .share-btn { 
+            background: var(--accent); 
+            color: #fff; 
+            padding: 8px 22px; 
+            border-radius: 25px;
+            font-weight: 600; 
+            font-size: 0.95rem; 
+            opacity: 0.4; 
+            pointer-events: none; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .share-btn.active { opacity: 1; pointer-events: auto; transform: scale(1.05); }
 
-    #display-text { font-size: 1rem; display: block; word-wrap: break-word; line-height: 1.3; }
+        /* Creative Canvas */
+        .editor-space { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            margin-top: -40px;
+        }
 
-    #music-tag {
-        display: flex; align-items: center; justify-content: center;
-        gap: 5px; font-size: 0.8rem; font-weight: 600; margin-top: 6px;
-        color: #a8a8a8;
-    }
+        .thought-wrapper { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            width: 100%; 
+        }
 
-    /* Profile Circle */
-    .profile-circle {
-        width: 110px; height: 110px; border-radius: 50%;
-        background: #1c1c1c; border: 2px solid #000;
-        overflow: hidden; position: relative;
-    }
-    .profile-circle img { width: 100%; height: 100%; object-fit: cover; }
+        /* The Instagram-Style Bubble */
+        .note-bubble {
+            background: var(--bubble-bg); 
+            padding: 14px 22px; 
+            border-radius: 26px;
+            min-width: 120px; 
+            max-width: 240px; 
+            text-align: center; 
+            position: relative;
+            margin-bottom: 18px; 
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
 
-    /* Hidden Input Overlay */
-    #note-input {
-        position: absolute; top: 0; left: 0; width: 100%; height: 50%;
-        opacity: 0; z-index: 5;
-    }
+        /* Bubble Tails */
+        .note-bubble::after {
+            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+            width: 14px; height: 14px; background: inherit; border-radius: 50%;
+        }
+        .note-bubble::before {
+            content: ''; position: absolute; bottom: -18px; left: 42%;
+            width: 7px; height: 7px; background: inherit; border-radius: 50%; opacity: 0.5;
+        }
 
-    /* Tools Area */
-    .tools-container {
-        display: flex; gap: 20px; margin-top: 25px;
-    }
+        #display-text { 
+            font-size: 1rem; 
+            font-weight: 500;
+            line-height: 1.4; 
+            display: block; 
+            word-wrap: break-word; 
+        }
+        
+        #music-tag {
+            display: none; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 5px;
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            margin-top: 8px; 
+            opacity: 0.9;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+        }
 
-    .tool-btn {
-        width: 44px; height: 44px; border-radius: 50%;
-        border: 1px solid #333; display: flex;
-        align-items: center; justify-content: center;
-        cursor: pointer; transition: 0.2s;
-    }
-    .tool-btn:active { transform: scale(0.9); }
-    .tool-btn svg { width: 20px; height: 20px; fill: #ff0050; }
+        .pfp-container {
+            width: 110px; 
+            height: 110px; 
+            border-radius: 50%; 
+            border: 3px solid #000;
+            overflow: hidden; 
+            background: #111;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-    /* Bottom Info */
-    .footer-info {
-        padding: 20px; text-align: center; color: #a8a8a8;
-        font-size: 0.85rem; display: flex; align-items: center;
-        justify-content: center; gap: 5px;
-    }
-</style>
+        /* Hidden Input Trigger */
+        #note-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 
-<body>
-    <header>
-        <div class="close-btn" onclick="history.back()">✕</div>
-        <div class="rainbow-orb" style="width:28px; height:28px; background: radial-gradient(circle, #f09433, #e6683c, #dc2743, #bc1888); border-radius:50%;"></div>
-        <div class="share-btn" id="share-btn" onclick="publishNote()">Share</div>
-    </header>
+        /* Tool Area */
+        .tools { margin-top: 35px; }
+        .music-btn {
+            width: 50px; 
+            height: 50px; 
+            border-radius: 50%; 
+            background: #1c1c1e;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 1px solid #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .music-btn:active { transform: scale(0.9); }
+        .music-btn svg { width: 22px; height: 22px; fill: #ff0050; }
 
-    <div class="editor-space" onclick="document.getElementById('note-input').focus()">
-        <div class="note-container">
-            <div class="note-bubble-preview" id="preview-bubble">
-                <span id="display-text">New day, new note...</span>
-                <div id="music-tag" style="display:none;">
-                    <svg viewBox="0 0 24 24" style="width:14px; fill:#a8a8a8;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                    <span id="song-name"></span>
-                </div>
+        /* Color Selection Bottom Sheet */
+        .color-sheet {
+            position: fixed; bottom: -100%; left: 0; width: 100%; 
+            background: var(--sheet-bg);
+            border-radius: 25px 25px 0 0; padding: 30px 20px; 
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1); 
+            z-index: 200;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+        }
+        .color-sheet.open { bottom: 0; }
+        
+        .color-grid { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 15px; 
+            padding: 10px 0;
+        }
+
+        .color-dot { 
+            aspect-ratio: 1/1;
+            border-radius: 15px; 
+            cursor: pointer; 
+            border: 3px solid transparent; 
+            transition: transform 0.2s;
+        }
+        .color-dot.active { border-color: #fff; transform: scale(1.1); }
+
+        .footer-tag { 
+            position: absolute; bottom: 40px; 
+            font-size: 0.85rem; color: #a8a8a8; 
+            display: flex; align-items: center; gap: 6px; 
+        }
+    </style>
+</head>
+<body onclick="focusInput()">
+
+<header>
+    <div class="close-btn" onclick="vibrate(); history.back()">✕</div>
+    <div class="color-wheel" onclick="vibrate(); toggleColors(event)"></div>
+    <div class="share-btn" id="share-btn" onclick="publishNote(event)">Share</div>
+</header>
+
+<div class="editor-space">
+    <div class="thought-wrapper">
+        <div class="note-bubble" id="preview-bubble">
+            <span id="display-text">What's on your mind?</span>
+            <div id="music-tag">
+                <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                <span id="song-name"></span>
             </div>
-            
-            <div class="profile-circle">
-                <img id="user-pfp" src="https://via.placeholder.com/110" alt="Profile">
-            </div>
-
-            <input type="text" id="note-input" maxlength="60" autofocus>
+        </div>
+        
+        <div class="pfp-container">
+            <img id="user-pfp" src="https://via.placeholder.com/110" alt="Profile">
         </div>
 
-        <div class="tools-container">
-            <div class="tool-btn" onclick="pickMusic()">
-                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-            </div>
-            <div class="tool-btn">
-                <svg viewBox="0 0 24 24" style="fill:#a43ff2;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            </div>
+        <input type="text" id="note-input" maxlength="60" autofocus autocomplete="off">
+    </div>
+
+    <div class="tools">
+        <div class="music-btn" onclick="vibrate(); pickMusic(event)">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         </div>
     </div>
 
-    <div class="footer-info">
-        <svg viewBox="0 0 24 24" style="width:16px; fill:#a8a8a8;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
-        <span>Share with followers you follow back</span>
+    <div class="footer-tag">
+        Share with friends <svg viewBox="0 0 24 24" style="width:14px; fill:#a8a8a8;"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
     </div>
+</div>
 
-    <song-picker id="music-picker"></song-picker>
+<div class="color-sheet" id="color-sheet">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+        <span style="font-size:1.1rem; font-weight:700;">Bubble Color</span>
+        <div onclick="vibrate(); toggleColors(event)" style="background:#333; padding:8px 16px; border-radius:20px; font-size:0.9rem; font-weight:600;">Done</div>
+    </div>
+    <div class="color-grid" id="palette"></div>
+</div>
 
-    <script>
-        // Use your existing Firebase logic here
-        // Update user profile picture on load
-        firebase.auth().onAuthStateChanged(user => {
-            if(user && user.photoURL) document.getElementById('user-pfp').src = user.photoURL;
-        });
+<song-picker id="music-picker"></song-picker>
 
-        const input = document.getElementById('note-input');
-        const display = document.getElementById('display-text');
-        const shareBtn = document.getElementById('share-btn');
+<script>
+    // 1. Firebase Logic
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-        input.oninput = () => {
-            display.innerText = input.value || "New day, new note...";
-            shareBtn.classList.toggle('active', input.value.trim().length > 0);
+    // 2. Vibration Utility
+    function vibrate() {
+        if (navigator.vibrate) navigator.vibrate(15); 
+    }
+
+    const themes = [
+        {bg: '#262626', text: '#ffffff'},
+        {bg: '#ffffff', text: '#000000'},
+        {bg: '#ff3b30', text: '#ffffff'},
+        {bg: '#007aff', text: '#ffffff'},
+        {bg: '#34c759', text: '#ffffff'},
+        {bg: '#af52de', text: '#ffffff'},
+        {bg: '#ffcc00', text: '#000000'},
+        {bg: '#ff9500', text: '#ffffff'},
+        {bg: '#5856d6', text: '#ffffff'},
+        {bg: '#8e8e93', text: '#ffffff'}
+    ];
+
+    let currentTheme = themes[0];
+    let currentSongData = null;
+
+    // Load User Profile
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const userDoc = await db.collection("users").doc(user.uid).get();
+            const pfp = userDoc.exists ? userDoc.data().photoURL : user.photoURL;
+            if(pfp) document.getElementById('user-pfp').src = pfp;
+        }
+    });
+
+    // Build Palette
+    const palette = document.getElementById('palette');
+    themes.forEach((t, i) => {
+        const dot = document.createElement('div');
+        dot.className = `color-dot ${i===0?'active':''}`;
+        dot.style.background = t.bg;
+        dot.onclick = (e) => {
+            e.stopPropagation();
+            vibrate();
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            dot.classList.add('active');
+            currentTheme = t;
+            updatePreview();
         };
-        
-        // Music Picker Integration
-        const picker = document.getElementById('music-picker');
-        function pickMusic() { picker.open(); }
-        
-        picker.addEventListener('song-selected', (e) => {
-            const song = e.detail;
-            document.getElementById('music-tag').style.display = 'flex';
-            document.getElementById('song-name').innerText = song.trackName;
-        });
-    </script>
+        palette.appendChild(dot);
+    });
+
+    function toggleColors(e) {
+        e.stopPropagation();
+        document.getElementById('color-sheet').classList.toggle('open');
+    }
+
+    function updatePreview() {
+        const b = document.getElementById('preview-bubble');
+        b.style.background = currentTheme.bg;
+        b.style.color = currentTheme.text;
+    }
+
+    // Input Management
+    const input = document.getElementById('note-input');
+    const display = document.getElementById('display-text');
+    const shareBtn = document.getElementById('share-btn');
+
+    input.oninput = () => {
+        display.innerText = input.value || "What's on your mind?";
+        shareBtn.classList.toggle('active', input.value.trim().length > 0);
+    };
+
+    function focusInput() { input.focus(); }
+
+    // Music Integration
+    const picker = document.getElementById('music-picker');
+    function pickMusic(e) { e.stopPropagation(); picker.open(); }
+
+    picker.addEventListener('song-selected', (e) => {
+        vibrate();
+        currentSongData = e.detail;
+        document.getElementById('music-tag').style.display = 'flex';
+        document.getElementById('song-name').innerText = currentSongData.trackName;
+    });
+
+    // Share & Save
+    async function publishNote(e) {
+        e.stopPropagation();
+        vibrate();
+        const user = firebase.auth().currentUser;
+        if(!user || !input.value.trim()) return;
+
+        shareBtn.innerText = "Sharing...";
+        shareBtn.style.opacity = "0.5";
+
+        const noteData = {
+            uid: user.uid,
+            text: input.value.trim(),
+            bgColor: currentTheme.bg,
+            textColor: currentTheme.text,
+            songName: currentSongData?.trackName || null,
+            songArtist: currentSongData?.artistName || null,
+            songPreview: currentSongData?.previewUrl || null,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            const batch = db.batch();
+            // Update Active Feed
+            batch.set(db.collection("active_notes").doc(user.uid), noteData);
+            // Save to Personal History
+            batch.set(db.collection("users").doc(user.uid).collection("notes_history").doc(), noteData);
+            
+            await batch.commit();
+            // Redirect back on success
+            history.back();
+        } catch (err) {
+            console.error(err);
+            shareBtn.innerText = "Error";
+        }
+    }
+</script>
 </body>
+</html>
