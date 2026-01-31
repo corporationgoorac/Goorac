@@ -386,7 +386,7 @@
         validateShare();
     });
 
-    // Share & Save (Updated with Time and Likes)
+    // Share & Save (Updated for Mutual Friends and Database PFPs)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
@@ -399,26 +399,40 @@
         shareBtn.innerText = "Sharing...";
         shareBtn.disabled = true;
 
-        const now = new Date();
-
-        const noteData = {
-            uid: user.uid,
-            text: input.value.trim(),
-            bgColor: currentTheme.bg,
-            textColor: currentTheme.text,
-            songName: currentSongData?.trackName || null,
-            songArtist: currentSongData?.artistName || null,
-            songPreview: currentSongData?.previewUrl || null,
-            songArt: currentSongData?.artworkUrl100 || null,
-            // New Fields for Time and Likes
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dateString: now.toDateString(), 
-            timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            likes: [],      // Array to store UIDs of likers
-            likeCount: 0    // Counter for easy display
-        };
-
         try {
+            // Fetch current user's data for Mutual Friend Logic
+            const userDoc = await db.collection("users").doc(user.uid).get();
+            const userData = userDoc.data() || {};
+            const myFollowing = userData.following || [];
+            const myFollowers = userData.followers || [];
+            
+            // Define Mutual Friends: People I follow who ALSO follow me
+            const mutualFriends = myFollowing.filter(uid => myFollowers.includes(uid));
+            
+            const now = new Date();
+            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24-hour expiry
+
+            const noteData = {
+                uid: user.uid,
+                username: userData.username || user.displayName || "User",
+                pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150', // Use database PFP URL
+                text: input.value.trim(),
+                bgColor: currentTheme.bg,
+                textColor: currentTheme.text,
+                songName: currentSongData?.trackName || null,
+                songArtist: currentSongData?.artistName || null,
+                songPreview: currentSongData?.previewUrl || null,
+                songArt: currentSongData?.artworkUrl100 || null,
+                // SECURITY: Only people in this array can query/see this note
+                visibleTo: mutualFriends, 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
+                dateString: now.toDateString(), 
+                timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                likes: [],      
+                likeCount: 0    
+            };
+
             const batch = db.batch();
             
             // 1. Main active notes feed
