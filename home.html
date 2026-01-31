@@ -12,6 +12,7 @@
 
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
+    <script src="components/viewNotes.js" defer></script>
 
     <style>
         :root {
@@ -81,8 +82,65 @@
             box-shadow: 0 0 10px var(--accent);
         }
 
+        /* --- NOTES UI SECTION --- */
+        .notes-wrapper {
+            padding: 15px 0 5px 0;
+            overflow-x: auto;
+            display: flex;
+            gap: 15px;
+            padding-left: 20px;
+            scrollbar-width: none;
+        }
+        .notes-wrapper::-webkit-scrollbar { display: none; }
+
+        .note-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 75px;
+            position: relative;
+        }
+
+        .note-bubble {
+            position: absolute;
+            top: -10px;
+            background: #262626;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 10px;
+            max-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid var(--border);
+            z-index: 2;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .note-pfp {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            padding: 2px;
+            border: 2px solid var(--border);
+            object-fit: cover;
+        }
+        .note-item.has-note .note-pfp { border-color: var(--accent); }
+
+        .note-username {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+            text-align: center;
+            width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* ------------------------ */
+
         .content { 
-            padding: 24px 20px; 
+            padding: 10px 20px; 
             max-width: 500px; 
             margin: 0 auto; 
         }
@@ -263,6 +321,14 @@
     <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
 </header>
 
+<div class="notes-wrapper" id="notes-container">
+    <div class="note-item" id="my-note-btn">
+        <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
+        <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
+        <span class="note-username">Your Note</span>
+    </div>
+    </div>
+
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
     
@@ -298,6 +364,7 @@
 
 <main-navbar></main-navbar>
 <call-notifier></call-notifier>
+<view-notes id="note-viewer"></view-notes>
 
 <script>
     const firebaseConfig = {
@@ -313,8 +380,8 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const prog = document.getElementById('progress-bar');
+    const viewer = document.getElementById('note-viewer');
 
-    // Professional Time Formatter
     function formatTime(timestamp) {
         if (!timestamp) return "";
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -341,6 +408,7 @@
             if (doc.exists) {
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
+                initNotesSystem(user);
             } else { window.location.href = "setup.html"; }
         } else { window.location.href = "login.html"; }
     });
@@ -358,26 +426,71 @@
         
         pfpEl.classList.remove('skeleton');
         pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
+
+        // Update Note PFP
+        document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
         
         prog.style.width = '100%';
         setTimeout(() => prog.style.opacity = '0', 400);
     }
 
+    // --- NOTES SYSTEM LOGIC ---
+    function initNotesSystem(user) {
+        // 1. My Note Logic
+        db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
+            const btn = document.getElementById('my-note-btn');
+            const preview = document.getElementById('my-note-preview');
+            const data = doc.exists ? doc.data() : null;
+
+            if(data) {
+                preview.style.display = 'block';
+                preview.innerText = data.text;
+                btn.classList.add('has-note');
+            } else {
+                preview.style.display = 'none';
+                btn.classList.remove('has-note');
+            }
+
+            btn.onclick = () => {
+                // If data is null, open() will redirect to notes.html automatically
+                viewer.open(data, true);
+            };
+        });
+
+        // 2. Friends Notes Logic
+        db.collection("active_notes")
+          .where("uid", "!=", user.uid)
+          .onSnapshot(snap => {
+              const container = document.getElementById('notes-container');
+              // Remove old friend nodes
+              const friendNodes = container.querySelectorAll('.friend-note');
+              friendNodes.forEach(n => n.remove());
+
+              snap.forEach(doc => {
+                  const note = doc.data();
+                  const div = document.createElement('div');
+                  div.className = 'note-item friend-note has-note';
+                  div.innerHTML = `
+                      <div class="note-bubble" style="background:${note.bgColor}; color:${note.textColor}">${note.text}</div>
+                      <img src="${note.pfp}" class="note-pfp">
+                      <span class="note-username">${note.username.split(' ')[0]}</span>
+                  `;
+                  div.onclick = () => viewer.open(note, false);
+                  container.appendChild(div);
+              });
+          });
+    }
+
     function startLiveCounters(uid) {
-        // 1. MESSAGES LOGIC
         db.collection("chats")
           .where("participants", "array-contains", uid)
           .orderBy("lastTimestamp", "desc")
           .onSnapshot(snap => {
               let latestUnreadChat = null;
-              
               for (const doc of snap.docs) {
                   const d = doc.data();
                   const isUnread = (d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0);
-                  if (isUnread) {
-                      latestUnreadChat = d;
-                      break; 
-                  }
+                  if (isUnread) { latestUnreadChat = d; break; }
               }
 
               const header = document.getElementById('msg-header');
@@ -391,10 +504,7 @@
                   subtext.innerText = "From " + (latestUnreadChat.lastSenderName || "User");
                   time.innerText = formatTime(latestUnreadChat.lastTimestamp);
                   card.classList.add('has-count');
-                  
-                  if (latestUnreadChat.lastSenderPfp) {
-                      pfpArea.innerHTML = `<img src="${latestUnreadChat.lastSenderPfp}">`;
-                  }
+                  if (latestUnreadChat.lastSenderPfp) pfpArea.innerHTML = `<img src="${latestUnreadChat.lastSenderPfp}">`;
               } else {
                   header.innerText = "Recent";
                   subtext.innerText = "History";
@@ -404,7 +514,6 @@
               }
           });
 
-        // 2. CALLS LOGIC
         db.collection("call_logs")
           .where("participants", "array-contains", uid)
           .orderBy("timestamp", "desc")
@@ -425,9 +534,7 @@
                       el.innerText = "Missed";
                       label.innerText = call.callerName || "Recent Call";
                       card.classList.add('missed-alert');
-                      if (call.callerPfp) {
-                          pfpArea.innerHTML = `<img src="${call.callerPfp}">`;
-                      }
+                      if (call.callerPfp) pfpArea.innerHTML = `<img src="${call.callerPfp}">`;
                   } else {
                       el.innerText = "Log";
                       label.innerText = "History";
