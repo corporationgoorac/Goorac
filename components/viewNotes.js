@@ -256,6 +256,7 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(initialNoteData, isOwnNote = false) {
+        // FAST OPEN: Clear logic then render immediately with passed data
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -265,27 +266,10 @@ class ViewNotes extends HTMLElement {
         this.currentNote = initialNoteData;
         this.currentUserProfile = null; 
         
-        const overlay = this.querySelector('#vn-overlay');
-        const content = this.querySelector('#vn-content');
-
-        if (initialNoteData && initialNoteData.songPreview) {
-            this.audioPlayer.src = initialNoteData.songPreview;
-            this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
-        }
-
-        try {
-            if(initialNoteData && initialNoteData.uid) {
-                const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
-                if (userDoc.exists) {
-                    this.currentUserProfile = userDoc.data();
-                }
-            }
-        } catch (err) {
-            console.error("Error fetching user profile:", err);
-        }
-
+        // RENDER IMMEDIATELY (Prevents lag)
         this.renderContent();
-            
+
+        const overlay = this.querySelector('#vn-overlay');
         overlay.classList.add('open');
         window.history.pushState({ vnOpen: true }, "", "#view-note");
         if(navigator.vibrate) navigator.vibrate(15);
@@ -293,6 +277,28 @@ class ViewNotes extends HTMLElement {
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
+        // Play Audio if exists
+        if (initialNoteData && initialNoteData.songPreview) {
+            this.audioPlayer.src = initialNoteData.songPreview;
+            this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
+        }
+
+        // BACKGROUND FETCH: Update profile data if needed
+        if(initialNoteData && initialNoteData.uid) {
+            this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
+                if(doc.exists) {
+                    this.currentUserProfile = doc.data();
+                    // Re-render header part if you want deeply fresh data, 
+                    // but usually renderContent logic below handles the header using currentUserProfile
+                    // For smoothness, we might skip re-rendering entire body to avoid flicker,
+                    // or just update specific DOM elements. 
+                    // For now, re-render is safe as it's fast.
+                    this.renderContent(); 
+                }
+            });
+        }
+
+        // REAL-TIME LISTENER
         if (initialNoteData && initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
@@ -464,7 +470,7 @@ class ViewNotes extends HTMLElement {
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
                 try {
                     if (!isCurrentlyLiked) {
-                        // FETCH REAL DB USER DATA BEFORE LIKING
+                        // FETCH REAL DB USER DATA BEFORE LIKING (UPDATED)
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
@@ -565,7 +571,7 @@ class ViewNotes extends HTMLElement {
                 lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid],
-                seen: false, 
+                seen: false, // Ensures UNREAD state
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
 
@@ -679,8 +685,8 @@ const NotesManager = {
             /* --- NEW: Like Indicator OUTSIDE Note Bubble (Bottom Right of PFP) --- */
             .note-like-indicator {
                 position: absolute;
-                top: 75px; /* Positions below the top of container (approx PFP bottom) */
-                right: 0px;  /* Align to right side */
+                top: 72px; /* Positioned relative to .note-item (which includes bubble height implicitly) */
+                right: 0px;  
                 font-size: 11px;
                 background: #1c1c1e;
                 border-radius: 50%;
@@ -777,6 +783,7 @@ const NotesManager = {
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
                 btn.onclick = () => {
+                    // Direct redirect if no note exists
                     window.location.href = 'notes.html';
                 };
             }
