@@ -7,11 +7,11 @@ class ViewNotes extends HTMLElement {
     constructor() {
         super();
         this.currentNote = null;
+        this.currentUserProfile = null; // Store the fetched user profile
         this.isOwnNote = false;
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
-        // NEW: Unsubscribe function holder
         this.unsubscribe = null;
     }
 
@@ -20,23 +20,17 @@ class ViewNotes extends HTMLElement {
         this.setupEventListeners();
     }
 
-    // --- NEW: Time Calculation Helper ---
     getRelativeTime(timestamp) {
         if (!timestamp) return 'Just now';
-        
-        // Handle Firestore Timestamp or standard Date
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const now = new Date();
         const diffInSeconds = Math.floor((now - date) / 1000);
 
         if (diffInSeconds < 60) return 'Just now';
-        
         const diffInMinutes = Math.floor(diffInSeconds / 60);
         if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-        
         const diffInHours = Math.floor(diffInMinutes / 60);
         if (diffInHours < 24) return `${diffInHours}h ago`;
-        
         const diffInDays = Math.floor(diffInHours / 24);
         return `${diffInDays}d ago`;
     }
@@ -48,40 +42,76 @@ class ViewNotes extends HTMLElement {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.7); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: blur(4px);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
             }
             .vn-sheet {
                 background: #1c1c1e; width: 100%; max-width: 500px;
-                border-radius: 20px 20px 0 0; padding: 24px 20px;
-                transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 24px 24px 0 0; padding: 24px 20px;
+                transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 1.25, 0.32, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 padding-bottom: max(30px, env(safe-area-inset-bottom));
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
             }
             .vn-overlay.open { display: flex; }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
             .vn-drag-handle { 
-                width: 40px; height: 5px; background: #333; 
-                border-radius: 10px; margin: -10px auto 20px; 
+                width: 36px; height: 4px; background: #48484a; 
+                border-radius: 10px; margin: -10px auto 25px; 
             }
 
+            /* --- NEW UI: Friend Profile Header --- */
+            .vn-profile-header {
+                display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+            }
+            .vn-friend-pfp {
+                width: 50px; height: 50px; border-radius: 50%; object-fit: cover;
+                border: 1px solid #333;
+            }
+            .vn-friend-info { display: flex; flex-direction: column; }
+            .vn-friend-name { 
+                font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; 
+            }
+            .vn-friend-handle { color: #8e8e93; font-size: 0.85rem; }
+            
+            .vn-verify-badge {
+                width: 14px; height: 14px; background: #00d2ff; display: inline-block; border-radius: 50%;
+                mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
+                -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
+            }
+
+            /* --- NEW UI: Note Card --- */
+            .vn-note-card {
+                padding: 24px; border-radius: 24px; margin-bottom: 20px;
+                text-align: center; position: relative; overflow: hidden;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                min-height: 120px;
+            }
+            .vn-note-text { 
+                font-size: 1.4rem; font-weight: 600; line-height: 1.3; z-index: 2;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+
+            /* Song Pill */
+            .vn-song-pill { 
+                display: inline-flex; align-items: center; gap: 8px; 
+                background: rgba(255,255,255,0.08); padding: 8px 16px; 
+                border-radius: 100px; font-size: 0.85rem; font-weight: 500;
+                margin-top: 20px; border: 1px solid rgba(255,255,255,0.05);
+                backdrop-filter: blur(5px);
+            }
+            .vn-music-icon { width: 14px; height: 14px; fill: currentColor; opacity: 0.8; }
+
+            /* Timestamp */
+            .vn-timestamp { 
+                font-size: 0.75rem; color: #636366; text-align: center; 
+                margin-top: 10px; margin-bottom: 20px; font-weight: 500; 
+            }
+
+            /* Own Note Specifics */
             .vn-header { text-align: center; margin-bottom: 25px; }
             .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
-            
-            .vn-song-tag { 
-                display: inline-flex; align-items: center; gap: 6px; 
-                background: rgba(255,255,255,0.1); padding: 6px 14px; 
-                border-radius: 20px; font-size: 0.85rem; font-weight: 600;
-            }
-
-            .vn-bubble-text { 
-                font-size: 1.1rem; font-weight: 500; margin: 15px 0; 
-                line-height: 1.4; color: #fff;
-            }
-
-            /* Updated style for timestamp */
-            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 8px; font-weight: 500; }
-
             .vn-likers-section { 
                 max-height: 250px; overflow-y: auto; 
                 margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
@@ -93,24 +123,31 @@ class ViewNotes extends HTMLElement {
             .vn-liker-info { display: flex; align-items: center; gap: 12px; }
             .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
 
+            /* Buttons */
             .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
             .vn-btn { 
                 width: 100%; padding: 14px; border-radius: 14px; border: none; 
                 font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
             }
-            .vn-btn:active { opacity: 0.7; }
             .vn-btn-primary { background: #007aff; color: white; }
             .vn-btn-danger { background: transparent; color: #ff3b30; }
 
+            /* Interaction Bar */
             .vn-interaction-bar { 
-                display: flex; align-items: center; gap: 12px; margin-top: 20px; 
-                background: #262626; padding: 8px 16px; border-radius: 30px;
+                display: flex; align-items: center; gap: 12px; 
+                background: #2c2c2e; padding: 6px 6px 6px 16px; border-radius: 30px;
+                border: 0.5px solid #3a3a3c;
             }
             .vn-reply-input { 
                 flex: 1; background: none; border: none; color: white; 
                 font-size: 0.95rem; padding: 8px 0; outline: none;
             }
-            .vn-heart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 5px; }
+            .vn-heart-btn { 
+                background: #3a3a3c; border: none; font-size: 1.2rem; cursor: pointer; 
+                width: 40px; height: 40px; border-radius: 50%; display: flex; 
+                justify-content: center; align-items: center; transition: transform 0.1s;
+            }
+            .vn-heart-btn:active { transform: scale(0.9); }
 
             @keyframes vnFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         </style>
@@ -137,22 +174,20 @@ class ViewNotes extends HTMLElement {
         });
     }
 
-    // --- MODIFIED: OPEN METHOD (Adds Realtime Listener) ---
     async open(initialNoteData, isOwnNote = false) {
         if (!initialNoteData && isOwnNote) {
             window.location.href = 'notes.html';
             return;
         }
 
-        // Clean up previous listeners if any
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
         }
 
         this.isOwnNote = isOwnNote;
-        // Set initial data immediately for perceived speed
-        this.currentNote = initialNoteData; 
+        this.currentNote = initialNoteData;
+        this.currentUserProfile = null; // Reset
         
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
@@ -162,10 +197,25 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // Initial Render
-        content.innerHTML = isOwnNote ? this.renderOwnNote(initialNoteData) : this.renderFriendNote(initialNoteData);
+        // --- FETCH REAL USER DATA (UI Redesign Requirement) ---
+        if (!isOwnNote) {
+            try {
+                // Fetch the user document from the 'users' collection using the note's UID
+                const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
+                if (userDoc.exists) {
+                    this.currentUserProfile = userDoc.data();
+                }
+            } catch (err) {
+                console.error("Error fetching user profile for note:", err);
+            }
+        }
+
+        // Render with new data
+        content.innerHTML = isOwnNote 
+            ? this.renderOwnNote(initialNoteData) 
+            : this.renderFriendNote(initialNoteData);
+            
         overlay.classList.add('open');
-        
         window.history.pushState({ vnOpen: true }, "", "#view-note");
         if(navigator.vibrate) navigator.vibrate(10);
         
@@ -174,26 +224,21 @@ class ViewNotes extends HTMLElement {
 
         this.handleActions();
 
-        // --- NEW: ATTACH REALTIME LISTENER ---
-        // This ensures likes update without refreshing
+        // Realtime listener for Note updates (likes)
         if (initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         const updatedData = doc.data();
-                        // Merge updated data with ID
                         this.currentNote = { ...updatedData, uid: doc.id };
                         
-                        // Re-render the content to show new likes
-                        // We preserve the audio state, just updating UI
+                        // Re-render, preserving user profile data if we have it
                         content.innerHTML = this.isOwnNote 
                             ? this.renderOwnNote(this.currentNote) 
                             : this.renderFriendNote(this.currentNote);
                         
-                        // Re-attach event listeners because we overwrote the HTML
                         this.handleActions();
                     } else {
-                        // Note was deleted while viewing
                         this.close();
                     }
                 });
@@ -201,16 +246,15 @@ class ViewNotes extends HTMLElement {
     }
 
     renderOwnNote(note) {
-        // Calculate relative time
+        // Keep original layout for Own Note, just slight clean up
         const timeAgo = this.getRelativeTime(note.createdAt);
-
         return `
             <div class="vn-header">
                 <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
                 <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
                 ${note.songName ? `
-                    <div class="vn-song-tag">
-                        <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    <div class="vn-song-pill">
+                        <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                         <span>${note.songName}</span>
                     </div>
                 ` : ''}
@@ -242,29 +286,41 @@ class ViewNotes extends HTMLElement {
     renderFriendNote(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
-        // Calculate relative time
         const timeAgo = this.getRelativeTime(note.createdAt);
+        
+        // Use fetched profile data if available, fallback to note data
+        const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
+        const displayName = this.currentUserProfile?.name || note.username || 'User';
+        const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
+        const isVerified = this.currentUserProfile?.verified === true;
 
         return `
-            <div class="vn-header">
-                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
-                <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
-                <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
-                    ${note.text}
-                </div>
-                ${note.songName ? `
-                    <div style="margin-top:10px;">
-                        <div class="vn-song-tag">
-                             <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                             <span>${note.songName} • ${note.songArtist}</span>
-                        </div>
+            <div class="vn-profile-header">
+                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='userProfile.html?user=${this.currentUserProfile?.username || ''}'">
+                <div class="vn-friend-info">
+                    <div class="vn-friend-name">
+                        ${displayName}
+                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
                     </div>
-                ` : ''}
-                <div class="vn-timestamp">${timeAgo}</div>
+                    <div class="vn-friend-handle">${displayHandle}</div>
+                </div>
             </div>
 
+            <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                <div class="vn-note-text">${note.text}</div>
+                
+                ${note.songName ? `
+                    <div class="vn-song-pill">
+                        <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <span>${note.songName} • ${note.songArtist}</span>
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="vn-timestamp">${timeAgo}</div>
+
             <div class="vn-interaction-bar">
-                <input type="text" class="vn-reply-input" placeholder="Reply to ${note.username || 'user'}...">
+                <input type="text" class="vn-reply-input" placeholder="Reply to ${displayName}...">
                 <button class="vn-heart-btn" id="like-toggle-btn">
                     ${isLiked ? '❤️' : '🤍'}
                 </button>
@@ -273,7 +329,6 @@ class ViewNotes extends HTMLElement {
     }
 
     close(fromHistory = false) {
-        // --- NEW: STOP LISTENER ---
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -313,7 +368,6 @@ class ViewNotes extends HTMLElement {
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
 
-                // Optimistic UI update is handled, but the listener will confirm it shortly
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
 
                 try {
