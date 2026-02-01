@@ -165,7 +165,6 @@ class ViewNotes extends HTMLElement {
 
     async open(initialNoteData, isOwnNote = false) {
         if (!initialNoteData && isOwnNote) {
-            // Fallback if empty data passed, though setupMyNote handles this
             window.location.href = 'notes.html';
             return;
         }
@@ -385,6 +384,54 @@ class ViewNotes extends HTMLElement {
                 } catch (e) { console.error("Like toggle failed", e); }
             };
         }
+
+        const replyInput = this.querySelector('.vn-reply-input');
+        if (replyInput) {
+            replyInput.addEventListener('keypress', async (e) => {
+                if (e.key === 'Enter' && replyInput.value.trim() !== '') {
+                    const text = replyInput.value.trim();
+                    const user = firebase.auth().currentUser;
+                    const targetUid = this.currentNote.uid;
+                    
+                    if(!user || !targetUid) return;
+
+                    replyInput.value = ''; 
+                    replyInput.blur();
+                    this.close();
+
+                    const chatId = [user.uid, targetUid].sort().join('_');
+                    const chatRef = this.db.collection('chats').doc(chatId);
+                    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+                    const batch = this.db.batch();
+                    const newMsgRef = chatRef.collection('messages').doc();
+
+                    batch.set(newMsgRef, {
+                        text: text,
+                        sender: user.uid,
+                        timestamp: timestamp,
+                        type: 'note_reply',
+                        noteContext: {
+                            text: this.currentNote.text || '',
+                            songName: this.currentNote.songName || '',
+                            bgColor: this.currentNote.bgColor || '#262626'
+                        }
+                    });
+
+                    batch.set(chatRef, {
+                        lastMessage: "replied to your notes", 
+                        lastSender: user.uid,
+                        lastTimestamp: timestamp,
+                        seen: false,
+                        participants: [user.uid, targetUid]
+                    }, { merge: true });
+
+                    try {
+                        await batch.commit();
+                    } catch(err) { console.error("Reply failed", err); }
+                }
+            });
+        }
     }
 }
 
@@ -433,7 +480,7 @@ const NotesManager = {
             }
 
             .note-bubble, #my-note-preview {
-                display: none; /* Hidden by default until loaded */
+                display: none; 
                 flex-direction: column;
                 justify-content: center !important;
                 align-items: center !important;
@@ -457,12 +504,10 @@ const NotesManager = {
                 border: 1px solid rgba(255,255,255,0.1);
             }
             
-            /* Visible State */
             .note-bubble.visible, #my-note-preview.visible {
                 display: flex !important;
             }
             
-            /* SPEECH BUBBLE TAIL */
             .note-bubble::after, #my-note-preview::after {
                 content: '';
                 position: absolute;
@@ -535,12 +580,9 @@ const NotesManager = {
             if (!btn || !preview) return; 
 
             const data = doc.exists ? doc.data() : null;
-
-            // Ensure bubble is visible now that we have data (or lack thereof)
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
-                // CASE 1: USER HAS A NOTE
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
                 
@@ -560,7 +602,6 @@ const NotesManager = {
                     if(data) viewer.open({ ...data, uid: user.uid }, true);
                 };
             } else {
-                // CASE 2: NO NOTE - SHOW "What's on your mind?"
                 preview.style.backgroundColor = 'rgba(255,255,255,0.1)';
                 preview.style.color = 'rgba(255,255,255,0.7)';
                 
@@ -635,7 +676,6 @@ const NotesManager = {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
                 
-                // Add .visible class immediately so they display flex
                 div.innerHTML = `
                     <div class="note-bubble visible" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
