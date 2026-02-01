@@ -314,13 +314,9 @@
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             try {
-                // FORCE: Always fetch the latest photoURL from the users collection
                 const userDoc = await db.collection("users").doc(user.uid).get();
-                if(userDoc.exists && userDoc.data().photoURL) {
-                    document.getElementById('user-pfp').src = userDoc.data().photoURL;
-                } else if(user.photoURL) {
-                    document.getElementById('user-pfp').src = user.photoURL;
-                }
+                const pfp = userDoc.exists && userDoc.data().photoURL ? userDoc.data().photoURL : user.photoURL;
+                if(pfp) document.getElementById('user-pfp').src = pfp;
             } catch(e) {
                 console.log("Error loading PFP", e);
             }
@@ -390,7 +386,7 @@
         validateShare();
     });
 
-    // Share & Save (STRICT MUTUAL FRIEND LOGIC)
+    // Share & Save (Updated for Mutual Friends and Database PFPs)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
@@ -404,23 +400,22 @@
         shareBtn.disabled = true;
 
         try {
-            // 1. FETCH MUTUALS: Users who follow you AND you follow back
+            // Fetch current user's data for Mutual Friend Logic
             const userDoc = await db.collection("users").doc(user.uid).get();
             const userData = userDoc.data() || {};
             const myFollowing = userData.following || [];
             const myFollowers = userData.followers || [];
             
-            // Intersection of following and followers
+            // Define Mutual Friends: People I follow who ALSO follow me
             const mutualFriends = myFollowing.filter(uid => myFollowers.includes(uid));
             
             const now = new Date();
-            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24hr expiry
+            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24-hour expiry
 
             const noteData = {
                 uid: user.uid,
                 username: userData.username || user.displayName || "User",
-                // Use DB photoURL primarily for the bubble feed
-                photoURL: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150', 
+                pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150', // Use database PFP URL
                 text: input.value.trim(),
                 bgColor: currentTheme.bg,
                 textColor: currentTheme.text,
@@ -428,10 +423,8 @@
                 songArtist: currentSongData?.artistName || null,
                 songPreview: currentSongData?.previewUrl || null,
                 songArt: currentSongData?.artworkUrl100 || null,
-                
-                // IMPORTANT: This array is checked by the feed to only show notes to mutuals
+                // SECURITY: Only people in this array can query/see this note
                 visibleTo: mutualFriends, 
-                
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
                 dateString: now.toDateString(), 
@@ -442,11 +435,11 @@
 
             const batch = db.batch();
             
-            // 1. Update main active notes feed
+            // 1. Main active notes feed
             const activeNoteRef = db.collection("active_notes").doc(user.uid);
             batch.set(activeNoteRef, noteData);
             
-            // 2. Log in history
+            // 2. User's personal history
             const historyRef = db.collection("users").doc(user.uid).collection("notes_history").doc();
             batch.set(historyRef, noteData);
             
