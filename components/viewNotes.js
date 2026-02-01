@@ -108,19 +108,19 @@ class ViewNotes extends HTMLElement {
                 margin-top: 5px; margin-bottom: 20px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
             }
 
-            /* --- REPLY SECTION --- */
+            /* --- REPLY SECTION & EMOJIS --- */
             .vn-footer-actions { margin-top: auto; padding-top: 10px; }
             
             .vn-emoji-bar {
-                display: flex; justify-content: space-around; margin-bottom: 12px;
-                padding: 0 10px;
+                display: flex; justify-content: space-between; margin-bottom: 12px;
+                padding: 0 5px;
             }
             .vn-quick-emoji {
-                font-size: 2rem; cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                font-size: 2.2rem; cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 user-select: none; -webkit-tap-highlight-color: transparent;
             }
             .vn-quick-emoji:active { transform: scale(1.4); }
-            .vn-quick-emoji.popped { animation: emojiPop 0.4s ease forwards; }
+            .vn-quick-emoji.popped { animation: emojiPop 0.5s ease forwards; }
 
             .vn-interaction-bar { 
                 display: flex; align-items: center; gap: 10px; 
@@ -129,13 +129,13 @@ class ViewNotes extends HTMLElement {
             }
             .vn-reply-input { 
                 flex: 1; background: none; border: none; color: white; 
-                font-size: 1rem; padding: 10px 0; outline: none;
+                font-size: 1rem; padding: 12px 0; outline: none;
             }
             .vn-reply-input::placeholder { color: #666; }
             
             .vn-send-btn {
-                color: #0095f6; font-weight: 600; font-size: 0.95rem; border: none; background: transparent;
-                padding: 0 10px; cursor: pointer; display: none;
+                color: #0095f6; font-weight: 700; font-size: 0.95rem; border: none; background: transparent;
+                padding: 0 12px; cursor: pointer; display: none;
             }
             .vn-send-btn.visible { display: block; }
 
@@ -154,8 +154,8 @@ class ViewNotes extends HTMLElement {
 
             @keyframes emojiPop { 
                 0% { transform: scale(1); opacity: 1; } 
-                50% { transform: scale(1.5) translateY(-10px); opacity: 0.8; } 
-                100% { transform: scale(0); opacity: 0; } 
+                50% { transform: scale(1.6) translateY(-15px); opacity: 1; } 
+                100% { transform: scale(1); opacity: 1; } 
             }
         </style>
 
@@ -227,7 +227,7 @@ class ViewNotes extends HTMLElement {
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         this.currentNote = { ...doc.data(), uid: doc.id };
-                        this.renderContent(); // Re-render on update
+                        this.renderContent(); 
                     } else {
                         this.close();
                     }
@@ -429,7 +429,7 @@ class ViewNotes extends HTMLElement {
         emojis.forEach(emojiEl => {
             emojiEl.onclick = () => {
                 const emoji = emojiEl.dataset.emoji;
-                if(navigator.vibrate) navigator.vibrate(20);
+                if(navigator.vibrate) navigator.vibrate(25);
                 
                 // Animation
                 emojiEl.classList.add('popped');
@@ -446,9 +446,6 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // Optimistic UI Feedback (Toast or just interaction)
-        // Note: We don't close the modal, per instructions
-
         try {
             const chatRef = this.db.collection("chats").doc(chatId);
             const messagesRef = chatRef.collection("messages");
@@ -462,18 +459,17 @@ class ViewNotes extends HTMLElement {
                 replyToNote: this.currentNote.text // Context for later if needed
             });
 
-            // 2. Update Chat Metadata so messages.html sees it
-            // THIS IS THE KEY PART for "Replied to a note"
+            // 2. Update Chat Metadata
+            // 'Replied to a note' becomes the preview text for BOTH users
+            // Setting 'seen: false' ensures it appears BRIGHT for the recipient in messages.html
             await chatRef.set({
-                lastMessage: "Replied to a note", // This text will show in inbox
+                lastMessage: "Replied to a note", 
                 lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid],
-                seen: false, // Ensures it is BRIGHT (unread) for recipient
+                seen: false, 
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
-
-            console.log("Reply sent successfully");
 
         } catch(e) {
             console.error("Failed to send reply", e);
