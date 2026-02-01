@@ -382,7 +382,7 @@
             <div class="input-box" id="msg-input-box">
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
-            <button id="send-btn" class="send-btn" onclick="sendMsg()">Send</button>
+            <button id="send-btn" class="send-btn">Send</button>
         </div>
     </div>
 </div>
@@ -458,8 +458,17 @@
     });
     
     // === KEYBOARD FIX: Prevent focus loss on Send Button ===
-    sendBtnUI.addEventListener('mousedown', (e) => { e.preventDefault(); });
-    sendBtnUI.addEventListener('touchstart', (e) => { e.preventDefault(); });
+    // Use touchstart for immediate execution on mobile without blur
+    sendBtnUI.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Prevents loss of focus on the textarea
+        sendMsg();
+    });
+
+    // Use mousedown for PC to prevent focus loss (click event causes blur first)
+    sendBtnUI.addEventListener('mousedown', (e) => {
+        e.preventDefault(); 
+        sendMsg();
+    });
 
     function formatTime12(date) {
         let hours = date.getHours();
@@ -519,10 +528,10 @@
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
     });
 
-    // Handle Enter key
+    // Handle Enter key - FIX to keep keyboard open
     mInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
+            e.preventDefault(); // Stop newline
             sendMsg();
         }
     });
@@ -1089,6 +1098,8 @@
         
         // KEEP FOCUS TO PREVENT KEYBOARD CLOSE
         mInput.focus(); 
+        // Forced refocus just in case
+        setTimeout(() => mInput.focus(), 10); 
 
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
