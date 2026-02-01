@@ -412,55 +412,116 @@ const NotesManager = {
     injectBubbleStyles: function() {
         const style = document.createElement('style');
         style.innerHTML = `
-            /* Redesigned Bubble */
-            .note-bubble {
+            /* CONTAINER FIX: Prevents overlap by increasing gap and padding */
+            #notes-container {
+                display: flex;
+                overflow-x: auto;
+                padding-top: 65px; /* Increased headroom for bubbles */
+                padding-bottom: 10px;
+                padding-left: 15px;
+                gap: 30px; /* INCREASED GAP to prevent bubble collision */
+                scrollbar-width: none;
+                align-items: flex-start;
+            }
+            #notes-container::-webkit-scrollbar { display: none; }
+
+            /* ITEM WRAPPER: Ensures spacing */
+            .note-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                position: relative;
+                width: 80px; /* Fixed width */
+                flex-shrink: 0;
+                cursor: pointer;
+            }
+
+            /* BUBBLE: Floating, Centered, Sized */
+            .note-bubble, #my-note-preview {
+                /* Flexbox for perfect centering of content */
                 display: flex !important;
                 flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                padding: 10px 12px !important;
-                border-radius: 18px !important;
-                font-size: 0.85rem !important;
+                justify-content: center !important;
+                align-items: center !important;
                 text-align: center;
-                min-width: 60px;
-                max-width: 100px;
-                cursor: pointer;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                overflow: hidden;
-                transition: transform 0.2s;
+                
+                position: absolute;
+                top: -65px; /* Move up */
+                left: 50%;
+                transform: translateX(-50%); /* Center horizontally relative to parent */
+                z-index: 100;
+                
+                padding: 10px 10px !important;
+                border-radius: 20px !important;
+                border-bottom-left-radius: 4px !important;
+                
+                font-size: 0.8rem !important;
+                min-width: 85px; /* Min width */
+                max-width: 115px; /* Max width to prevent giant bubbles */
+                min-height: 50px;
+                width: max-content; /* Shrink to fit text */
+                
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                box-sizing: border-box;
+                border: 1px solid rgba(255,255,255,0.05);
             }
-            .note-bubble:active { transform: scale(0.95); }
             
             /* Text Handling */
             .note-text-content {
                 line-height: 1.25;
-                font-weight: 500;
+                font-weight: 600;
                 display: -webkit-box;
-                -webkit-line-clamp: 3;
+                -webkit-line-clamp: 2; /* Limit lines */
                 -webkit-box-orient: vertical;
                 overflow: hidden;
-            }
-
-            /* Mini Music Icon in Bubble */
-            .note-music-tag {
-                display: flex; align-items: center; gap: 3px;
-                font-size: 0.7rem; opacity: 0.8; margin-top: 5px;
-                white-space: nowrap; overflow: hidden; max-width: 100%;
-            }
-
-            /* Fix for My Note Bubble Preview */
-            #my-note-preview {
-                display: none;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                padding: 10px 12px;
-                border-radius: 18px;
-                font-size: 0.85rem;
+                width: 100%;
                 text-align: center;
-                min-width: 60px;
-                max-width: 100px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                margin-bottom: 2px;
+            }
+
+            /* Mini Music Icon in Bubble - FIXED ALIGNMENT */
+            .note-music-tag {
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                gap: 4px;
+                font-size: 0.7rem; 
+                opacity: 0.85; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                max-width: 100%;
+                width: 100%;
+            }
+            
+            .note-music-tag svg {
+                flex-shrink: 0;
+            }
+            
+            /* User PFP Styling */
+            .note-pfp {
+                width: 65px;
+                height: 65px;
+                border-radius: 50%;
+                border: 2px solid #262626;
+                object-fit: cover;
+                background: #333;
+            }
+
+            /* Username Styling */
+            .note-username {
+                font-size: 0.75rem;
+                margin-top: 6px;
+                color: #a0a0a0;
+                max-width: 80px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-align: center;
+            }
+
+            /* Fix for My Note Bubble Preview specific styling */
+            #my-note-preview {
+                display: none; /* Toggled via JS */
             }
         `;
         document.head.appendChild(style);
