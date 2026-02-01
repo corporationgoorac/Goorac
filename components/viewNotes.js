@@ -446,22 +446,34 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
+        // Prepare rich metadata for the Professional UI in chat.html
+        const noteMetadata = {
+            text: this.currentNote.text || "",
+            bgColor: this.currentNote.bgColor || "#262626",
+            textColor: this.currentNote.textColor || "#fff",
+            songName: this.currentNote.songName || null,
+            username: this.currentNote.username || "User",
+            pfp: this.currentNote.pfp || null,
+            uid: this.currentNote.uid 
+        };
+
         try {
             const chatRef = this.db.collection("chats").doc(chatId);
             const messagesRef = chatRef.collection("messages");
 
-            // 1. Add Message Doc
+            // 1. Add Message Doc with RICH DATA
             await messagesRef.add({
                 text: text,
                 sender: myUid,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 seen: false,
-                replyToNote: this.currentNote.text // Context for later if needed
+                replyToNote: this.currentNote.text, // Fallback string
+                noteMetadata: noteMetadata // Rich object for chat.html UI
             });
 
-            // 2. Update Chat Metadata
-            // 'Replied to a note' becomes the preview text for BOTH users
-            // Setting 'seen: false' ensures it appears BRIGHT for the recipient in messages.html
+            // 2. Update Chat Metadata (Inbox)
+            // 'Replied to a note' is the text shown in messages.html
+            // Setting 'seen: false' ensures it appears BRIGHT for the recipient
             await chatRef.set({
                 lastMessage: "Replied to a note", 
                 lastSender: myUid,
