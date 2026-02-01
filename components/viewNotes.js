@@ -346,6 +346,7 @@ class ViewNotes extends HTMLElement {
                     try {
                         await this.db.collection("active_notes").doc(user.uid).delete();
                         this.close();
+                        window.location.reload(); // FIXED: Reload page after delete
                     } catch(e) { console.error("Delete failed", e); }
                 }
             };
@@ -436,21 +437,26 @@ const NotesManager = {
                 justify-content: center !important;
                 align-items: center !important;
                 text-align: center;
+                
                 position: absolute;
-                top: 5px; 
+                top: 0px; 
                 left: 50%;
                 transform: translate(-50%, -100%); 
                 z-index: 10;
+                
                 padding: 6px 12px !important;
                 border-radius: 16px !important;
+                
                 font-size: 0.75rem !important;
                 width: max-content;
                 max-width: 90px; 
+                
                 box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 box-sizing: border-box;
                 border: 1px solid rgba(255,255,255,0.1);
             }
             
+            /* SPEECH BUBBLE TAIL */
             .note-bubble::after, #my-note-preview::after {
                 content: '';
                 position: absolute;
@@ -476,45 +482,44 @@ const NotesManager = {
             }
 
             .note-music-tag {
-                display: flex; align-items: center; justify-content: center;
-                gap: 3px; font-size: 0.65rem; opacity: 0.8; margin-top: 2px;
-                white-space: nowrap; overflow: hidden; max-width: 100%; width: 100%;
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                gap: 3px;
+                font-size: 0.65rem; 
+                opacity: 0.8; 
+                margin-top: 2px;
+                white-space: nowrap; 
+                overflow: hidden; 
+                max-width: 100%;
+                width: 100%;
             }
             
+            .note-music-tag svg { flex-shrink: 0; }
+            
             .note-pfp {
-                width: 65px; height: 65px;
-                border-radius: 50%; border: 2px solid #262626;
-                object-fit: cover; background: #333;
+                width: 65px;
+                height: 65px;
+                border-radius: 50%;
+                border: 2px solid #262626;
+                object-fit: cover;
+                background: #333;
                 z-index: 2;
             }
 
             .note-username {
-                font-size: 0.75rem; margin-top: 6px;
-                color: #a0a0a0; max-width: 75px;
-                overflow: hidden; text-overflow: ellipsis;
-                white-space: nowrap; text-align: center;
+                font-size: 0.75rem;
+                margin-top: 6px;
+                color: #a0a0a0;
+                max-width: 75px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-align: center;
             }
 
-            #my-note-preview { display: none; }
-
-            /* --- CLEANER SKELETON STYLES (No Bubble) --- */
-            .skeleton-item {
-                display: flex; flex-direction: column;
-                align-items: center; width: 75px; flex-shrink: 0;
-            }
-            .skeleton-pfp {
-                width: 65px; height: 65px;
-                border-radius: 50%; background: #2a2a2a;
-                border: 2px solid #1a1a1a;
-            }
-            .skeleton-text {
-                width: 50px; height: 8px;
-                background: #2a2a2a; margin-top: 8px;
-                border-radius: 4px;
-            }
-            .pulse { animation: skelPulse 1.5s infinite ease-in-out; }
-            @keyframes skelPulse {
-                0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; }
+            #my-note-preview {
+                display: none;
             }
         `;
         document.head.appendChild(style);
@@ -539,7 +544,7 @@ const NotesManager = {
                     ${data.songName ? `
                         <div class="note-music-tag">
                             <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                            <span>${data.songName.substring(0, 10)}</span>
+                            <span>${data.songName.substring(0, 10)}${data.songName.length>10?'...':''}</span>
                         </div>
                     ` : ''}
                 `;
@@ -562,19 +567,6 @@ const NotesManager = {
         const container = document.getElementById('notes-container');
         if(!container) return;
 
-        // Render clean skeletons (Only PFP and Username)
-        const skeletonWrapper = document.createElement('div');
-        skeletonWrapper.id = 'skeleton-wrapper';
-        skeletonWrapper.style.display = 'flex';
-        skeletonWrapper.style.gap = '25px';
-        skeletonWrapper.innerHTML = `
-            <div class="skeleton-item pulse">
-                <div class="skeleton-pfp"></div>
-                <div class="skeleton-text"></div>
-            </div>
-        `.repeat(5);
-        container.appendChild(skeletonWrapper);
-
         try {
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
@@ -584,12 +576,15 @@ const NotesManager = {
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
             if(mutualUIDs.length === 0) {
-                skeletonWrapper.remove();
+                const existing = container.querySelectorAll('.friend-note');
+                existing.forEach(e => e.remove());
                 return;
             }
 
             const chunks = [];
-            while(mutualUIDs.length > 0) chunks.push(mutualUIDs.splice(0, 30));
+            while(mutualUIDs.length > 0) {
+                chunks.push(mutualUIDs.splice(0, 30));
+            }
 
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
@@ -598,6 +593,7 @@ const NotesManager = {
             });
 
             const snapshots = await Promise.all(queries);
+            
             let allNotes = [];
             const now = new Date();
 
@@ -605,24 +601,32 @@ const NotesManager = {
                 snap.forEach(doc => {
                     const note = doc.data();
                     const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
-                    if(isActive) allNotes.push({ ...note, uid: doc.id });
+                    if(isActive) {
+                        allNotes.push({ ...note, uid: doc.id });
+                    }
                 });
             });
 
-            allNotes.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+            allNotes.sort((a, b) => {
+                const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+                const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+                return tb - ta;
+            });
 
-            skeletonWrapper.remove();
+            const existingFriends = container.querySelectorAll('.friend-note');
+            existingFriends.forEach(e => e.remove());
 
             allNotes.forEach(note => {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
+                
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
                         ${note.songName ? `
                             <div class="note-music-tag">
                                 <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                                <span>${note.songName.substring(0, 10)}</span>
+                                <span>${note.songName.substring(0, 10)}${note.songName.length>10?'...':''}</span>
                             </div>
                         ` : ''}
                     </div>
@@ -632,14 +636,16 @@ const NotesManager = {
                 
                 div.onclick = () => {
                     const viewer = document.querySelector('view-notes');
+                    const nav = document.querySelector('main-navbar');
+                    if(nav) nav.classList.add('hidden');
                     viewer.open(note, false);
                 };
+                
                 container.appendChild(div);
             });
 
         } catch (e) {
             console.error("Error loading notes:", e);
-            if(document.getElementById('skeleton-wrapper')) document.getElementById('skeleton-wrapper').remove();
         }
     }
 };
