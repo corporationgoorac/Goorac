@@ -131,6 +131,7 @@ class ViewNotes extends HTMLElement {
     }
 
     renderOwnNote(note) {
+        // Updated to use photoURL first
         return `
             <div class="vn-header">
                 <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
@@ -170,6 +171,7 @@ class ViewNotes extends HTMLElement {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
 
+        // Updated to use photoURL first
         return `
             <div class="vn-header">
                 <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
@@ -207,6 +209,7 @@ class ViewNotes extends HTMLElement {
     }
 
     handleActions() {
+        // Delete Functionality
         const deleteBtn = this.querySelector('#delete-note-btn');
         if(deleteBtn) {
             deleteBtn.onclick = async () => {
@@ -221,6 +224,7 @@ class ViewNotes extends HTMLElement {
             };
         }
 
+        // Like/Unlike Functionality
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
@@ -231,6 +235,7 @@ class ViewNotes extends HTMLElement {
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
 
+                // UI feedback
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
 
                 try {
@@ -260,12 +265,13 @@ customElements.define('view-notes', ViewNotes);
 
 
 // ==========================================
-// FIXED: Notes Manager (Strict Mutual Logic)
+// FIXED: Notes Manager for Fetching & Mutuals
 // ==========================================
 
 const NotesManager = {
     allNotes: [],
     
+    // Call this function when the page loads
     init: function() {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
@@ -282,55 +288,46 @@ const NotesManager = {
         container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
 
         try {
-            // 1. Get MY lists (Following AND Followers)
+            // 1. Get MY lists (Following AND Followers) for Mutual Calculation
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data();
             const myFollowing = myData?.following || [];
-            const myFollowers = myData?.followers || []; // Essential for mutual check
+            const myFollowers = myData?.followers || [];
 
-            // 2. Identify Mutual Friends UIDs (Intersection)
-            // Mutual Friend = Someone I follow who ALSO follows me
+            // 2. Calculate Mutuals: People I follow who ALSO follow me
+            // This is the strict filter key.
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
-            // 3. Listen to Active Notes
+            // 3. Fetch Active Notes
             db.collection("active_notes").onSnapshot(async (snapshot) => {
                 const rawNotes = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
                 
-                // 4. STRICT FILTERING
-                const filteredPromises = rawNotes.map(async (note) => {
-                    // Always show my own note
-                    if (note.uid === user.uid) {
-                        return { ...note, isOwn: true, photoURL: user.photoURL };
-                    }
-
-                    // Check if note author is in my Mutuals list
-                    if (mutualUIDs.includes(note.uid)) {
-                        // We need to fetch their latest PFP/Username to ensure it's up to date
-                        // (Optional optimization: use note.pfp if you trust it, but fetching ensures freshness)
-                        try {
-                            const authorDoc = await db.collection("users").doc(note.uid).get();
-                            if(authorDoc.exists) {
-                                const authorData = authorDoc.data();
-                                return { 
-                                    ...note, 
-                                    isOwn: false, 
-                                    photoURL: authorData.photoURL || note.pfp, 
-                                    username: authorData.username || note.username
-                                };
-                            }
-                        } catch(e) { return null; }
-                    }
-                    return null; // Not mutual, exclude
+                // 4. FILTER: Is the note from Me OR a Mutual Friend?
+                const filteredNotes = rawNotes.filter(note => {
+                    const isMe = note.uid === user.uid;
+                    const isMutual = mutualUIDs.includes(note.uid);
+                    return isMe || isMutual;
                 });
 
-                const resolvedNotes = await Promise.all(filteredPromises);
-                this.allNotes = resolvedNotes.filter(n => n !== null);
+                // 5. Format Data (Handle "My Note" vs "Friend Note")
+                this.allNotes = filteredNotes.map(note => {
+                    const isMe = note.uid === user.uid;
+                    // Use saved note data, fallback to auth data if it's me
+                    return {
+                        ...note,
+                        isOwn: isMe,
+                        // Prioritize the photo saved in the note, fall back to current User auth photo if it's mine
+                        photoURL: note.pfp || note.photoURL || (isMe ? user.photoURL : 'https://via.placeholder.com/70')
+                    };
+                });
 
+                // Render the list
                 this.renderList(this.allNotes);
             });
 
         } catch (e) {
             console.error("Error loading notes:", e);
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading updates</div>';
         }
     },
 
@@ -341,10 +338,11 @@ const NotesManager = {
         container.innerHTML = '';
         
         if (notes.length === 0) {
-            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No mutual notes.</div>';
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No notes from mutuals.</div>';
             return;
         }
 
+        // Horizontal Scroll Container
         const scrollWrapper = document.createElement('div');
         scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none;";
         
@@ -352,6 +350,7 @@ const NotesManager = {
             const bubble = document.createElement('div');
             bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
             
+            // Note Bubble UI
             bubble.innerHTML = `
                 <div style="position: relative;">
                     <div style="
@@ -376,6 +375,7 @@ const NotesManager = {
                 <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.username || 'You'}</div>
             `;
 
+            // Handle Click -> Open ViewNotes Component
             bubble.onclick = () => {
                 const viewer = document.querySelector('view-notes');
                 if (viewer) viewer.open(note, note.isOwn);
@@ -387,6 +387,7 @@ const NotesManager = {
         container.appendChild(scrollWrapper);
     },
 
+    // Call this from your search input oninput="NotesManager.filter(this.value)"
     filter: function(query) {
         const lowerQ = query.toLowerCase();
         const filtered = this.allNotes.filter(n => 
