@@ -1,6 +1,7 @@
 /**
- * ViewNotes Component
- * Handles the Instagram-style bottom sheet for viewing and interacting with notes.
+ * =======================================================
+ * PART 1: THE VIEWER COMPONENT (Bottom Sheet UI)
+ * =======================================================
  */
 class ViewNotes extends HTMLElement {
     constructor() {
@@ -106,6 +107,7 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(noteData, isOwnNote = false) {
+        // If clicking own note but no data exists, go to share page
         if (!noteData && isOwnNote) {
             window.location.href = 'notes.html';
             return;
@@ -116,6 +118,7 @@ class ViewNotes extends HTMLElement {
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
 
+        // Play music if exists
         if (noteData.songPreview) {
             this.audioPlayer.src = noteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
@@ -123,9 +126,12 @@ class ViewNotes extends HTMLElement {
 
         content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
         overlay.classList.add('open');
-        this.vibrate(10);
+        if(navigator.vibrate) navigator.vibrate(10);
         
-        // Internal activation of buttons
+        // Hide Main Navbar (Optional helper)
+        const mainNav = document.querySelector('main-navbar');
+        if(mainNav) mainNav.classList.add('hidden');
+
         this.handleActions();
     }
 
@@ -198,15 +204,12 @@ class ViewNotes extends HTMLElement {
     close() {
         this.audioPlayer.pause();
         this.querySelector('#vn-overlay').classList.remove('open');
-        this.vibrate(5);
-    }
-
-    vibrate(ms) {
-        if (navigator.vibrate) navigator.vibrate(ms);
+        // Show Main Navbar
+        const mainNav = document.querySelector('main-navbar');
+        if(mainNav) mainNav.classList.remove('hidden');
     }
 
     handleActions() {
-        // Delete Functionality
         const deleteBtn = this.querySelector('#delete-note-btn');
         if(deleteBtn) {
             deleteBtn.onclick = async () => {
@@ -215,24 +218,21 @@ class ViewNotes extends HTMLElement {
                     try {
                         await this.db.collection("active_notes").doc(user.uid).delete();
                         this.close();
-                        window.location.reload();
                     } catch(e) { console.error("Delete failed", e); }
                 }
             };
         }
 
-        // Like/Unlike Functionality
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
                 const user = firebase.auth().currentUser;
                 if(!user) return;
 
-                this.vibrate(15);
+                if(navigator.vibrate) navigator.vibrate(15);
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
 
-                // UI feedback
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
 
                 try {
@@ -261,142 +261,139 @@ class ViewNotes extends HTMLElement {
 customElements.define('view-notes', ViewNotes);
 
 
-// ==========================================
-// FIXED: Strict Mutuals Manager (Both Lists)
-// ==========================================
-
+/**
+ * =======================================================
+ * PART 2: THE NOTES MANAGER (Logic & Data Fetching)
+ * =======================================================
+ * This handles:
+ * 1. Fetching "My Note"
+ * 2. Fetching Friends Notes (Strict Mutual Check)
+ * 3. Updating the DOM in home.html
+ */
 const NotesManager = {
     init: function() {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                this.loadNotes(user);
+                this.setupMyNote(user);
+                this.loadMutualNotes(user);
             }
         });
     },
 
-    loadNotes: async function(user) {
+    // 1. Handle "My Note" Bubble
+    setupMyNote: function(user) {
         const db = firebase.firestore();
-        const container = document.getElementById('notes-list-container');
+        db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
+            const btn = document.getElementById('my-note-btn');
+            const preview = document.getElementById('my-note-preview');
+            // Safety check if elements exist in home.html
+            if (!btn || !preview) return; 
+
+            const data = doc.exists ? doc.data() : null;
+
+            if(data) {
+                preview.style.display = 'block';
+                preview.innerText = data.text;
+                btn.classList.add('has-note');
+            } else {
+                preview.style.display = 'none';
+                btn.classList.remove('has-note');
+            }
+
+            btn.onclick = () => {
+                const viewer = document.querySelector('view-notes');
+                // Open Viewer or Redirect to Create
+                if(data) viewer.open(data, true);
+                else window.location.href = 'notes.html';
+            };
+        });
+    },
+
+    // 2. Fetch Friend Notes (Strict Mutuals)
+    loadMutualNotes: async function(user) {
+        const db = firebase.firestore();
+        const container = document.getElementById('notes-container');
         if(!container) return;
 
-        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading...</div>';
-
         try {
-            // 1. GET BOTH LISTS: Following AND Followers
-            // We need both to confirm "Mutual" status (A follows B AND B follows A)
+            // A. GET BOTH LISTS (Following & Followers)
+            // Essential for checking "Do they follow me back?"
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
-            const myFollowing = myData.following || []; // People I follow
-            const myFollowers = myData.followers || []; // People who follow me
+            const myFollowing = myData.following || []; 
+            const myFollowers = myData.followers || []; 
 
-            // 2. QUERY: Fetch notes
-            // We keep the server filter for performance, but relying on the client check below is safer for your issue.
+            // B. SERVER FILTER: Get notes where I am in 'visibleTo'
+            // This prevents downloading 1000s of notes.
             db.collection("active_notes")
-              .where("visibleTo", "array-contains", user.uid) 
-              .onSnapshot(snapshot => {
+              .where("visibleTo", "array-contains", user.uid)
+              .onSnapshot(snap => {
                   
-                  let notes = [];
+                  // Clear old friend bubbles (Keep the first one, which is "My Note")
+                  const existingFriends = container.querySelectorAll('.friend-note');
+                  existingFriends.forEach(el => el.remove());
+
                   const now = new Date();
+                  let notesToShow = [];
 
-                  snapshot.forEach(doc => {
-                      const data = doc.data();
+                  snap.forEach(doc => {
+                      const note = doc.data();
+
+                      // C. CLIENT DOUBLE-CHECK (Unfollow Protection)
+                      const isMe = note.uid === user.uid;
+                      const iFollowThem = myFollowing.includes(note.uid);
+                      const theyFollowMe = myFollowers.includes(note.uid);
                       
-                      // 3. STRICT MUTUAL CHECK
-                      const isMe = data.uid === user.uid;
-                      
-                      // Check 1: Do I follow them?
-                      const iFollowThem = myFollowing.includes(data.uid);
-                      
-                      // Check 2: Do they follow me?
-                      const theyFollowMe = myFollowers.includes(data.uid);
-                      
-                      // MUTUAL DEFINITION: Both must be true
+                      // STRICT MUTUAL DEFINITION: I follow them AND they follow me
                       const isMutual = iFollowThem && theyFollowMe;
+                      
+                      // 24 Hour Check
+                      const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
 
-                      // Check 3: Is it active?
-                      const isActive = data.expiresAt ? data.expiresAt.toDate() > now : true;
-
-                      // FINAL FILTER: Show only if Active AND (It's Me OR It's a Mutual Friend)
-                      if (isActive && (isMe || isMutual)) {
-                          notes.push({ ...data, uid: doc.id });
+                      // RENDER IF: Active AND (Mutual OR Me)
+                      // We skip 'isMe' here because setupMyNote handles it separately above
+                      if (isActive && isMutual && !isMe) {
+                          notesToShow.push({ ...note, uid: doc.id });
                       }
                   });
 
-                  // Sort by newest first
-                  notes.sort((a, b) => {
-                      const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                      const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                      return timeB - timeA;
+                  // Sort: Newest First
+                  notesToShow.sort((a, b) => {
+                      const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+                      const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+                      return tb - ta;
                   });
 
-                  this.renderList(notes, user);
+                  // Render Bubbles to Home Page
+                  notesToShow.forEach(note => {
+                      const div = document.createElement('div');
+                      div.className = 'note-item friend-note has-note'; // Uses existing CSS
+                      div.innerHTML = `
+                          <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                            ${note.text}
+                          </div>
+                          <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                          <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
+                      `;
+                      
+                      div.onclick = () => {
+                          const viewer = document.querySelector('view-notes');
+                          // Helper to hide nav when opening
+                          const nav = document.querySelector('main-navbar');
+                          if(nav) nav.classList.add('hidden');
+                          
+                          viewer.open(note, false);
+                      };
+                      
+                      container.appendChild(div);
+                  });
               });
 
         } catch (e) {
-            console.error("Error loading notes:", e);
-            container.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading updates</div>';
+            console.error("Error loading mutual notes:", e);
         }
-    },
-
-    renderList: function(notes, currentUser) {
-        const container = document.getElementById('notes-list-container');
-        if(!container) return;
-        
-        container.innerHTML = '';
-        
-        if (notes.length === 0) {
-            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No mutual notes.</div>';
-            return;
-        }
-
-        // Horizontal Scroll Container
-        const scrollWrapper = document.createElement('div');
-        scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none;";
-        
-        notes.forEach(note => {
-            const isMe = note.uid === currentUser.uid;
-            
-            // Note PFP Logic
-            const displayPFP = isMe ? (currentUser.photoURL || note.pfp) : (note.pfp || 'https://via.placeholder.com/70');
-
-            const bubble = document.createElement('div');
-            bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
-            
-            bubble.innerHTML = `
-                <div style="position: relative;">
-                    <div style="
-                        width: 70px; height: 70px; border-radius: 50%; 
-                        padding: 3px; border: 2px solid ${isMe ? '#333' : '#00d2ff'};
-                    ">
-                        <img src="${displayPFP}" 
-                             style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
-                    </div>
-                    ${note.text ? `
-                        <div style="
-                            position: absolute; top: -10px; right: -10px; 
-                            background: rgba(255,255,255,0.9); color: black; 
-                            padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; 
-                            max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                        ">
-                            ${note.text}
-                        </div>
-                    ` : ''}
-                </div>
-                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${isMe ? 'You' : (note.username || 'User')}</div>
-            `;
-
-            bubble.onclick = () => {
-                const viewer = document.querySelector('view-notes');
-                if (viewer) viewer.open(note, isMe);
-            };
-
-            scrollWrapper.appendChild(bubble);
-        });
-
-        container.appendChild(scrollWrapper);
     }
 };
 
-// Initialize
+// Initialize Logic Automatically
 document.addEventListener('DOMContentLoaded', () => NotesManager.init());
