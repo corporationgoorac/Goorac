@@ -167,16 +167,41 @@
         .reply-box-ui:active { opacity: 0.7; }
         
         /* NEW: Instagram-style Note Reply UI */
-        .note-reply-ui { 
-            background: rgba(255, 255, 255, 0.1); 
-            padding: 8px 12px; 
-            border-radius: 14px; 
-            margin-bottom: 6px; 
-            font-size: 0.85rem; 
-            border-left: 3px solid #0095f6; 
-            color: #ddd; 
-            max-width: 100%; 
-            display: flex; flex-direction: column; gap: 2px;
+        .note-reply-container {
+            margin-bottom: 8px;
+            display: flex; flex-direction: column; align-items: center;
+            max-width: 100%;
+        }
+        .note-reply-pill { 
+            background: #2a2a2a; 
+            padding: 8px 16px; 
+            border-radius: 20px; 
+            display: inline-flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border: 1px solid #333;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 100px; text-align: center;
+            position: relative;
+        }
+        .note-reply-label {
+            font-size: 0.65rem; 
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            color: #ccc;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .note-icon-small {
+            width: 8px; height: 8px; background: #0095f6; border-radius: 50%;
+        }
+        .note-reply-text {
+            font-size: 0.85rem; font-style: italic; color: #fff; line-height: 1.2;
+            opacity: 0.9;
+        }
+        /* Connecting line visual */
+        .note-reply-connector {
+            width: 2px; height: 8px; background: #333; margin-top: -1px; margin-bottom: -4px; z-index: 0;
         }
 
         #scroll-down-btn { position: fixed; bottom: 85px; right: 20px; width: 42px; height: 42px; background: #262626; border-radius: 50%; display: none; align-items: center; justify-content: center; color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #333; z-index: 900; cursor: pointer; font-size: 1.2rem; transition: all 0.3s ease; }
@@ -329,7 +354,7 @@
     <div class="input-area-container">
         <div id="reply-dock">
             <div id="reply-text" style="font-size:0.8rem; color:#aaa; overflow:hidden; text-overflow:ellipsis;"></div>
-            <div onclick="cancelReply()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
+            <div onclick="cancelInteraction()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
         </div>
 
         <div id="emoji-tray">
@@ -894,11 +919,17 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // NEW: Note Reply Logic
+        // NEW: Unique Instagram-like Note Reply UI
         const noteReplyHtml = m.replyToNote ? `
-            <div class="note-reply-ui">
-                <div style="font-size:0.7rem; color:#888; margin-bottom:2px;">Replied to note</div>
-                <div style="font-style:italic;">"${m.replyToNote}"</div>
+            <div class="note-reply-container">
+                <div class="note-reply-pill">
+                    <div class="note-reply-label">
+                        <div class="note-icon-small"></div>
+                        Replied to note
+                    </div>
+                    <div class="note-reply-text">"${m.replyToNote}"</div>
+                </div>
+                <div class="note-reply-connector"></div>
             </div>
         ` : '';
 
@@ -989,7 +1020,7 @@
 
     function triggerReply(text) {
         replyingTo = text;
-        document.getElementById('reply-text').innerText = replyingTo;
+        document.getElementById('reply-text').innerText = "Replying to: " + replyingTo;
         document.getElementById('reply-dock').style.display = 'flex';
         mInput.focus(); 
     }
@@ -1013,9 +1044,10 @@
         
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
+            cancelInteraction(); // Close the editing dock
             await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
         } else {
-            const rText = replyingTo; cancelReply();
+            const rText = replyingTo; cancelInteraction(); // Close reply dock
             scrollToBottom();
             await db.collection("chats").doc(chatId).collection("messages").add({
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1134,12 +1166,31 @@
     }
 
     function closeMenu() { document.getElementById('menu-overlay').style.display = 'none'; }
-    function cancelReply() { replyingTo = null; document.getElementById('reply-dock').style.display = 'none'; }
     
+    // Unified Cancel function for Replying AND Editing
+    function cancelInteraction() { 
+        replyingTo = null; 
+        editModeId = null;
+        document.getElementById('reply-dock').style.display = 'none'; 
+        mInput.value = ""; // Clear input if cancelling edit
+        mInput.style.height = 'auto';
+    }
+    
+    // NEW: Proper Edit Mode with UI Feedback
     function initEdit() {
-        mInput.value = document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim();
-        mInput.style.height = 'auto'; mInput.style.height = mInput.scrollHeight + 'px';
-        editModeId = activeMenuId; closeMenu(); mInput.focus();
+        const textToEdit = document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim();
+        mInput.value = textToEdit;
+        mInput.style.height = 'auto'; 
+        mInput.style.height = mInput.scrollHeight + 'px';
+        
+        editModeId = activeMenuId; 
+        closeMenu(); 
+        
+        // Show the dock as "Editing"
+        document.getElementById('reply-text').innerHTML = "<strong>Editing:</strong> " + textToEdit;
+        document.getElementById('reply-dock').style.display = 'flex';
+        
+        mInput.focus();
     }
 
     async function unsendMsg() { 
