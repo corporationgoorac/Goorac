@@ -458,17 +458,13 @@
     });
     
     // === KEYBOARD FIX: Prevent focus loss on Send Button ===
-    // Use touchstart for immediate execution on mobile without blur
-    sendBtnUI.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Prevents loss of focus on the textarea
+    const handleSendClick = (e) => {
+        e.preventDefault(); // Stop button from stealing focus
         sendMsg();
-    });
+    };
 
-    // Use mousedown for PC to prevent focus loss (click event causes blur first)
-    sendBtnUI.addEventListener('mousedown', (e) => {
-        e.preventDefault(); 
-        sendMsg();
-    });
+    sendBtnUI.addEventListener('mousedown', handleSendClick);
+    sendBtnUI.addEventListener('touchstart', handleSendClick);
 
     function formatTime12(date) {
         let hours = date.getHours();
@@ -1090,16 +1086,16 @@
 
         popSound.play().catch(e => {});
 
+        // KEYBOARD FIX: Clear value but DO NOT BLUR
         mInput.value = "";
         mInput.style.height = 'auto'; 
+        
         sendBtnUI.classList.remove('active'); 
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
-        // KEEP FOCUS TO PREVENT KEYBOARD CLOSE
+        // FORCE FOCUS TO REMAIN
         mInput.focus(); 
-        // Forced refocus just in case
-        setTimeout(() => mInput.focus(), 10); 
 
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
