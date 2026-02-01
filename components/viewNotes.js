@@ -42,13 +42,13 @@ class ViewNotes extends HTMLElement {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.7); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
+                /* REMOVED BLUR for faster opening/performance */
             }
             .vn-sheet {
                 background: #1c1c1e; width: 100%; max-width: 500px;
                 border-radius: 24px 24px 0 0; padding: 24px 20px;
-                transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 1.25, 0.32, 1);
+                /* Speed up transition: 0.25s for snappier feel */
+                transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.32, 1.25, 0.32, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 padding-bottom: max(30px, env(safe-area-inset-bottom));
                 box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
@@ -61,7 +61,7 @@ class ViewNotes extends HTMLElement {
                 border-radius: 10px; margin: -10px auto 25px; 
             }
 
-            /* --- NEW UI: Friend Profile Header --- */
+            /* --- UI: Profile Header --- */
             .vn-profile-header {
                 display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
             }
@@ -81,7 +81,7 @@ class ViewNotes extends HTMLElement {
                 -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
             }
 
-            /* --- NEW UI: Note Card --- */
+            /* --- UI: Note Card --- */
             .vn-note-card {
                 padding: 24px; border-radius: 24px; margin-bottom: 20px;
                 text-align: center; position: relative; overflow: hidden;
@@ -109,9 +109,7 @@ class ViewNotes extends HTMLElement {
                 margin-top: 10px; margin-bottom: 20px; font-weight: 500; 
             }
 
-            /* Own Note Specifics */
-            .vn-header { text-align: center; margin-bottom: 25px; }
-            .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
+            /* Likers Section (Own Note) */
             .vn-likers-section { 
                 max-height: 250px; overflow-y: auto; 
                 margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
@@ -197,17 +195,16 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // --- FETCH REAL USER DATA (UI Redesign Requirement) ---
-        if (!isOwnNote) {
-            try {
-                // Fetch the user document from the 'users' collection using the note's UID
-                const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
-                if (userDoc.exists) {
-                    this.currentUserProfile = userDoc.data();
-                }
-            } catch (err) {
-                console.error("Error fetching user profile for note:", err);
+        // --- FETCH PROFILE DATA (For BOTH Own and Friend notes) ---
+        // We do this to ensure we have the verification badge, handle, and latest name
+        // regardless of whether it's me or a friend.
+        try {
+            const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
+            if (userDoc.exists) {
+                this.currentUserProfile = userDoc.data();
             }
+        } catch (err) {
+            console.error("Error fetching user profile:", err);
         }
 
         // Render with new data
@@ -246,20 +243,37 @@ class ViewNotes extends HTMLElement {
     }
 
     renderOwnNote(note) {
-        // Keep original layout for Own Note, just slight clean up
+        // --- UPDATED: Uses the same rich profile header as Friends ---
         const timeAgo = this.getRelativeTime(note.createdAt);
+        
+        const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
+        const displayName = this.currentUserProfile?.name || note.username || 'You';
+        const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
+        const isVerified = this.currentUserProfile?.verified === true;
+
         return `
-            <div class="vn-header">
-                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
-                <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
+            <div class="vn-profile-header">
+                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='profile.html'">
+                <div class="vn-friend-info">
+                    <div class="vn-friend-name">
+                        ${displayName}
+                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                    </div>
+                    <div class="vn-friend-handle">${displayHandle}</div>
+                </div>
+            </div>
+
+            <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                <div class="vn-note-text">${note.text || ''}</div>
                 ${note.songName ? `
                     <div class="vn-song-pill">
                         <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                         <span>${note.songName}</span>
                     </div>
                 ` : ''}
-                <div class="vn-timestamp">${timeAgo}</div>
             </div>
+
+            <div class="vn-timestamp">${timeAgo}</div>
 
             <div class="vn-likers-section">
                 <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
