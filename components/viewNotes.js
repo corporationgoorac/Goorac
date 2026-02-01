@@ -13,11 +13,17 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
         this.unsubscribe = null;
+        
+        // Swipe Logic Variables
+        this.startY = 0;
+        this.currentY = 0;
+        this.isDragging = false;
     }
 
     connectedCallback() {
         this.render();
         this.setupEventListeners();
+        this.setupSwipeLogic();
     }
 
     getRelativeTime(timestamp) {
@@ -40,25 +46,43 @@ class ViewNotes extends HTMLElement {
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.85); display: none; z-index: 2000;
+                background: rgba(0,0,0,0.6); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: blur(5px);
+                /* No Blur as requested */
+                backdrop-filter: none; 
+                opacity: 0; transition: opacity 0.2s ease;
             }
+            .vn-overlay.open { display: flex; opacity: 1; }
+            
             .vn-sheet {
                 background: #121212; width: 100%; max-width: 500px;
                 border-radius: 24px 24px 0 0; padding: 24px 20px;
-                transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                transform: translateY(100%); 
+                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 padding-bottom: max(20px, env(safe-area-inset-bottom));
                 display: flex; flex-direction: column; max-height: 90vh;
                 border-top: 1px solid #333;
+                box-shadow: 0 -5px 30px rgba(0,0,0,0.5);
             }
-            .vn-overlay.open { display: flex; }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
+            /* --- PC RESPONSIVENESS --- */
+            @media (min-width: 600px) {
+                .vn-overlay { align-items: center; }
+                .vn-sheet {
+                    border-radius: 24px;
+                    width: 400px;
+                    max-height: 80vh;
+                    transform: scale(0.95); opacity: 0;
+                    margin: 0 auto;
+                }
+                .vn-overlay.open .vn-sheet { transform: scale(1); opacity: 1; }
+            }
+
             .vn-drag-handle { 
                 width: 40px; height: 5px; background: #3a3a3c; 
-                border-radius: 10px; margin: -10px auto 25px; 
+                border-radius: 10px; margin: -10px auto 25px; cursor: grab;
             }
 
             .vn-profile-header {
@@ -146,9 +170,24 @@ class ViewNotes extends HTMLElement {
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- OWN NOTE STYLES --- */
+            /* --- OWN NOTE STYLES (NEW NOTE INPUT) --- */
             .vn-likers-section { margin-top: 20px; border-top: 1px solid #222; padding-top: 15px; }
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+            
+            .vn-new-note-container {
+                background: #1c1c1e; border-radius: 16px; padding: 16px;
+                margin-top: 10px; display: flex; flex-direction: column; gap: 10px;
+            }
+            .vn-new-note-input {
+                background: transparent; border: none; color: white; font-size: 1rem;
+                width: 100%; outline: none; resize: none; font-family: inherit;
+            }
+            .vn-post-btn {
+                align-self: flex-end; background: #0095f6; color: white; border: none;
+                padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer;
+                font-size: 0.9rem;
+            }
+
             .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
             .vn-btn-danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
 
@@ -160,8 +199,8 @@ class ViewNotes extends HTMLElement {
         </style>
 
         <div class="vn-overlay" id="vn-overlay">
-            <div class="vn-sheet">
-                <div class="vn-drag-handle"></div>
+            <div class="vn-sheet" id="vn-sheet">
+                <div class="vn-drag-handle" id="vn-handle"></div>
                 <div id="vn-content" style="display:flex; flex-direction:column; height:100%;"></div>
             </div>
         </div>
@@ -181,10 +220,56 @@ class ViewNotes extends HTMLElement {
         });
     }
 
+    setupSwipeLogic() {
+        const sheet = this.querySelector('#vn-sheet');
+        const handle = this.querySelector('#vn-handle');
+        
+        // Allow dragging from handle or top of sheet
+        const startDrag = (e) => {
+            this.startY = e.touches ? e.touches[0].clientY : e.clientY;
+            this.isDragging = true;
+            sheet.style.transition = 'none'; // Disable transition for direct tracking
+        };
+
+        const onDrag = (e) => {
+            if (!this.isDragging) return;
+            this.currentY = e.touches ? e.touches[0].clientY : e.clientY;
+            const deltaY = this.currentY - this.startY;
+            
+            // Only allow dragging down
+            if (deltaY > 0) {
+                e.preventDefault(); // Prevent scroll
+                sheet.style.transform = `translateY(${deltaY}px)`;
+            }
+        };
+
+        const endDrag = (e) => {
+            if (!this.isDragging) return;
+            this.isDragging = false;
+            sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            
+            const deltaY = this.currentY - this.startY;
+            // Threshold to close (120px)
+            if (deltaY > 120) {
+                this.close();
+            } else {
+                sheet.style.transform = `translateY(0)`;
+            }
+        };
+
+        handle.addEventListener('touchstart', startDrag);
+        handle.addEventListener('touchmove', onDrag);
+        handle.addEventListener('touchend', endDrag);
+        
+        // Also allow mouse drag for PC testing
+        handle.addEventListener('mousedown', startDrag);
+        window.addEventListener('mousemove', onDrag);
+        window.addEventListener('mouseup', endDrag);
+    }
+
     async open(initialNoteData, isOwnNote = false) {
         if (!initialNoteData && isOwnNote) {
-            window.location.href = 'notes.html';
-            return;
+            // If empty own note, redirect to creation or show creation UI (handled below)
         }
 
         if (this.unsubscribe) {
@@ -199,18 +284,20 @@ class ViewNotes extends HTMLElement {
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
 
-        if (initialNoteData.songPreview) {
+        if (initialNoteData && initialNoteData.songPreview) {
             this.audioPlayer.src = initialNoteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        try {
-            const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
-            if (userDoc.exists) {
-                this.currentUserProfile = userDoc.data();
+        if (initialNoteData && initialNoteData.uid) {
+            try {
+                const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
+                if (userDoc.exists) {
+                    this.currentUserProfile = userDoc.data();
+                }
+            } catch (err) {
+                console.error("Error fetching user profile:", err);
             }
-        } catch (err) {
-            console.error("Error fetching user profile:", err);
         }
 
         this.renderContent();
@@ -222,14 +309,14 @@ class ViewNotes extends HTMLElement {
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
-        if (initialNoteData.uid) {
+        if (initialNoteData && initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         this.currentNote = { ...doc.data(), uid: doc.id };
                         this.renderContent(); 
-                    } else {
-                        this.close();
+                    } else if (!this.isOwnNote) {
+                        this.close(); // Close if friend deletes note
                     }
                 });
         }
@@ -237,6 +324,11 @@ class ViewNotes extends HTMLElement {
 
     renderContent() {
         const content = this.querySelector('#vn-content');
+        if (!this.currentNote && this.isOwnNote) {
+            // Mock empty note for creation
+            this.currentNote = { text: "Add a note...", uid: firebase.auth().currentUser.uid };
+        }
+
         content.innerHTML = this.isOwnNote 
             ? this.getOwnNoteHTML(this.currentNote) 
             : this.getFriendNoteHTML(this.currentNote);
@@ -246,8 +338,9 @@ class ViewNotes extends HTMLElement {
 
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
-        const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
-        const displayName = this.currentUserProfile?.name || note.username || 'You';
+        const user = firebase.auth().currentUser;
+        const displayPfp = this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
+        const displayName = this.currentUserProfile?.name || user?.displayName || 'You';
         
         return `
             <div class="vn-profile-header">
@@ -260,7 +353,7 @@ class ViewNotes extends HTMLElement {
 
             <div class="vn-scroll-content">
                 <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                    <div class="vn-note-text">${note.text || ''}</div>
+                    <div class="vn-note-text">${note.text || 'Share a thought...'}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
                             <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -269,6 +362,12 @@ class ViewNotes extends HTMLElement {
                     ` : ''}
                 </div>
                 <div class="vn-timestamp">${timeAgo}</div>
+
+                <div style="font-weight:700; font-size:0.9rem; margin-top:20px; color:#888;">Leave a new note</div>
+                <div class="vn-new-note-container">
+                    <textarea id="vn-new-note-input" class="vn-new-note-input" rows="2" placeholder="What's on your mind?"></textarea>
+                    <button id="vn-post-btn" class="vn-post-btn">Share</button>
+                </div>
 
                 <div class="vn-likers-section">
                     <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#888;">Activity</div>
@@ -354,9 +453,31 @@ class ViewNotes extends HTMLElement {
                     try {
                         await this.db.collection("active_notes").doc(user.uid).delete();
                         this.close();
-                        window.location.reload(); 
                     } catch(e) { console.error(e); }
                 }
+            };
+        }
+
+        const postBtn = this.querySelector('#vn-post-btn');
+        if (postBtn) {
+            postBtn.onclick = async () => {
+                const text = this.querySelector('#vn-new-note-input').value.trim();
+                if (!text) return;
+                
+                try {
+                    // Simple text note creation
+                    await this.db.collection("active_notes").doc(user.uid).set({
+                        text: text,
+                        uid: user.uid,
+                        username: user.displayName || "User",
+                        pfp: user.photoURL,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+                        likes: []
+                    });
+                    this.querySelector('#vn-new-note-input').value = "";
+                    alert("Note posted!");
+                } catch(e) { console.error(e); }
             };
         }
 
@@ -675,7 +796,10 @@ const NotesManager = {
                 preview.style.color = 'rgba(255,255,255,0.7)';
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
-                btn.onclick = () => window.location.href = 'notes.html';
+                btn.onclick = () => {
+                    const viewer = document.querySelector('view-notes');
+                    viewer.open(null, true); // Open blank note creation
+                };
             }
         });
     },
