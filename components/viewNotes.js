@@ -1,495 +1,419 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Quantum Calls</title>
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+/**
+ * ViewNotes Component
+ * Handles the Instagram-style bottom sheet for viewing and interacting with notes.
+ * Integrated with Firebase for Like/Delete functionality.
+ */
+class ViewNotes extends HTMLElement {
+    constructor() {
+        super();
+        this.currentNote = null;
+        this.isOwnNote = false;
+        this.audioPlayer = new Audio();
+        this.audioPlayer.loop = true;
+        this.db = firebase.firestore();
+    }
 
-    <style>
-        :root {
-            --bg: #0b141a;
-            --accent: #00d2ff; 
-            --border: rgba(255, 255, 255, 0.1);
-            --text-dim: #888; 
-            --danger: #ff4444; 
-            --success: #1ebea5;
-            --ig-blue: #0095f6;
-        }
+    connectedCallback() {
+        this.render();
+        this.setupEventListeners();
+    }
 
-        body {
-            background: #000; color: white; margin: 0;
-            font-family: -apple-system, system-ui, sans-serif;
-            height: 100vh; overflow: hidden;
-            display: flex; flex-direction: column;
-            -webkit-user-select: none; user-select: none;
-        }
-
-        input { -webkit-user-select: text; user-select: text; }
-
-        header { padding: 15px 20px; border-bottom: 1px solid var(--border); background: #000; }
-        .header-logo { font-weight: 900; font-size: 1.4rem; color: var(--accent); }
-        .search-box { padding: 15px; }
-        .search-box input { width: 100%; background: #111; border: 1px solid var(--border); padding: 12px; border-radius: 12px; color: white; outline: none; box-sizing: border-box; }
-        .tabs { display: flex; padding: 0 20px 10px; gap: 20px; border-bottom: 1px solid var(--border); }
-        .tab { font-size: 0.8rem; font-weight: 800; color: var(--text-dim); cursor: pointer; padding-bottom: 5px; }
-        .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
-
-        #list-container { flex: 1; overflow-y: auto; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
-
-        /* Skeleton UI */
-        .skeleton { background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 4px; }
-        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; gap: 15px; }
-        .sk-pfp { width: 50px; height: 50px; border-radius: 50%; }
-        .sk-text { height: 12px; width: 60%; margin-bottom: 8px; }
-        .sk-meta { height: 10px; width: 40%; }
-
-        /* List Items */
-        .call-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .call-pfp { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 1.5px solid var(--border); }
-        .call-info { flex: 1; }
-        .u-name { font-weight: 700; display: flex; align-items: center; gap: 4px; }
-        
-        .v-badge { 
-            display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px;
-            background-color: var(--ig-blue);
-            -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
-            mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
-            -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-            position: relative; margin-left: 4px; flex-shrink: 0; vertical-align: middle;
-        }
-        .v-badge::before { content: ""; width: 3.5px; height: 6.5px; border: solid white; border-width: 0 1.8px 1.8px 0; transform: translateY(-1px) rotate(45deg); }
-
-        .call-meta { font-size: 0.75rem; color: var(--text-dim); }
-        .status-missed { color: var(--danger); font-weight: bold; }
-        .status-incoming { color: var(--success); }
-        .status-outgoing { color: var(--accent); }
-        .btn-call { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0, 210, 255, 0.1); color: var(--accent); cursor: pointer; }
-
-        /* Call Screen */
-        #call-screen {
-            position: fixed; inset: 0; background: linear-gradient(to bottom, #0b141a, #121b22); z-index: 9999;
-            display: none; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 40px;
-        }
-        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; background: #000; }
-        #local-video { position: absolute; top: 40px; right: 20px; width: 90px; height: 130px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 10; display: none; background: #000; }
-        .call-header { z-index: 5; text-align: center; }
-        .call-header h2 { font-size: 1.8rem; margin: 0 0 8px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        #call-status { font-size: 0.9rem; color: #aebac1; text-transform: uppercase; letter-spacing: 1.5px; margin: 0; }
-        #call-timer { font-size: 1rem; color: white; margin-top: 5px; font-weight: 400; display: none; }
-        .call-body { z-index: 5; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
-        .big-pfp-container { position: relative; }
-        #target-pfp { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); }
-        .pulse { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); animation: pulse-ring 2s infinite; }
-        @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
-        
-        .call-controls { display: flex; flex-direction: column; gap: 30px; z-index: 20; width: 100%; align-items: center; }
-        .control-row { display: flex; gap: 25px; align-items: center; justify-content: center; }
-        .ctrl-btn { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; background: rgba(255,255,255,0.15); }
-        .btn-end { width: 65px; height: 65px; background: var(--danger) !important; }
-        .btn-accept { width: 65px; height: 65px; background: var(--success) !important; }
-        .btn-off { background: rgba(255,255,255,0.5); color: #000; }
-    </style>
-</head>
-<body oncontextmenu="return false;">
-
-    <audio id="ringtone" loop preload="auto"><source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg"></audio>
-    <audio id="dialtone" loop preload="auto"><source src="https://www.soundjay.com/phone/sounds/phone-calling-1.mp3" type="audio/mpeg"></audio>
-
-    <header>
-        <div class="header-logo">GOORAC</div>
-        <div class="search-box"><input type="text" id="search" placeholder="Search..." autocomplete="off"></div>
-        <div class="tabs">
-            <div class="tab active" id="tab-recent" onclick="switchTab('recent')">Recent</div>
-            <div class="tab" id="tab-contacts" onclick="switchTab('contacts')">Contacts</div>
-        </div>
-    </header>
-
-    <div id="list-container"></div>
-
-    <div id="call-screen">
-        <video id="remote-video" autoplay playsinline></video>
-        <video id="local-video" autoplay playsinline muted></video>
-        <div class="call-header">
-            <h2 id="target-name">User</h2>
-            <p id="call-status">RINGING...</p>
-            <div id="call-timer">00:00</div>
-        </div>
-        <div class="call-body" id="pfp-area">
-            <div class="big-pfp-container">
-                <div class="pulse" id="ring-animation"></div>
-                <img src="" id="target-pfp">
-            </div>
-        </div>
-        <div class="call-controls">
-            <div class="control-row">
-                <button class="ctrl-btn" id="mic-btn" onclick="toggleMic()">🎙️</button>
-                <button class="ctrl-btn" id="cam-btn" onclick="toggleCam()">📷</button>
-                <button class="ctrl-btn" id="speaker-btn">🔊</button>
-            </div>
-            <div class="control-row">
-                <button class="ctrl-btn btn-accept" id="answer-btn" style="display:none;" onclick="answerCall()">📞</button>
-                <button class="ctrl-btn btn-end" id="hangup-btn" onclick="hangUp()">📞</button>
-            </div>
-        </div>
-    </div>
-
-    <call-notifier></call-notifier>
-
-    <script>
-        // Custom Element Notifier
-        class CallNotifier extends HTMLElement {
-            constructor() { super(); }
-            connectedCallback() {
-                this.innerHTML = `
-                <style>
-                    #notif-banner {
-                        position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
-                        width: calc(100% - 30px); max-width: 400px;
-                        background: rgba(10, 15, 20, 0.98); backdrop-filter: blur(20px);
-                        border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 24px;
-                        padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-                        z-index: 100000; box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-                        transition: top 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-                    }
-                    #notif-banner.active { top: 20px; }
-                    .nb-info { display: flex; align-items: center; gap: 12px; color: white; }
-                    .nb-pfp { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
-                    .nb-text h4 { margin: 0; font-size: 0.95rem; }
-                    .nb-text p { margin: 0; font-size: 0.75rem; color: var(--accent); }
-                    .nb-actions { display: flex; gap: 10px; }
-                    .nb-btn { border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
-                    .nb-acc { background: var(--accent); color: black; }
-                    .nb-dec { background: rgba(255,68,68,0.2); color: #ff4444; }
-                </style>
-                <div id="notif-banner">
-                    <div class="nb-info">
-                        <img id="nb-img" class="nb-pfp" src="">
-                        <div class="nb-text"><h4 id="nb-user">User</h4><p>Incoming Call...</p></div>
-                    </div>
-                    <div class="nb-actions">
-                        <button class="nb-btn nb-dec" id="nb-decline">Decline</button>
-                        <button class="nb-btn nb-acc" id="nb-answer">Answer</button>
-                    </div>
-                </div>`;
+    render() {
+        this.innerHTML = `
+        <style>
+            .vn-overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); display: none; z-index: 2000;
+                justify-content: center; align-items: flex-end;
+                backdrop-filter: blur(4px);
             }
-            show(name, pfp, onAccept, onDecline) {
-                const b = this.querySelector('#notif-banner');
-                this.querySelector('#nb-user').innerText = name;
-                this.querySelector('#nb-img').src = pfp || 'https://via.placeholder.com/150';
-                b.classList.add('active');
-                this.querySelector('#nb-answer').onclick = () => { b.classList.remove('active'); onAccept(); };
-                this.querySelector('#nb-decline').onclick = () => { b.classList.remove('active'); onDecline(); };
+            .vn-sheet {
+                background: #1c1c1e; width: 100%; max-width: 500px;
+                border-radius: 20px 20px 0 0; padding: 24px 20px;
+                transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                padding-bottom: max(30px, env(safe-area-inset-bottom));
             }
-            hide() { this.querySelector('#notif-banner').classList.remove('active'); }
-        }
-        customElements.define('call-notifier', CallNotifier);
+            .vn-overlay.open { display: flex; }
+            .vn-overlay.open .vn-sheet { transform: translateY(0); }
+            
+            .vn-drag-handle { 
+                width: 40px; height: 5px; background: #333; 
+                border-radius: 10px; margin: -10px auto 20px; 
+            }
 
-        // Firebase Setup
-        const firebaseConfig = {
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-            authDomain: "goorac-c3b59.firebaseapp.com",
-            projectId: "goorac-c3b59",
-            storageBucket: "goorac-c3b59.firebasestorage.app",
-            messagingSenderId: "746746595332",
-            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+            .vn-header { text-align: center; margin-bottom: 25px; }
+            .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
+            
+            .vn-song-tag { 
+                display: inline-flex; align-items: center; gap: 6px; 
+                background: rgba(255,255,255,0.1); padding: 6px 14px; 
+                border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            }
+
+            .vn-bubble-text { 
+                font-size: 1.1rem; font-weight: 500; margin: 15px 0; 
+                line-height: 1.4; color: #fff;
+            }
+
+            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 5px; }
+
+            .vn-likers-section { 
+                max-height: 250px; overflow-y: auto; 
+                margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
+            }
+            .vn-liker-item { 
+                display: flex; align-items: center; justify-content: space-between; 
+                margin-bottom: 15px; animation: vnFadeIn 0.3s ease;
+            }
+            .vn-liker-info { display: flex; align-items: center; gap: 12px; }
+            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+
+            .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+            .vn-btn { 
+                width: 100%; padding: 14px; border-radius: 14px; border: none; 
+                font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
+            }
+            .vn-btn:active { opacity: 0.7; }
+            .vn-btn-primary { background: #007aff; color: white; }
+            .vn-btn-danger { background: transparent; color: #ff3b30; }
+
+            .vn-interaction-bar { 
+                display: flex; align-items: center; gap: 12px; margin-top: 20px; 
+                background: #262626; padding: 8px 16px; border-radius: 30px;
+            }
+            .vn-reply-input { 
+                flex: 1; background: none; border: none; color: white; 
+                font-size: 0.95rem; padding: 8px 0; outline: none;
+            }
+            .vn-heart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 5px; }
+
+            @keyframes vnFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        </style>
+
+        <div class="vn-overlay" id="vn-overlay">
+            <div class="vn-sheet">
+                <div class="vn-drag-handle"></div>
+                <div id="vn-content"></div>
+            </div>
+        </div>
+        `;
+    }
+
+    setupEventListeners() {
+        this.querySelector('#vn-overlay').onclick = (e) => {
+            if (e.target.id === 'vn-overlay') this.close();
         };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const rdb = firebase.database();
-        const auth = firebase.auth();
+    }
 
-        // Global State
-        let myUid, myData, pc, localStream, timerInterval;
-        let currentCallId = null;
-        let isCaller = false;
-        let secondsElapsed = 0;
-        let currentActiveTarget = null;
-        let isCamOn = false;
-        let remoteCandidatesQueue = [];
+    async open(noteData, isOwnNote = false) {
+        if (!noteData && isOwnNote) {
+            window.location.href = 'notes.html';
+            return;
+        }
 
-        const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
+        this.currentNote = noteData;
+        this.isOwnNote = isOwnNote;
+        const overlay = this.querySelector('#vn-overlay');
+        const content = this.querySelector('#vn-content');
 
-        auth.onAuthStateChanged(async user => {
+        if (noteData.songPreview) {
+            this.audioPlayer.src = noteData.songPreview;
+            this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
+        }
+
+        content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
+        overlay.classList.add('open');
+        this.vibrate(10);
+        
+        // Internal activation of buttons
+        this.handleActions();
+    }
+
+    renderOwnNote(note) {
+        // Updated to use photoURL first
+        return `
+            <div class="vn-header">
+                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
+                ${note.songName ? `
+                    <div class="vn-song-tag">
+                        <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <span>${note.songName}</span>
+                    </div>
+                ` : ''}
+                <div class="vn-timestamp">Shared ${note.timeString || 'Recently'}</div>
+            </div>
+
+            <div class="vn-likers-section">
+                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
+                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
+                    <div class="vn-liker-item">
+                        <div class="vn-liker-info">
+                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
+                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
+                        </div>
+                        <span style="color:#ff3b30;">❤️</span>
+                    </div>
+                `).join('') : `
+                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
+                `}
+            </div>
+
+            <div class="vn-action-group">
+                <button class="vn-btn vn-btn-primary" onclick="window.location.href='notes.html'">Leave a new note</button>
+                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete note</button>
+            </div>
+        `;
+    }
+
+    renderFriendNote(note) {
+        const user = firebase.auth()?.currentUser;
+        const isLiked = note.likes?.some(l => l.uid === user?.uid);
+
+        // Updated to use photoURL first
+        return `
+            <div class="vn-header">
+                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
+                <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
+                <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
+                    ${note.text}
+                </div>
+                ${note.songName ? `
+                    <div style="margin-top:10px;">
+                        <div class="vn-song-tag">
+                             <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                             <span>${note.songName} • ${note.songArtist}</span>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="vn-interaction-bar">
+                <input type="text" class="vn-reply-input" placeholder="Reply to ${note.username || 'user'}...">
+                <button class="vn-heart-btn" id="like-toggle-btn">
+                    ${isLiked ? '❤️' : '🤍'}
+                </button>
+            </div>
+        `;
+    }
+
+    close() {
+        this.audioPlayer.pause();
+        this.querySelector('#vn-overlay').classList.remove('open');
+        this.vibrate(5);
+    }
+
+    vibrate(ms) {
+        if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
+    handleActions() {
+        // Delete Functionality
+        const deleteBtn = this.querySelector('#delete-note-btn');
+        if(deleteBtn) {
+            deleteBtn.onclick = async () => {
+                if(confirm("Delete this note?")) {
+                    const user = firebase.auth().currentUser;
+                    try {
+                        await this.db.collection("active_notes").doc(user.uid).delete();
+                        this.close();
+                        window.location.reload();
+                    } catch(e) { console.error("Delete failed", e); }
+                }
+            };
+        }
+
+        // Like/Unlike Functionality
+        const likeBtn = this.querySelector('#like-toggle-btn');
+        if(likeBtn) {
+            likeBtn.onclick = async () => {
+                const user = firebase.auth().currentUser;
+                if(!user) return;
+
+                this.vibrate(15);
+                const isCurrentlyLiked = likeBtn.innerText === '❤️';
+                const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
+
+                // UI feedback
+                likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
+
+                try {
+                    if (!isCurrentlyLiked) {
+                        await noteRef.update({
+                            likes: firebase.firestore.FieldValue.arrayUnion({
+                                uid: user.uid,
+                                displayName: user.displayName || "User",
+                                photoURL: user.photoURL || ""
+                            })
+                        });
+                    } else {
+                        const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
+                        if (likerObj) {
+                            await noteRef.update({
+                                likes: firebase.firestore.FieldValue.arrayRemove(likerObj)
+                            });
+                        }
+                    }
+                } catch (e) { console.error("Like toggle failed", e); }
+            };
+        }
+    }
+}
+
+customElements.define('view-notes', ViewNotes);
+
+
+// ==========================================
+// NEW: Notes Manager for Fetching & Mutuals
+// ==========================================
+// Paste this below the class or in your main script
+// Ensures "Search and display mutual frnds notes" works.
+
+const NotesManager = {
+    allNotes: [],
+    
+    // Call this function when the page loads
+    init: function() {
+        firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                myUid = user.uid;
-                const doc = await db.collection("users").doc(myUid).get();
-                myData = doc.data() || {};
-                loadData();
-                listenForPings();
-            } else { window.location.href = 'login.html'; }
+                this.loadMutualNotes(user);
+            }
+        });
+    },
+
+    loadMutualNotes: async function(user) {
+        const db = firebase.firestore();
+        const container = document.getElementById('notes-list-container'); // Ensure you have this DIV in your HTML
+        if(!container) return;
+
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
+
+        try {
+            // 1. Get current user's profile to see who they follow
+            const myProfileDoc = await db.collection("users").doc(user.uid).get();
+            const myData = myProfileDoc.data();
+            const myFollowing = myData?.following || [];
+
+            // 2. Fetch ALL active notes (Realtime listener recommended)
+            db.collection("active_notes").onSnapshot(async (snapshot) => {
+                const rawNotes = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+                
+                // 3. FILTER FOR MUTUALS
+                const mutualNotesPromises = rawNotes.map(async (note) => {
+                    // Always show own note
+                    if (note.uid === user.uid) {
+                        return { ...note, isOwn: true, photoURL: user.photoURL }; 
+                    }
+
+                    // STRICT FILTER: If I don't follow them, ignore immediately
+                    if (!myFollowing.includes(note.uid)) return null;
+
+                    // Strict Mutual Check: Does this user follow me back?
+                    try {
+                        const authorDoc = await db.collection("users").doc(note.uid).get();
+                        if (!authorDoc.exists) return null;
+                        
+                        const authorData = authorDoc.data();
+                        const authorFollowing = authorData.following || [];
+
+                        // MUTUAL CONDITION: They must follow me back
+                        if (authorFollowing.includes(user.uid)) {
+                            return { 
+                                ...note, 
+                                isOwn: false, 
+                                photoURL: authorData.photoURL, 
+                                username: authorData.username 
+                            };
+                        }
+                    } catch (e) {
+                        console.error("Error checking mutual:", e);
+                    }
+                    return null;
+                });
+
+                // Resolve all promises and filter out nulls
+                const resolvedNotes = await Promise.all(mutualNotesPromises);
+                
+                // Final verification: Ensure only valid mutual notes are stored
+                this.allNotes = resolvedNotes.filter(n => n !== null);
+
+                // Render the list
+                this.renderList(this.allNotes);
+            });
+
+        } catch (e) {
+            console.error("Error loading notes:", e);
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading updates</div>';
+        }
+    },
+
+    renderList: function(notes) {
+        const container = document.getElementById('notes-list-container');
+        if(!container) return;
+        
+        container.innerHTML = '';
+        
+        if (notes.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No notes from mutuals.</div>';
+            return;
+        }
+
+        // Horizontal Scroll Container
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none;";
+        
+        notes.forEach(note => {
+            const bubble = document.createElement('div');
+            bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
+            
+            // Note Bubble UI
+            bubble.innerHTML = `
+                <div style="position: relative;">
+                    <div style="
+                        width: 70px; height: 70px; border-radius: 50%; 
+                        padding: 3px; border: 2px solid ${note.isOwn ? '#333' : '#00d2ff'};
+                    ">
+                        <img src="${note.photoURL || 'https://via.placeholder.com/70'}" 
+                             style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    </div>
+                    ${note.text ? `
+                        <div style="
+                            position: absolute; top: -10px; right: -10px; 
+                            background: rgba(255,255,255,0.9); color: black; 
+                            padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; 
+                            max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        ">
+                            ${note.text}
+                        </div>
+                    ` : ''}
+                </div>
+                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.username || 'You'}</div>
+            `;
+
+            // Handle Click -> Open ViewNotes Component
+            bubble.onclick = () => {
+                const viewer = document.querySelector('view-notes');
+                if (viewer) viewer.open(note, note.isOwn);
+            };
+
+            scrollWrapper.appendChild(bubble);
         });
 
-        // --- NEW WEBRTC LOGIC ---
+        container.appendChild(scrollWrapper);
+    },
 
-        async function initWebRTC() {
-            pc = new RTCPeerConnection(servers);
-            remoteCandidatesQueue = [];
+    // Call this from your search input oninput="NotesManager.filter(this.value)"
+    filter: function(query) {
+        const lowerQ = query.toLowerCase();
+        const filtered = this.allNotes.filter(n => 
+            (n.username && n.username.toLowerCase().includes(lowerQ)) ||
+            (n.text && n.text.toLowerCase().includes(lowerQ))
+        );
+        this.renderList(filtered);
+    }
+};
 
-            pc.onicecandidate = (event) => {
-                if (event.candidate && currentCallId) {
-                    rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).push(event.candidate.toJSON());
-                }
-            };
-
-            pc.ontrack = (event) => {
-                const rv = document.getElementById('remote-video');
-                rv.srcObject = event.streams[0];
-                rv.style.display = 'block';
-                document.getElementById('pfp-area').style.display = 'none';
-            };
-
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('local-video').srcObject = localStream;
-            localStream.getVideoTracks()[0].enabled = false; // Default camera off
-
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-        }
-
-        async function processQueuedCandidates() {
-            while (remoteCandidatesQueue.length > 0) {
-                const candidate = remoteCandidatesQueue.shift();
-                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } 
-                catch (e) { console.warn("ICE candidate failed", e); }
-            }
-        }
-
-        async function startCall(targetUid, name, pfp, isVerified) {
-            if (currentCallId) return;
-            isCaller = true;
-            currentCallId = `call_${Date.now()}_${myUid}`;
-            currentActiveTarget = { uid: targetUid, name, pfp };
-
-            showCallUI(name, pfp, "DIALING...", isVerified);
-            document.getElementById('dialtone').play();
-
-            try {
-                await initWebRTC();
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-
-                const callPayload = {
-                    offer: { sdp: offer.sdp, type: offer.type },
-                    callerId: myUid, callerName: myData.name || "User",
-                    receiverId: targetUid, status: 'ringing', timestamp: Date.now()
-                };
-
-                await rdb.ref(`calls/${currentCallId}`).set(callPayload);
-                await rdb.ref(`signaling/${targetUid}`).set({ from: myUid, callId: currentCallId, name: myData.name, pfp: myData.photoURL, timestamp: Date.now() });
-
-                // Watch for answer and candidates
-                rdb.ref(`calls/${currentCallId}`).on('value', async snap => {
-                    const data = snap.val();
-                    if (!data) return;
-                    if (['declined', 'cancelled', 'ended'].includes(data.status)) hangUp(false);
-                    if (data.answer && !pc.currentRemoteDescription) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        await processQueuedCandidates();
-                        onConnected();
-                    }
-                });
-
-                rdb.ref(`calls/${currentCallId}/candidates/${targetUid}`).on('child_added', snap => {
-                    if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-                    else remoteCandidatesQueue.push(snap.val());
-                });
-
-            } catch (e) { console.error(e); hangUp(true); }
-        }
-
-        async function answerCall() {
-            document.getElementById('ringtone').pause();
-            updateCallStatus("CONNECTING...", "var(--accent)");
-
-            try {
-                const snap = await rdb.ref(`calls/${currentCallId}`).get();
-                const callData = snap.val();
-
-                await initWebRTC();
-                await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                await processQueuedCandidates();
-
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-
-                await rdb.ref(`calls/${currentCallId}`).update({ answer: { sdp: answer.sdp, type: answer.type }, status: 'connected' });
-                await rdb.ref(`signaling/${myUid}`).remove();
-
-                rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).on('child_added', snap => {
-                    if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-                    else remoteCandidatesQueue.push(snap.val());
-                });
-
-                onConnected();
-            } catch (e) { console.error(e); hangUp(true); }
-        }
-
-        function onConnected() {
-            document.getElementById('dialtone').pause();
-            document.getElementById('ringtone').pause();
-            updateCallStatus("CONNECTED", "#1ebea5");
-            document.getElementById('answer-btn').style.display = 'none';
-            startTimer();
-        }
-
-        function listenForPings() {
-            rdb.ref(`signaling/${myUid}`).on('value', snap => {
-                const data = snap.val();
-                if (!data || currentCallId) return;
-                
-                document.querySelector('call-notifier').show(data.name, data.pfp, 
-                    () => { // Accept
-                        currentCallId = data.callId;
-                        currentActiveTarget = { uid: data.from, name: data.name, pfp: data.pfp };
-                        showCallUI(data.name, data.pfp, "INCOMING...", false);
-                        document.getElementById('answer-btn').style.display = 'flex';
-                        document.getElementById('ringtone').pause();
-                    },
-                    () => { // Decline
-                        rdb.ref(`calls/${data.callId}`).update({ status: 'declined' });
-                        rdb.ref(`signaling/${myUid}`).remove();
-                        document.getElementById('ringtone').pause();
-                    }
-                );
-                document.getElementById('ringtone').play().catch(()=>{});
-            });
-        }
-
-        async function hangUp(shouldNotifyRemote = true) {
-            if (shouldNotifyRemote && currentCallId) {
-                const status = secondsElapsed > 0 ? 'ended' : (isCaller ? 'cancelled' : 'declined');
-                await rdb.ref(`calls/${currentCallId}`).update({ status });
-                if (isCaller) logCall(status);
-            }
-
-            if (currentCallId) {
-                rdb.ref(`calls/${currentCallId}`).off();
-                rdb.ref(`calls/${currentCallId}/candidates/${myUid}`).off();
-                if(currentActiveTarget) rdb.ref(`calls/${currentCallId}/candidates/${currentActiveTarget.uid}`).off();
-            }
-
-            if (timerInterval) clearInterval(timerInterval);
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (pc) pc.close();
-
-            document.getElementById('call-screen').style.display = 'none';
-            document.getElementById('ringtone').pause();
-            document.getElementById('dialtone').pause();
-            
-            setTimeout(() => window.location.reload(), 500);
-        }
-
-        // UI Helpers
-        function showCallUI(name, pfp, status, verified) {
-            document.getElementById('call-screen').style.display = 'flex';
-            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
-            document.getElementById('target-pfp').src = pfp || 'https://via.placeholder.com/150';
-            updateCallStatus(status, "var(--accent)");
-        }
-
-        function updateCallStatus(t, c) {
-            const el = document.getElementById('call-status');
-            el.innerText = t; el.style.color = c;
-        }
-
-        function startTimer() {
-            document.getElementById('call-timer').style.display = 'block';
-            timerInterval = setInterval(() => {
-                secondsElapsed++;
-                const m = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-                const s = String(secondsElapsed % 60).padStart(2, '0');
-                document.getElementById('call-timer').innerText = `${m}:${s}`;
-            }, 1000);
-        }
-
-        function toggleCam() {
-            if (!localStream) return;
-            isCamOn = !isCamOn;
-            localStream.getVideoTracks()[0].enabled = isCamOn;
-            document.getElementById('cam-btn').classList.toggle('btn-off', !isCamOn);
-            document.getElementById('local-video').style.display = isCamOn ? 'block' : 'none';
-        }
-
-        function toggleMic() {
-            if (!localStream) return;
-            const t = localStream.getAudioTracks()[0];
-            t.enabled = !t.enabled;
-            document.getElementById('mic-btn').classList.toggle('btn-off', !t.enabled);
-        }
-
-        // Data Loading (History/Contacts)
-        let cachedList = [];
-        async function loadData() {
-            const list = document.getElementById('list-container');
-            list.innerHTML = `<div class="skeleton-item"><div class="sk-pfp skeleton"></div><div style="flex:1"><div class="sk-text skeleton"></div><div class="sk-meta skeleton"></div></div></div>`;
-            const tab = document.querySelector('.tab.active').id;
-            if (tab === 'tab-recent') await loadRecent(); else await loadContacts();
-        }
-
-        async function loadRecent() {
-            const snap = await db.collection("call_logs").where('participants', 'array-contains', myUid).orderBy('timestamp', 'desc').limit(15).get();
-            const list = document.getElementById('list-container');
-            list.innerHTML = "";
-            snap.forEach(doc => {
-                const data = doc.data();
-                const isOutgoing = data.callerId === myUid;
-                const otherName = isOutgoing ? data.receiverName : data.callerName;
-                const otherPfp = isOutgoing ? data.receiverPfp : data.callerPfp;
-                const otherId = isOutgoing ? data.receiverId : data.callerId;
-                
-                list.innerHTML += `
-                <div class="call-item">
-                    <img src="${otherPfp || 'https://via.placeholder.com/150'}" class="call-pfp">
-                    <div class="call-info">
-                        <div class="u-name">${otherName}</div>
-                        <div class="call-meta">${isOutgoing ? '↗ Outgoing' : '↙ Incoming'} • ${data.duration}</div>
-                    </div>
-                    <button class="btn-call" onclick="startCall('${otherId}', '${otherName}', '${otherPfp}', false)">📞</button>
-                </div>`;
-            });
-        }
-
-        async function loadContacts() {
-            const following = myData.following || [];
-            const list = document.getElementById('list-container');
-            list.innerHTML = "";
-            for (let uid of following) {
-                const uDoc = await db.collection("users").doc(uid).get();
-                const u = uDoc.data();
-                if (u) {
-                    list.innerHTML += `
-                    <div class="call-item">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
-                        <div class="call-info"><div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div><div class="call-meta">@${u.username}</div></div>
-                        <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
-                    </div>`;
-                }
-            }
-        }
-
-        function switchTab(t) {
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-'+t).classList.add('active');
-            loadData();
-        }
-
-        async function logCall(status) {
-            if (!currentActiveTarget) return;
-            const dur = Math.floor(secondsElapsed / 60) + "m " + (secondsElapsed % 60) + "s";
-            await db.collection("call_logs").add({
-                participants: [myUid, currentActiveTarget.uid],
-                callerId: myUid, callerName: myData.name, callerPfp: myData.photoURL,
-                receiverId: currentActiveTarget.uid, receiverName: currentActiveTarget.name, receiverPfp: currentActiveTarget.pfp,
-                status, duration: dur, timestamp: Date.now()
-            });
-        }
-
-    </script>
-</body>
-</html>
+// Initialize
+// document.addEventListener('DOMContentLoaded', () => NotesManager.init());
