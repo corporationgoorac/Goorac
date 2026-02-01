@@ -679,17 +679,19 @@ const NotesManager = {
                 z-index: -1;
             }
 
-            /* --- NEW: Like Indicator on Note Bubble --- */
+            /* --- NEW: Like Indicator OUTSIDE Note Bubble --- */
             .note-like-indicator {
                 position: absolute;
-                bottom: -6px;
-                right: -4px;
-                font-size: 12px;
+                bottom: -8px; /* Pushed out more */
+                right: -8px;  /* Pushed out more */
+                font-size: 14px;
                 background: #1c1c1e;
                 border-radius: 50%;
-                padding: 2px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                z-index: 12;
+                width: 22px; height: 22px;
+                display: flex; align-items: center; justify-content: center;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+                border: 2px solid #121212; /* Border to separate from bubble */
+                z-index: 20;
             }
 
             .note-text-content {
@@ -790,6 +792,7 @@ const NotesManager = {
         const container = document.getElementById('notes-container');
         if(!container) return;
 
+        // REAL-TIME LISTENER FOR FRIENDS NOTES (UPDATED LOGIC)
         try {
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
@@ -807,56 +810,55 @@ const NotesManager = {
             let tempUIDs = [...mutualUIDs];
             while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 30));
 
-            const queries = chunks.map(chunk => {
-                return db.collection("active_notes")
+            // Use onSnapshot for real-time updates
+            chunks.forEach(chunk => {
+                db.collection("active_notes")
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
-                    .get();
+                    .onSnapshot(snapshot => {
+                        snapshot.docChanges().forEach(change => {
+                            const noteData = change.doc.data();
+                            const uid = change.doc.id;
+                            
+                            // Remove existing note element if it exists to prevent dupes/stale data
+                            const existingEl = document.getElementById(`note-${uid}`);
+                            if(existingEl) existingEl.remove();
+
+                            if (change.type === "added" || change.type === "modified") {
+                                const now = new Date();
+                                const isActive = noteData.expiresAt ? noteData.expiresAt.toDate() > now : true;
+                                
+                                if(isActive) {
+                                    const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
+                                    const div = document.createElement('div');
+                                    div.id = `note-${uid}`; // Unique ID for updating
+                                    div.className = 'note-item friend-note has-note';
+                                    div.innerHTML = `
+                                        <div class="note-bubble visible" style="background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}">
+                                            <div class="note-text-content">${noteData.text}</div>
+                                            ${noteData.songName ? `
+                                                <div class="note-music-tag">
+                                                    <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                                    <span>${noteData.songName.substring(0, 10)}${noteData.songName.length>10?'...':''}</span>
+                                                </div>
+                                            ` : ''}
+                                            ${isLiked ? '<div class="note-like-indicator">❤️</div>' : ''}
+                                        </div>
+                                        <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                                        <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
+                                    `;
+                                    div.onclick = () => {
+                                        const viewer = document.querySelector('view-notes');
+                                        const nav = document.querySelector('main-navbar');
+                                        if(nav) nav.classList.add('hidden');
+                                        viewer.open({ ...noteData, uid: uid }, false);
+                                    };
+                                    container.appendChild(div);
+                                }
+                            }
+                        });
+                    });
             });
 
-            const snapshots = await Promise.all(queries);
-            
-            let allNotes = [];
-            const now = new Date();
-
-            snapshots.forEach(snap => {
-                snap.forEach(doc => {
-                    const note = doc.data();
-                    const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
-                    if(isActive) allNotes.push({ ...note, uid: doc.id });
-                });
-            });
-
-            allNotes.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
-
-            container.querySelectorAll('.friend-note').forEach(e => e.remove());
-
-            allNotes.forEach(note => {
-                const isLiked = note.likes && note.likes.some(l => l.uid === user.uid);
-
-                const div = document.createElement('div');
-                div.className = 'note-item friend-note has-note';
-                div.innerHTML = `
-                    <div class="note-bubble visible" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                        <div class="note-text-content">${note.text}</div>
-                        ${note.songName ? `
-                            <div class="note-music-tag">
-                                <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                                <span>${note.songName.substring(0, 10)}${note.songName.length>10?'...':''}</span>
-                            </div>
-                        ` : ''}
-                        ${isLiked ? '<div class="note-like-indicator">❤️</div>' : ''}
-                    </div>
-                    <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
-                    <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
-                `;
-                div.onclick = () => {
-                    const viewer = document.querySelector('view-notes');
-                    const nav = document.querySelector('main-navbar');
-                    if(nav) nav.classList.add('hidden');
-                    viewer.open(note, false);
-                };
-                container.appendChild(div);
-            });
         } catch (e) { console.error("Error loading notes:", e); }
     }
 };
