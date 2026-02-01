@@ -534,7 +534,8 @@ const NotesManager = {
 
             const data = doc.exists ? doc.data() : null;
 
-            if(data) {
+            // Updated: Hide bubble if no text exists
+            if(data && data.text) {
                 preview.style.display = 'flex';
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
@@ -550,7 +551,9 @@ const NotesManager = {
                 `;
                 btn.classList.add('has-note');
             } else {
+                // Remove bubble content and hide it
                 preview.style.display = 'none';
+                preview.innerHTML = '';
                 btn.classList.remove('has-note');
             }
 
@@ -582,8 +585,9 @@ const NotesManager = {
             }
 
             const chunks = [];
-            while(mutualUIDs.length > 0) {
-                chunks.push(mutualUIDs.splice(0, 30));
+            let tempUIDs = [...mutualUIDs];
+            while(tempUIDs.length > 0) {
+                chunks.push(tempUIDs.splice(0, 30));
             }
 
             const queries = chunks.map(chunk => {
