@@ -1,4 +1,3 @@
-
 /**
  * =======================================================
  * PART 1: THE VIEWER COMPONENT (Bottom Sheet UI)
@@ -12,11 +11,34 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
+        // NEW: Unsubscribe function holder
+        this.unsubscribe = null;
     }
 
     connectedCallback() {
         this.render();
         this.setupEventListeners();
+    }
+
+    // --- NEW: Time Calculation Helper ---
+    getRelativeTime(timestamp) {
+        if (!timestamp) return 'Just now';
+        
+        // Handle Firestore Timestamp or standard Date
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+
+        if (diffInSeconds < 60) return 'Just now';
+        
+        const diffInMinutes = Math.floor(diffInSeconds / 60);
+        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+        
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        if (diffInHours < 24) return `${diffInHours}h ago`;
+        
+        const diffInDays = Math.floor(diffInHours / 24);
+        return `${diffInDays}d ago`;
     }
 
     render() {
@@ -57,7 +79,8 @@ class ViewNotes extends HTMLElement {
                 line-height: 1.4; color: #fff;
             }
 
-            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 5px; }
+            /* Updated style for timestamp */
+            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 8px; font-weight: 500; }
 
             .vn-likers-section { 
                 max-height: 250px; overflow-y: auto; 
@@ -106,48 +129,81 @@ class ViewNotes extends HTMLElement {
             if (e.target.id === 'vn-overlay') this.close();
         };
 
-        // --- NEW: LISTEN FOR BACK BUTTON ---
         window.addEventListener('popstate', (event) => {
             const overlay = this.querySelector('#vn-overlay');
             if (overlay && overlay.classList.contains('open')) {
-                // If back button was pressed and modal is open, close it (pass true for fromHistory)
                 this.close(true);
             }
         });
     }
 
-    async open(noteData, isOwnNote = false) {
-        if (!noteData && isOwnNote) {
+    // --- MODIFIED: OPEN METHOD (Adds Realtime Listener) ---
+    async open(initialNoteData, isOwnNote = false) {
+        if (!initialNoteData && isOwnNote) {
             window.location.href = 'notes.html';
             return;
         }
 
-        this.currentNote = noteData;
+        // Clean up previous listeners if any
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.unsubscribe = null;
+        }
+
         this.isOwnNote = isOwnNote;
+        // Set initial data immediately for perceived speed
+        this.currentNote = initialNoteData; 
+        
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
 
-        if (noteData.songPreview) {
-            this.audioPlayer.src = noteData.songPreview;
+        if (initialNoteData.songPreview) {
+            this.audioPlayer.src = initialNoteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
+        // Initial Render
+        content.innerHTML = isOwnNote ? this.renderOwnNote(initialNoteData) : this.renderFriendNote(initialNoteData);
         overlay.classList.add('open');
         
-        // --- NEW: PUSH HISTORY STATE ---
-        // This adds a fake entry so the back button has something to remove
         window.history.pushState({ vnOpen: true }, "", "#view-note");
-
         if(navigator.vibrate) navigator.vibrate(10);
         
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
         this.handleActions();
+
+        // --- NEW: ATTACH REALTIME LISTENER ---
+        // This ensures likes update without refreshing
+        if (initialNoteData.uid) {
+            this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
+                .onSnapshot((doc) => {
+                    if (doc.exists) {
+                        const updatedData = doc.data();
+                        // Merge updated data with ID
+                        this.currentNote = { ...updatedData, uid: doc.id };
+                        
+                        // Re-render the content to show new likes
+                        // We preserve the audio state, just updating UI
+                        content.innerHTML = this.isOwnNote 
+                            ? this.renderOwnNote(this.currentNote) 
+                            : this.renderFriendNote(this.currentNote);
+                        
+                        // Re-attach event listeners because we overwrote the HTML
+                        this.handleActions();
+                    } else {
+                        // Note was deleted while viewing
+                        this.close();
+                    }
+                });
+        }
     }
 
     renderOwnNote(note) {
+        // Calculate relative time
+        const timeAgo = this.getRelativeTime(note.createdAt);
+
         return `
             <div class="vn-header">
                 <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
@@ -158,7 +214,7 @@ class ViewNotes extends HTMLElement {
                         <span>${note.songName}</span>
                     </div>
                 ` : ''}
-                <div class="vn-timestamp">Shared ${note.timeString || 'Recently'}</div>
+                <div class="vn-timestamp">${timeAgo}</div>
             </div>
 
             <div class="vn-likers-section">
@@ -186,6 +242,8 @@ class ViewNotes extends HTMLElement {
     renderFriendNote(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
+        // Calculate relative time
+        const timeAgo = this.getRelativeTime(note.createdAt);
 
         return `
             <div class="vn-header">
@@ -202,6 +260,7 @@ class ViewNotes extends HTMLElement {
                         </div>
                     </div>
                 ` : ''}
+                <div class="vn-timestamp">${timeAgo}</div>
             </div>
 
             <div class="vn-interaction-bar">
@@ -213,15 +272,18 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
-    // --- MODIFIED: CLOSE METHOD ---
     close(fromHistory = false) {
+        // --- NEW: STOP LISTENER ---
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.unsubscribe = null;
+        }
+
         this.audioPlayer.pause();
         this.querySelector('#vn-overlay').classList.remove('open');
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.remove('hidden');
 
-        // If this close was triggered by a click/drag (not the back button),
-        // we need to remove the history state manually so the user isn't stuck.
         if (!fromHistory && window.location.hash === "#view-note") {
             window.history.back();
         }
@@ -251,6 +313,7 @@ class ViewNotes extends HTMLElement {
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
 
+                // Optimistic UI update is handled, but the listener will confirm it shortly
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
 
                 try {
@@ -318,7 +381,8 @@ const NotesManager = {
 
             btn.onclick = () => {
                 const viewer = document.querySelector('view-notes');
-                if(data) viewer.open(data, true);
+                // Pass UID explicitly so the realtime listener works
+                if(data) viewer.open({ ...data, uid: user.uid }, true);
                 else window.location.href = 'notes.html';
             };
         });
