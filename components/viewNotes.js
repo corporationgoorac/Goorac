@@ -40,37 +40,39 @@ class ViewNotes extends HTMLElement {
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.7); display: none; z-index: 2000;
+                background: rgba(0,0,0,0.85); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
+                backdrop-filter: blur(5px);
             }
             .vn-sheet {
-                background: #1c1c1e; width: 100%; max-width: 500px;
+                background: #121212; width: 100%; max-width: 500px;
                 border-radius: 24px 24px 0 0; padding: 24px 20px;
-                transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.32, 1.25, 0.32, 1);
+                transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                padding-bottom: max(30px, env(safe-area-inset-bottom));
-                box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+                padding-bottom: max(20px, env(safe-area-inset-bottom));
+                display: flex; flex-direction: column; max-height: 90vh;
+                border-top: 1px solid #333;
             }
             .vn-overlay.open { display: flex; }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
             .vn-drag-handle { 
-                width: 36px; height: 4px; background: #48484a; 
+                width: 40px; height: 5px; background: #3a3a3c; 
                 border-radius: 10px; margin: -10px auto 25px; 
             }
 
             .vn-profile-header {
-                display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+                display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-shrink: 0;
             }
             .vn-friend-pfp {
-                width: 50px; height: 50px; border-radius: 50%; object-fit: cover;
+                width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
                 border: 1px solid #333;
             }
             .vn-friend-info { display: flex; flex-direction: column; }
             .vn-friend-name { 
                 font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; 
             }
-            .vn-friend-handle { color: #8e8e93; font-size: 0.85rem; }
+            .vn-friend-handle { color: #888; font-size: 0.85rem; }
             
             .vn-verify-badge {
                 width: 14px; height: 14px; background: #00d2ff; display: inline-block; border-radius: 50%;
@@ -78,81 +80,89 @@ class ViewNotes extends HTMLElement {
                 -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
             }
 
+            .vn-scroll-content { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .vn-scroll-content::-webkit-scrollbar { display: none; }
+
             .vn-note-card {
-                padding: 24px; border-radius: 24px; margin-bottom: 20px;
+                padding: 30px 24px; border-radius: 24px; margin-bottom: 20px;
                 text-align: center; position: relative; overflow: hidden;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
-                min-height: 120px;
+                min-height: 140px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             }
             .vn-note-text { 
-                font-size: 1.4rem; font-weight: 600; line-height: 1.3; z-index: 2;
-                text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                font-size: 1.5rem; font-weight: 700; line-height: 1.3; z-index: 2;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.1); word-break: break-word;
             }
 
             .vn-song-pill { 
                 display: inline-flex; align-items: center; gap: 8px; 
-                background: rgba(255,255,255,0.08); padding: 8px 16px; 
-                border-radius: 100px; font-size: 0.85rem; font-weight: 500;
-                margin-top: 20px; border: 1px solid rgba(255,255,255,0.05);
-                backdrop-filter: blur(5px);
+                background: rgba(255,255,255,0.1); padding: 8px 16px; 
+                border-radius: 100px; font-size: 0.8rem; font-weight: 600;
+                margin-top: 20px; border: 1px solid rgba(255,255,255,0.1);
+                backdrop-filter: blur(10px); color: rgba(255,255,255,0.9);
             }
-            .vn-music-icon { width: 14px; height: 14px; fill: currentColor; opacity: 0.8; }
+            .vn-music-icon { width: 12px; height: 12px; fill: currentColor; }
 
             .vn-timestamp { 
-                font-size: 0.75rem; color: #636366; text-align: center; 
-                margin-top: 10px; margin-bottom: 20px; font-weight: 500; 
+                font-size: 0.75rem; color: #555; text-align: center; 
+                margin-top: 5px; margin-bottom: 20px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
             }
 
-            .vn-likers-section { 
-                max-height: 250px; overflow-y: auto; 
-                margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
+            /* --- REPLY SECTION --- */
+            .vn-footer-actions { margin-top: auto; padding-top: 10px; }
+            
+            .vn-emoji-bar {
+                display: flex; justify-content: space-around; margin-bottom: 12px;
+                padding: 0 10px;
             }
-            .vn-liker-item { 
-                display: flex; align-items: center; justify-content: space-between; 
-                margin-bottom: 15px; animation: vnFadeIn 0.3s ease;
+            .vn-quick-emoji {
+                font-size: 2rem; cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                user-select: none; -webkit-tap-highlight-color: transparent;
             }
-            .vn-liker-info { display: flex; align-items: center; gap: 12px; }
-            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-
-            .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-            .vn-btn { 
-                width: 100%; padding: 14px; border-radius: 14px; border: none; 
-                font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
-            }
-            .vn-btn-primary { background: #007aff; color: white; }
-            .vn-btn-danger { background: transparent; color: #ff3b30; }
-
-            .vn-emoji-reactions {
-                display: flex; justify-content: space-around; padding: 10px 0; margin-bottom: 5px;
-            }
-            .vn-emoji-btn {
-                font-size: 1.6rem; cursor: pointer; transition: transform 0.2s;
-            }
-            .vn-emoji-btn:active { transform: scale(1.4); }
+            .vn-quick-emoji:active { transform: scale(1.4); }
+            .vn-quick-emoji.popped { animation: emojiPop 0.4s ease forwards; }
 
             .vn-interaction-bar { 
-                display: flex; align-items: center; gap: 12px; 
-                background: #2c2c2e; padding: 6px 6px 6px 16px; border-radius: 30px;
-                border: 0.5px solid #3a3a3c;
+                display: flex; align-items: center; gap: 10px; 
+                background: #1c1c1e; padding: 5px 6px 5px 16px; border-radius: 30px;
+                border: 1px solid #333; position: relative;
             }
             .vn-reply-input { 
                 flex: 1; background: none; border: none; color: white; 
-                font-size: 0.95rem; padding: 8px 0; outline: none;
+                font-size: 1rem; padding: 10px 0; outline: none;
             }
-            .vn-heart-btn { 
-                background: #3a3a3c; border: none; font-size: 1.2rem; cursor: pointer; 
-                width: 40px; height: 40px; border-radius: 50%; display: flex; 
-                justify-content: center; align-items: center; transition: transform 0.1s;
+            .vn-reply-input::placeholder { color: #666; }
+            
+            .vn-send-btn {
+                color: #0095f6; font-weight: 600; font-size: 0.95rem; border: none; background: transparent;
+                padding: 0 10px; cursor: pointer; display: none;
             }
-            .vn-heart-btn:active { transform: scale(0.9); }
+            .vn-send-btn.visible { display: block; }
 
-            @keyframes vnFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+            .vn-heart-btn { 
+                background: transparent; border: none; font-size: 1.6rem; cursor: pointer; 
+                width: 44px; height: 44px; display: flex; justify-content: center; align-items: center; 
+                transition: transform 0.1s; -webkit-tap-highlight-color: transparent;
+            }
+            .vn-heart-btn:active { transform: scale(0.8); }
+
+            /* --- OWN NOTE STYLES --- */
+            .vn-likers-section { margin-top: 20px; border-top: 1px solid #222; padding-top: 15px; }
+            .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+            .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+            .vn-btn-danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+
+            @keyframes emojiPop { 
+                0% { transform: scale(1); opacity: 1; } 
+                50% { transform: scale(1.5) translateY(-10px); opacity: 0.8; } 
+                100% { transform: scale(0); opacity: 0; } 
+            }
         </style>
 
         <div class="vn-overlay" id="vn-overlay">
             <div class="vn-sheet">
                 <div class="vn-drag-handle"></div>
-                <div id="vn-content"></div>
+                <div id="vn-content" style="display:flex; flex-direction:column; height:100%;"></div>
             </div>
         </div>
         `;
@@ -173,7 +183,6 @@ class ViewNotes extends HTMLElement {
 
     async open(initialNoteData, isOwnNote = false) {
         if (!initialNoteData && isOwnNote) {
-            // Fallback if empty data passed, though setupMyNote handles this
             window.location.href = 'notes.html';
             return;
         }
@@ -204,29 +213,21 @@ class ViewNotes extends HTMLElement {
             console.error("Error fetching user profile:", err);
         }
 
-        content.innerHTML = isOwnNote 
-            ? this.renderOwnNote(initialNoteData) 
-            : this.renderFriendNote(initialNoteData);
+        this.renderContent();
             
         overlay.classList.add('open');
         window.history.pushState({ vnOpen: true }, "", "#view-note");
-        if(navigator.vibrate) navigator.vibrate(10);
+        if(navigator.vibrate) navigator.vibrate(15);
         
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
-
-        this.handleActions();
 
         if (initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
-                        const updatedData = doc.data();
-                        this.currentNote = { ...updatedData, uid: doc.id };
-                        content.innerHTML = this.isOwnNote 
-                            ? this.renderOwnNote(this.currentNote) 
-                            : this.renderFriendNote(this.currentNote);
-                        this.handleActions();
+                        this.currentNote = { ...doc.data(), uid: doc.id };
+                        this.renderContent(); // Re-render on update
                     } else {
                         this.close();
                     }
@@ -234,64 +235,63 @@ class ViewNotes extends HTMLElement {
         }
     }
 
-    renderOwnNote(note) {
+    renderContent() {
+        const content = this.querySelector('#vn-content');
+        content.innerHTML = this.isOwnNote 
+            ? this.getOwnNoteHTML(this.currentNote) 
+            : this.getFriendNoteHTML(this.currentNote);
+        
+        this.attachDynamicListeners();
+    }
+
+    getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'You';
-        const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
-        const isVerified = this.currentUserProfile?.verified === true;
-
+        
         return `
             <div class="vn-profile-header">
                 <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='profile.html'">
                 <div class="vn-friend-info">
-                    <div class="vn-friend-name">
-                        ${displayName}
-                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
-                    </div>
-                    <div class="vn-friend-handle">${displayHandle}</div>
+                    <div class="vn-friend-name">${displayName} (You)</div>
+                    <div class="vn-friend-handle">Your Note</div>
                 </div>
             </div>
 
-            <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                <div class="vn-note-text">${note.text || ''}</div>
-                ${note.songName ? `
-                    <div class="vn-song-pill">
-                        <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${note.songName}</span>
-                    </div>
-                ` : ''}
-            </div>
-
-            <div class="vn-timestamp">${timeAgo}</div>
-
-            <div class="vn-likers-section">
-                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
-                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
-                    <div class="vn-liker-item">
-                        <div class="vn-liker-info">
-                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
-                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
+            <div class="vn-scroll-content">
+                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                    <div class="vn-note-text">${note.text || ''}</div>
+                    ${note.songName ? `
+                        <div class="vn-song-pill">
+                            <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                            <span>${note.songName}</span>
                         </div>
-                        <span style="color:#ff3b30;">❤️</span>
-                    </div>
-                `).join('') : `
-                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
-                `}
-            </div>
+                    ` : ''}
+                </div>
+                <div class="vn-timestamp">${timeAgo}</div>
 
-            <div class="vn-action-group">
-                <button class="vn-btn vn-btn-primary" onclick="window.location.href='notes.html'">Leave a new note</button>
-                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete note</button>
+                <div class="vn-likers-section">
+                    <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#888;">Activity</div>
+                    ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
+                        <div class="vn-liker-item">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%;">
+                                <span style="font-weight:600;">${liker.displayName || 'User'}</span>
+                            </div>
+                            <span style="color:#ff3b30;">❤️</span>
+                        </div>
+                    `).join('') : `<div style="text-align:center; color:#555;">No likes yet</div>`}
+                </div>
+                
+                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete Note</button>
             </div>
         `;
     }
 
-    renderFriendNote(note) {
+    getFriendNoteHTML(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
-        
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'User';
         const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
@@ -309,36 +309,175 @@ class ViewNotes extends HTMLElement {
                 </div>
             </div>
 
-            <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                <div class="vn-note-text">${note.text}</div>
-                ${note.songName ? `
-                    <div class="vn-song-pill">
-                        <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${note.songName} • ${note.songArtist}</span>
-                    </div>
-                ` : ''}
+            <div class="vn-scroll-content">
+                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                    <div class="vn-note-text">${note.text}</div>
+                    ${note.songName ? `
+                        <div class="vn-song-pill">
+                            <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                            <span>${note.songName} • ${note.songArtist}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="vn-timestamp">${timeAgo}</div>
             </div>
 
-            <div class="vn-timestamp">${timeAgo}</div>
-
-            <div class="vn-emoji-reactions">
-                <span class="vn-emoji-btn">❤️</span>
-                <span class="vn-emoji-btn">😂</span>
-                <span class="vn-emoji-btn">😮</span>
-                <span class="vn-emoji-btn">😢</span>
-                <span class="vn-emoji-btn">🔥</span>
-                <span class="vn-emoji-btn">👏</span>
-                <span class="vn-emoji-btn">🙌</span>
-                <span class="vn-emoji-btn">😍</span>
-            </div>
-
-            <div class="vn-interaction-bar">
-                <input type="text" id="vn-reply-input" class="vn-reply-input" placeholder="Reply to ${displayName}...">
-                <button class="vn-heart-btn" id="like-toggle-btn">
-                    ${isLiked ? '❤️' : '🤍'}
-                </button>
+            <div class="vn-footer-actions">
+                <div class="vn-emoji-bar">
+                    <span class="vn-quick-emoji" data-emoji="😂">😂</span>
+                    <span class="vn-quick-emoji" data-emoji="😮">😮</span>
+                    <span class="vn-quick-emoji" data-emoji="😍">😍</span>
+                    <span class="vn-quick-emoji" data-emoji="😢">😢</span>
+                    <span class="vn-quick-emoji" data-emoji="🔥">🔥</span>
+                    <span class="vn-quick-emoji" data-emoji="👏">👏</span>
+                </div>
+                <div class="vn-interaction-bar">
+                    <input type="text" id="vn-reply-input" class="vn-reply-input" placeholder="Reply to ${displayName}..." autocomplete="off">
+                    <button id="vn-send-text-btn" class="vn-send-btn">Send</button>
+                    <button class="vn-heart-btn" id="like-toggle-btn">
+                        ${isLiked ? '❤️' : '🤍'}
+                    </button>
+                </div>
             </div>
         `;
+    }
+
+    attachDynamicListeners() {
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+
+        // --- OWN NOTE LISTENERS ---
+        const deleteBtn = this.querySelector('#delete-note-btn');
+        if (deleteBtn) {
+            deleteBtn.onclick = async () => {
+                if(confirm("Delete this note?")) {
+                    try {
+                        await this.db.collection("active_notes").doc(user.uid).delete();
+                        this.close();
+                        window.location.reload(); 
+                    } catch(e) { console.error(e); }
+                }
+            };
+        }
+
+        // --- FRIEND NOTE LISTENERS ---
+        const likeBtn = this.querySelector('#like-toggle-btn');
+        if(likeBtn) {
+            likeBtn.onclick = async () => {
+                if(navigator.vibrate) navigator.vibrate(10);
+                const isCurrentlyLiked = likeBtn.innerText === '❤️';
+                likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️'; // Optimistic UI
+                
+                // Animate Heart
+                likeBtn.style.transform = "scale(1.3)";
+                setTimeout(() => likeBtn.style.transform = "scale(1)", 150);
+
+                const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
+                try {
+                    if (!isCurrentlyLiked) {
+                        await noteRef.update({
+                            likes: firebase.firestore.FieldValue.arrayUnion({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL })
+                        });
+                    } else {
+                        const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
+                        if (likerObj) await noteRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
+                    }
+                } catch (e) { console.error("Like toggle failed", e); }
+            };
+        }
+
+        // --- REPLY & REACTION LOGIC ---
+        if(this.isOwnNote) return;
+
+        const input = this.querySelector('#vn-reply-input');
+        const sendBtn = this.querySelector('#vn-send-text-btn');
+        const emojis = this.querySelectorAll('.vn-quick-emoji');
+        const heartBtn = this.querySelector('#like-toggle-btn');
+
+        // Input Behavior
+        input.addEventListener('input', () => {
+            if(input.value.trim().length > 0) {
+                sendBtn.classList.add('visible');
+                heartBtn.style.display = 'none';
+            } else {
+                sendBtn.classList.remove('visible');
+                heartBtn.style.display = 'flex';
+            }
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter' && input.value.trim().length > 0) {
+                this.handleSendReply(input.value.trim());
+                input.value = '';
+                input.blur(); // Close keyboard
+                sendBtn.classList.remove('visible');
+                heartBtn.style.display = 'flex';
+            }
+        });
+
+        sendBtn.onclick = () => {
+            if(input.value.trim().length > 0) {
+                this.handleSendReply(input.value.trim());
+                input.value = '';
+                input.blur(); // Close keyboard
+                sendBtn.classList.remove('visible');
+                heartBtn.style.display = 'flex';
+            }
+        };
+
+        // Quick Emojis
+        emojis.forEach(emojiEl => {
+            emojiEl.onclick = () => {
+                const emoji = emojiEl.dataset.emoji;
+                if(navigator.vibrate) navigator.vibrate(20);
+                
+                // Animation
+                emojiEl.classList.add('popped');
+                setTimeout(() => emojiEl.classList.remove('popped'), 500);
+
+                // Send Logic
+                this.handleSendReply(emoji);
+            };
+        });
+    }
+
+    async handleSendReply(text) {
+        const myUid = firebase.auth().currentUser.uid;
+        const targetUid = this.currentNote.uid;
+        const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
+        
+        // Optimistic UI Feedback (Toast or just interaction)
+        // Note: We don't close the modal, per instructions
+
+        try {
+            const chatRef = this.db.collection("chats").doc(chatId);
+            const messagesRef = chatRef.collection("messages");
+
+            // 1. Add Message Doc
+            await messagesRef.add({
+                text: text,
+                sender: myUid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                seen: false,
+                replyToNote: this.currentNote.text // Context for later if needed
+            });
+
+            // 2. Update Chat Metadata so messages.html sees it
+            // THIS IS THE KEY PART for "Replied to a note"
+            await chatRef.set({
+                lastMessage: "Replied to a note", // This text will show in inbox
+                lastSender: myUid,
+                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                participants: [myUid, targetUid],
+                seen: false, // Ensures it is BRIGHT (unread) for recipient
+                [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+            }, { merge: true });
+
+            console.log("Reply sent successfully");
+
+        } catch(e) {
+            console.error("Failed to send reply", e);
+        }
     }
 
     close(fromHistory = false) {
@@ -354,109 +493,6 @@ class ViewNotes extends HTMLElement {
 
         if (!fromHistory && window.location.hash === "#view-note") {
             window.history.back();
-        }
-    }
-
-    async sendReply(text) {
-        const user = firebase.auth().currentUser;
-        if (!user || !this.currentNote || !text.trim()) return;
-
-        const targetUid = this.currentNote.uid;
-        const chatId = user.uid < targetUid ? `${user.uid}_${targetUid}` : `${targetUid}_${user.uid}`;
-        
-        const replyMessage = {
-            sender: user.uid,
-            text: text.trim(),
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            isNoteReply: true,
-            noteText: this.currentNote.text
-        };
-
-        try {
-            await this.db.collection('chats').doc(chatId).collection('messages').add(replyMessage);
-            await this.db.collection('chats').doc(chatId).set({
-                lastMessage: `Replied to a note: ${text.trim()}`,
-                lastSender: user.uid,
-                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                participants: [user.uid, targetUid]
-            }, { merge: true });
-
-            if(navigator.vibrate) navigator.vibrate(20);
-            
-            const input = this.querySelector('#vn-reply-input');
-            if (input) {
-                input.value = '';
-                input.blur(); // Dismiss keyboard
-                input.placeholder = "Reply sent!";
-                setTimeout(() => { input.placeholder = `Reply...`; }, 2000);
-            }
-        } catch (e) {
-            console.error("Reply failed", e);
-        }
-    }
-
-    handleActions() {
-        const deleteBtn = this.querySelector('#delete-note-btn');
-        if(deleteBtn) {
-            deleteBtn.onclick = async () => {
-                if(confirm("Delete this note?")) {
-                    const user = firebase.auth().currentUser;
-                    try {
-                        await this.db.collection("active_notes").doc(user.uid).delete();
-                        this.close();
-                        window.location.reload(); 
-                    } catch(e) { console.error("Delete failed", e); }
-                }
-            };
-        }
-
-        const replyInput = this.querySelector('#vn-reply-input');
-        if(replyInput) {
-            replyInput.onkeypress = (e) => {
-                if (e.key === 'Enter') {
-                    this.sendReply(replyInput.value);
-                }
-            };
-        }
-
-        const emojiBtns = this.querySelectorAll('.vn-emoji-btn');
-        emojiBtns.forEach(btn => {
-            btn.onclick = () => {
-                this.sendReply(btn.innerText);
-            };
-        });
-
-        const likeBtn = this.querySelector('#like-toggle-btn');
-        if(likeBtn) {
-            likeBtn.onclick = async () => {
-                const user = firebase.auth().currentUser;
-                if(!user) return;
-
-                if(navigator.vibrate) navigator.vibrate(15);
-                const isCurrentlyLiked = likeBtn.innerText === '❤️';
-                const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
-
-                likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
-
-                try {
-                    if (!isCurrentlyLiked) {
-                        await noteRef.update({
-                            likes: firebase.firestore.FieldValue.arrayUnion({
-                                uid: user.uid,
-                                displayName: user.displayName || "User",
-                                photoURL: user.photoURL || ""
-                            })
-                        });
-                    } else {
-                        const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
-                        if (likerObj) {
-                            await noteRef.update({
-                                likes: firebase.firestore.FieldValue.arrayRemove(likerObj)
-                            });
-                        }
-                    }
-                } catch (e) { console.error("Like toggle failed", e); }
-            };
         }
     }
 }
@@ -503,10 +539,11 @@ const NotesManager = {
                 width: 75px; 
                 flex-shrink: 0;
                 cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
             }
 
             .note-bubble, #my-note-preview {
-                display: none; /* Hidden by default until loaded */
+                display: none; 
                 flex-direction: column;
                 justify-content: center !important;
                 align-items: center !important;
@@ -530,12 +567,8 @@ const NotesManager = {
                 border: 1px solid rgba(255,255,255,0.1);
             }
             
-            /* Visible State */
-            .note-bubble.visible, #my-note-preview.visible {
-                display: flex !important;
-            }
+            .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
             
-            /* SPEECH BUBBLE TAIL */
             .note-bubble::after, #my-note-preview::after {
                 content: '';
                 position: absolute;
@@ -608,12 +641,9 @@ const NotesManager = {
             if (!btn || !preview) return; 
 
             const data = doc.exists ? doc.data() : null;
-
-            // Ensure bubble is visible now that we have data (or lack thereof)
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
-                // CASE 1: USER HAS A NOTE
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
                 
@@ -633,18 +663,11 @@ const NotesManager = {
                     if(data) viewer.open({ ...data, uid: user.uid }, true);
                 };
             } else {
-                // CASE 2: NO NOTE - SHOW "What's on your mind?"
                 preview.style.backgroundColor = 'rgba(255,255,255,0.1)';
                 preview.style.color = 'rgba(255,255,255,0.7)';
-                
-                preview.innerHTML = `
-                    <div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>
-                `;
+                preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
-
-                btn.onclick = () => {
-                    window.location.href = 'notes.html';
-                };
+                btn.onclick = () => window.location.href = 'notes.html';
             }
         });
     },
@@ -663,16 +686,13 @@ const NotesManager = {
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
             if(mutualUIDs.length === 0) {
-                const existing = container.querySelectorAll('.friend-note');
-                existing.forEach(e => e.remove());
+                container.querySelectorAll('.friend-note').forEach(e => e.remove());
                 return;
             }
 
             const chunks = [];
             let tempUIDs = [...mutualUIDs];
-            while(tempUIDs.length > 0) {
-                chunks.push(tempUIDs.splice(0, 30));
-            }
+            while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 30));
 
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
@@ -689,26 +709,17 @@ const NotesManager = {
                 snap.forEach(doc => {
                     const note = doc.data();
                     const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
-                    if(isActive) {
-                        allNotes.push({ ...note, uid: doc.id });
-                    }
+                    if(isActive) allNotes.push({ ...note, uid: doc.id });
                 });
             });
 
-            allNotes.sort((a, b) => {
-                const ta = a.createdAt ? a.createdAt.toMillis() : 0;
-                const tb = b.createdAt ? b.createdAt.toMillis() : 0;
-                return tb - ta;
-            });
+            allNotes.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
 
-            const existingFriends = container.querySelectorAll('.friend-note');
-            existingFriends.forEach(e => e.remove());
+            container.querySelectorAll('.friend-note').forEach(e => e.remove());
 
             allNotes.forEach(note => {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
-                
-                // Add .visible class immediately so they display flex
                 div.innerHTML = `
                     <div class="note-bubble visible" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
@@ -722,20 +733,15 @@ const NotesManager = {
                     <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                     <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
                 `;
-                
                 div.onclick = () => {
                     const viewer = document.querySelector('view-notes');
                     const nav = document.querySelector('main-navbar');
                     if(nav) nav.classList.add('hidden');
                     viewer.open(note, false);
                 };
-                
                 container.appendChild(div);
             });
-
-        } catch (e) {
-            console.error("Error loading notes:", e);
-        }
+        } catch (e) { console.error("Error loading notes:", e); }
     }
 };
 
