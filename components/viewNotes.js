@@ -265,7 +265,7 @@ customElements.define('view-notes', ViewNotes);
 
 
 // ==========================================
-// NEW: Notes Manager for Fetching & Mutuals
+// FIXED: Notes Manager (Directly using visibleTo)
 // ==========================================
 
 const NotesManager = {
@@ -288,55 +288,19 @@ const NotesManager = {
         container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
 
         try {
-            // 1. Get current user's profile to see who they follow
-            const myProfileDoc = await db.collection("users").doc(user.uid).get();
-            const myData = myProfileDoc.data();
-            const myFollowing = myData?.following || [];
-
-            // 2. Fetch ALL active notes via Snapshot (Realtime)
+            // Fetch ALL active notes. The filtering happens on the client based on the 'visibleTo' array.
             db.collection("active_notes").onSnapshot(async (snapshot) => {
                 const rawNotes = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
                 
-                // 3. FILTER FOR MUTUALS
-                const mutualNotesPromises = rawNotes.map(async (note) => {
-                    // CONDITION 1: Always show own note
-                    if (note.uid === user.uid) {
-                        return { ...note, isOwn: true, photoURL: user.photoURL };
-                    }
-
-                    // CONDITION 2: Do I follow them?
-                    if (!myFollowing.includes(note.uid)) return null;
-
-                    // CONDITION 3: Do they follow me back? (STRICT MUTUAL CHECK)
-                    try {
-                        const authorDoc = await db.collection("users").doc(note.uid).get();
-                        if (!authorDoc.exists) return null;
-                        
-                        const authorData = authorDoc.data();
-                        const authorFollowing = authorData.following || [];
-
-                        // Only return the note if my UID is in THEIR following list
-                        if (authorFollowing.includes(user.uid)) {
-                            return { 
-                                ...note, 
-                                isOwn: false, 
-                                photoURL: authorData.photoURL, 
-                                username: authorData.username 
-                            };
-                        }
-                    } catch (e) {
-                        console.error("Error checking mutual:", e);
-                    }
-                    return null;
+                // FILTER LOGIC:
+                // 1. Show note if it belongs to me (uid === current user uid)
+                // 2. Show note if the current user UID is inside the note's 'visibleTo' array 
+                //    (The mutualFriends array created in notes.html)
+                const filteredNotes = rawNotes.filter(note => {
+                    return note.uid === user.uid || (note.visibleTo && note.visibleTo.includes(user.uid));
                 });
 
-                // Wait for all mutual checks to complete
-                const resolvedNotes = await Promise.all(mutualNotesPromises);
-                
-                // Final clean list of notes (only your own and strict mutuals)
-                this.allNotes = resolvedNotes.filter(n => n !== null);
-
-                // Render the list
+                this.allNotes = filteredNotes;
                 this.renderList(this.allNotes);
             });
 
@@ -359,40 +323,47 @@ const NotesManager = {
 
         // Horizontal Scroll Container
         const scrollWrapper = document.createElement('div');
-        scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none;";
+        scrollWrapper.style.cssText = "display: flex; gap: 15px; overflow-x: auto; padding: 10px 15px; scrollbar-width: none; -webkit-overflow-scrolling: touch;";
         
-        notes.forEach(note => {
+        // Ensure own note is always first
+        const sortedNotes = notes.sort((a, b) => (a.uid === firebase.auth().currentUser.uid ? -1 : 1));
+
+        sortedNotes.forEach(note => {
+            const isMe = note.uid === firebase.auth().currentUser.uid;
             const bubble = document.createElement('div');
-            bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
+            bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 75px; cursor: pointer; flex-shrink: 0;";
             
             // Note Bubble UI
             bubble.innerHTML = `
                 <div style="position: relative;">
                     <div style="
-                        width: 70px; height: 70px; border-radius: 50%; 
-                        padding: 3px; border: 2px solid ${note.isOwn ? '#333' : '#00d2ff'};
+                        width: 72px; height: 72px; border-radius: 50%; 
+                        padding: 3px; border: 2px solid ${isMe ? '#333' : '#00d2ff'};
                     ">
-                        <img src="${note.photoURL || 'https://via.placeholder.com/70'}" 
+                        <img src="${note.pfp || note.photoURL || 'https://via.placeholder.com/72'}" 
                              style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
                     </div>
                     ${note.text ? `
                         <div style="
-                            position: absolute; top: -10px; right: -10px; 
-                            background: rgba(255,255,255,0.9); color: black; 
-                            padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; 
-                            max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+                            background: rgba(255,255,255,0.95); color: black; 
+                            padding: 5px 10px; border-radius: 15px; font-size: 0.75rem; 
+                            max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.25); border: 1px solid #eee;
+                            z-index: 5;
                         ">
                             ${note.text}
                         </div>
                     ` : ''}
                 </div>
-                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.isOwn ? 'You' : (note.username || 'Friend')}</div>
+                <div style="margin-top: 8px; font-size: 0.75rem; color: #fff; font-weight: 500;">
+                    ${isMe ? 'Your note' : (note.username || 'Friend')}
+                </div>
             `;
 
             bubble.onclick = () => {
                 const viewer = document.querySelector('view-notes');
-                if (viewer) viewer.open(note, note.isOwn);
+                if (viewer) viewer.open(note, isMe);
             };
 
             scrollWrapper.appendChild(bubble);
@@ -402,6 +373,7 @@ const NotesManager = {
     },
 
     filter: function(query) {
+        if(!query) { this.renderList(this.allNotes); return; }
         const lowerQ = query.toLowerCase();
         const filtered = this.allNotes.filter(n => 
             (n.username && n.username.toLowerCase().includes(lowerQ)) ||
@@ -411,5 +383,5 @@ const NotesManager = {
     }
 };
 
-// Auto-initialize when the DOM is ready
+// Initialize
 document.addEventListener('DOMContentLoaded', () => NotesManager.init());
