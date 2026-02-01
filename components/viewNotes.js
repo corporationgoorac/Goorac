@@ -1,7 +1,6 @@
 /**
  * ViewNotes Component
  * Handles the Instagram-style bottom sheet for viewing and interacting with notes.
- * Integrated with Firebase for Like/Delete functionality.
  */
 class ViewNotes extends HTMLElement {
     constructor() {
@@ -263,7 +262,7 @@ customElements.define('view-notes', ViewNotes);
 
 
 // ==========================================
-// FIXED: Notes Manager with Unfollow Check
+// FIXED: Strict Mutuals Manager (Both Lists)
 // ==========================================
 
 const NotesManager = {
@@ -280,19 +279,20 @@ const NotesManager = {
         const container = document.getElementById('notes-list-container');
         if(!container) return;
 
-        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading...</div>';
 
         try {
-            // 1. FRESH DATA: Get who I follow RIGHT NOW
-            // This is critical to fix the "Unfollow 10 mins later" issue
+            // 1. GET BOTH LISTS: Following AND Followers
+            // We need both to confirm "Mutual" status (A follows B AND B follows A)
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
-            const myFollowing = myData.following || [];
+            const myFollowing = myData.following || []; // People I follow
+            const myFollowers = myData.followers || []; // People who follow me
 
-            // 2. QUERY: Ask DB for notes I am *allowed* to see (Efficient)
-            // This grabs notes where the author added ME to their 'visibleTo' list
+            // 2. QUERY: Fetch notes
+            // We keep the server filter for performance, but relying on the client check below is safer for your issue.
             db.collection("active_notes")
-              .where("visibleTo", "array-contains", user.uid)
+              .where("visibleTo", "array-contains", user.uid) 
               .onSnapshot(snapshot => {
                   
                   let notes = [];
@@ -301,19 +301,23 @@ const NotesManager = {
                   snapshot.forEach(doc => {
                       const data = doc.data();
                       
-                      // 3. THE DOUBLE CHECK (Security)
-                      // Condition A: Is it MY note?
+                      // 3. STRICT MUTUAL CHECK
                       const isMe = data.uid === user.uid;
                       
-                      // Condition B: Do I STILL follow them? 
-                      // (Filters out people I unfollowed recently)
-                      const isFollowing = myFollowing.includes(data.uid);
+                      // Check 1: Do I follow them?
+                      const iFollowThem = myFollowing.includes(data.uid);
+                      
+                      // Check 2: Do they follow me?
+                      const theyFollowMe = myFollowers.includes(data.uid);
+                      
+                      // MUTUAL DEFINITION: Both must be true
+                      const isMutual = iFollowThem && theyFollowMe;
 
-                      // Condition C: Is it expired? (Client-side cleanup)
+                      // Check 3: Is it active?
                       const isActive = data.expiresAt ? data.expiresAt.toDate() > now : true;
 
-                      // Only show if: (It's Active) AND (It's Me OR I Follow Them)
-                      if (isActive && (isMe || isFollowing)) {
+                      // FINAL FILTER: Show only if Active AND (It's Me OR It's a Mutual Friend)
+                      if (isActive && (isMe || isMutual)) {
                           notes.push({ ...data, uid: doc.id });
                       }
                   });
@@ -341,7 +345,7 @@ const NotesManager = {
         container.innerHTML = '';
         
         if (notes.length === 0) {
-            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No notes.</div>';
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No mutual notes.</div>';
             return;
         }
 
@@ -352,13 +356,12 @@ const NotesManager = {
         notes.forEach(note => {
             const isMe = note.uid === currentUser.uid;
             
-            // Note PFP Logic: Use note's PFP, fallback to User Auth if it's me, else placeholder
+            // Note PFP Logic
             const displayPFP = isMe ? (currentUser.photoURL || note.pfp) : (note.pfp || 'https://via.placeholder.com/70');
 
             const bubble = document.createElement('div');
             bubble.style.cssText = "display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer;";
             
-            // Note Bubble UI
             bubble.innerHTML = `
                 <div style="position: relative;">
                     <div style="
@@ -383,7 +386,6 @@ const NotesManager = {
                 <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${isMe ? 'You' : (note.username || 'User')}</div>
             `;
 
-            // Handle Click -> Open ViewNotes Component
             bubble.onclick = () => {
                 const viewer = document.querySelector('view-notes');
                 if (viewer) viewer.open(note, isMe);
