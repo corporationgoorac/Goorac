@@ -415,6 +415,10 @@
     let myUserData = null;
     let isFirstLoad = true;
     let statusTimeout = null;
+    
+    // NEW: Variables for periodic status update
+    let lastStatusData = null;
+    let statusUpdateInterval = null;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -452,6 +456,10 @@
         document.body.appendChild(circle);
         setTimeout(() => circle.remove(), 600);
     });
+    
+    // === KEYBOARD FIX: Prevent focus loss on Send Button ===
+    sendBtnUI.addEventListener('mousedown', (e) => { e.preventDefault(); });
+    sendBtnUI.addEventListener('touchstart', (e) => { e.preventDefault(); });
 
     function formatTime12(date) {
         let hours = date.getHours();
@@ -616,27 +624,52 @@
         });
     }
 
+    // === UPDATED: Function to update header UI based on latest data ===
+    function updateHeaderStatus() {
+        if (!lastStatusData) return;
+        
+        // Check typing status first (priority)
+        const isTyping = bottomTyping.style.display === 'flex';
+        if (isTyping) return; // Don't overwrite "Typing..."
+
+        if (lastStatusData.state === 'online') {
+            onlineDot.style.display = 'block';
+            headerSubLabel.innerText = "Active now";
+            headerSubLabel.style.color = "#00e676";
+        } else {
+            onlineDot.style.display = 'none';
+            headerSubLabel.innerText = formatActiveTime(lastStatusData.last_changed);
+            headerSubLabel.style.color = "var(--text-secondary)";
+        }
+    }
+
     function monitorTargetStatus() {
         if (!targetUid) return;
+        
+        // Clear any existing interval
+        if (statusUpdateInterval) clearInterval(statusUpdateInterval);
+
+        // Start interval to refresh time every 60s
+        statusUpdateInterval = setInterval(() => {
+            updateHeaderStatus();
+        }, 60000);
+
         rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
-            const data = snapshot.val();
+            lastStatusData = snapshot.val();
             
+            // Only update immediately if not typing
             if (statusTimeout) clearTimeout(statusTimeout);
-            headerSubLabel.innerText = `@${chatTargetData.username}`;
-            headerSubLabel.style.color = "var(--text-secondary)";
+            
+            // Initial simple state
+            if (!lastStatusData) {
+               headerSubLabel.innerText = `@${chatTargetData.username}`;
+               headerSubLabel.style.color = "var(--text-secondary)";
+               return;
+            }
 
             statusTimeout = setTimeout(() => {
-                if (!data) return;
-                if (data.state === 'online') {
-                    onlineDot.style.display = 'block';
-                    headerSubLabel.innerText = "Active now";
-                    headerSubLabel.style.color = "#00e676";
-                } else {
-                    onlineDot.style.display = 'none';
-                    headerSubLabel.innerText = formatActiveTime(data.last_changed);
-                    headerSubLabel.style.color = "var(--text-secondary)";
-                }
-            }, 3000); 
+                updateHeaderStatus();
+            }, 3000); // Small delay to prevent flickering on quick switches
         });
     }
 
@@ -686,16 +719,7 @@
                 headerSubLabel.style.color = "#00e676";
                 scrollToBottom();
             } else {
-                rdb.ref('/status/' + targetUid).once('value', (snapshot) => {
-                    const d = snapshot.val();
-                    if(d && d.state === 'online') {
-                        headerSubLabel.innerText = "Active now";
-                        headerSubLabel.style.color = "#00e676";
-                    } else {
-                         headerSubLabel.innerText = `@${chatTargetData.username}`;
-                         headerSubLabel.style.color = "var(--text-secondary)";
-                    }
-                });
+                updateHeaderStatus(); // Revert to status
             }
         });
 
@@ -935,34 +959,24 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // === PROFESSIONAL NOTE REPLY RENDERING ===
-        let noteReplyHtml = '';
-        if (m.replyToNote) {
-            // Check if we have rich metadata (Colors, Song, etc.) from newer implementations
-            // Fallback to defaults if only text is present
-            const noteColor = m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626';
-            const noteTextColor = m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff';
-            const noteSong = m.noteMetadata ? m.noteMetadata.songName : null;
-            const noteSenderName = m.noteMetadata ? m.noteMetadata.username : "User";
-            const notePfp = m.noteMetadata ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : '');
-
-            noteReplyHtml = `
+        // NEW: Unique Instagram-like Note Reply UI
+        const noteReplyHtml = m.replyToNote ? `
             <div class="note-reply-wrapper">
-                <div class="note-reply-pill" style="background: ${noteColor}; color: ${noteTextColor}">
+                <div class="note-reply-pill" style="background: ${m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626'}; color: ${m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff'}">
                     <div class="note-header-row">
-                        <img src="${notePfp || 'https://via.placeholder.com/20'}" class="note-mini-pfp">
+                        <img src="${m.noteMetadata && m.noteMetadata.pfp ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" class="note-mini-pfp">
                         <span class="note-label">Replied to note</span>
                     </div>
                     <div class="note-content-text">"${m.replyToNote}"</div>
-                    ${noteSong ? `
+                    ${m.noteMetadata && m.noteMetadata.songName ? `
                     <div class="note-song-tag">
                         <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${noteSong}</span>
+                        <span>${m.noteMetadata.songName}</span>
                     </div>` : ''}
                 </div>
                 <div class="note-connector"></div>
-            </div>`;
-        }
+            </div>
+        ` : '';
 
         // --- HTML ASSEMBLY ---
         let innerHTML = '';
@@ -1051,7 +1065,7 @@
 
     function triggerReply(text) {
         replyingTo = text;
-        document.getElementById('reply-text').innerHTML = "Replying to:<br>" + text;
+        document.getElementById('reply-text').innerText = "Replying to: " + replyingTo;
         document.getElementById('reply-dock').style.display = 'flex';
         mInput.focus(); 
     }
@@ -1073,6 +1087,9 @@
         emojiTray.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
+        // KEEP FOCUS TO PREVENT KEYBOARD CLOSE
+        mInput.focus(); 
+
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
             cancelInteraction(); // Close the editing dock
@@ -1080,7 +1097,6 @@
         } else {
             const rText = replyingTo; cancelInteraction(); // Close reply dock
             scrollToBottom();
-            // Note: If you want note colors to appear, ensure the sender code (viewNotes.js) saves 'noteMetadata'
             await db.collection("chats").doc(chatId).collection("messages").add({
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
@@ -1127,13 +1143,10 @@
 
     async function applyReactionToId(id, emoji) {
         // --- 1. OPTIMISTIC UPDATE (Fix for old messages) ---
-        // Update local map immediately so UI reflects change even if outside listener limit
         if(messagesMap.has(id)) {
             let msg = messagesMap.get(id);
             if(!msg.reactions) msg.reactions = {};
 
-            // Check if adding or removing (toggle logic)
-            // Note: Simplistic toggle check. If you send empty emoji '', it acts as remove.
             if(msg.reactions[myUid] && msg.reactions[myUid].emoji === emoji) {
                  delete msg.reactions[myUid];
             } else if (emoji !== '') {
