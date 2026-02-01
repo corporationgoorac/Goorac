@@ -408,7 +408,7 @@ const NotesManager = {
         });
     },
 
-    // --- NEW: Inject Bubble CSS (Instagram Style) ---
+    // --- NEW: Inject Bubble CSS (Instagram Style - FIXED ALIGNMENT) ---
     injectBubbleStyles: function() {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -416,10 +416,10 @@ const NotesManager = {
             #notes-container {
                 display: flex;
                 overflow-x: auto;
-                padding-top: 65px; /* Space for the floating bubble */
+                padding-top: 70px; /* Space for the floating bubble */
                 padding-bottom: 10px;
                 padding-left: 15px;
-                gap: 30px; /* INCREASED GAP for spacing */
+                gap: 25px; /* Gap to prevent horizontal overlaps */
                 scrollbar-width: none;
                 align-items: flex-start;
             }
@@ -431,12 +431,12 @@ const NotesManager = {
                 flex-direction: column;
                 align-items: center;
                 position: relative;
-                width: 80px; /* Fixed width base */
+                width: 75px; 
                 flex-shrink: 0;
                 cursor: pointer;
             }
 
-            /* BUBBLE: Absolute positioning above head */
+            /* BUBBLE: Floating, Centered, Sized Correctly */
             .note-bubble, #my-note-preview {
                 display: flex !important;
                 flex-direction: column;
@@ -445,36 +445,64 @@ const NotesManager = {
                 text-align: center;
                 
                 position: absolute;
-                top: -65px; /* Floats above profile pic */
+                /* Anchor bottom of bubble near top of PFP */
+                top: 5px; 
+                /* Move up by 100% of height + centering logic */
                 left: 50%;
-                transform: translateX(-50%); /* Centers perfectly horizontally */
+                transform: translate(-50%, -100%); 
                 z-index: 10;
                 
-                padding: 10px 12px !important;
-                border-radius: 20px !important;
-                border-bottom-left-radius: 4px !important; /* Little tail effect */
+                padding: 6px 12px !important;
+                border-radius: 16px !important;
                 
-                font-size: 0.8rem !important;
-                min-width: 80px;
-                max-width: 110px; /* Limits width to prevent overlapping neighbors */
+                font-size: 0.75rem !important;
+                
+                /* Auto width with constraints */
                 width: max-content;
+                max-width: 90px; 
                 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 box-sizing: border-box;
-                border: 1px solid rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.1);
             }
             
+            /* SPEECH BUBBLE TAIL (The Dot) */
+            .note-bubble::after, #my-note-preview::after {
+                content: '';
+                position: absolute;
+                bottom: -4px; /* Hangs below */
+                left: 50%;
+                transform: translateX(-50%);
+                width: 6px;
+                height: 6px;
+                background: inherit;
+                border-radius: 50%;
+                z-index: -1;
+            }
+            /* Smaller second dot for effect */
+            .note-bubble::before, #my-note-preview::before {
+                content: '';
+                position: absolute;
+                bottom: -8px;
+                left: 55%;
+                width: 3px;
+                height: 3px;
+                background: inherit;
+                border-radius: 50%;
+                z-index: -1;
+                opacity: 0.7;
+            }
+
             /* Text Handling */
             .note-text-content {
                 line-height: 1.25;
-                font-weight: 600;
+                font-weight: 500;
                 display: -webkit-box;
                 -webkit-line-clamp: 2;
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
                 text-align: center;
-                margin-bottom: 2px;
             }
 
             /* Mini Music Icon in Bubble */
@@ -482,9 +510,10 @@ const NotesManager = {
                 display: flex; 
                 align-items: center; 
                 justify-content: center;
-                gap: 4px;
-                font-size: 0.7rem; 
-                opacity: 0.85; 
+                gap: 3px;
+                font-size: 0.65rem; 
+                opacity: 0.8; 
+                margin-top: 2px;
                 white-space: nowrap; 
                 overflow: hidden; 
                 max-width: 100%;
@@ -501,6 +530,7 @@ const NotesManager = {
                 border: 2px solid #262626;
                 object-fit: cover;
                 background: #333;
+                z-index: 2; /* Ensure PFP is below bubble z-index but visible */
             }
 
             /* Username Styling */
@@ -508,7 +538,7 @@ const NotesManager = {
                 font-size: 0.75rem;
                 margin-top: 6px;
                 color: #a0a0a0;
-                max-width: 80px;
+                max-width: 75px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -534,6 +564,7 @@ const NotesManager = {
             const data = doc.exists ? doc.data() : null;
 
             if(data) {
+                // --- MODIFIED: Show Color & Song in My Note Bubble ---
                 preview.style.display = 'flex';
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
@@ -630,6 +661,7 @@ const NotesManager = {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
                 
+                // --- MODIFIED: Friend Bubble HTML to show Song & Text ---
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
