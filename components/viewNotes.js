@@ -165,6 +165,7 @@ class ViewNotes extends HTMLElement {
 
     async open(initialNoteData, isOwnNote = false) {
         if (!initialNoteData && isOwnNote) {
+            // Fallback if empty data passed, though setupMyNote handles this
             window.location.href = 'notes.html';
             return;
         }
@@ -186,7 +187,6 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // Fetch user profile for display details
         try {
             const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
             if (userDoc.exists) {
@@ -209,7 +209,6 @@ class ViewNotes extends HTMLElement {
 
         this.handleActions();
 
-        // Real-time listener
         if (initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
@@ -221,7 +220,6 @@ class ViewNotes extends HTMLElement {
                             : this.renderFriendNote(this.currentNote);
                         this.handleActions();
                     } else {
-                        // Note was deleted externally
                         this.close();
                     }
                 });
@@ -233,12 +231,16 @@ class ViewNotes extends HTMLElement {
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'You';
         const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
+        const isVerified = this.currentUserProfile?.verified === true;
 
         return `
             <div class="vn-profile-header">
                 <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='profile.html'">
                 <div class="vn-friend-info">
-                    <div class="vn-friend-name">${displayName}</div>
+                    <div class="vn-friend-name">
+                        ${displayName}
+                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                    </div>
                     <div class="vn-friend-handle">${displayHandle}</div>
                 </div>
             </div>
@@ -285,12 +287,16 @@ class ViewNotes extends HTMLElement {
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'User';
         const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
+        const isVerified = this.currentUserProfile?.verified === true;
 
         return `
             <div class="vn-profile-header">
                 <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='userProfile.html?user=${this.currentUserProfile?.username || ''}'">
                 <div class="vn-friend-info">
-                    <div class="vn-friend-name">${displayName}</div>
+                    <div class="vn-friend-name">
+                        ${displayName}
+                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                    </div>
                     <div class="vn-friend-handle">${displayHandle}</div>
                 </div>
             </div>
@@ -333,32 +339,20 @@ class ViewNotes extends HTMLElement {
     }
 
     handleActions() {
-        // Delete Logic
         const deleteBtn = this.querySelector('#delete-note-btn');
         if(deleteBtn) {
             deleteBtn.onclick = async () => {
                 if(confirm("Delete this note?")) {
                     const user = firebase.auth().currentUser;
                     try {
-                        // Delete from Firestore
                         await this.db.collection("active_notes").doc(user.uid).delete();
-                        
-                        // Close viewer
                         this.close();
-                        
-                        // Manually reset UI to "What's on your mind" immediately
-                        const bubble = document.getElementById('my-note-preview');
-                        if(bubble) {
-                            bubble.innerHTML = "What's on your mind?";
-                            bubble.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                            bubble.style.color = '#fff';
-                        }
+                        window.location.reload(); 
                     } catch(e) { console.error("Delete failed", e); }
                 }
             };
         }
 
-        // Like Logic
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
@@ -399,16 +393,12 @@ customElements.define('view-notes', ViewNotes);
 
 /**
  * =======================================================
- * PART 2: THE NOTES MANAGER (Batched Query + Skeletons)
+ * PART 2: THE NOTES MANAGER (Logic & Styles)
  * =======================================================
  */
 const NotesManager = {
     init: function() {
         this.injectBubbleStyles(); 
-        
-        // Show skeletons immediately on load
-        this.renderSkeletons();
-
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 this.setupMyNote(user);
@@ -443,7 +433,7 @@ const NotesManager = {
             }
 
             .note-bubble, #my-note-preview {
-                display: flex !important;
+                display: none; /* Hidden by default until loaded */
                 flex-direction: column;
                 justify-content: center !important;
                 align-items: center !important;
@@ -465,6 +455,11 @@ const NotesManager = {
                 box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 box-sizing: border-box;
                 border: 1px solid rgba(255,255,255,0.1);
+            }
+            
+            /* Visible State */
+            .note-bubble.visible, #my-note-preview.visible {
+                display: flex !important;
             }
             
             /* SPEECH BUBBLE TAIL */
@@ -528,46 +523,8 @@ const NotesManager = {
                 white-space: nowrap;
                 text-align: center;
             }
-
-            /* SKELETON LOADING STYLES */
-            .skeleton-bubble {
-                width: 60px; height: 30px; border-radius: 12px; margin-bottom: 5px;
-                background: linear-gradient(90deg, #2c2c2e 25%, #3a3a3c 50%, #2c2c2e 75%);
-                background-size: 200% 100%; animation: shimmer 1.5s infinite;
-            }
-            .skeleton-pfp {
-                width: 65px; height: 65px; border-radius: 50%;
-                background: linear-gradient(90deg, #2c2c2e 25%, #3a3a3c 50%, #2c2c2e 75%);
-                background-size: 200% 100%; animation: shimmer 1.5s infinite;
-            }
-            .skeleton-text {
-                width: 40px; height: 10px; margin-top: 6px; border-radius: 4px;
-                background: #2c2c2e;
-            }
-            @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-            #my-note-preview {
-                display: flex; /* Ensure it's always flex */
-            }
         `;
         document.head.appendChild(style);
-    },
-
-    renderSkeletons: function() {
-        const container = document.getElementById('notes-container');
-        if (!container) return;
-        
-        // Don't remove 'my-note' section, just append skeletons after it
-        const skeletons = Array(5).fill(0).map(() => `
-            <div class="note-item skeleton-item">
-                <div class="skeleton-bubble"></div>
-                <div class="skeleton-pfp"></div>
-                <div class="skeleton-text"></div>
-            </div>
-        `).join('');
-        
-        // Append skeletons to the container
-        container.insertAdjacentHTML('beforeend', skeletons);
     },
 
     setupMyNote: function(user) {
@@ -578,6 +535,9 @@ const NotesManager = {
             if (!btn || !preview) return; 
 
             const data = doc.exists ? doc.data() : null;
+
+            // Ensure bubble is visible now that we have data (or lack thereof)
+            preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
                 // CASE 1: USER HAS A NOTE
@@ -593,20 +553,22 @@ const NotesManager = {
                         </div>
                     ` : ''}
                 `;
+                btn.classList.add('has-note');
                 
-                // Click opens Viewer
                 btn.onclick = () => {
                     const viewer = document.querySelector('view-notes');
                     if(data) viewer.open({ ...data, uid: user.uid }, true);
                 };
-
             } else {
                 // CASE 2: NO NOTE - SHOW "What's on your mind?"
                 preview.style.backgroundColor = 'rgba(255,255,255,0.1)';
                 preview.style.color = 'rgba(255,255,255,0.7)';
-                preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem;">What's on your mind?</div>`;
                 
-                // Click opens Create Page
+                preview.innerHTML = `
+                    <div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>
+                `;
+                btn.classList.remove('has-note');
+
                 btn.onclick = () => {
                     window.location.href = 'notes.html';
                 };
@@ -627,18 +589,16 @@ const NotesManager = {
 
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
-            // Remove Skeletons once we have the ID list (even if empty)
-            const skeletons = container.querySelectorAll('.skeleton-item');
-            skeletons.forEach(s => s.remove());
-
             if(mutualUIDs.length === 0) {
+                const existing = container.querySelectorAll('.friend-note');
+                existing.forEach(e => e.remove());
                 return;
             }
 
             const chunks = [];
             let tempUIDs = [...mutualUIDs];
             while(tempUIDs.length > 0) {
-                chunks.push(tempUIDs.splice(0, 30)); // Firestore limit is 30 for 'in' queries
+                chunks.push(tempUIDs.splice(0, 30));
             }
 
             const queries = chunks.map(chunk => {
@@ -668,16 +628,16 @@ const NotesManager = {
                 return tb - ta;
             });
 
-            // Clean up old friends if re-rendering, but keep My Note
             const existingFriends = container.querySelectorAll('.friend-note');
             existingFriends.forEach(e => e.remove());
 
             allNotes.forEach(note => {
                 const div = document.createElement('div');
-                div.className = 'note-item friend-note';
+                div.className = 'note-item friend-note has-note';
                 
+                // Add .visible class immediately so they display flex
                 div.innerHTML = `
-                    <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                    <div class="note-bubble visible" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
                         ${note.songName ? `
                             <div class="note-music-tag">
@@ -702,9 +662,6 @@ const NotesManager = {
 
         } catch (e) {
             console.error("Error loading notes:", e);
-            // Remove skeletons on error too
-            const skeletons = container.querySelectorAll('.skeleton-item');
-            skeletons.forEach(s => s.remove());
         }
     }
 };
