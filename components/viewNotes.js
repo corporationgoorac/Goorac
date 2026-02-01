@@ -534,14 +534,13 @@ const NotesManager = {
 
             const data = doc.exists ? doc.data() : null;
 
-            // Updated: Hide bubble if no text exists
-            if(data && data.text) {
+            if(data && (data.text || data.songName)) {
                 preview.style.display = 'flex';
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
                 
                 preview.innerHTML = `
-                    <div class="note-text-content">${data.text}</div>
+                    ${data.text ? `<div class="note-text-content">${data.text}</div>` : ''}
                     ${data.songName ? `
                         <div class="note-music-tag">
                             <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -551,7 +550,7 @@ const NotesManager = {
                 `;
                 btn.classList.add('has-note');
             } else {
-                // Remove bubble content and hide it
+                // Completely hide the preview container to remove the tail/bird element
                 preview.style.display = 'none';
                 preview.innerHTML = '';
                 btn.classList.remove('has-note');
