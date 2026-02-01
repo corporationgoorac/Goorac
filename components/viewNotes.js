@@ -13,7 +13,7 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
         this.unsubscribe = null;
-        
+
         // Swipe Logic Variables
         this.startY = 0;
         this.currentY = 0;
@@ -46,9 +46,9 @@ class ViewNotes extends HTMLElement {
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.6); display: none; z-index: 2000;
+                background: rgba(0,0,0,0.65); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                /* No Blur as requested */
+                /* Clean background, no blur as requested */
                 backdrop-filter: none; 
                 opacity: 0; transition: opacity 0.2s ease;
             }
@@ -68,14 +68,15 @@ class ViewNotes extends HTMLElement {
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
             /* --- PC RESPONSIVENESS --- */
-            @media (min-width: 600px) {
-                .vn-overlay { align-items: center; }
+            @media (min-width: 768px) {
+                .vn-overlay { align-items: center; } /* Center vertically */
                 .vn-sheet {
-                    border-radius: 24px;
-                    width: 400px;
+                    border-radius: 24px; /* Rounded all corners */
+                    width: 420px;
                     max-height: 80vh;
                     transform: scale(0.95); opacity: 0;
                     margin: 0 auto;
+                    border: 1px solid #333;
                 }
                 .vn-overlay.open .vn-sheet { transform: scale(1); opacity: 1; }
             }
@@ -170,25 +171,12 @@ class ViewNotes extends HTMLElement {
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- OWN NOTE STYLES (NEW NOTE INPUT) --- */
+            /* --- OWN NOTE STYLES --- */
             .vn-likers-section { margin-top: 20px; border-top: 1px solid #222; padding-top: 15px; }
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
             
-            .vn-new-note-container {
-                background: #1c1c1e; border-radius: 16px; padding: 16px;
-                margin-top: 10px; display: flex; flex-direction: column; gap: 10px;
-            }
-            .vn-new-note-input {
-                background: transparent; border: none; color: white; font-size: 1rem;
-                width: 100%; outline: none; resize: none; font-family: inherit;
-            }
-            .vn-post-btn {
-                align-self: flex-end; background: #0095f6; color: white; border: none;
-                padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer;
-                font-size: 0.9rem;
-            }
-
             .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+            .vn-btn-primary { background: #262626; color: #fff; border: 1px solid #333; }
             .vn-btn-danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
 
             @keyframes emojiPop { 
@@ -224,11 +212,14 @@ class ViewNotes extends HTMLElement {
         const sheet = this.querySelector('#vn-sheet');
         const handle = this.querySelector('#vn-handle');
         
-        // Allow dragging from handle or top of sheet
+        // Touch events for mobile swiping
         const startDrag = (e) => {
+            // Only enable swipe on mobile/tablet widths
+            if(window.innerWidth > 768) return; 
+            
             this.startY = e.touches ? e.touches[0].clientY : e.clientY;
             this.isDragging = true;
-            sheet.style.transition = 'none'; // Disable transition for direct tracking
+            sheet.style.transition = 'none'; // Disable transition for direct interaction
         };
 
         const onDrag = (e) => {
@@ -236,9 +227,9 @@ class ViewNotes extends HTMLElement {
             this.currentY = e.touches ? e.touches[0].clientY : e.clientY;
             const deltaY = this.currentY - this.startY;
             
-            // Only allow dragging down
+            // Only allow dragging downwards
             if (deltaY > 0) {
-                e.preventDefault(); // Prevent scroll
+                e.preventDefault(); 
                 sheet.style.transform = `translateY(${deltaY}px)`;
             }
         };
@@ -249,29 +240,21 @@ class ViewNotes extends HTMLElement {
             sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
             const deltaY = this.currentY - this.startY;
-            // Threshold to close (120px)
-            if (deltaY > 120) {
+            // Threshold to close (100px)
+            if (deltaY > 100) {
                 this.close();
             } else {
                 sheet.style.transform = `translateY(0)`;
             }
         };
 
+        // Attach listeners
         handle.addEventListener('touchstart', startDrag);
         handle.addEventListener('touchmove', onDrag);
         handle.addEventListener('touchend', endDrag);
-        
-        // Also allow mouse drag for PC testing
-        handle.addEventListener('mousedown', startDrag);
-        window.addEventListener('mousemove', onDrag);
-        window.addEventListener('mouseup', endDrag);
     }
 
     async open(initialNoteData, isOwnNote = false) {
-        if (!initialNoteData && isOwnNote) {
-            // If empty own note, redirect to creation or show creation UI (handled below)
-        }
-
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -289,15 +272,15 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        if (initialNoteData && initialNoteData.uid) {
-            try {
+        try {
+            if(initialNoteData && initialNoteData.uid) {
                 const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
                 if (userDoc.exists) {
                     this.currentUserProfile = userDoc.data();
                 }
-            } catch (err) {
-                console.error("Error fetching user profile:", err);
             }
+        } catch (err) {
+            console.error("Error fetching user profile:", err);
         }
 
         this.renderContent();
@@ -324,9 +307,10 @@ class ViewNotes extends HTMLElement {
 
     renderContent() {
         const content = this.querySelector('#vn-content');
-        if (!this.currentNote && this.isOwnNote) {
-            // Mock empty note for creation
-            this.currentNote = { text: "Add a note...", uid: firebase.auth().currentUser.uid };
+        
+        // Handle empty own note (shouldn't happen often but failsafe)
+        if (this.isOwnNote && !this.currentNote) {
+             this.currentNote = { text: "Add a note...", uid: firebase.auth().currentUser.uid };
         }
 
         content.innerHTML = this.isOwnNote 
@@ -363,12 +347,6 @@ class ViewNotes extends HTMLElement {
                 </div>
                 <div class="vn-timestamp">${timeAgo}</div>
 
-                <div style="font-weight:700; font-size:0.9rem; margin-top:20px; color:#888;">Leave a new note</div>
-                <div class="vn-new-note-container">
-                    <textarea id="vn-new-note-input" class="vn-new-note-input" rows="2" placeholder="What's on your mind?"></textarea>
-                    <button id="vn-post-btn" class="vn-post-btn">Share</button>
-                </div>
-
                 <div class="vn-likers-section">
                     <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#888;">Activity</div>
                     ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
@@ -382,6 +360,7 @@ class ViewNotes extends HTMLElement {
                     `).join('') : `<div style="text-align:center; color:#555;">No likes yet</div>`}
                 </div>
                 
+                <button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Leave a New Note 📝</button>
                 <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete Note</button>
             </div>
         `;
@@ -446,6 +425,13 @@ class ViewNotes extends HTMLElement {
         if (!user) return;
 
         // --- OWN NOTE LISTENERS ---
+        const leaveNoteBtn = this.querySelector('#vn-leave-new-note');
+        if(leaveNoteBtn) {
+            leaveNoteBtn.onclick = () => {
+                window.location.href = 'notes.html'; // Direct redirect
+            };
+        }
+
         const deleteBtn = this.querySelector('#delete-note-btn');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
@@ -453,31 +439,9 @@ class ViewNotes extends HTMLElement {
                     try {
                         await this.db.collection("active_notes").doc(user.uid).delete();
                         this.close();
+                        window.location.reload(); 
                     } catch(e) { console.error(e); }
                 }
-            };
-        }
-
-        const postBtn = this.querySelector('#vn-post-btn');
-        if (postBtn) {
-            postBtn.onclick = async () => {
-                const text = this.querySelector('#vn-new-note-input').value.trim();
-                if (!text) return;
-                
-                try {
-                    // Simple text note creation
-                    await this.db.collection("active_notes").doc(user.uid).set({
-                        text: text,
-                        uid: user.uid,
-                        username: user.displayName || "User",
-                        pfp: user.photoURL,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
-                        likes: []
-                    });
-                    this.querySelector('#vn-new-note-input').value = "";
-                    alert("Note posted!");
-                } catch(e) { console.error(e); }
             };
         }
 
@@ -594,13 +558,13 @@ class ViewNotes extends HTMLElement {
 
             // 2. Update Chat Metadata (Inbox)
             // 'Replied to a note' is the text shown in messages.html
-            // Setting 'seen: false' ensures it appears BRIGHT for the recipient
+            // KEY FIX: Explicitly set seen: false ensuring it's BRIGHT for recipient
             await chatRef.set({
                 lastMessage: "Replied to a note", 
                 lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid],
-                seen: false, 
+                seen: false, // Ensures UNREAD state
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
 
@@ -797,8 +761,8 @@ const NotesManager = {
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
                 btn.onclick = () => {
-                    const viewer = document.querySelector('view-notes');
-                    viewer.open(null, true); // Open blank note creation
+                    // Direct redirect if no note exists
+                    window.location.href = 'notes.html';
                 };
             }
         });
