@@ -7,7 +7,7 @@ class ViewNotes extends HTMLElement {
     constructor() {
         super();
         this.currentNote = null;
-        this.currentUserProfile = null; // Store the fetched user profile
+        this.currentUserProfile = null;
         this.isOwnNote = false;
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
@@ -42,12 +42,10 @@ class ViewNotes extends HTMLElement {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.7); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                /* REMOVED BLUR for faster opening/performance */
             }
             .vn-sheet {
                 background: #1c1c1e; width: 100%; max-width: 500px;
                 border-radius: 24px 24px 0 0; padding: 24px 20px;
-                /* Speed up transition: 0.25s for snappier feel */
                 transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.32, 1.25, 0.32, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 padding-bottom: max(30px, env(safe-area-inset-bottom));
@@ -61,7 +59,6 @@ class ViewNotes extends HTMLElement {
                 border-radius: 10px; margin: -10px auto 25px; 
             }
 
-            /* --- UI: Profile Header --- */
             .vn-profile-header {
                 display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
             }
@@ -81,7 +78,6 @@ class ViewNotes extends HTMLElement {
                 -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
             }
 
-            /* --- UI: Note Card --- */
             .vn-note-card {
                 padding: 24px; border-radius: 24px; margin-bottom: 20px;
                 text-align: center; position: relative; overflow: hidden;
@@ -93,7 +89,6 @@ class ViewNotes extends HTMLElement {
                 text-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
 
-            /* Song Pill */
             .vn-song-pill { 
                 display: inline-flex; align-items: center; gap: 8px; 
                 background: rgba(255,255,255,0.08); padding: 8px 16px; 
@@ -103,13 +98,11 @@ class ViewNotes extends HTMLElement {
             }
             .vn-music-icon { width: 14px; height: 14px; fill: currentColor; opacity: 0.8; }
 
-            /* Timestamp */
             .vn-timestamp { 
                 font-size: 0.75rem; color: #636366; text-align: center; 
                 margin-top: 10px; margin-bottom: 20px; font-weight: 500; 
             }
 
-            /* Likers Section (Own Note) */
             .vn-likers-section { 
                 max-height: 250px; overflow-y: auto; 
                 margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
@@ -121,7 +114,6 @@ class ViewNotes extends HTMLElement {
             .vn-liker-info { display: flex; align-items: center; gap: 12px; }
             .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
 
-            /* Buttons */
             .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
             .vn-btn { 
                 width: 100%; padding: 14px; border-radius: 14px; border: none; 
@@ -130,7 +122,6 @@ class ViewNotes extends HTMLElement {
             .vn-btn-primary { background: #007aff; color: white; }
             .vn-btn-danger { background: transparent; color: #ff3b30; }
 
-            /* Interaction Bar */
             .vn-interaction-bar { 
                 display: flex; align-items: center; gap: 12px; 
                 background: #2c2c2e; padding: 6px 6px 6px 16px; border-radius: 30px;
@@ -185,7 +176,7 @@ class ViewNotes extends HTMLElement {
 
         this.isOwnNote = isOwnNote;
         this.currentNote = initialNoteData;
-        this.currentUserProfile = null; // Reset
+        this.currentUserProfile = null; 
         
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
@@ -195,9 +186,6 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // --- FETCH PROFILE DATA (For BOTH Own and Friend notes) ---
-        // We do this to ensure we have the verification badge, handle, and latest name
-        // regardless of whether it's me or a friend.
         try {
             const userDoc = await this.db.collection('users').doc(initialNoteData.uid).get();
             if (userDoc.exists) {
@@ -207,7 +195,6 @@ class ViewNotes extends HTMLElement {
             console.error("Error fetching user profile:", err);
         }
 
-        // Render with new data
         content.innerHTML = isOwnNote 
             ? this.renderOwnNote(initialNoteData) 
             : this.renderFriendNote(initialNoteData);
@@ -221,19 +208,15 @@ class ViewNotes extends HTMLElement {
 
         this.handleActions();
 
-        // Realtime listener for Note updates (likes)
         if (initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         const updatedData = doc.data();
                         this.currentNote = { ...updatedData, uid: doc.id };
-                        
-                        // Re-render, preserving user profile data if we have it
                         content.innerHTML = this.isOwnNote 
                             ? this.renderOwnNote(this.currentNote) 
                             : this.renderFriendNote(this.currentNote);
-                        
                         this.handleActions();
                     } else {
                         this.close();
@@ -243,9 +226,7 @@ class ViewNotes extends HTMLElement {
     }
 
     renderOwnNote(note) {
-        // --- UPDATED: Uses the same rich profile header as Friends ---
         const timeAgo = this.getRelativeTime(note.createdAt);
-        
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'You';
         const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
@@ -302,7 +283,6 @@ class ViewNotes extends HTMLElement {
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
         
-        // Use fetched profile data if available, fallback to note data
         const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || note.username || 'User';
         const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
@@ -322,7 +302,6 @@ class ViewNotes extends HTMLElement {
 
             <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                 <div class="vn-note-text">${note.text}</div>
-                
                 ${note.songName ? `
                     <div class="vn-song-pill">
                         <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -420,12 +399,71 @@ customElements.define('view-notes', ViewNotes);
  */
 const NotesManager = {
     init: function() {
+        this.injectBubbleStyles(); // Inject CSS for bubbles
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 this.setupMyNote(user);
                 this.loadMutualNotes(user);
             }
         });
+    },
+
+    // --- NEW: Inject Bubble CSS ---
+    injectBubbleStyles: function() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            /* Redesigned Bubble */
+            .note-bubble {
+                display: flex !important;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 10px 12px !important;
+                border-radius: 18px !important;
+                font-size: 0.85rem !important;
+                text-align: center;
+                min-width: 60px;
+                max-width: 100px;
+                cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                overflow: hidden;
+                transition: transform 0.2s;
+            }
+            .note-bubble:active { transform: scale(0.95); }
+            
+            /* Text Handling */
+            .note-text-content {
+                line-height: 1.25;
+                font-weight: 500;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            /* Mini Music Icon in Bubble */
+            .note-music-tag {
+                display: flex; align-items: center; gap: 3px;
+                font-size: 0.7rem; opacity: 0.8; margin-top: 5px;
+                white-space: nowrap; overflow: hidden; max-width: 100%;
+            }
+
+            /* Fix for My Note Bubble Preview */
+            #my-note-preview {
+                display: none;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 10px 12px;
+                border-radius: 18px;
+                font-size: 0.85rem;
+                text-align: center;
+                min-width: 60px;
+                max-width: 100px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+        `;
+        document.head.appendChild(style);
     },
 
     // 1. My Note Bubble
@@ -439,8 +477,20 @@ const NotesManager = {
             const data = doc.exists ? doc.data() : null;
 
             if(data) {
-                preview.style.display = 'block';
-                preview.innerText = data.text;
+                // --- MODIFIED: Show Color & Song in My Note Bubble ---
+                preview.style.display = 'flex';
+                preview.style.backgroundColor = data.bgColor || '#262626';
+                preview.style.color = data.textColor || '#fff';
+                
+                preview.innerHTML = `
+                    <div class="note-text-content">${data.text}</div>
+                    ${data.songName ? `
+                        <div class="note-music-tag">
+                            <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                            <span>${data.songName.substring(0, 10)}${data.songName.length>10?'...':''}</span>
+                        </div>
+                    ` : ''}
+                `;
                 btn.classList.add('has-note');
             } else {
                 preview.style.display = 'none';
@@ -524,9 +574,17 @@ const NotesManager = {
             allNotes.forEach(note => {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
+                
+                // --- MODIFIED: Friend Bubble HTML to show Song & Text ---
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                        ${note.text}
+                        <div class="note-text-content">${note.text}</div>
+                        ${note.songName ? `
+                            <div class="note-music-tag">
+                                <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                <span>${note.songName.substring(0, 10)}${note.songName.length>10?'...':''}</span>
+                            </div>
+                        ` : ''}
                     </div>
                     <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                     <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
