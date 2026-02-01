@@ -408,37 +408,36 @@ const NotesManager = {
         });
     },
 
-    // --- NEW: Inject Bubble CSS ---
+    // --- NEW: Inject Bubble CSS (Instagram Style) ---
     injectBubbleStyles: function() {
         const style = document.createElement('style');
         style.innerHTML = `
-            /* CONTAINER FIX: Prevents overlap by increasing gap and padding */
+            /* CONTAINER FIX: Increased gap prevents overlaps */
             #notes-container {
                 display: flex;
                 overflow-x: auto;
-                padding-top: 65px; /* Increased headroom for bubbles */
+                padding-top: 65px; /* Space for the floating bubble */
                 padding-bottom: 10px;
                 padding-left: 15px;
-                gap: 30px; /* INCREASED GAP to prevent bubble collision */
+                gap: 30px; /* INCREASED GAP for spacing */
                 scrollbar-width: none;
                 align-items: flex-start;
             }
             #notes-container::-webkit-scrollbar { display: none; }
 
-            /* ITEM WRAPPER: Ensures spacing */
+            /* ITEM WRAPPER */
             .note-item {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 position: relative;
-                width: 80px; /* Fixed width */
+                width: 80px; /* Fixed width base */
                 flex-shrink: 0;
                 cursor: pointer;
             }
 
-            /* BUBBLE: Floating, Centered, Sized */
+            /* BUBBLE: Absolute positioning above head */
             .note-bubble, #my-note-preview {
-                /* Flexbox for perfect centering of content */
                 display: flex !important;
                 flex-direction: column;
                 justify-content: center !important;
@@ -446,24 +445,23 @@ const NotesManager = {
                 text-align: center;
                 
                 position: absolute;
-                top: -65px; /* Move up */
+                top: -65px; /* Floats above profile pic */
                 left: 50%;
-                transform: translateX(-50%); /* Center horizontally relative to parent */
-                z-index: 100;
+                transform: translateX(-50%); /* Centers perfectly horizontally */
+                z-index: 10;
                 
-                padding: 10px 10px !important;
+                padding: 10px 12px !important;
                 border-radius: 20px !important;
-                border-bottom-left-radius: 4px !important;
+                border-bottom-left-radius: 4px !important; /* Little tail effect */
                 
                 font-size: 0.8rem !important;
-                min-width: 85px; /* Min width */
-                max-width: 115px; /* Max width to prevent giant bubbles */
-                min-height: 50px;
-                width: max-content; /* Shrink to fit text */
+                min-width: 80px;
+                max-width: 110px; /* Limits width to prevent overlapping neighbors */
+                width: max-content;
                 
                 box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 box-sizing: border-box;
-                border: 1px solid rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.08);
             }
             
             /* Text Handling */
@@ -471,7 +469,7 @@ const NotesManager = {
                 line-height: 1.25;
                 font-weight: 600;
                 display: -webkit-box;
-                -webkit-line-clamp: 2; /* Limit lines */
+                -webkit-line-clamp: 2;
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
@@ -479,7 +477,7 @@ const NotesManager = {
                 margin-bottom: 2px;
             }
 
-            /* Mini Music Icon in Bubble - FIXED ALIGNMENT */
+            /* Mini Music Icon in Bubble */
             .note-music-tag {
                 display: flex; 
                 align-items: center; 
@@ -493,9 +491,7 @@ const NotesManager = {
                 width: 100%;
             }
             
-            .note-music-tag svg {
-                flex-shrink: 0;
-            }
+            .note-music-tag svg { flex-shrink: 0; }
             
             /* User PFP Styling */
             .note-pfp {
@@ -538,7 +534,6 @@ const NotesManager = {
             const data = doc.exists ? doc.data() : null;
 
             if(data) {
-                // --- MODIFIED: Show Color & Song in My Note Bubble ---
                 preview.style.display = 'flex';
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
@@ -560,7 +555,6 @@ const NotesManager = {
 
             btn.onclick = () => {
                 const viewer = document.querySelector('view-notes');
-                // Pass UID explicitly so the realtime listener works
                 if(data) viewer.open({ ...data, uid: user.uid }, true);
                 else window.location.href = 'notes.html';
             };
@@ -636,7 +630,6 @@ const NotesManager = {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
                 
-                // --- MODIFIED: Friend Bubble HTML to show Song & Text ---
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
