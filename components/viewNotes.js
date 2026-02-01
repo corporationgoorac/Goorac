@@ -11,11 +11,25 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
+        this._handlePopState = this._handlePopState.bind(this);
     }
 
     connectedCallback() {
         this.render();
         this.setupEventListeners();
+        window.addEventListener('popstate', this._handlePopState);
+    }
+
+    disconnectedCallback() {
+        window.removeEventListener('popstate', this._handlePopState);
+    }
+
+    _handlePopState(event) {
+        // When back button is pressed, close the UI
+        const overlay = this.querySelector('#vn-overlay');
+        if (overlay && overlay.classList.contains('open')) {
+            this.internalClose();
+        }
     }
 
     render() {
@@ -23,78 +37,109 @@ class ViewNotes extends HTMLElement {
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.7); display: none; z-index: 2000;
+                background: rgba(0,0,0,0.6); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: blur(4px);
+                backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+                opacity: 0; transition: opacity 0.3s ease;
             }
+            .vn-overlay.open { display: flex; opacity: 1; }
+            
             .vn-sheet {
                 background: #1c1c1e; width: 100%; max-width: 500px;
-                border-radius: 20px 20px 0 0; padding: 24px 20px;
-                transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 24px 24px 0 0; padding: 10px 0 30px 0;
+                transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 padding-bottom: max(30px, env(safe-area-inset-bottom));
+                display: flex; flex-direction: column;
+                max-height: 85vh;
             }
-            .vn-overlay.open { display: flex; }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
             .vn-drag-handle { 
-                width: 40px; height: 5px; background: #333; 
-                border-radius: 10px; margin: -10px auto 20px; 
+                width: 36px; height: 4px; background: #3a3a3c; 
+                border-radius: 10px; margin: 12px auto 25px; 
             }
 
-            .vn-header { text-align: center; margin-bottom: 25px; }
-            .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
+            .vn-content-wrapper {
+                padding: 0 24px;
+                overflow-y: auto;
+            }
+
+            /* --- NEW HEADER UI --- */
+            .vn-header-profile {
+                display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;
+            }
             
-            .vn-song-tag { 
-                display: inline-flex; align-items: center; gap: 6px; 
-                background: rgba(255,255,255,0.1); padding: 6px 14px; 
-                border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            .vn-pfp-ring {
+                padding: 3px; border-radius: 50%; 
+                border: 2px solid #333; margin-bottom: 10px;
+            }
+            .vn-pfp-large { 
+                width: 75px; height: 75px; border-radius: 50%; 
+                object-fit: cover; display: block;
             }
 
+            .vn-user-row {
+                display: flex; align-items: center; gap: 4px;
+                margin-bottom: 2px;
+            }
+            .vn-username {
+                font-weight: 700; font-size: 1rem; letter-spacing: -0.3px;
+            }
+            .vn-verified-badge {
+                width: 14px; height: 14px; fill: #3897f0;
+            }
+            .vn-time-text {
+                font-size: 0.75rem; color: #8e8e93; font-weight: 500;
+            }
+
+            /* --- NOTE BUBBLE --- */
+            .vn-bubble-container {
+                display: flex; justify-content: center; margin-bottom: 25px;
+            }
             .vn-bubble-text { 
-                font-size: 1.1rem; font-weight: 500; margin: 15px 0; 
-                line-height: 1.4; color: #fff;
+                font-size: 1.1rem; font-weight: 500; margin: 0; 
+                line-height: 1.4; color: #fff; text-align: center;
+                background: #2c2c2e; padding: 16px 24px; border-radius: 22px;
+                position: relative; max-width: 90%;
+            }
+            
+            /* Song Chip */
+            .vn-song-pill { 
+                display: inline-flex; align-items: center; gap: 6px; 
+                background: rgba(255,255,255,0.08); padding: 6px 14px; 
+                border-radius: 100px; font-size: 0.75rem; font-weight: 600;
+                margin-top: 15px; color: #ccc;
             }
 
-            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 5px; }
-
-            .vn-likers-section { 
-                max-height: 250px; overflow-y: auto; 
-                margin-top: 20px; border-top: 0.5px solid #333; padding-top: 15px; 
-            }
-            .vn-liker-item { 
-                display: flex; align-items: center; justify-content: space-between; 
-                margin-bottom: 15px; animation: vnFadeIn 0.3s ease;
-            }
-            .vn-liker-info { display: flex; align-items: center; gap: 12px; }
-            .vn-pfp-small { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-
-            .vn-action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-            .vn-btn { 
-                width: 100%; padding: 14px; border-radius: 14px; border: none; 
-                font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
-            }
-            .vn-btn:active { opacity: 0.7; }
-            .vn-btn-primary { background: #007aff; color: white; }
-            .vn-btn-danger { background: transparent; color: #ff3b30; }
-
+            /* --- FOOTER / ACTIONS --- */
             .vn-interaction-bar { 
-                display: flex; align-items: center; gap: 12px; margin-top: 20px; 
-                background: #262626; padding: 8px 16px; border-radius: 30px;
+                display: flex; align-items: center; gap: 12px; margin-top: 15px; 
+                background: #2c2c2e; padding: 6px 6px 6px 16px; border-radius: 30px;
             }
             .vn-reply-input { 
                 flex: 1; background: none; border: none; color: white; 
                 font-size: 0.95rem; padding: 8px 0; outline: none;
             }
-            .vn-heart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 5px; }
+            .vn-heart-btn { 
+                background: #3a3a3c; border: none; width: 36px; height: 36px;
+                border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                font-size: 1.1rem; cursor: pointer; transition: transform 0.1s;
+            }
+            .vn-heart-btn:active { transform: scale(0.9); }
 
-            @keyframes vnFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+            .vn-btn-danger { 
+                width: 100%; padding: 14px; border-radius: 14px; border: none; 
+                font-weight: 600; font-size: 0.95rem; cursor: pointer; 
+                background: rgba(255, 59, 48, 0.15); color: #ff453a; margin-top: 10px;
+            }
         </style>
 
         <div class="vn-overlay" id="vn-overlay">
             <div class="vn-sheet">
                 <div class="vn-drag-handle"></div>
-                <div id="vn-content"></div>
+                <div class="vn-content-wrapper" id="vn-content">
+                    </div>
             </div>
         </div>
         `;
@@ -102,6 +147,7 @@ class ViewNotes extends HTMLElement {
 
     setupEventListeners() {
         this.querySelector('#vn-overlay').onclick = (e) => {
+            // Close if clicking outside the sheet
             if (e.target.id === 'vn-overlay') this.close();
         };
     }
@@ -117,88 +163,109 @@ class ViewNotes extends HTMLElement {
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
 
+        // Play music
         if (noteData.songPreview) {
             this.audioPlayer.src = noteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
+        // Render Content
+        content.innerHTML = this.generateHTML(noteData, isOwnNote);
+        
+        // Open UI
         overlay.classList.add('open');
         if(navigator.vibrate) navigator.vibrate(10);
         
+        // Hide Main Navbar
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
+
+        // Push History State for Back Button Support
+        window.history.pushState({ vnOpen: true }, "");
 
         this.handleActions();
     }
 
-    renderOwnNote(note) {
-        return `
-            <div class="vn-header">
-                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
-                <div class="vn-bubble-text" style="color:${note.textColor || '#fff'}">${note.text || ''}</div>
-                ${note.songName ? `
-                    <div class="vn-song-tag">
-                        <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${note.songName}</span>
-                    </div>
-                ` : ''}
-                <div class="vn-timestamp">Shared ${note.timeString || 'Recently'}</div>
-            </div>
-
-            <div class="vn-likers-section">
-                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
-                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
-                    <div class="vn-liker-item">
-                        <div class="vn-liker-info">
-                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
-                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
-                        </div>
-                        <span style="color:#ff3b30;">❤️</span>
-                    </div>
-                `).join('') : `
-                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
-                `}
-            </div>
-
-            <div class="vn-action-group">
-                <button class="vn-btn vn-btn-primary" onclick="window.location.href='notes.html'">Leave a new note</button>
-                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete note</button>
-            </div>
-        `;
+    // Helper to format time (e.g. "2h")
+    getTimeAgo(timestamp) {
+        if(!timestamp) return 'Just now';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const seconds = Math.floor((new Date() - date) / 1000);
+        
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h`;
+        return `${Math.floor(hours / 24)}d`;
     }
 
-    renderFriendNote(note) {
-        const user = firebase.auth()?.currentUser;
+    generateHTML(note, isOwn) {
+        const timeString = this.getTimeAgo(note.createdAt);
+        const isVerified = note.isVerified || false; // Check for verified status
+        const user = firebase.auth().currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
 
+        // Verification Badge SVG
+        const verifiedBadge = `
+            <svg class="vn-verified-badge" viewBox="0 0 24 24">
+                <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.02-2.147 3.6 0 1.457.746 2.74 1.863 3.494C2.88 16.63 2.5 17.618 2.5 18.75c0 2.07 1.68 3.75 3.75 3.75 1.13 0 2.118-.377 2.754-.863.754 1.115 2.037 1.86 3.495 1.86s2.74-.745 3.494-1.86c.636.486 1.624.863 2.755.863 2.07 0 3.75-1.68 3.75-3.75 0-1.132-.38-2.12-.864-2.755 1.117-.754 1.864-2.037 1.864-3.495z" fill="#0095f6"></path>
+                <path d="M10 17.5l-4-4 1.41-1.41L10 14.67l7.59-7.59L19 8.5l-9 9z" fill="#fff"></path>
+            </svg>
+        `;
+
         return `
-            <div class="vn-header">
-                <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
-                <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
-                <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
-                    ${note.text}
+            <div class="vn-header-profile">
+                <div class="vn-pfp-ring" style="border-color:${isOwn ? '#333' : '#0095f6'}">
+                    <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
                 </div>
-                ${note.songName ? `
-                    <div style="margin-top:10px;">
-                        <div class="vn-song-tag">
-                             <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                             <span>${note.songName} • ${note.songArtist}</span>
-                        </div>
-                    </div>
-                ` : ''}
+                <div class="vn-user-row">
+                    <span class="vn-username">${note.username || 'User'}</span>
+                    ${isVerified ? verifiedBadge : ''}
+                </div>
+                <span class="vn-time-text">${timeString}</span>
             </div>
 
-            <div class="vn-interaction-bar">
-                <input type="text" class="vn-reply-input" placeholder="Reply to ${note.username || 'user'}...">
-                <button class="vn-heart-btn" id="like-toggle-btn">
-                    ${isLiked ? '❤️' : '🤍'}
-                </button>
+            <div class="vn-bubble-container">
+                <div class="vn-bubble-text" style="background:${note.bgColor || '#2c2c2e'}; color:${note.textColor || '#fff'}">
+                    ${note.text}
+                </div>
             </div>
+
+            ${note.songName ? `
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div class="vn-song-pill">
+                        <svg viewBox="0 0 24 24" style="width:12px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <span>${note.songName} • ${note.songArtist}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${isOwn ? `
+                <button class="vn-btn-danger" id="delete-note-btn">Delete note</button>
+            ` : `
+                <div class="vn-interaction-bar">
+                    <input type="text" class="vn-reply-input" placeholder="Reply to ${note.username}...">
+                    <button class="vn-heart-btn" id="like-toggle-btn" style="color:${isLiked ? '#ff3b30' : '#fff'}">
+                        ${isLiked ? '❤️' : '🤍'}
+                    </button>
+                </div>
+            `}
         `;
     }
 
+    // Called when User clicks X or Backdrop
     close() {
+        // If history state exists, go back (this triggers popstate, which calls internalClose)
+        if (window.history.state && window.history.state.vnOpen) {
+            window.history.back();
+        } else {
+            this.internalClose();
+        }
+    }
+
+    // Internal function to actually hide UI
+    internalClose() {
         this.audioPlayer.pause();
         this.querySelector('#vn-overlay').classList.remove('open');
         const mainNav = document.querySelector('main-navbar');
@@ -229,7 +296,9 @@ class ViewNotes extends HTMLElement {
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
 
+                // UI Optimistic Update
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
+                likeBtn.style.color = isCurrentlyLiked ? '#fff' : '#ff3b30';
 
                 try {
                     if (!isCurrentlyLiked) {
@@ -261,9 +330,7 @@ customElements.define('view-notes', ViewNotes);
  * =======================================================
  * PART 2: THE NOTES MANAGER (Batched Query Logic)
  * =======================================================
- * This version calculates Mutual Friends first, then 
- * specifically requests ONLY their notes.
- * This solves the "New Follower" issue.
+ * Handles fetching, filtering, and populating the home screen bubbles.
  */
 const NotesManager = {
     init: function() {
@@ -302,7 +369,7 @@ const NotesManager = {
         });
     },
 
-    // 2. Load Mutual Notes (Batched Query - The Fix)
+    // 2. Load Mutual Notes (Batched Query - Fixes New Follower Issue)
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
@@ -319,7 +386,6 @@ const NotesManager = {
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
             if(mutualUIDs.length === 0) {
-                // No mutuals, clear any existing notes
                 const existing = container.querySelectorAll('.friend-note');
                 existing.forEach(e => e.remove());
                 return;
@@ -331,15 +397,13 @@ const NotesManager = {
                 chunks.push(mutualUIDs.splice(0, 30));
             }
 
-            // C. Perform Batched Queries (Ask DB for these specific UIDs)
+            // C. Perform Batched Queries
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
-                    // We query by Document ID because in active_notes, DocID = UserID
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
                     .get();
             });
 
-            // Wait for all chunks
             const snapshots = await Promise.all(queries);
             
             // D. Process & Merge
@@ -374,14 +438,16 @@ const NotesManager = {
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         ${note.text}
                     </div>
-                    <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                    <div style="position:relative; width:65px; height:65px;">
+                        <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp" style="width:100%; height:100%; border-radius:50%;">
+                        ${note.isVerified ? '<div style="position:absolute; bottom:0; right:0; background:#fff; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 24 24" style="width:12px; fill:#0095f6;"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.02-2.147 3.6 0 1.457.746 2.74 1.863 3.494C2.88 16.63 2.5 17.618 2.5 18.75c0 2.07 1.68 3.75 3.75 3.75 1.13 0 2.118-.377 2.754-.863.754 1.115 2.037 1.86 3.495 1.86s2.74-.745 3.494-1.86c.636.486 1.624.863 2.755.863 2.07 0 3.75-1.68 3.75-3.75 0-1.132-.38-2.12-.864-2.755 1.117-.754 1.864-2.037 1.864-3.495z"></path><path d="M10 17.5l-4-4 1.41-1.41L10 14.67l7.59-7.59L19 8.5l-9 9z" fill="#fff"></path></svg></div>' : ''}
+                    </div>
                     <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
                 `;
                 
                 div.onclick = () => {
                     const viewer = document.querySelector('view-notes');
-                    const nav = document.querySelector('main-navbar');
-                    if(nav) nav.classList.add('hidden');
+                    // Hide nav logic handled inside open()
                     viewer.open(note, false);
                 };
                 
