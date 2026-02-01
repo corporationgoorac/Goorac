@@ -1,6 +1,6 @@
 /**
  * =======================================================
- * PART 1: THE VIEWER COMPONENT (Bottom Sheet UI)
+ * PART 1: THE VIEWER COMPONENT (UI)
  * =======================================================
  */
 class ViewNotes extends HTMLElement {
@@ -107,7 +107,6 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(noteData, isOwnNote = false) {
-        // If clicking own note but no data exists, go to share page
         if (!noteData && isOwnNote) {
             window.location.href = 'notes.html';
             return;
@@ -118,7 +117,6 @@ class ViewNotes extends HTMLElement {
         const overlay = this.querySelector('#vn-overlay');
         const content = this.querySelector('#vn-content');
 
-        // Play music if exists
         if (noteData.songPreview) {
             this.audioPlayer.src = noteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
@@ -128,7 +126,6 @@ class ViewNotes extends HTMLElement {
         overlay.classList.add('open');
         if(navigator.vibrate) navigator.vibrate(10);
         
-        // Hide Main Navbar (Optional helper)
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
@@ -204,7 +201,6 @@ class ViewNotes extends HTMLElement {
     close() {
         this.audioPlayer.pause();
         this.querySelector('#vn-overlay').classList.remove('open');
-        // Show Main Navbar
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.remove('hidden');
     }
@@ -263,12 +259,8 @@ customElements.define('view-notes', ViewNotes);
 
 /**
  * =======================================================
- * PART 2: THE NOTES MANAGER (Logic & Data Fetching)
+ * PART 2: THE NOTES MANAGER (Batched Query Logic)
  * =======================================================
- * This handles:
- * 1. Fetching "My Note"
- * 2. Fetching Friends Notes (Strict Mutual Check)
- * 3. Updating the DOM in home.html
  */
 const NotesManager = {
     init: function() {
@@ -280,13 +272,12 @@ const NotesManager = {
         });
     },
 
-    // 1. Handle "My Note" Bubble
+    // 1. My Note
     setupMyNote: function(user) {
         const db = firebase.firestore();
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
             const btn = document.getElementById('my-note-btn');
             const preview = document.getElementById('my-note-preview');
-            // Safety check if elements exist in home.html
             if (!btn || !preview) return; 
 
             const data = doc.exists ? doc.data() : null;
@@ -302,98 +293,100 @@ const NotesManager = {
 
             btn.onclick = () => {
                 const viewer = document.querySelector('view-notes');
-                // Open Viewer or Redirect to Create
                 if(data) viewer.open(data, true);
                 else window.location.href = 'notes.html';
             };
         });
     },
 
-    // 2. Fetch Friend Notes (Strict Mutuals)
+    // 2. Mutual Notes (New Follower Fix)
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
         if(!container) return;
 
         try {
-            // A. GET BOTH LISTS (Following & Followers)
-            // Essential for checking "Do they follow me back?"
+            // A. Identify Mutual Friends UIDs (Author-Based)
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            // B. SERVER FILTER: Get notes where I am in 'visibleTo'
-            // This prevents downloading 1000s of notes.
-            db.collection("active_notes")
-              .where("visibleTo", "array-contains", user.uid)
-              .onSnapshot(snap => {
-                  
-                  // Clear old friend bubbles (Keep the first one, which is "My Note")
-                  const existingFriends = container.querySelectorAll('.friend-note');
-                  existingFriends.forEach(el => el.remove());
+            // Strict Mutual Check: I follow them AND they follow me
+            const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
-                  const now = new Date();
-                  let notesToShow = [];
+            if(mutualUIDs.length === 0) {
+                const existing = container.querySelectorAll('.friend-note');
+                existing.forEach(e => e.remove());
+                return;
+            }
 
-                  snap.forEach(doc => {
-                      const note = doc.data();
+            // B. Chunking (Firestore 'IN' query limit is 30)
+            const chunks = [];
+            while(mutualUIDs.length > 0) {
+                chunks.push(mutualUIDs.splice(0, 30));
+            }
 
-                      // C. CLIENT DOUBLE-CHECK (Unfollow Protection)
-                      const isMe = note.uid === user.uid;
-                      const iFollowThem = myFollowing.includes(note.uid);
-                      const theyFollowMe = myFollowers.includes(note.uid);
-                      
-                      // STRICT MUTUAL DEFINITION: I follow them AND they follow me
-                      const isMutual = iFollowThem && theyFollowMe;
-                      
-                      // 24 Hour Check
-                      const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
+            // C. Perform Batched Queries
+            const queries = chunks.map(chunk => {
+                return db.collection("active_notes")
+                    .where(firebase.firestore.FieldPath.documentId(), "in", chunk)
+                    .get();
+            });
 
-                      // RENDER IF: Active AND (Mutual OR Me)
-                      // We skip 'isMe' here because setupMyNote handles it separately above
-                      if (isActive && isMutual && !isMe) {
-                          notesToShow.push({ ...note, uid: doc.id });
-                      }
-                  });
+            // Wait for all chunks
+            const snapshots = await Promise.all(queries);
+            
+            // D. Process & Merge
+            let allNotes = [];
+            const now = new Date();
 
-                  // Sort: Newest First
-                  notesToShow.sort((a, b) => {
-                      const ta = a.createdAt ? a.createdAt.toMillis() : 0;
-                      const tb = b.createdAt ? b.createdAt.toMillis() : 0;
-                      return tb - ta;
-                  });
+            snapshots.forEach(snap => {
+                snap.forEach(doc => {
+                    const note = doc.data();
+                    const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
+                    if(isActive) {
+                        allNotes.push({ ...note, uid: doc.id });
+                    }
+                });
+            });
 
-                  // Render Bubbles to Home Page
-                  notesToShow.forEach(note => {
-                      const div = document.createElement('div');
-                      div.className = 'note-item friend-note has-note'; // Uses existing CSS
-                      div.innerHTML = `
-                          <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                            ${note.text}
-                          </div>
-                          <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
-                          <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
-                      `;
-                      
-                      div.onclick = () => {
-                          const viewer = document.querySelector('view-notes');
-                          // Helper to hide nav when opening
-                          const nav = document.querySelector('main-navbar');
-                          if(nav) nav.classList.add('hidden');
-                          
-                          viewer.open(note, false);
-                      };
-                      
-                      container.appendChild(div);
-                  });
-              });
+            // Sort: Newest First
+            allNotes.sort((a, b) => {
+                const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+                const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+                return tb - ta;
+            });
+
+            // E. Render
+            const existingFriends = container.querySelectorAll('.friend-note');
+            existingFriends.forEach(e => e.remove());
+
+            allNotes.forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'note-item friend-note has-note';
+                div.innerHTML = `
+                    <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
+                        ${note.text}
+                    </div>
+                    <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                    <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
+                `;
+                
+                div.onclick = () => {
+                    const viewer = document.querySelector('view-notes');
+                    const nav = document.querySelector('main-navbar');
+                    if(nav) nav.classList.add('hidden');
+                    viewer.open(note, false);
+                };
+                
+                container.appendChild(div);
+            });
 
         } catch (e) {
-            console.error("Error loading mutual notes:", e);
+            console.error("Error loading notes:", e);
         }
     }
 };
 
-// Initialize Logic Automatically
 document.addEventListener('DOMContentLoaded', () => NotesManager.init());
