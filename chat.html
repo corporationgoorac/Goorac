@@ -154,6 +154,9 @@
         .bubble { padding: 12px 16px; border-radius: 20px; font-size: 1rem; line-height: 1.45; position: relative; word-wrap: break-word; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
         .sent .bubble { background: var(--sent-bg); color: #fff; border-top-right-radius: 18px; border-top-left-radius: 18px; border-bottom-left-radius: 18px; border-bottom-right-radius: 4px; text-align: left; }
         .received .bubble { background: var(--received-bg); color: #fff; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom-right-radius: 18px; border-bottom-left-radius: 4px; text-align: left; }
+        
+        /* OWN FEATURE: Link Styling */
+        .bubble a { color: #87ceeb; text-decoration: underline; cursor: pointer; }
 
         .sliding-timestamp { position: absolute; top: 50%; transform: translateY(-50%); right: -65px; font-size: 0.7rem; color: #666; font-weight: 500; width: 50px; text-align: center; pointer-events: none; }
         .reaction-badge { position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; border-radius: 20px; padding: 4px 7px; font-size: 0.85rem; z-index: 10; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -419,6 +422,9 @@
     // NEW: Variables for periodic status update
     let lastStatusData = null;
     let statusUpdateInterval = null;
+    
+    // NEW: First load flag for header logic
+    let isFirstStatusLoad = true;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -522,14 +528,17 @@
         }
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
+        
+        // Own Feature: Auto-Scroll on Typing
+        if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
+             scrollToBottom();
+        }
     });
 
-    // Handle Enter key - FIX to keep keyboard open
+    // Handle Enter key - Modified as per request
     mInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault(); // Stop newline
-            sendMsg();
-        }
+        // Enter creates new line, so we do nothing here (default behavior)
+        // Only explicitly shift+enter might be useful, but standard Enter = Next Line
     });
     
     // --- SCROLL BUTTON VISIBILITY LOGIC ---
@@ -656,7 +665,9 @@
 
         // Start interval to refresh time every 60s
         statusUpdateInterval = setInterval(() => {
-            updateHeaderStatus();
+            if (!isFirstStatusLoad) {
+                updateHeaderStatus();
+            }
         }, 60000);
 
         rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
@@ -672,15 +683,27 @@
                return;
             }
 
-            // SHOW USERNAME IMMEDIATELY
-            headerSubLabel.innerText = `@${chatTargetData.username}`;
-            headerSubLabel.style.color = "var(--text-secondary)";
-            onlineDot.style.display = 'none'; // Hide dot while showing username (cleaner look)
+            // === NEW LOGIC: SHOW USERNAME FIRST 3 SECONDS ===
+            if (isFirstStatusLoad) {
+                // Force show username
+                headerSubLabel.innerText = `@${chatTargetData.username}`;
+                headerSubLabel.style.color = "var(--text-secondary)";
+                onlineDot.style.display = 'none';
 
-            // AFTER 3 SECONDS, SHOW STATUS
-            statusTimeout = setTimeout(() => {
-                updateHeaderStatus();
-            }, 3000); 
+                // Wait 3 seconds, then switch to live status
+                statusTimeout = setTimeout(() => {
+                    isFirstStatusLoad = false;
+                    updateHeaderStatus(); 
+                }, 3000);
+            } else {
+                // Normal live update
+                if(bottomTyping.style.display !== 'flex') {
+                    // Small delay to prevent jitter
+                    statusTimeout = setTimeout(() => {
+                        updateHeaderStatus();
+                    }, 500); 
+                }
+            }
         });
     }
 
@@ -919,6 +942,15 @@
         likeSound.play().catch(e => {}); 
     }
 
+    // Own Feature: Link Detection
+    function linkify(text) {
+        if (!text) return "";
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.replace(urlRegex, function(url) {
+            return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>`;
+        });
+    }
+
     function scrollToAndFlash(textSnippet) {
         const bubbles = document.querySelectorAll('.bubble span');
         let targetId = null;
@@ -990,6 +1022,7 @@
         ` : '';
 
         // --- HTML ASSEMBLY ---
+        const safeText = linkify(m.text);
         let innerHTML = '';
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
@@ -1001,7 +1034,7 @@
                         ${noteReplyHtml}
                         ${replyHtml}
                         <div class="bubble" id="bubble-${id}">
-                            <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                            <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                             <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                         </div>
                     </div>
@@ -1012,7 +1045,7 @@
                     ${noteReplyHtml}
                     ${replyHtml}
                     <div class="bubble" id="bubble-${id}">
-                        <span id="text-${id}">${m.text} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                        <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                     </div>
                 </div>`;
@@ -1230,10 +1263,15 @@
     // Unified Cancel function for Replying AND Editing
     // FIX: Properly clears edit mode ID to prevent overwriting
     function cancelInteraction() { 
+        // FIX: Clear input ONLY if we were editing. If replying, keep draft.
+        if (editModeId) {
+            mInput.value = "";
+            mInput.style.height = 'auto';
+        }
+        
         replyingTo = null; 
         editModeId = null;
         document.getElementById('reply-dock').style.display = 'none'; 
-        // REMOVED mInput.value = "" here. Clearing should happen at Send or explicit Cancel call if needed.
         // REMOVED mInput.blur() to keep keyboard open
     }
     
