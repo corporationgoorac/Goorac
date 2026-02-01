@@ -1,6 +1,6 @@
 /**
  * =======================================================
- * PART 1: THE VIEWER COMPONENT (UI)
+ * PART 1: THE VIEWER COMPONENT (Bottom Sheet UI)
  * =======================================================
  */
 class ViewNotes extends HTMLElement {
@@ -261,6 +261,9 @@ customElements.define('view-notes', ViewNotes);
  * =======================================================
  * PART 2: THE NOTES MANAGER (Batched Query Logic)
  * =======================================================
+ * This version calculates Mutual Friends first, then 
+ * specifically requests ONLY their notes.
+ * This solves the "New Follower" issue.
  */
 const NotesManager = {
     init: function() {
@@ -272,7 +275,7 @@ const NotesManager = {
         });
     },
 
-    // 1. My Note
+    // 1. My Note Bubble
     setupMyNote: function(user) {
         const db = firebase.firestore();
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
@@ -299,23 +302,24 @@ const NotesManager = {
         });
     },
 
-    // 2. Mutual Notes (New Follower Fix)
+    // 2. Load Mutual Notes (Batched Query - The Fix)
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
         if(!container) return;
 
         try {
-            // A. Identify Mutual Friends UIDs (Author-Based)
+            // A. Identify Mutual Friends UIDs
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            // Strict Mutual Check: I follow them AND they follow me
+            // Strict Mutual: I follow them AND they follow me
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
             if(mutualUIDs.length === 0) {
+                // No mutuals, clear any existing notes
                 const existing = container.querySelectorAll('.friend-note');
                 existing.forEach(e => e.remove());
                 return;
@@ -327,10 +331,11 @@ const NotesManager = {
                 chunks.push(mutualUIDs.splice(0, 30));
             }
 
-            // C. Perform Batched Queries
+            // C. Perform Batched Queries (Ask DB for these specific UIDs)
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
-                    .where(firebase.firestore.FieldPath.documentId(), "in", chunk)
+                    // We query by Document ID because in active_notes, DocID = UserID
+                    .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
                     .get();
             });
 
