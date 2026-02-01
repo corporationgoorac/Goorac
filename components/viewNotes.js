@@ -408,18 +408,18 @@ const NotesManager = {
         });
     },
 
-    // --- NEW: Inject Bubble CSS (Instagram Style - FIXED ALIGNMENT) ---
+    // --- NEW: Inject Bubble CSS with SKELETONS ---
     injectBubbleStyles: function() {
         const style = document.createElement('style');
         style.innerHTML = `
-            /* CONTAINER FIX: Increased gap prevents overlaps */
+            /* CONTAINER */
             #notes-container {
                 display: flex;
                 overflow-x: auto;
-                padding-top: 70px; /* Space for the floating bubble */
+                padding-top: 70px;
                 padding-bottom: 10px;
                 padding-left: 15px;
-                gap: 25px; /* Gap to prevent horizontal overlaps */
+                gap: 25px;
                 scrollbar-width: none;
                 align-items: flex-start;
             }
@@ -445,19 +445,16 @@ const NotesManager = {
                 text-align: center;
                 
                 position: absolute;
-                /* Anchor bottom of bubble near top of PFP */
-                top: 5px; 
-                /* Move up by 100% of height + centering logic */
+                top: 5px; /* Anchor point */
                 left: 50%;
-                transform: translate(-50%, -100%); 
+                transform: translate(-50%, -100%); /* Moves UP */
                 z-index: 10;
                 
                 padding: 6px 12px !important;
                 border-radius: 16px !important;
-                
                 font-size: 0.75rem !important;
                 
-                /* Auto width with constraints */
+                /* Auto width logic */
                 width: max-content;
                 max-width: 90px; 
                 
@@ -466,11 +463,11 @@ const NotesManager = {
                 border: 1px solid rgba(255,255,255,0.1);
             }
             
-            /* SPEECH BUBBLE TAIL (The Dot) */
+            /* TAIL */
             .note-bubble::after, #my-note-preview::after {
                 content: '';
                 position: absolute;
-                bottom: -4px; /* Hangs below */
+                bottom: -4px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 6px;
@@ -479,7 +476,6 @@ const NotesManager = {
                 border-radius: 50%;
                 z-index: -1;
             }
-            /* Smaller second dot for effect */
             .note-bubble::before, #my-note-preview::before {
                 content: '';
                 position: absolute;
@@ -493,7 +489,7 @@ const NotesManager = {
                 opacity: 0.7;
             }
 
-            /* Text Handling */
+            /* CONTENT */
             .note-text-content {
                 line-height: 1.25;
                 font-weight: 500;
@@ -503,51 +499,58 @@ const NotesManager = {
                 overflow: hidden;
                 width: 100%;
                 text-align: center;
+                margin-bottom: 2px;
             }
 
-            /* Mini Music Icon in Bubble */
             .note-music-tag {
-                display: flex; 
-                align-items: center; 
-                justify-content: center;
-                gap: 3px;
-                font-size: 0.65rem; 
-                opacity: 0.8; 
-                margin-top: 2px;
-                white-space: nowrap; 
-                overflow: hidden; 
-                max-width: 100%;
-                width: 100%;
+                display: flex; align-items: center; justify-content: center;
+                gap: 3px; font-size: 0.65rem; opacity: 0.8; margin-top: 2px;
+                white-space: nowrap; overflow: hidden; max-width: 100%; width: 100%;
             }
-            
             .note-music-tag svg { flex-shrink: 0; }
             
-            /* User PFP Styling */
             .note-pfp {
-                width: 65px;
-                height: 65px;
-                border-radius: 50%;
-                border: 2px solid #262626;
-                object-fit: cover;
-                background: #333;
-                z-index: 2; /* Ensure PFP is below bubble z-index but visible */
+                width: 65px; height: 65px;
+                border-radius: 50%; border: 2px solid #262626;
+                object-fit: cover; background: #333;
+                z-index: 2;
             }
 
-            /* Username Styling */
             .note-username {
-                font-size: 0.75rem;
-                margin-top: 6px;
-                color: #a0a0a0;
-                max-width: 75px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                text-align: center;
+                font-size: 0.75rem; margin-top: 6px;
+                color: #a0a0a0; max-width: 75px;
+                overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; text-align: center;
             }
 
-            /* Fix for My Note Bubble Preview specific styling */
-            #my-note-preview {
-                display: none; /* Toggled via JS */
+            #my-note-preview { display: none; }
+
+            /* --- SKELETON STYLES --- */
+            .skeleton-item {
+                display: flex; flex-direction: column;
+                align-items: center; position: relative;
+                width: 75px; flex-shrink: 0;
+            }
+            .skeleton-bubble {
+                width: 60px; height: 35px;
+                background: #2a2a2a; border-radius: 16px;
+                position: absolute; top: 5px; left: 50%;
+                transform: translate(-50%, -100%);
+                border-bottom-left-radius: 4px;
+            }
+            .skeleton-pfp {
+                width: 65px; height: 65px;
+                border-radius: 50%; background: #2a2a2a;
+                border: 2px solid #1a1a1a;
+            }
+            .skeleton-text {
+                width: 50px; height: 8px;
+                background: #2a2a2a; margin-top: 8px;
+                border-radius: 4px;
+            }
+            .pulse { animation: skelPulse 1.5s infinite ease-in-out; }
+            @keyframes skelPulse {
+                0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; }
             }
         `;
         document.head.appendChild(style);
@@ -564,7 +567,6 @@ const NotesManager = {
             const data = doc.exists ? doc.data() : null;
 
             if(data) {
-                // --- MODIFIED: Show Color & Song in My Note Bubble ---
                 preview.style.display = 'flex';
                 preview.style.backgroundColor = data.bgColor || '#262626';
                 preview.style.color = data.textColor || '#fff';
@@ -598,6 +600,24 @@ const NotesManager = {
         const container = document.getElementById('notes-container');
         if(!container) return;
 
+        // --- RENDER SKELETONS ---
+        const skeletonHTML = `
+            <div class="skeleton-item pulse">
+                <div class="skeleton-bubble"></div>
+                <div class="skeleton-pfp"></div>
+                <div class="skeleton-text"></div>
+            </div>
+        `.repeat(5); // Show 5 skeletons
+        
+        // Append to container (keep "My Note" if physically separate, otherwise append)
+        // Assuming "My Note" is separate in HTML, we just append skeletons to the list
+        const skeletonWrapper = document.createElement('div');
+        skeletonWrapper.id = 'skeleton-wrapper';
+        skeletonWrapper.style.display = 'flex';
+        skeletonWrapper.style.gap = '25px';
+        skeletonWrapper.innerHTML = skeletonHTML;
+        container.appendChild(skeletonWrapper);
+
         try {
             // A. Identify Mutual Friends UIDs
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
@@ -605,31 +625,29 @@ const NotesManager = {
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            // Strict Mutual: I follow them AND they follow me
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
+            // REMOVE SKELETONS ONCE DATA IS READY (or empty)
             if(mutualUIDs.length === 0) {
-                // No mutuals, clear any existing notes
+                skeletonWrapper.remove();
                 const existing = container.querySelectorAll('.friend-note');
                 existing.forEach(e => e.remove());
                 return;
             }
 
-            // B. Chunking (Firestore 'IN' query limit is 30)
+            // B. Chunking
             const chunks = [];
             while(mutualUIDs.length > 0) {
                 chunks.push(mutualUIDs.splice(0, 30));
             }
 
-            // C. Perform Batched Queries (Ask DB for these specific UIDs)
+            // C. Perform Batched Queries
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
-                    // We query by Document ID because in active_notes, DocID = UserID
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
                     .get();
             });
 
-            // Wait for all chunks
             const snapshots = await Promise.all(queries);
             
             // D. Process & Merge
@@ -653,6 +671,9 @@ const NotesManager = {
                 return tb - ta;
             });
 
+            // REMOVE SKELETONS BEFORE RENDERING REAL NOTES
+            skeletonWrapper.remove();
+
             // E. Render
             const existingFriends = container.querySelectorAll('.friend-note');
             existingFriends.forEach(e => e.remove());
@@ -661,7 +682,6 @@ const NotesManager = {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
                 
-                // --- MODIFIED: Friend Bubble HTML to show Song & Text ---
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
@@ -688,6 +708,9 @@ const NotesManager = {
 
         } catch (e) {
             console.error("Error loading notes:", e);
+            // Ensure skeletons are removed even on error
+            const skel = document.getElementById('skeleton-wrapper');
+            if(skel) skel.remove();
         }
     }
 };
