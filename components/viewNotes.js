@@ -48,7 +48,6 @@ class ViewNotes extends HTMLElement {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.65); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                /* Clean background, no blur as requested */
                 backdrop-filter: none; 
                 opacity: 0; transition: opacity 0.2s ease;
             }
@@ -69,9 +68,9 @@ class ViewNotes extends HTMLElement {
             
             /* --- PC RESPONSIVENESS --- */
             @media (min-width: 768px) {
-                .vn-overlay { align-items: center; } /* Center vertically */
+                .vn-overlay { align-items: center; } 
                 .vn-sheet {
-                    border-radius: 24px; /* Rounded all corners */
+                    border-radius: 24px; 
                     width: 420px;
                     max-height: 80vh;
                     transform: scale(0.95); opacity: 0;
@@ -172,7 +171,14 @@ class ViewNotes extends HTMLElement {
             .vn-heart-btn:active { transform: scale(0.8); }
 
             /* --- OWN NOTE STYLES --- */
-            .vn-likers-section { margin-top: 20px; border-top: 1px solid #222; padding-top: 15px; }
+            .vn-likers-section { 
+                margin-top: 20px; border-top: 1px solid #222; padding-top: 15px;
+                max-height: 220px; overflow-y: auto; /* SCROLLBAR ADDED */
+                scrollbar-width: thin; scrollbar-color: #333 #121212;
+            }
+            .vn-likers-section::-webkit-scrollbar { width: 4px; }
+            .vn-likers-section::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
             
             .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
@@ -214,12 +220,11 @@ class ViewNotes extends HTMLElement {
         
         // Touch events for mobile swiping
         const startDrag = (e) => {
-            // Only enable swipe on mobile/tablet widths
             if(window.innerWidth > 768) return; 
             
             this.startY = e.touches ? e.touches[0].clientY : e.clientY;
             this.isDragging = true;
-            sheet.style.transition = 'none'; // Disable transition for direct interaction
+            sheet.style.transition = 'none'; 
         };
 
         const onDrag = (e) => {
@@ -227,7 +232,6 @@ class ViewNotes extends HTMLElement {
             this.currentY = e.touches ? e.touches[0].clientY : e.clientY;
             const deltaY = this.currentY - this.startY;
             
-            // Only allow dragging downwards
             if (deltaY > 0) {
                 e.preventDefault(); 
                 sheet.style.transform = `translateY(${deltaY}px)`;
@@ -240,7 +244,6 @@ class ViewNotes extends HTMLElement {
             sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
             const deltaY = this.currentY - this.startY;
-            // Threshold to close (100px)
             if (deltaY > 100) {
                 this.close();
             } else {
@@ -248,7 +251,6 @@ class ViewNotes extends HTMLElement {
             }
         };
 
-        // Attach listeners
         handle.addEventListener('touchstart', startDrag);
         handle.addEventListener('touchmove', onDrag);
         handle.addEventListener('touchend', endDrag);
@@ -299,7 +301,7 @@ class ViewNotes extends HTMLElement {
                         this.currentNote = { ...doc.data(), uid: doc.id };
                         this.renderContent(); 
                     } else if (!this.isOwnNote) {
-                        this.close(); // Close if friend deletes note
+                        this.close(); 
                     }
                 });
         }
@@ -307,8 +309,6 @@ class ViewNotes extends HTMLElement {
 
     renderContent() {
         const content = this.querySelector('#vn-content');
-        
-        // Handle empty own note (shouldn't happen often but failsafe)
         if (this.isOwnNote && !this.currentNote) {
              this.currentNote = { text: "Add a note...", uid: firebase.auth().currentUser.uid };
         }
@@ -326,11 +326,17 @@ class ViewNotes extends HTMLElement {
         const displayPfp = this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
         const displayName = this.currentUserProfile?.name || user?.displayName || 'You';
         
+        // CHECK IF CURRENT USER IS VERIFIED (ADDED FEATURE)
+        const isVerified = this.currentUserProfile?.verified === true; 
+
         return `
             <div class="vn-profile-header">
                 <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='profile.html'">
                 <div class="vn-friend-info">
-                    <div class="vn-friend-name">${displayName} (You)</div>
+                    <div class="vn-friend-name">
+                        ${displayName} (You)
+                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                    </div>
                     <div class="vn-friend-handle">Your Note</div>
                 </div>
             </div>
@@ -552,13 +558,11 @@ class ViewNotes extends HTMLElement {
                 sender: myUid,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 seen: false,
-                replyToNote: this.currentNote.text, // Fallback string
-                noteMetadata: noteMetadata // Rich object for chat.html UI
+                replyToNote: this.currentNote.text, 
+                noteMetadata: noteMetadata 
             });
 
             // 2. Update Chat Metadata (Inbox)
-            // 'Replied to a note' is the text shown in messages.html
-            // KEY FIX: Explicitly set seen: false ensuring it's BRIGHT for recipient
             await chatRef.set({
                 lastMessage: "Replied to a note", 
                 lastSender: myUid,
@@ -673,6 +677,19 @@ const NotesManager = {
                 background: inherit;
                 border-radius: 50%;
                 z-index: -1;
+            }
+
+            /* --- NEW: Like Indicator on Note Bubble --- */
+            .note-like-indicator {
+                position: absolute;
+                bottom: -6px;
+                right: -4px;
+                font-size: 12px;
+                background: #1c1c1e;
+                border-radius: 50%;
+                padding: 2px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                z-index: 12;
             }
 
             .note-text-content {
@@ -814,6 +831,8 @@ const NotesManager = {
             container.querySelectorAll('.friend-note').forEach(e => e.remove());
 
             allNotes.forEach(note => {
+                const isLiked = note.likes && note.likes.some(l => l.uid === user.uid);
+
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
                 div.innerHTML = `
@@ -825,6 +844,7 @@ const NotesManager = {
                                 <span>${note.songName.substring(0, 10)}${note.songName.length>10?'...':''}</span>
                             </div>
                         ` : ''}
+                        ${isLiked ? '<div class="note-like-indicator">❤️</div>' : ''}
                     </div>
                     <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                     <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
