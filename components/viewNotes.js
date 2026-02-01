@@ -267,8 +267,6 @@ customElements.define('view-notes', ViewNotes);
 // ==========================================
 // NEW: Notes Manager for Fetching & Mutuals
 // ==========================================
-// Paste this below the class or in your main script
-// Ensures "Search and display mutual frnds notes" works.
 
 const NotesManager = {
     allNotes: [],
@@ -284,7 +282,7 @@ const NotesManager = {
 
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
-        const container = document.getElementById('notes-list-container'); // Ensure you have this DIV in your HTML
+        const container = document.getElementById('notes-list-container'); 
         if(!container) return;
 
         container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Loading notes...</div>';
@@ -295,21 +293,21 @@ const NotesManager = {
             const myData = myProfileDoc.data();
             const myFollowing = myData?.following || [];
 
-            // 2. Fetch ALL active notes (Realtime listener recommended)
+            // 2. Fetch ALL active notes via Snapshot (Realtime)
             db.collection("active_notes").onSnapshot(async (snapshot) => {
                 const rawNotes = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
                 
                 // 3. FILTER FOR MUTUALS
                 const mutualNotesPromises = rawNotes.map(async (note) => {
-                    // Always show own note
+                    // CONDITION 1: Always show own note
                     if (note.uid === user.uid) {
-                        return { ...note, isOwn: true, photoURL: user.photoURL }; 
+                        return { ...note, isOwn: true, photoURL: user.photoURL };
                     }
 
-                    // STRICT FILTER: If I don't follow them, ignore immediately
+                    // CONDITION 2: Do I follow them?
                     if (!myFollowing.includes(note.uid)) return null;
 
-                    // Strict Mutual Check: Does this user follow me back?
+                    // CONDITION 3: Do they follow me back? (STRICT MUTUAL CHECK)
                     try {
                         const authorDoc = await db.collection("users").doc(note.uid).get();
                         if (!authorDoc.exists) return null;
@@ -317,7 +315,7 @@ const NotesManager = {
                         const authorData = authorDoc.data();
                         const authorFollowing = authorData.following || [];
 
-                        // MUTUAL CONDITION: They must follow me back
+                        // Only return the note if my UID is in THEIR following list
                         if (authorFollowing.includes(user.uid)) {
                             return { 
                                 ...note, 
@@ -332,10 +330,10 @@ const NotesManager = {
                     return null;
                 });
 
-                // Resolve all promises and filter out nulls
+                // Wait for all mutual checks to complete
                 const resolvedNotes = await Promise.all(mutualNotesPromises);
                 
-                // Final verification: Ensure only valid mutual notes are stored
+                // Final clean list of notes (only your own and strict mutuals)
                 this.allNotes = resolvedNotes.filter(n => n !== null);
 
                 // Render the list
@@ -389,10 +387,9 @@ const NotesManager = {
                         </div>
                     ` : ''}
                 </div>
-                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.username || 'You'}</div>
+                <div style="margin-top: 5px; font-size: 0.75rem; color: #aaa;">${note.isOwn ? 'You' : (note.username || 'Friend')}</div>
             `;
 
-            // Handle Click -> Open ViewNotes Component
             bubble.onclick = () => {
                 const viewer = document.querySelector('view-notes');
                 if (viewer) viewer.open(note, note.isOwn);
@@ -404,7 +401,6 @@ const NotesManager = {
         container.appendChild(scrollWrapper);
     },
 
-    // Call this from your search input oninput="NotesManager.filter(this.value)"
     filter: function(query) {
         const lowerQ = query.toLowerCase();
         const filtered = this.allNotes.filter(n => 
@@ -415,5 +411,5 @@ const NotesManager = {
     }
 };
 
-// Initialize
-// document.addEventListener('DOMContentLoaded', () => NotesManager.init());
+// Auto-initialize when the DOM is ready
+document.addEventListener('DOMContentLoaded', () => NotesManager.init());
