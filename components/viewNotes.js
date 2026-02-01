@@ -393,13 +393,10 @@ customElements.define('view-notes', ViewNotes);
  * =======================================================
  * PART 2: THE NOTES MANAGER (Batched Query Logic)
  * =======================================================
- * This version calculates Mutual Friends first, then 
- * specifically requests ONLY their notes.
- * This solves the "New Follower" issue.
  */
 const NotesManager = {
     init: function() {
-        this.injectBubbleStyles(); // Inject CSS for bubbles
+        this.injectBubbleStyles(); 
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 this.setupMyNote(user);
@@ -408,11 +405,9 @@ const NotesManager = {
         });
     },
 
-    // --- NEW: Inject Bubble CSS with SKELETONS ---
     injectBubbleStyles: function() {
         const style = document.createElement('style');
         style.innerHTML = `
-            /* CONTAINER */
             #notes-container {
                 display: flex;
                 overflow-x: auto;
@@ -425,7 +420,6 @@ const NotesManager = {
             }
             #notes-container::-webkit-scrollbar { display: none; }
 
-            /* ITEM WRAPPER */
             .note-item {
                 display: flex;
                 flex-direction: column;
@@ -436,34 +430,27 @@ const NotesManager = {
                 cursor: pointer;
             }
 
-            /* BUBBLE: Floating, Centered, Sized Correctly */
             .note-bubble, #my-note-preview {
                 display: flex !important;
                 flex-direction: column;
                 justify-content: center !important;
                 align-items: center !important;
                 text-align: center;
-                
                 position: absolute;
-                top: 5px; /* Anchor point */
+                top: 5px; 
                 left: 50%;
-                transform: translate(-50%, -100%); /* Moves UP */
+                transform: translate(-50%, -100%); 
                 z-index: 10;
-                
                 padding: 6px 12px !important;
                 border-radius: 16px !important;
                 font-size: 0.75rem !important;
-                
-                /* Auto width logic */
                 width: max-content;
                 max-width: 90px; 
-                
                 box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 box-sizing: border-box;
                 border: 1px solid rgba(255,255,255,0.1);
             }
             
-            /* TAIL */
             .note-bubble::after, #my-note-preview::after {
                 content: '';
                 position: absolute;
@@ -476,20 +463,7 @@ const NotesManager = {
                 border-radius: 50%;
                 z-index: -1;
             }
-            .note-bubble::before, #my-note-preview::before {
-                content: '';
-                position: absolute;
-                bottom: -8px;
-                left: 55%;
-                width: 3px;
-                height: 3px;
-                background: inherit;
-                border-radius: 50%;
-                z-index: -1;
-                opacity: 0.7;
-            }
 
-            /* CONTENT */
             .note-text-content {
                 line-height: 1.25;
                 font-weight: 500;
@@ -499,7 +473,6 @@ const NotesManager = {
                 overflow: hidden;
                 width: 100%;
                 text-align: center;
-                margin-bottom: 2px;
             }
 
             .note-music-tag {
@@ -507,7 +480,6 @@ const NotesManager = {
                 gap: 3px; font-size: 0.65rem; opacity: 0.8; margin-top: 2px;
                 white-space: nowrap; overflow: hidden; max-width: 100%; width: 100%;
             }
-            .note-music-tag svg { flex-shrink: 0; }
             
             .note-pfp {
                 width: 65px; height: 65px;
@@ -525,18 +497,10 @@ const NotesManager = {
 
             #my-note-preview { display: none; }
 
-            /* --- SKELETON STYLES --- */
+            /* --- CLEANER SKELETON STYLES (No Bubble) --- */
             .skeleton-item {
                 display: flex; flex-direction: column;
-                align-items: center; position: relative;
-                width: 75px; flex-shrink: 0;
-            }
-            .skeleton-bubble {
-                width: 60px; height: 35px;
-                background: #2a2a2a; border-radius: 16px;
-                position: absolute; top: 5px; left: 50%;
-                transform: translate(-50%, -100%);
-                border-bottom-left-radius: 4px;
+                align-items: center; width: 75px; flex-shrink: 0;
             }
             .skeleton-pfp {
                 width: 65px; height: 65px;
@@ -556,7 +520,6 @@ const NotesManager = {
         document.head.appendChild(style);
     },
 
-    // 1. My Note Bubble
     setupMyNote: function(user) {
         const db = firebase.firestore();
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
@@ -576,7 +539,7 @@ const NotesManager = {
                     ${data.songName ? `
                         <div class="note-music-tag">
                             <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                            <span>${data.songName.substring(0, 10)}${data.songName.length>10?'...':''}</span>
+                            <span>${data.songName.substring(0, 10)}</span>
                         </div>
                     ` : ''}
                 `;
@@ -594,32 +557,25 @@ const NotesManager = {
         });
     },
 
-    // 2. Load Mutual Notes (Batched Query - The Fix)
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
         if(!container) return;
 
-        // --- RENDER SKELETONS ---
-        const skeletonHTML = `
-            <div class="skeleton-item pulse">
-                <div class="skeleton-bubble"></div>
-                <div class="skeleton-pfp"></div>
-                <div class="skeleton-text"></div>
-            </div>
-        `.repeat(5); // Show 5 skeletons
-        
-        // Append to container (keep "My Note" if physically separate, otherwise append)
-        // Assuming "My Note" is separate in HTML, we just append skeletons to the list
+        // Render clean skeletons (Only PFP and Username)
         const skeletonWrapper = document.createElement('div');
         skeletonWrapper.id = 'skeleton-wrapper';
         skeletonWrapper.style.display = 'flex';
         skeletonWrapper.style.gap = '25px';
-        skeletonWrapper.innerHTML = skeletonHTML;
+        skeletonWrapper.innerHTML = `
+            <div class="skeleton-item pulse">
+                <div class="skeleton-pfp"></div>
+                <div class="skeleton-text"></div>
+            </div>
+        `.repeat(5);
         container.appendChild(skeletonWrapper);
 
         try {
-            // A. Identify Mutual Friends UIDs
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
             const myFollowing = myData.following || []; 
@@ -627,21 +583,14 @@ const NotesManager = {
 
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
-            // REMOVE SKELETONS ONCE DATA IS READY (or empty)
             if(mutualUIDs.length === 0) {
                 skeletonWrapper.remove();
-                const existing = container.querySelectorAll('.friend-note');
-                existing.forEach(e => e.remove());
                 return;
             }
 
-            // B. Chunking
             const chunks = [];
-            while(mutualUIDs.length > 0) {
-                chunks.push(mutualUIDs.splice(0, 30));
-            }
+            while(mutualUIDs.length > 0) chunks.push(mutualUIDs.splice(0, 30));
 
-            // C. Perform Batched Queries
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
@@ -649,8 +598,6 @@ const NotesManager = {
             });
 
             const snapshots = await Promise.all(queries);
-            
-            // D. Process & Merge
             let allNotes = [];
             const now = new Date();
 
@@ -658,37 +605,24 @@ const NotesManager = {
                 snap.forEach(doc => {
                     const note = doc.data();
                     const isActive = note.expiresAt ? note.expiresAt.toDate() > now : true;
-                    if(isActive) {
-                        allNotes.push({ ...note, uid: doc.id });
-                    }
+                    if(isActive) allNotes.push({ ...note, uid: doc.id });
                 });
             });
 
-            // Sort: Newest First
-            allNotes.sort((a, b) => {
-                const ta = a.createdAt ? a.createdAt.toMillis() : 0;
-                const tb = b.createdAt ? b.createdAt.toMillis() : 0;
-                return tb - ta;
-            });
+            allNotes.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
-            // REMOVE SKELETONS BEFORE RENDERING REAL NOTES
             skeletonWrapper.remove();
-
-            // E. Render
-            const existingFriends = container.querySelectorAll('.friend-note');
-            existingFriends.forEach(e => e.remove());
 
             allNotes.forEach(note => {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
-                
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         <div class="note-text-content">${note.text}</div>
                         ${note.songName ? `
                             <div class="note-music-tag">
                                 <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                                <span>${note.songName.substring(0, 10)}${note.songName.length>10?'...':''}</span>
+                                <span>${note.songName.substring(0, 10)}</span>
                             </div>
                         ` : ''}
                     </div>
@@ -698,19 +632,14 @@ const NotesManager = {
                 
                 div.onclick = () => {
                     const viewer = document.querySelector('view-notes');
-                    const nav = document.querySelector('main-navbar');
-                    if(nav) nav.classList.add('hidden');
                     viewer.open(note, false);
                 };
-                
                 container.appendChild(div);
             });
 
         } catch (e) {
             console.error("Error loading notes:", e);
-            // Ensure skeletons are removed even on error
-            const skel = document.getElementById('skeleton-wrapper');
-            if(skel) skel.remove();
+            if(document.getElementById('skeleton-wrapper')) document.getElementById('skeleton-wrapper').remove();
         }
     }
 };
