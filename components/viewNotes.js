@@ -1,11 +1,5 @@
 
 /**
- * IMPORT CONFIG
- * Assumes config.js is one level up from this file
- */
-import '../config.js'; 
-
-/**
  * =======================================================
  * PART 1: THE VIEWER COMPONENT (Bottom Sheet UI)
  * =======================================================
@@ -15,7 +9,6 @@ class ViewNotes extends HTMLElement {
         super();
         this.currentNote = null;
         this.isOwnNote = false;
-        this.unsubscribe = null; // Store the real-time listener
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.db = firebase.firestore();
@@ -53,12 +46,6 @@ class ViewNotes extends HTMLElement {
             .vn-header { text-align: center; margin-bottom: 25px; }
             .vn-pfp-large { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 3px solid #333; margin-bottom: 12px; }
             
-            /* Username Row to center badge */
-            .vn-username-row { 
-                display: flex; align-items: center; justify-content: center; 
-                gap: 6px; margin-bottom: 5px; font-weight: 700; font-size: 1.1rem; 
-            }
-            
             .vn-song-tag { 
                 display: inline-flex; align-items: center; gap: 6px; 
                 background: rgba(255,255,255,0.1); padding: 6px 14px; 
@@ -70,7 +57,7 @@ class ViewNotes extends HTMLElement {
                 line-height: 1.4; color: #fff;
             }
 
-            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 8px; font-weight: 500; }
+            .vn-timestamp { font-size: 0.75rem; color: #8e8e93; margin-top: 5px; }
 
             .vn-likers-section { 
                 max-height: 250px; overflow-y: auto; 
@@ -119,36 +106,14 @@ class ViewNotes extends HTMLElement {
             if (e.target.id === 'vn-overlay') this.close();
         };
 
-        // Listen for browser Back Button (Android/iOS)
+        // --- NEW: LISTEN FOR BACK BUTTON ---
         window.addEventListener('popstate', (event) => {
             const overlay = this.querySelector('#vn-overlay');
             if (overlay && overlay.classList.contains('open')) {
-                // Close without triggering another history.back()
+                // If back button was pressed and modal is open, close it (pass true for fromHistory)
                 this.close(true);
             }
         });
-    }
-
-    // --- HELPER: Relative Time ---
-    getRelativeTime(timestamp) {
-        if (!timestamp) return 'Recently';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const now = new Date();
-        const seconds = Math.floor((now - date) / 1000);
-        
-        if (seconds < 60) return 'Just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
-    }
-
-    // --- HELPER: Verification Badge SVG ---
-    getVerifiedBadge() {
-        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="#1DA1F2" style="flex-shrink:0;"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.02-2.147 3.6 0 1.457.746 2.747 1.863 3.483-.242.66-.375 1.38-.375 2.13 0 3.314 2.686 6 6 6 .63 0 1.235-.1 1.815-.28.847.886 2.033 1.442 3.352 1.442s2.505-.556 3.352-1.44c.58.178 1.185.28 1.815.28 3.315 0 6-2.686 6-6 0-.75-.134-1.47-.376-2.13C21.754 15.247 22.5 13.957 22.5 12.5zM9.547 17.5l-3.35-3.35 1.59-1.59 1.76 1.76 5.64-5.64 1.59 1.59-7.23 7.23z"/></svg>`;
     }
 
     async open(noteData, isOwnNote = false) {
@@ -167,71 +132,19 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // 1. Initial Render
         content.innerHTML = isOwnNote ? this.renderOwnNote(noteData) : this.renderFriendNote(noteData);
         overlay.classList.add('open');
         
-        // 2. Start Real-time Listener (Crucial for "Who Liked My Note" list and "Like Persistence")
-        this.startRealtimeListener(noteData.uid, isOwnNote);
-
-        // 3. Push History State for Back Button support
+        // --- NEW: PUSH HISTORY STATE ---
+        // This adds a fake entry so the back button has something to remove
         window.history.pushState({ vnOpen: true }, "", "#view-note");
-        
+
         if(navigator.vibrate) navigator.vibrate(10);
         
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
         this.handleActions();
-    }
-
-    // --- REAL-TIME UPDATER ---
-    startRealtimeListener(uid, isOwnNote) {
-        // Stop any previous listener
-        if(this.unsubscribe) this.unsubscribe();
-
-        // Listen for changes to the note document
-        this.unsubscribe = this.db.collection('active_notes').doc(uid)
-            .onSnapshot(doc => {
-                if(doc.exists) {
-                    const freshData = doc.data();
-                    freshData.uid = doc.id;
-                    this.currentNote = freshData;
-                    
-                    // Specific helper to update just the dynamic parts (Likes list, Heart status)
-                    this.updateDynamicUI(freshData, isOwnNote);
-                }
-            });
-    }
-
-    updateDynamicUI(note, isOwnNote) {
-        // 1. Update the Likers List (Activity Section)
-        // This ensures "Who liked my notes" updates instantly
-        const likersContainer = this.querySelector('.vn-likers-section');
-        if(likersContainer) {
-            likersContainer.innerHTML = `
-                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
-                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
-                    <div class="vn-liker-item">
-                        <div class="vn-liker-info">
-                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
-                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
-                        </div>
-                        <span style="color:#ff3b30;">❤️</span>
-                    </div>
-                `).join('') : `
-                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
-                `}
-            `;
-        }
-
-        // 2. Update Heart Icon (if viewing a friend's note)
-        if(!isOwnNote) {
-            const user = firebase.auth().currentUser;
-            const isLiked = note.likes?.some(l => l.uid === user?.uid);
-            const likeBtn = this.querySelector('#like-toggle-btn');
-            if(likeBtn) likeBtn.innerText = isLiked ? '❤️' : '🤍';
-        }
     }
 
     renderOwnNote(note) {
@@ -245,11 +158,22 @@ class ViewNotes extends HTMLElement {
                         <span>${note.songName}</span>
                     </div>
                 ` : ''}
-                <div class="vn-timestamp">${this.getRelativeTime(note.createdAt)}</div>
+                <div class="vn-timestamp">Shared ${note.timeString || 'Recently'}</div>
             </div>
 
             <div class="vn-likers-section">
-                <div style="text-align:center; padding:20px; color:#8e8e93;">Loading activity...</div>
+                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#8e8e93;">Activity</div>
+                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
+                    <div class="vn-liker-item">
+                        <div class="vn-liker-info">
+                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" class="vn-pfp-small">
+                            <span style="font-weight:600;">${liker.displayName || 'Friend'}</span>
+                        </div>
+                        <span style="color:#ff3b30;">❤️</span>
+                    </div>
+                `).join('') : `
+                    <div style="text-align:center; padding:20px; color:#8e8e93; font-size:0.9rem;">No likes yet</div>
+                `}
             </div>
 
             <div class="vn-action-group">
@@ -262,15 +186,11 @@ class ViewNotes extends HTMLElement {
     renderFriendNote(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
-        const verifiedBadge = note.verification ? this.getVerifiedBadge() : '';
 
         return `
             <div class="vn-header">
                 <img src="${note.photoURL || note.pfp || 'https://via.placeholder.com/85'}" class="vn-pfp-large">
-                <div class="vn-username-row">
-                    <span>${note.username || 'User'}</span>
-                    ${verifiedBadge}
-                </div>
+                <div style="font-weight:700; margin-bottom:5px;">${note.username || 'User'}</div>
                 <div class="vn-bubble-text" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; padding:12px 20px; border-radius:22px; display:inline-block;">
                     ${note.text}
                 </div>
@@ -282,7 +202,6 @@ class ViewNotes extends HTMLElement {
                         </div>
                     </div>
                 ` : ''}
-                <div class="vn-timestamp">${this.getRelativeTime(note.createdAt)}</div>
             </div>
 
             <div class="vn-interaction-bar">
@@ -294,15 +213,15 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
+    // --- MODIFIED: CLOSE METHOD ---
     close(fromHistory = false) {
         this.audioPlayer.pause();
-        if(this.unsubscribe) this.unsubscribe(); // Stop listening to DB updates
-        
         this.querySelector('#vn-overlay').classList.remove('open');
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.remove('hidden');
 
-        // Only go back manually if NOT triggered by the browser back button
+        // If this close was triggered by a click/drag (not the back button),
+        // we need to remove the history state manually so the user isn't stuck.
         if (!fromHistory && window.location.hash === "#view-note") {
             window.history.back();
         }
@@ -331,8 +250,7 @@ class ViewNotes extends HTMLElement {
                 if(navigator.vibrate) navigator.vibrate(15);
                 const isCurrentlyLiked = likeBtn.innerText === '❤️';
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
-                
-                // Optimistic UI update (feels instant)
+
                 likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️';
 
                 try {
@@ -352,11 +270,7 @@ class ViewNotes extends HTMLElement {
                             });
                         }
                     }
-                } catch (e) { 
-                    console.error("Like toggle failed", e); 
-                    // Revert UI if DB fails
-                    likeBtn.innerText = isCurrentlyLiked ? '❤️' : '🤍';
-                }
+                } catch (e) { console.error("Like toggle failed", e); }
             };
         }
     }
@@ -369,6 +283,9 @@ customElements.define('view-notes', ViewNotes);
  * =======================================================
  * PART 2: THE NOTES MANAGER (Batched Query Logic)
  * =======================================================
+ * This version calculates Mutual Friends first, then 
+ * specifically requests ONLY their notes.
+ * This solves the "New Follower" issue.
  */
 const NotesManager = {
     init: function() {
@@ -380,6 +297,7 @@ const NotesManager = {
         });
     },
 
+    // 1. My Note Bubble
     setupMyNote: function(user) {
         const db = firebase.firestore();
         db.collection("active_notes").doc(user.uid).onSnapshot(doc => {
@@ -406,38 +324,47 @@ const NotesManager = {
         });
     },
 
+    // 2. Load Mutual Notes (Batched Query - The Fix)
     loadMutualNotes: async function(user) {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
         if(!container) return;
 
         try {
+            // A. Identify Mutual Friends UIDs
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
             const myData = myProfileDoc.data() || {};
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
+            // Strict Mutual: I follow them AND they follow me
             const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
 
             if(mutualUIDs.length === 0) {
+                // No mutuals, clear any existing notes
                 const existing = container.querySelectorAll('.friend-note');
                 existing.forEach(e => e.remove());
                 return;
             }
 
+            // B. Chunking (Firestore 'IN' query limit is 30)
             const chunks = [];
             while(mutualUIDs.length > 0) {
                 chunks.push(mutualUIDs.splice(0, 30));
             }
 
+            // C. Perform Batched Queries (Ask DB for these specific UIDs)
             const queries = chunks.map(chunk => {
                 return db.collection("active_notes")
+                    // We query by Document ID because in active_notes, DocID = UserID
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
                     .get();
             });
 
+            // Wait for all chunks
             const snapshots = await Promise.all(queries);
             
+            // D. Process & Merge
             let allNotes = [];
             const now = new Date();
 
@@ -451,32 +378,25 @@ const NotesManager = {
                 });
             });
 
+            // Sort: Newest First
             allNotes.sort((a, b) => {
                 const ta = a.createdAt ? a.createdAt.toMillis() : 0;
                 const tb = b.createdAt ? b.createdAt.toMillis() : 0;
                 return tb - ta;
             });
 
+            // E. Render
             const existingFriends = container.querySelectorAll('.friend-note');
             existingFriends.forEach(e => e.remove());
 
             allNotes.forEach(note => {
                 const div = document.createElement('div');
                 div.className = 'note-item friend-note has-note';
-                
-                // --- VERIFICATION BADGE FOR MAIN VIEW ---
-                const verifiedBadge = note.verification
-                    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="#1DA1F2" style="position:absolute; right:-2px; bottom:2px; background:white; border-radius:50%; box-shadow: 0 0 0 1.5px #000;"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.02-2.147 3.6 0 1.457.746 2.747 1.863 3.483-.242.66-.375 1.38-.375 2.13 0 3.314 2.686 6 6 6 .63 0 1.235-.1 1.815-.28.847.886 2.033 1.442 3.352 1.442s2.505-.556 3.352-1.44c.58.178 1.185.28 1.815.28 3.315 0 6-2.686 6-6 0-.75-.134-1.47-.376-2.13C21.754 15.247 22.5 13.957 22.5 12.5zM9.547 17.5l-3.35-3.35 1.59-1.59 1.76 1.76 5.64-5.64 1.59 1.59-7.23 7.23z"/></svg>`
-                    : '';
-
                 div.innerHTML = `
                     <div class="note-bubble" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
                         ${note.text}
                     </div>
-                    <div style="position:relative;">
-                        <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
-                        ${verifiedBadge}
-                    </div>
+                    <img src="${note.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                     <span class="note-username">${(note.username || 'User').split(' ')[0]}</span>
                 `;
                 
@@ -497,5 +417,3 @@ const NotesManager = {
 };
 
 document.addEventListener('DOMContentLoaded', () => NotesManager.init());
-
-
