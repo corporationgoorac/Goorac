@@ -38,7 +38,7 @@
             align-items: center;
             padding-top: env(safe-area-inset-top, 15px); 
             z-index: 100;
-            flex-shrink: 0; /* Prevent header from shrinking */
+            flex-shrink: 0; 
         }
 
         .close-btn { font-size: 26px; font-weight: 300; cursor: pointer; padding: 5px; }
@@ -76,7 +76,7 @@
             align-items: center; 
             justify-content: center; 
             position: relative;
-            padding-bottom: 10vh; /* Visual balance */
+            padding-bottom: 10vh; 
         }
 
         .thought-wrapper { 
@@ -86,7 +86,6 @@
             width: 100%; 
             position: relative;
             z-index: 5;
-            /* Added gap for better alignment between bubble and PFP */
             gap: 15px; 
         }
 
@@ -95,14 +94,13 @@
             background: var(--bubble-bg); 
             padding: 14px 22px; 
             border-radius: 26px;
-            min-width: 100px; /* Reduced min-width */
-            max-width: 80%; /* Responsive width */
+            min-width: 100px; 
+            max-width: 80%; 
             text-align: center; 
             position: relative;
             transition: all 0.3s ease;
             box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             z-index: 2;
-            /* Animation for appearance */
             animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
@@ -130,7 +128,7 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
             word-wrap: break-word; 
-            min-height: 1.4em; /* Ensure height even when empty */
+            min-height: 1.4em; 
         }
         
         #music-tag {
@@ -152,7 +150,7 @@
         #song-artist { opacity: 0.8; font-size: 0.7rem; }
 
         .pfp-container {
-            width: 90px; /* Slightly adjusted size for better proportion */
+            width: 90px; 
             height: 90px; 
             border-radius: 50%; 
             border: 3px solid #111;
@@ -163,7 +161,7 @@
         }
         .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Input Trigger - Adjusted to sit directly over the bubble area */
+        /* Input Trigger - Fixed z-index and opacity handling */
         #note-input { 
             position: absolute; 
             opacity: 0; 
@@ -173,6 +171,7 @@
             left: 0;
             z-index: 10;
             cursor: text;
+            font-size: 16px; /* Prevents iOS zoom */
         }
 
         /* Tool Area */
@@ -275,19 +274,41 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 2. Mobile Keyboard Management (Fixed)
+    // 2. Mobile Keyboard & Paste Management
     const input = document.getElementById('note-input');
+    const display = document.getElementById('display-text');
+    const shareBtn = document.getElementById('share-btn');
     
     function focusInput() {
         input.focus();
     }
 
-    // Automatically focus on load (Standard method, better for mobile)
+    // Auto-focus on load
     window.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            input.focus();
-        }, 100);
+        setTimeout(() => input.focus(), 100);
     });
+
+    // Handle Input and Paste events cleanly
+    function updateText() {
+        const val = input.value;
+        if(val.length > 0) {
+            display.innerText = val;
+        } else {
+            // Only show placeholder if no song selected
+            if (!currentSongData) display.innerText = "What's on your mind?";
+            else display.innerText = ""; // Hide placeholder if song exists
+        }
+        validateShare();
+    }
+
+    input.addEventListener('input', updateText);
+    input.addEventListener('paste', () => setTimeout(updateText, 0)); // Slight delay to catch pasted content
+
+    function validateShare() {
+        const hasText = input.value.trim().length > 0;
+        const hasSong = currentSongData !== null;
+        shareBtn.classList.toggle('active', hasText || hasSong);
+    }
 
     // 3. Vibration Utility
     function vibrate() {
@@ -351,21 +372,6 @@
         b.style.color = currentTheme.text;
     }
 
-    // Input Management
-    const display = document.getElementById('display-text');
-    const shareBtn = document.getElementById('share-btn');
-
-    input.oninput = () => {
-        display.innerText = input.value || "What's on your mind?";
-        validateShare();
-    };
-
-    function validateShare() {
-        const hasText = input.value.trim().length > 0;
-        const hasSong = currentSongData !== null;
-        shareBtn.classList.toggle('active', hasText || hasSong);
-    }
-
     // Music Integration
     const picker = document.getElementById('music-picker');
     function pickMusic(e) { 
@@ -379,14 +385,10 @@
         document.getElementById('music-tag').style.display = 'flex';
         document.getElementById('song-name').innerText = currentSongData.trackName;
         document.getElementById('song-artist').innerText = currentSongData.artistName;
-        
-        // Keep placeholder text even when song is selected
-        if(input.value === "") display.innerText = "What's on your mind?";
-        
-        validateShare();
+        updateText(); // Re-run to potentially clear placeholder
     });
 
-    // Share & Save (Updated for Mutual Friends and Database PFPs)
+    // Share & Save (CLEANED: No friend list calculation needed anymore)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
@@ -400,17 +402,9 @@
         shareBtn.disabled = true;
 
         try {
-            // Fetch current user's data for Mutual Friend Logic
+            // Just get the profile info, no friends list logic
             const userDoc = await db.collection("users").doc(user.uid).get();
             const userData = userDoc.data() || {};
-            const myFollowing = userData.following || [];
-            const myFollowers = userData.followers || [];
-            
-            // Define Mutual Friends: People I follow who ALSO follow me
-            const mutualFriends = myFollowing.filter(uid => myFollowers.includes(uid));
-
-            // FIX: Add self to the list so I can see my own note
-            mutualFriends.push(user.uid);
             
             const now = new Date();
             const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24-hour expiry
@@ -418,7 +412,7 @@
             const noteData = {
                 uid: user.uid,
                 username: userData.username || user.displayName || "User",
-                pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150', // Use database PFP URL
+                pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150',
                 text: input.value.trim(),
                 bgColor: currentTheme.bg,
                 textColor: currentTheme.text,
@@ -426,8 +420,10 @@
                 songArtist: currentSongData?.artistName || null,
                 songPreview: currentSongData?.previewUrl || null,
                 songArt: currentSongData?.artworkUrl100 || null,
-                // SECURITY: Only people in this array can query/see this note
-                visibleTo: mutualFriends, 
+                
+                // NO 'visibleTo' ARRAY NEEDED HERE anymore.
+                // The Home Page logic handles the privacy check dynamically.
+                
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
                 dateString: now.toDateString(), 
