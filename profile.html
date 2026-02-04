@@ -11,8 +11,6 @@
 
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
-    
-    <script src="components/imagePicker.js" defer></script>
 
     <style>
         :root {
@@ -83,7 +81,6 @@
             height: 110px;
             margin: 0 auto 20px;
             overflow: visible;
-            position: relative; /* Added for edit icon positioning if needed */
         }
 
         .pfp-main {
@@ -96,27 +93,10 @@
             cursor: pointer;
         }
 
-        /* Edit Overlay Hint */
-        .pfp-container::after {
-            content: '📷';
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            background: #000;
-            border: 1px solid #333;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            pointer-events: none;
-        }
-
         .pfp-main:active {
-            transform: scale(0.95); /* Changed from zoom to press effect for better UX with picker */
-            opacity: 0.8;
+            transform: scale(1.5);
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
         .name-container {
@@ -247,7 +227,7 @@
 
 <div class="profile-hero">
     <div class="pfp-container">
-        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton" onclick="openProfilePicker()">
+        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton">
     </div>
     
     <div class="name-container">
@@ -287,10 +267,7 @@
 
 <div id="toast">Copied to Clipboard</div>
 
-<image-picker id="profile-image-picker"></image-picker>
-
 <main-navbar></main-navbar>
-<call-notifier></call-notifier>
 
 <script>
     const firebaseConfig = {
@@ -302,45 +279,9 @@
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
     };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-
-    // --- Image Picker Integration Logic ---
-    const picker = document.getElementById('profile-image-picker');
-    
-    function openProfilePicker() {
-        if(picker) picker.openPicker();
-    }
-
-    // Listen for image upload success
-    picker.addEventListener('image-uploaded', async (e) => {
-        const newUrl = e.detail.url;
-        const user = auth.currentUser;
-        
-        // Optimistic Update
-        document.getElementById('pfp-img').src = newUrl;
-
-        if (user) {
-            try {
-                // Update Firestore
-                await db.collection("users").doc(user.uid).update({
-                    photoURL: newUrl
-                });
-                
-                // Update Auth Profile (Optional, good for caching)
-                await user.updateProfile({ photoURL: newUrl });
-
-                showToast("Profile Picture Updated!");
-            } catch (error) {
-                console.error("Error updating profile picture:", error);
-                showToast("Failed to update");
-            }
-        }
-    });
-    // --------------------------------------
 
     auth.onAuthStateChanged(async (user) => {
         if (user) {
@@ -400,7 +341,7 @@
         // Try Modern API first
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(id).then(() => {
-                showToast("ID Copied!");
+                showToast();
             }).catch(() => {
                 fallbackCopy(id);
             });
@@ -421,16 +362,15 @@
         
         try {
             document.execCommand('copy');
-            showToast("ID Copied!");
+            showToast();
         } catch (err) {
             console.error('Copy failed', err);
         }
         document.body.removeChild(textArea);
     }
 
-    function showToast(msg = "Copied to Clipboard") {
+    function showToast() {
         const toast = document.getElementById('toast');
-        toast.innerText = msg;
         toast.style.display = 'block';
         toast.style.opacity = '1';
         setTimeout(() => { 
@@ -446,5 +386,6 @@
     };
 </script>
 
+<call-notifier></call-notifier>
 </body>
 </html>
