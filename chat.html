@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000"> 
     <title>Goorac | Quantum</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -67,6 +68,12 @@
         @keyframes fadeStatus { 0% { opacity: 0; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }
         
+        /* FEATURE: Pulse Animation for Online Dot */
+        @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 70% { box-shadow: 0 0 0 4px rgba(0, 230, 118, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } }
+        
+        /* FEATURE: Smooth Image Fade In */
+        @keyframes imgFadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
         /* Modal Slide Up Animation */
         @keyframes slideUp {
             from { transform: translateY(100%); }
@@ -103,7 +110,7 @@
         
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
         .h-pfp { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #121212; border: 1px solid #333; transition: opacity 0.3s ease; }
-        .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); }
+        .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); animation: pulseGreen 2s infinite; }
         
         .h-info { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
         .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.1; }
@@ -161,7 +168,21 @@
         .bubble a { color: #87ceeb; text-decoration: underline; cursor: pointer; }
 
         .sliding-timestamp { position: absolute; top: 50%; transform: translateY(-50%); right: -65px; font-size: 0.7rem; color: #666; font-weight: 500; width: 50px; text-align: center; pointer-events: none; }
-        .reaction-badge { position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; border-radius: 20px; padding: 4px 7px; font-size: 0.85rem; z-index: 10; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        
+        /* FIXED REACTION BADGE VISIBILITY */
+        .reaction-badge { 
+            position: absolute; 
+            bottom: -10px; /* Moves emoji slightly below the bubble/image */
+            background: #1a1a1a; 
+            border: 2px solid #000; 
+            border-radius: 20px; 
+            padding: 4px 7px; 
+            font-size: 0.85rem; 
+            z-index: 20; /* Ensure it sits on top of images */
+            display: none; 
+            cursor: pointer; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); 
+        }
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
@@ -306,20 +327,26 @@
             width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto;
         }
 
-        /* NEW: Styles for Media Messages */
+        /* NEW: Styles for Media Messages - FIXED VISIBILITY */
         .msg-media-wrapper {
-            overflow: hidden; cursor: pointer; 
+            position: relative; /* Allows absolute positioning of badge */
+            /* REMOVED overflow:hidden so reaction can stick out */
+            cursor: pointer; 
             margin-bottom: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            position: relative;
         }
-        .received .msg-media-wrapper { border-radius: 18px; border-bottom-left-radius: 4px; }
-        .sent .msg-media-wrapper { border-radius: 18px; border-bottom-right-radius: 4px; }
         
         .chat-media-img {
             display: block; width: 100%; max-width: 280px; max-height: 350px; 
-            object-fit: cover; border-radius: inherit;
+            object-fit: cover; 
+            border-radius: 18px; /* Rounded corners handled here now */
+            animation: imgFadeIn 0.4s ease-out; /* Feature: Smooth Fade In */
         }
+        
+        /* Corner logic since parent no longer clips */
+        .received .chat-media-img { border-bottom-left-radius: 4px; }
+        .sent .chat-media-img { border-bottom-right-radius: 4px; }
+
         /* When media is present, the caption bubble needs less padding at top or needs to be attached */
         .bubble.has-media {
             border-top-left-radius: 4px; border-top-right-radius: 4px;
@@ -1114,9 +1141,11 @@
         ` : '';
 
         // NEW: MEDIA (IMAGE) RENDERING - Clean UI, no bubble
+        // Added specific classes received-media-img / sent-media-img for border radius control
+        const imgClass = side === 'sent' ? 'sent-media-img' : 'received-media-img';
         const mediaHtml = m.imageUrl ? `
             <div class="msg-media-wrapper" onclick="document.getElementById('media-viewer').open('${m.imageUrl}')">
-                <img src="${m.imageUrl}" class="chat-media-img">
+                <img src="${m.imageUrl}" class="chat-media-img ${imgClass}">
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>
         ` : '';
