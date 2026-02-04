@@ -10,6 +10,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script src="components/emojiPicker.js" defer></script>
+    <script src="components/imagePicker.js" defer></script>
+    <script src="components/viewMedia.js" defer></script>
 
     <style>
         :root { 
@@ -155,28 +157,8 @@
         .sent .bubble { background: var(--sent-bg); color: #fff; border-top-right-radius: 18px; border-top-left-radius: 18px; border-bottom-left-radius: 18px; border-bottom-right-radius: 4px; text-align: left; }
         .received .bubble { background: var(--received-bg); color: #fff; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom-right-radius: 18px; border-bottom-left-radius: 4px; text-align: left; }
         
-        /* OWN FEATURE: Link Styling, Image & Video Preview */
+        /* OWN FEATURE: Link Styling */
         .bubble a { color: #87ceeb; text-decoration: underline; cursor: pointer; }
-        .bubble-media-preview { max-width: 100%; border-radius: 12px; margin-top: 8px; display: block; border: 1px solid rgba(255,255,255,0.1); }
-        .bubble-video-preview { max-width: 100%; border-radius: 12px; margin-top: 8px; display: block; border: 1px solid rgba(255,255,255,0.1); }
-        
-        /* NEW: Read More styles for long messages */
-        .read-more-btn {
-            color: #87ceeb; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-            margin-top: 5px; display: inline-block;
-        }
-        .truncated-msg {
-            max-height: 400px; /* Approx 20 lines */
-            overflow: hidden;
-            position: relative;
-            display: -webkit-box;
-            -webkit-line-clamp: 20;
-            -webkit-box-orient: vertical;
-        }
-        .expanded-msg {
-            max-height: none;
-            -webkit-line-clamp: unset;
-        }
 
         .sliding-timestamp { position: absolute; top: 50%; transform: translateY(-50%); right: -65px; font-size: 0.7rem; color: #666; font-weight: 500; width: 50px; text-align: center; pointer-events: none; }
         .reaction-badge { position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; border-radius: 20px; padding: 4px 7px; font-size: 0.85rem; z-index: 10; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -254,11 +236,28 @@
         .input-area { padding: 10px 12px; display: flex; align-items: flex-end; gap: 10px; }
         .input-box { flex: 1; background: #121212; border-radius: 22px; padding: 4px 14px; border: 1px solid #333; display: flex; align-items: center; min-height: 42px; transition: border-color 0.2s; }
         .msg-input { width: 100%; background: transparent; border: none; color: white; padding: 9px 0; font-size: 16px; resize: none; max-height: 120px; overflow-y: auto; line-height: 1.35; }
-        .plus-btn { font-size: 26px; color: var(--accent); cursor: pointer; padding: 0 5px; height: 44px; display: flex; align-items: center; }
+        .plus-btn { font-size: 26px; color: var(--accent); cursor: pointer; padding: 0 5px; height: 44px; display: flex; align-items: center; transition: transform 0.2s; }
+        .plus-btn:active { transform: scale(0.9); }
         .send-btn { background: transparent; border: none; font-weight: 600; font-size: 1rem; padding: 0 5px; height: 44px; display: flex; align-items: center; color: #444; pointer-events: none; transition: color 0.2s ease, text-shadow 0.2s ease; }
         .send-btn.active { color: var(--accent); cursor: pointer; pointer-events: auto; text-shadow: 0 0 12px rgba(0, 149, 246, 0.6); }
 
         #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
+        
+        /* NEW: Attachment Menu (Popup for + Button) */
+        #attachment-menu {
+            display: none; position: absolute; bottom: 70px; left: 15px;
+            background: rgba(28, 28, 28, 0.95); backdrop-filter: blur(10px);
+            border-radius: 16px; padding: 10px; z-index: 1001;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            animation: slideUpFade 0.2s ease-out;
+            flex-direction: column; gap: 5px; width: 150px;
+        }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .attach-opt { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; color: white; font-size: 0.95rem; font-weight: 500; }
+        .attach-opt:active { background: rgba(255,255,255,0.1); }
+        .attach-opt svg { width: 22px; height: 22px; fill: white; }
 
         #menu-overlay, #reaction-details-overlay { 
             display: none; position: fixed; inset: 0; 
@@ -273,7 +272,15 @@
         .menu-opt { padding: 16px; text-align: center; font-size: 1rem; border-bottom: 1px solid #333; color: #fff; }
         .menu-opt:active { background: #333; }
         
-        #reply-dock { display: none; background: #111; padding: 12px 16px; border-top: 1px solid var(--border); justify-content: space-between; align-items: center; }
+        #reply-dock, #media-dock { display: none; background: #111; padding: 12px 16px; border-top: 1px solid var(--border); justify-content: space-between; align-items: center; }
+        
+        /* NEW: Media Preview Dock Styles */
+        #media-dock {
+            background: #111; display: none; padding: 10px 16px;
+            align-items: center; gap: 15px; border-top: 1px solid var(--border);
+        }
+        .media-preview-thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #333; }
+        .media-dock-info { flex: 1; font-size: 0.85rem; color: #ccc; }
 
         .react-list-container { width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; max-height: 50vh; }
         .react-list-header { padding: 16px; text-align: center; font-weight: 600; font-size: 1.1rem; border-bottom: 1px solid #333; position: relative; color: white;}
@@ -306,9 +313,30 @@
         .picker-drag-handle {
             width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto;
         }
+
+        /* NEW: Styles for Media Messages */
+        .msg-media-wrapper {
+            overflow: hidden; cursor: pointer; margin-bottom: 4px;
+        }
+        .received .msg-media-wrapper { border-radius: 18px; border-bottom-left-radius: 4px; }
+        .sent .msg-media-wrapper { border-radius: 18px; border-bottom-right-radius: 4px; }
+        
+        .chat-media-img {
+            display: block; width: 100%; max-width: 280px; max-height: 350px; 
+            object-fit: cover; border-radius: inherit;
+        }
+        /* When media is present, the caption bubble needs less padding at top or needs to be attached */
+        .bubble.has-media {
+            border-top-left-radius: 4px; border-top-right-radius: 4px;
+            margin-top: 2px;
+        }
+        
     </style>
 </head>
 <body>
+
+<image-picker id="img-picker"></image-picker>
+<view-media id="media-viewer"></view-media>
 
 <div id="heart-overlay">❤️</div>
 
@@ -391,6 +419,12 @@
     </div>
 
     <div class="input-area-container">
+        <div id="media-dock">
+            <img id="pending-media-img" src="" class="media-preview-thumb">
+            <div class="media-dock-info">Image selected</div>
+            <div onclick="clearPendingMedia()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
+        </div>
+
         <div id="reply-dock">
             <div id="reply-text" style="font-size:0.8rem; color:#aaa; overflow:hidden; text-overflow:ellipsis;"></div>
             <div onclick="cancelInteraction()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
@@ -400,8 +434,19 @@
              <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
         </div>
 
+        <div id="attachment-menu">
+            <div class="attach-opt" onclick="openCameraPicker()">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <span>Camera / Gallery</span>
+            </div>
+            <div class="attach-opt" onclick="toggleEmojiTray()">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                <span>Emoji</span>
+            </div>
+        </div>
+
         <div class="input-area">
-            <div class="plus-btn" onclick="toggleEmojiTray()">+</div>
+            <div class="plus-btn" onclick="toggleAttachmentMenu()">+</div>
             <div class="input-box" id="msg-input-box">
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
@@ -446,6 +491,9 @@
     // NEW: First load flag for header logic
     let isFirstStatusLoad = true;
 
+    // NEW: Pending Image Upload URL
+    let pendingImageUrl = null;
+
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
     const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -460,6 +508,7 @@
     const sendBtnUI = document.getElementById('send-btn');
     const onlineDot = document.getElementById('h-online-dot');
     const headerSubLabel = document.getElementById('h-username-label');
+    const attachmentMenu = document.getElementById('attachment-menu');
 
     // UNWANTED EMOJIS REMOVED HERE
 
@@ -473,6 +522,11 @@
     
     // NEW: Global Ripple Effect
     document.addEventListener('click', function(e) {
+        // Close attachment menu if clicking elsewhere
+        if (!e.target.closest('#attachment-menu') && !e.target.closest('.plus-btn')) {
+            attachmentMenu.style.display = 'none';
+        }
+        
         if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('emoji-picker')) return;
         const circle = document.createElement('div');
         circle.style.width = circle.style.height = '15px';
@@ -541,19 +595,24 @@
         this.style.height = (this.scrollHeight) + 'px';
         if(this.value === '') this.style.height = 'auto';
         
-        if(this.value.trim().length > 0) {
-            sendBtnUI.classList.add('active');
-        } else {
-            sendBtnUI.classList.remove('active');
-        }
+        checkSendButton();
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
         
         // Own Feature: Auto-Scroll on Typing
         if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
-              scrollToBottom();
+             scrollToBottom();
         }
     });
+    
+    // NEW: Check send button state (Text OR Image pending)
+    function checkSendButton() {
+        if(mInput.value.trim().length > 0 || pendingImageUrl) {
+            sendBtnUI.classList.add('active');
+        } else {
+            sendBtnUI.classList.remove('active');
+        }
+    }
 
     // Handle Enter key - Modified as per request
     mInput.addEventListener('keydown', (e) => {
@@ -581,6 +640,9 @@
     
     // --- COMPONENT INTEGRATION ---
     const mainPicker = document.getElementById('main-picker');
+    const imagePickerComponent = document.getElementById('img-picker');
+    const mediaViewerComponent = document.getElementById('media-viewer');
+
     if(mainPicker) {
         mainPicker.addEventListener('emoji-click', event => {
             const emoji = event.detail.emoji || event.detail.unicode; 
@@ -590,13 +652,55 @@
         });
     }
 
+    // NEW: Image Picker Listener
+    if (imagePickerComponent) {
+        imagePickerComponent.addEventListener('image-uploaded', (e) => {
+            const url = e.detail.url;
+            pendingImageUrl = url;
+            
+            // Show Dock
+            const dock = document.getElementById('media-dock');
+            document.getElementById('pending-media-img').src = url;
+            dock.style.display = 'flex';
+            
+            // Enable send button
+            checkSendButton();
+            mInput.placeholder = "Add a caption...";
+            mInput.focus();
+        });
+    }
+
+    function toggleAttachmentMenu() {
+        if (attachmentMenu.style.display === 'flex') {
+            attachmentMenu.style.display = 'none';
+        } else {
+            emojiTray.style.display = 'none'; // Close emoji if open
+            attachmentMenu.style.display = 'flex';
+        }
+    }
+
+    function openCameraPicker() {
+        attachmentMenu.style.display = 'none';
+        if (imagePickerComponent) {
+            imagePickerComponent.openPicker();
+        }
+    }
+
     function toggleEmojiTray() {
+        attachmentMenu.style.display = 'none'; // Close menu if open
         if (emojiTray.style.display === 'block') {
             emojiTray.style.display = 'none';
         } else {
             emojiTray.style.display = 'block';
         }
         scrollToBottom();
+    }
+    
+    function clearPendingMedia() {
+        pendingImageUrl = null;
+        document.getElementById('media-dock').style.display = 'none';
+        mInput.placeholder = "Message...";
+        checkSendButton();
     }
     
     // Reaction Picker Logic (Half Screen Modal Component)
@@ -639,7 +743,7 @@
         if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
     }
     
-    mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; });
+    mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none'; });
 
     // --- REALTIME PRESENCE SYSTEM ---
     function setupMyPresence() {
@@ -962,22 +1066,11 @@
         likeSound.play().catch(e => {}); 
     }
 
-    // Own Feature: Link Detection & Media Preview
+    // Own Feature: Link Detection
     function linkify(text) {
         if (!text) return "";
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         return text.replace(urlRegex, function(url) {
-            // Check if it's an image
-            const lowerUrl = url.toLowerCase();
-            if (lowerUrl.match(/\.(jpeg|jpg|gif|png|webp)$/) != null) {
-                return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>
-                        <img src="${url}" class="bubble-media-preview" onclick="event.stopPropagation(); window.open('${url}', '_blank')">`;
-            }
-            // Check if it's a video
-            if (lowerUrl.match(/\.(mp4|webm|mov)$/) != null) {
-                return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>
-                        <video src="${url}" controls class="bubble-video-preview" onclick="event.stopPropagation()"></video>`;
-            }
             return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>`;
         });
     }
@@ -1003,15 +1096,6 @@
                 }
             }
         }
-    }
-    
-    // Function to expand long messages
-    window.expandMessage = function(id) {
-        const span = document.getElementById(`text-${id}`);
-        const btn = document.getElementById(`read-more-${id}`);
-        if(span) span.classList.remove('truncated-msg');
-        if(span) span.classList.add('expanded-msg');
-        if(btn) btn.style.display = 'none';
     }
 
     function renderMessage(m, id, isLastSeen, isLastInGroup) {
@@ -1042,40 +1126,36 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // NEW: Unique Instagram-like Note Reply UI (Fixed Logic)
-        let noteReplyHtml = '';
-        if (m.replyToNote) {
-            // Safe Color Extraction for Notes
-            const nBg = (m.noteMetadata && m.noteMetadata.bgColor) ? m.noteMetadata.bgColor : '#262626';
-            const nTxt = (m.noteMetadata && m.noteMetadata.textColor) ? m.noteMetadata.textColor : '#fff';
-            const nPfp = (m.noteMetadata && m.noteMetadata.pfp) ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20');
-            const nSong = (m.noteMetadata && m.noteMetadata.songName) ? m.noteMetadata.songName : null;
-
-            noteReplyHtml = `
+        // NEW: Unique Instagram-like Note Reply UI
+        const noteReplyHtml = m.replyToNote ? `
             <div class="note-reply-wrapper">
-                <div class="note-reply-pill" style="background: ${nBg}; color: ${nTxt}">
+                <div class="note-reply-pill" style="background: ${m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626'}; color: ${m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff'}">
                     <div class="note-header-row">
-                        <img src="${nPfp}" class="note-mini-pfp">
+                        <img src="${m.noteMetadata && m.noteMetadata.pfp ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" class="note-mini-pfp">
                         <span class="note-label">Replied to note</span>
                     </div>
                     <div class="note-content-text">"${m.replyToNote}"</div>
-                    ${nSong ? `
+                    ${m.noteMetadata && m.noteMetadata.songName ? `
                     <div class="note-song-tag">
                         <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${nSong}</span>
+                        <span>${m.noteMetadata.songName}</span>
                     </div>` : ''}
                 </div>
                 <div class="note-connector"></div>
             </div>
-            `;
-        }
+        ` : '';
+
+        // NEW: MEDIA (IMAGE) RENDERING
+        const mediaHtml = m.imageUrl ? `
+            <div class="msg-media-wrapper" onclick="document.getElementById('media-viewer').open('${m.imageUrl}')">
+                <img src="${m.imageUrl}" class="chat-media-img">
+            </div>
+        ` : '';
         
-        // --- LONG TEXT HANDLER (READ MORE) ---
-        // Check line count roughly by characters (approx 40 chars per line on mobile, 20 lines = 800 chars)
-        // Or strictly use CSS + Button for overflow
-        const isLongMessage = m.text.length > 600 || (m.text.match(/\n/g) || []).length > 20;
-        const textClass = isLongMessage ? "truncated-msg" : "";
-        const readMoreBtn = isLongMessage ? `<div id="read-more-${id}" class="read-more-btn" onclick="event.stopPropagation(); expandMessage('${id}')">Read More...</div>` : "";
+        // If image exists, text bubble becomes optional (caption)
+        // If text exists with image, we style it slightly differently (attached to bottom of image)
+        const bubbleClass = m.imageUrl ? "bubble has-media" : "bubble";
+        const bubbleStyle = (m.imageUrl && !m.text) ? "display:none;" : ""; // Hide text bubble if empty caption
 
         // --- HTML ASSEMBLY ---
         const safeText = linkify(m.text);
@@ -1089,9 +1169,9 @@
                     <div class="msg-bubble-box" ${boxStyle}>
                         ${noteReplyHtml}
                         ${replyHtml}
-                        <div class="bubble" id="bubble-${id}">
-                            <span id="text-${id}" class="${textClass}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                            ${readMoreBtn}
+                        ${mediaHtml}
+                        <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
+                            <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                             <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                         </div>
                     </div>
@@ -1101,9 +1181,9 @@
                 <div class="msg-bubble-box" ${boxStyle}>
                     ${noteReplyHtml}
                     ${replyHtml}
-                    <div class="bubble" id="bubble-${id}">
-                        <span id="text-${id}" class="${textClass}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                        ${readMoreBtn}
+                    ${mediaHtml}
+                    <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
+                        <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
                         <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
                     </div>
                 </div>`;
@@ -1116,9 +1196,26 @@
         `;
         container.appendChild(rowDiv);
 
+        // Add listeners to text bubble ONLY if it exists and is visible
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
-        if(bubbleEl) {
-            bubbleEl.addEventListener('dblclick', (e) => {
+        if(bubbleEl && bubbleEl.style.display !== 'none') {
+            attachMessageListeners(bubbleEl, id, m);
+        }
+        
+        // Also attach long-press menu to the Image if it exists
+        if(m.imageUrl) {
+             const mediaEl = rowDiv.querySelector('.msg-media-wrapper');
+             if(mediaEl) attachMessageListeners(mediaEl, id, m);
+        }
+    }
+    
+    // Extracted Listener Logic for re-use on Text Bubble OR Image
+    function attachMessageListeners(element, id, m) {
+            let reactionsList = [];
+            let myReaction = null;
+            if (m.reactions && m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
+
+            element.addEventListener('dblclick', (e) => {
                 e.preventDefault(); e.stopPropagation(); vibrate(40);
                 triggerHeartAnimation();
                 applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
@@ -1126,9 +1223,8 @@
 
             let startX = 0, currentX = 0, menuTimer = null, isScrolling = false, swipeTriggered = false;
 
-            bubbleEl.addEventListener('touchstart', (e) => {
+            element.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
-                const startY = e.touches[0].clientY;
                 isScrolling = false; 
                 swipeTriggered = false;
                 
@@ -1137,45 +1233,44 @@
                 }, 500);
             }, {passive: true});
 
-            bubbleEl.addEventListener('touchmove', (e) => {
+            element.addEventListener('touchmove', (e) => {
                 currentX = e.touches[0].clientX;
-                const currentY = e.touches[0].clientY;
                 
-                if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { 
-                      clearTimeout(menuTimer);
-                      isScrolling = true;
+                if (Math.abs(currentX - startX) > 10) { 
+                     clearTimeout(menuTimer);
+                     isScrolling = true;
                 }
                 
                 let diff = currentX - startX;
                 if (diff > 0 && diff < 80) {
-                    bubbleEl.style.transform = `translateX(${diff}px)`;
-                    bubbleEl.style.transition = "none";
+                    element.style.transform = `translateX(${diff}px)`;
+                    element.style.transition = "none";
                     if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
                 }
             }, {passive: true});
 
-            bubbleEl.addEventListener('touchend', () => {
+            element.addEventListener('touchend', () => {
                 clearTimeout(menuTimer);
                 let diff = currentX - startX;
-                bubbleEl.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                bubbleEl.style.transform = `translateX(0px)`;
-                if (diff > 50 && swipeTriggered) triggerReply(m.text);
+                element.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                element.style.transform = `translateX(0px)`;
+                if (diff > 50 && swipeTriggered) triggerReply(m.text || "Image");
                 startX = 0; currentX = 0;
             });
-        }
     }
 
     function triggerReply(text) {
         replyingTo = text;
-        document.getElementById('reply-text').innerText = "Replying to: " + replyingTo;
+        document.getElementById('reply-text').innerText = "Replying to: " + (text.length > 50 ? text.substring(0,50)+"..." : text);
         document.getElementById('reply-dock').style.display = 'flex';
         mInput.focus(); 
     }
 
     async function sendMsg() {
         const text = mInput.value.trim();
-        if (!text) {
-            // New Feature: Input Shake on Empty Send
+        
+        // Prevent empty sends unless image is attached
+        if (!text && !pendingImageUrl) {
             inputBox.classList.add('shake-anim');
             setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
             return;
@@ -1189,12 +1284,15 @@
         
         sendBtnUI.classList.remove('active'); 
         emojiTray.style.display = 'none';
+        attachmentMenu.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         
         // FORCE FOCUS TO REMAIN
         mInput.focus(); 
-        // Forced refocus just in case
         setTimeout(() => mInput.focus(), 10); 
+        
+        const finalImage = pendingImageUrl; // Capture image url
+        clearPendingMedia(); // Clear UI state
 
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
@@ -1203,12 +1301,22 @@
         } else {
             const rText = replyingTo; cancelInteraction(); // Close reply dock
             scrollToBottom();
-            await db.collection("chats").doc(chatId).collection("messages").add({
+            
+            let msgData = {
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
-            });
+            };
+            
+            if(finalImage) {
+                msgData.imageUrl = finalImage;
+            }
+
+            await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+            
+            const lastMsgText = finalImage ? (text ? "📷 " + text : "📷 Image") : text;
+            
             await db.collection("chats").doc(chatId).set({
-                lastMessage: text, lastSender: myUid,
+                lastMessage: lastMsgText, lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid], seen: false,
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
@@ -1224,7 +1332,7 @@
     function openMenu(id, sender, text) {
         activeMenuId = id;
         const isMine = sender === myUid;
-        document.getElementById('edit-btn').style.display = isMine ? 'block' : 'none';
+        document.getElementById('edit-btn').style.display = (isMine && text) ? 'block' : 'none'; // Only allow edit if text exists
         document.getElementById('unsend-btn').style.display = isMine ? 'block' : 'none';
         document.getElementById('menu-emoji-grid').style.display = 'none';
         document.getElementById('menu-overlay').style.display = 'flex';
@@ -1232,7 +1340,10 @@
 
     async function copyMessageText() {
         if (!activeMenuId) return;
-        const msgText = document.getElementById('text-' + activeMenuId).innerText.split('(edited)')[0].trim();
+        const el = document.getElementById('text-' + activeMenuId);
+        if(!el) { closeMenu(); return; } // Might be image only
+        
+        const msgText = el.innerText.split('(edited)')[0].trim();
         try {
             await navigator.clipboard.writeText(msgText);
             closeMenu();
@@ -1312,7 +1423,9 @@
     // and ensure usage of the Full Component modal defined above.
 
     function initReplyFromActive() {
-        triggerReply(document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim());
+        const el = document.getElementById('text-'+activeMenuId);
+        const text = el ? el.innerText.split('(edited)')[0].trim() : "Image";
+        triggerReply(text);
         closeMenu();
     }
 
@@ -1335,7 +1448,10 @@
     
     // NEW: Proper Edit Mode with UI Feedback
     function initEdit() {
-        const textToEdit = document.getElementById('text-'+activeMenuId).innerText.split('(edited)')[0].trim();
+        const el = document.getElementById('text-'+activeMenuId);
+        if(!el) return; // Cannot edit image only messages
+        
+        const textToEdit = el.innerText.split('(edited)')[0].trim();
         mInput.value = textToEdit;
         mInput.style.height = 'auto'; 
         mInput.style.height = mInput.scrollHeight + 'px';
@@ -1351,47 +1467,16 @@
     }
 
     async function unsendMsg() { 
-        const idToDelete = activeMenuId; 
-        closeMenu();
-
-        // 1. Get the message data before deleting to check if it was seen
-        const msgDoc = await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).get();
-        const wasSeen = msgDoc.exists ? msgDoc.data().seen : true; 
-
-        // Optimistic Remove UI
+        const idToDelete = activeMenuId; closeMenu();
+        // Optimistic Remove
         if (messagesMap.has(idToDelete)) { messagesMap.delete(idToDelete); renderAll(); }
         
-        // 2. Delete the specific message
         await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-
-        // 3. Find the NEW last message
         const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
-        
         if (!snapshot.empty) {
             const lastMsg = snapshot.docs[0].data();
-            
-            // FIX: If the deleted message was NOT seen by the other person, decrement their unread count
-            const updateData = { 
-                lastMessage: lastMsg.text, 
-                lastSender: lastMsg.sender, 
-                lastTimestamp: lastMsg.timestamp,
-                // CRITICAL FIX: Sync the 'seen' status of the Chat Doc to the new last message's status.
-                // This ensures the Inbox reflects the true status of the remaining conversation.
-                seen: lastMsg.seen || false 
-            };
-            
-            if (!wasSeen) {
-                updateData[`unreadCount.${targetUid}`] = firebase.firestore.FieldValue.increment(-1);
-            }
-
-            await db.collection("chats").doc(chatId).update(updateData);
-        } else {
-            // Chat is now empty
-            await db.collection("chats").doc(chatId).update({ 
-                lastMessage: "", 
-                lastSender: "", 
-                seen: true 
-            });
+            const txt = lastMsg.imageUrl ? (lastMsg.text ? "📷 "+lastMsg.text : "📷 Image") : lastMsg.text;
+            await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
         }
     }
 </script>
