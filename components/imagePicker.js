@@ -9,11 +9,29 @@ class ImagePicker extends HTMLElement {
         // Editor State
         this.currentRotation = 0;
         this.isGrayscale = false;
+        this.cropper = null; // CropperJS instance
     }
 
     connectedCallback() {
+        this.loadCropperResources();
         this.render();
         this.setupEvents();
+    }
+
+    // Dynamically load CropperJS so you don't need to add it to <head> manually
+    loadCropperResources() {
+        if (!document.getElementById('cropper-css')) {
+            const link = document.createElement('link');
+            link.id = 'cropper-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css';
+            document.head.appendChild(link);
+        }
+        if (!window.Cropper) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js';
+            document.head.appendChild(script);
+        }
     }
 
     render() {
@@ -35,9 +53,10 @@ class ImagePicker extends HTMLElement {
                 display: flex; justify-content: space-between; align-items: center;
                 padding: 15px 20px; 
                 background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-                position: absolute; top: 0; left: 0; width: 100%; z-index: 2;
-                box-sizing: border-box;
+                position: absolute; top: 0; left: 0; width: 100%; z-index: 20;
+                box-sizing: border-box; pointer-events: none; /* Let clicks pass to cropper if needed */
             }
+            .ip-header > * { pointer-events: auto; } /* Re-enable pointer events for buttons */
             
             .ip-btn-icon {
                 background: rgba(255,255,255,0.15); border: none; color: white; 
@@ -66,12 +85,14 @@ class ImagePicker extends HTMLElement {
             .ip-preview-container {
                 flex: 1; display: flex; justify-content: center; align-items: center;
                 overflow: hidden; position: relative; background: #000;
+                width: 100%; height: 100%;
             }
             
             .ip-image {
                 max-width: 100%; max-height: 80vh; 
                 object-fit: contain;
-                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease;
+                display: block; /* Important for CropperJS */
+                transition: filter 0.3s ease; /* Remove transform transition to avoid conflict with cropper */
             }
 
             /* --- TOOLBAR --- */
@@ -80,6 +101,7 @@ class ImagePicker extends HTMLElement {
                 display: flex; justify-content: space-around; align-items: center;
                 border-top: 1px solid #333;
                 padding-bottom: max(30px, env(safe-area-inset-bottom));
+                z-index: 20;
             }
 
             .ip-tool {
@@ -91,10 +113,25 @@ class ImagePicker extends HTMLElement {
             .ip-tool.active { color: #3b82f6; }
             .ip-tool:active svg { transform: scale(0.8); }
             
+            /* --- CROP ACTIONS (Hidden by default) --- */
+            .ip-crop-actions {
+                position: absolute; bottom: 100px; left: 0; width: 100%;
+                display: flex; justify-content: center; gap: 20px;
+                z-index: 30; pointer-events: none; opacity: 0; transition: opacity 0.2s;
+            }
+            .ip-crop-actions.visible { opacity: 1; pointer-events: auto; }
+            
+            .ip-pill-btn {
+                background: rgba(0,0,0,0.8); color: white; border: 1px solid #333;
+                padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer;
+                backdrop-filter: blur(5px); display: flex; align-items: center; gap: 6px;
+            }
+            .ip-pill-btn.confirm { background: #3b82f6; border-color: #3b82f6; }
+            
             /* --- LOADING OVERLAY --- */
             .ip-loading {
                 position: absolute; top:0; left:0; width:100%; height:100%;
-                background: rgba(0,0,0,0.85); display: none; z-index: 5;
+                background: rgba(0,0,0,0.85); display: none; z-index: 50;
                 justify-content: center; align-items: center; flex-direction: column; color: white;
                 backdrop-filter: blur(5px);
             }
@@ -106,6 +143,10 @@ class ImagePicker extends HTMLElement {
             @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
             #ip-file-input { display: none; }
+            
+            /* CropperJS Override */
+            .cropper-view-box, .cropper-face { border-radius: 0; }
+            .cropper-modal { background-color: rgba(0, 0, 0, 0.8); }
         </style>
 
         <div class="ip-overlay" id="ip-overlay">
@@ -120,13 +161,18 @@ class ImagePicker extends HTMLElement {
             <div class="ip-preview-container">
                 <img id="ip-preview-img" class="ip-image" src="" alt="Preview">
                 
+                <div class="ip-crop-actions" id="ip-crop-actions">
+                    <button class="ip-pill-btn" id="ip-cancel-crop">Cancel</button>
+                    <button class="ip-pill-btn confirm" id="ip-apply-crop">Done</button>
+                </div>
+
                 <div class="ip-loading" id="ip-loading">
                     <div class="ip-spinner"></div>
                     <span style="font-weight:500; letter-spacing:0.5px;">Processing & Uploading...</span>
                 </div>
             </div>
 
-            <div class="ip-toolbar">
+            <div class="ip-toolbar" id="ip-main-toolbar">
                 <button class="ip-tool" id="btn-rotate">
                     <svg viewBox="0 0 24 24"><path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/></svg>
                     <span>Rotate</span>
@@ -137,7 +183,7 @@ class ImagePicker extends HTMLElement {
                     <span>B&W</span>
                 </button>
 
-                 <button class="ip-tool" style="opacity:0.5; cursor: default;">
+                 <button class="ip-tool" id="btn-crop">
                     <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM17 7l-5 5-5-5-1.41 1.41L10.59 12 5.59 17 7 18.41 12 13.41 17 18.41 18.41 17 13.41 12 18.41 7z"/></svg>
                     <span>Crop</span>
                 </button>
@@ -155,11 +201,30 @@ class ImagePicker extends HTMLElement {
         const uploadBtn = this.querySelector('#ip-upload-btn');
         const rotateBtn = this.querySelector('#btn-rotate');
         const filterBtn = this.querySelector('#btn-filter');
+        const cropBtn = this.querySelector('#btn-crop');
+        const applyCropBtn = this.querySelector('#ip-apply-crop');
+        const cancelCropBtn = this.querySelector('#ip-cancel-crop');
 
-        // Close / Back
-        backBtn.onclick = () => this.close();
+        // --- Back / Close Logic ---
+        backBtn.onclick = () => {
+            if (this.cropper) {
+                // If in cropping mode, back just cancels crop
+                this.destroyCropper();
+            } else {
+                this.close();
+            }
+        };
 
-        // Handle File Selection
+        // --- Mobile Back Button Handling ---
+        window.addEventListener('popstate', (event) => {
+            if (overlay.classList.contains('open')) {
+                // Stop the browser from actually going back in history
+                // We just want to close the modal
+                this.close(true); 
+            }
+        });
+
+        // --- File Selection ---
         fileInput.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -170,51 +235,134 @@ class ImagePicker extends HTMLElement {
                     const img = this.querySelector('#ip-preview-img');
                     img.src = this.previewUrl;
                     
-                    // Reset Edits
+                    // Reset State
                     this.currentRotation = 0;
                     this.isGrayscale = false;
+                    this.destroyCropper(); // Cleanup any old instances
                     this.updateImageVisuals();
                     
+                    // Open Overlay & Push State for Back Button Safety
                     overlay.classList.add('open');
+                    window.history.pushState({ imagePickerOpen: true }, document.title);
                 };
                 reader.readAsDataURL(file);
             }
         };
 
-        // Editor: Rotate
+        // --- Editor Tools ---
+        
         rotateBtn.onclick = () => {
-            this.currentRotation = (this.currentRotation + 90) % 360;
-            this.updateImageVisuals();
+            if (this.cropper) {
+                this.cropper.rotate(90);
+            } else {
+                this.currentRotation = (this.currentRotation + 90) % 360;
+                this.updateImageVisuals();
+            }
             if(navigator.vibrate) navigator.vibrate(10);
         };
 
-        // Editor: B&W Filter
         filterBtn.onclick = () => {
+            // Filter is visual only until upload
             this.isGrayscale = !this.isGrayscale;
             this.updateImageVisuals();
             filterBtn.classList.toggle('active', this.isGrayscale);
             if(navigator.vibrate) navigator.vibrate(10);
         };
 
-        // Handle Upload (Processing + sending)
+        cropBtn.onclick = () => {
+            if (!this.cropper && window.Cropper) {
+                this.initCropper();
+            }
+        };
+
+        applyCropBtn.onclick = () => {
+            if (!this.cropper) return;
+            const canvas = this.cropper.getCroppedCanvas();
+            this.previewUrl = canvas.toDataURL('image/jpeg');
+            this.querySelector('#ip-preview-img').src = this.previewUrl;
+            
+            // Cropping essentially resets rotation to 0 because the new image is already "baked"
+            this.currentRotation = 0; 
+            
+            this.destroyCropper();
+            this.updateImageVisuals(); // Re-apply grayscale if needed
+        };
+
+        cancelCropBtn.onclick = () => {
+            this.destroyCropper();
+            this.updateImageVisuals();
+        };
+
+        // Handle Upload
         uploadBtn.onclick = () => this.processAndUpload();
+    }
+
+    initCropper() {
+        const img = this.querySelector('#ip-preview-img');
+        
+        // Hide Main Toolbar, Show Crop Actions
+        this.querySelector('#ip-main-toolbar').style.display = 'none';
+        this.querySelector('#ip-crop-actions').classList.add('visible');
+        this.querySelector('#ip-upload-btn').style.display = 'none';
+
+        // Apply current rotation visually before initializing cropper to sync state
+        img.style.transform = 'none'; 
+        
+        this.cropper = new Cropper(img, {
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.9,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false,
+            initialAspectRatio: NaN, // Free crop
+            rotatable: true,
+            data: { rotate: this.currentRotation } // Sync rotation
+        });
+    }
+
+    destroyCropper() {
+        if (this.cropper) {
+            this.cropper.destroy();
+            this.cropper = null;
+        }
+        // Restore UI
+        this.querySelector('#ip-main-toolbar').style.display = 'flex';
+        this.querySelector('#ip-crop-actions').classList.remove('visible');
+        this.querySelector('#ip-upload-btn').style.display = 'block';
+        this.updateImageVisuals(); // Restore CSS transforms
     }
 
     updateImageVisuals() {
         const img = this.querySelector('#ip-preview-img');
         const filterVal = this.isGrayscale ? 'grayscale(100%)' : 'none';
-        img.style.transform = `rotate(${this.currentRotation}deg)`;
+        // Only apply CSS transform if Cropper is NOT active
+        if (!this.cropper) {
+            img.style.transform = `rotate(${this.currentRotation}deg)`;
+        }
         img.style.filter = filterVal;
     }
 
     // --- MAIN FUNCTION: Process Canvas & Upload ---
     async processAndUpload() {
-        if (!this.selectedFile || this.isUploading) return;
+        if (!this.previewUrl || this.isUploading) return;
+        
+        // If user hits send while cropping, apply crop first automatically
+        if (this.cropper) {
+             const canvas = this.cropper.getCroppedCanvas();
+             this.previewUrl = canvas.toDataURL('image/jpeg');
+             this.currentRotation = 0; // Reset as it's baked in
+             this.destroyCropper();
+        }
+
         this.isUploading = true;
         this.querySelector('#ip-loading').style.display = 'flex';
 
         try {
-            // 1. Create a Canvas to "bake in" the edits
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
@@ -222,7 +370,7 @@ class ImagePicker extends HTMLElement {
             img.src = this.previewUrl;
             await new Promise(r => img.onload = r);
 
-            // 2. Handle Rotation Dimension Swaps
+            // Handle Rotation Dimension Swaps (Only if rotation exists post-crop)
             if (this.currentRotation === 90 || this.currentRotation === 270) {
                 canvas.width = img.height;
                 canvas.height = img.width;
@@ -231,7 +379,7 @@ class ImagePicker extends HTMLElement {
                 canvas.height = img.height;
             }
 
-            // 3. Apply Transformations to Canvas Context
+            // Apply Transformations
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.rotate(this.currentRotation * Math.PI / 180);
             if (this.isGrayscale) {
@@ -239,10 +387,8 @@ class ImagePicker extends HTMLElement {
             }
             ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-            // 4. Convert Canvas back to Blob (File)
             const processedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
 
-            // 5. Upload to ImgBB
             const formData = new FormData();
             formData.append('image', processedBlob);
 
@@ -254,14 +400,11 @@ class ImagePicker extends HTMLElement {
             const result = await response.json();
 
             if (result.success) {
-                const imageUrl = result.data.url;
-                
                 this.dispatchEvent(new CustomEvent('image-uploaded', { 
-                    detail: { url: imageUrl },
+                    detail: { url: result.data.url },
                     bubbles: true, 
                     composed: true 
                 }));
-
                 this.close();
             } else {
                 throw new Error(result.error.message);
@@ -281,12 +424,23 @@ class ImagePicker extends HTMLElement {
         this.querySelector('#ip-file-input').click();
     }
 
-    close() {
+    close(fromHistory = false) {
         this.querySelector('#ip-overlay').classList.remove('open');
         this.querySelector('#ip-file-input').value = ''; 
         this.selectedFile = null;
         this.isUploading = false;
         this.querySelector('#ip-loading').style.display = 'none';
+        this.destroyCropper();
+        
+        // Handle History Cleanliness
+        if (!fromHistory) {
+             // If closed manually (button), we should go back to remove the pushed state
+             // But checking state is hard in vanilla JS, so usually history.back() is called
+             // ONLY if we are sure we pushed a state.
+             if (history.state && history.state.imagePickerOpen) {
+                 history.back();
+             }
+        }
         
         // Reset Visuals
         const filterBtn = this.querySelector('#btn-filter');
