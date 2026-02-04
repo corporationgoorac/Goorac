@@ -755,7 +755,19 @@ const NotesManager = {
             const preview = document.getElementById('my-note-preview');
             if (!btn || !preview) return; 
 
-            const data = doc.exists ? doc.data() : null;
+            // CHANGED: Use 'let' instead of 'const' to allow modification if expired
+            let data = doc.exists ? doc.data() : null;
+            
+            // --- FIX FOR OWN NOTE EXPIRATION ---
+            if (data && data.expiresAt) {
+                const now = new Date();
+                const expires = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
+                if (now > expires) {
+                    data = null; // Treat as expired (removed) like friend notes
+                }
+            }
+            // -----------------------------------
+
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
