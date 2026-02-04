@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Share Note</title>
+    <title>Goorac | Create Note</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -11,64 +11,51 @@
 
     <style>
         :root { 
-            --bg: #000; 
-            --accent: #4c68d7; 
+            --bg: #000000; 
+            --surface: #121212;
+            --accent: #007AFF; 
             --bubble-bg: #262626; 
-            --sheet-bg: #1c1c1e;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; outline: none; }
         
         body { 
             background: var(--bg); 
-            color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Dynamic viewport height for mobile */
+            color: var(--text-primary); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            height: 100dvh; 
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
         }
 
-        /* Top Navigation */
+        /* --- HEADER --- */
         header { 
             padding: 15px 20px; 
             display: flex; 
             justify-content: space-between; 
             align-items: center;
-            padding-top: env(safe-area-inset-top, 15px); 
+            padding-top: env(safe-area-inset-top, 20px); 
             z-index: 100;
             flex-shrink: 0; 
         }
 
-        .close-btn { font-size: 26px; font-weight: 300; cursor: pointer; padding: 5px; }
-        
-        .color-wheel { 
-            width: 32px; 
-            height: 32px; 
+        .close-btn { 
+            width: 40px; height: 40px; 
+            background: rgba(255,255,255,0.1); 
             border-radius: 50%; 
-            cursor: pointer;
-            background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
-            border: 2px solid #000;
-            box-shadow: 0 0 12px rgba(255,255,255,0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 500; 
+            cursor: pointer; backdrop-filter: blur(10px);
+            transition: background 0.2s;
         }
+        .close-btn:active { background: rgba(255,255,255,0.2); }
+        
+        .header-title { font-weight: 600; font-size: 1rem; opacity: 0.8; letter-spacing: 0.5px; }
 
-        .share-btn { 
-            background: var(--accent); 
-            color: #fff; 
-            padding: 8px 24px; 
-            border-radius: 25px;
-            font-weight: 600; 
-            font-size: 0.95rem; 
-            opacity: 0.4; 
-            pointer-events: none; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-right: 5px;
-            border: none;
-        }
-        .share-btn.active { opacity: 1; pointer-events: auto; }
-
-        /* Creative Canvas */
+        /* --- EDITOR CANVAS --- */
         .editor-space { 
             flex: 1; 
             display: flex; 
@@ -76,7 +63,8 @@
             align-items: center; 
             justify-content: center; 
             position: relative;
-            padding-bottom: 10vh; 
+            padding-bottom: 120px; /* Space for bottom controls */
+            width: 100%;
         }
 
         .thought-wrapper { 
@@ -86,154 +74,188 @@
             width: 100%; 
             position: relative;
             z-index: 5;
-            gap: 15px; 
+            gap: 20px; 
+            transform: scale(1);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        
+        /* Interactive scale effect when typing */
+        .thought-wrapper.typing { transform: scale(1.02); }
 
-        /* The Instagram-Style Bubble */
+        /* --- NOTE BUBBLE (Enhanced) --- */
         .note-bubble {
             background: var(--bubble-bg); 
-            padding: 14px 22px; 
-            border-radius: 26px;
-            min-width: 100px; 
-            max-width: 80%; 
+            padding: 20px 28px; 
+            border-radius: 32px;
+            min-width: 120px; 
+            max-width: 82%; 
             text-align: center; 
             position: relative;
             transition: all 0.3s ease;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
             z-index: 2;
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
+            cursor: text;
         }
 
         /* Bubble Tails */
         .note-bubble::after {
-            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
-            width: 14px; height: 14px; background: inherit; border-radius: 50%;
+            content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+            width: 18px; height: 18px; background: inherit; border-radius: 50%;
+            z-index: -1;
         }
         .note-bubble::before {
-            content: ''; position: absolute; bottom: -18px; left: 45%;
-            width: 7px; height: 7px; background: inherit; border-radius: 50%; opacity: 0.5;
+            content: ''; position: absolute; bottom: -24px; left: 45%;
+            width: 10px; height: 10px; background: inherit; border-radius: 50%; opacity: 0.6;
+            z-index: -1;
         }
 
         #display-text { 
-            font-size: 1rem; 
-            font-weight: 500;
-            line-height: 1.4; 
-            display: -webkit-box;
-            -webkit-line-clamp: 4; 
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-size: 1.15rem; 
+            font-weight: 600;
+            line-height: 1.35; 
+            min-height: 1.35em;
             word-wrap: break-word; 
-            min-height: 1.4em; 
+            white-space: pre-wrap; /* Preserves newlines */
         }
         
+        /* Music Tag Pill */
         #music-tag {
             display: none; 
             align-items: center; 
             justify-content: center; 
-            flex-direction: column;
-            gap: 2px;
+            gap: 8px;
             font-size: 0.75rem; 
             font-weight: 600; 
-            margin-top: 8px; 
-            opacity: 0.9;
-            background: rgba(255,255,255,0.1);
-            padding: 6px 12px;
-            border-radius: 12px;
+            margin-top: 12px; 
+            background: rgba(255,255,255,0.15);
+            padding: 6px 14px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            width: fit-content;
+            margin-left: auto; margin-right: auto;
         }
-
-        #song-name { font-weight: 800; font-size: 0.8rem; }
-        #song-artist { opacity: 0.8; font-size: 0.7rem; }
-
+        
+        /* Profile Picture */
         .pfp-container {
-            width: 90px; 
-            height: 90px; 
+            width: 70px; height: 70px; 
             border-radius: 50%; 
-            border: 3px solid #111;
+            border: 3px solid #1c1c1e;
             overflow: hidden; 
             background: #111;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             flex-shrink: 0;
+            margin-top: 10px;
         }
         .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Input Trigger - Fixed z-index and opacity handling */
+        /* Hidden Input */
         #note-input { 
-            position: absolute; 
-            opacity: 0; 
-            width: 100%; 
-            height: 100%; 
-            top: 0; 
-            left: 0;
-            z-index: 10;
-            cursor: text;
-            font-size: 16px; /* Prevents iOS zoom */
+            position: absolute; opacity: 0; width: 100%; height: 100%; 
+            top: 0; left: 0; z-index: 10; cursor: text;
         }
 
-        /* Tool Area */
-        .tools { margin-top: 25px; z-index: 10; }
-        .music-btn {
-            width: 50px; 
-            height: 50px; 
-            border-radius: 50%; 
-            background: #1c1c1e;
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            border: 1px solid #333;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        /* --- BOTTOM CONTROLS (New Layout) --- */
+        .bottom-controls {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 0 20px 30px;
+            z-index: 50;
+            background: linear-gradient(to top, rgba(0,0,0,1) 20%, rgba(0,0,0,0));
+            padding-bottom: max(30px, env(safe-area-inset-bottom));
+        }
+
+        /* Floating Tool Dock */
+        .tool-dock {
+            display: flex; gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 10px 20px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .tool-btn {
+            width: 44px; height: 44px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            background: transparent;
         }
-        .music-btn svg { width: 22px; height: 22px; fill: #ff0050; }
+        .tool-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.1); }
+        .tool-btn svg { width: 24px; height: 24px; fill: white; }
+        .tool-btn.active svg { fill: var(--accent); }
 
-        /* Color Selection Bottom Sheet */
+        /* Main Share Button */
+        .share-btn { 
+            width: 100%; max-width: 400px;
+            height: 56px;
+            background: #fff; 
+            color: #000; 
+            border-radius: 28px;
+            font-weight: 700; 
+            font-size: 1.05rem; 
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border: none; cursor: pointer;
+            box-shadow: 0 5px 20px rgba(255,255,255,0.2);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            opacity: 0.5; pointer-events: none; transform: scale(0.98);
+        }
+        
+        .share-btn.ready { opacity: 1; pointer-events: auto; transform: scale(1); }
+        .share-btn:active { transform: scale(0.95); }
+
+        /* --- COLOR SHEET --- */
         .color-sheet {
             position: fixed; bottom: -100%; left: 0; width: 100%; 
-            background: var(--sheet-bg);
-            border-radius: 25px 25px 0 0; padding: 30px 20px; 
-            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1); 
+            background: #1c1c1e;
+            border-radius: 24px 24px 0 0; 
+            padding: 24px 20px; 
+            transition: bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
             z-index: 200;
             padding-bottom: max(30px, env(safe-area-inset-bottom));
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
         }
         .color-sheet.open { bottom: 0; }
         
+        .sheet-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+        }
+        .sheet-title { font-weight: 700; font-size: 1.1rem; }
+        .sheet-close { 
+            background: #333; padding: 6px 14px; border-radius: 16px; 
+            font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff;
+        }
+
         .color-grid { 
-            display: grid; 
-            grid-template-columns: repeat(5, 1fr); 
-            gap: 15px; 
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; 
+            max-height: 250px; overflow-y: auto;
         }
 
         .color-dot { 
-            aspect-ratio: 1/1;
-            border-radius: 15px; 
-            cursor: pointer; 
-            border: 3px solid transparent; 
+            aspect-ratio: 1/1; border-radius: 50%; 
+            cursor: pointer; position: relative;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
         }
-        .color-dot.active { border-color: #fff; transform: scale(1.1); }
+        .color-dot.active { border: 3px solid #fff; transform: scale(1.1); }
     </style>
 </head>
 <body>
 
 <header>
     <div class="close-btn" onclick="vibrate(); history.back()">✕</div>
-    <div class="color-wheel" onclick="vibrate(); toggleColors(event)"></div>
-    <button class="share-btn" id="share-btn" onclick="publishNote(event)">Share</button>
-</header>
+    <div class="header-title">New Note</div>
+    <div style="width:40px;"></div> </header>
 
 <div class="editor-space">
-    <div class="thought-wrapper" onclick="focusInput()">
+    <div class="thought-wrapper" id="thought-wrapper" onclick="focusInput()">
         <div class="note-bubble" id="preview-bubble">
-            <span id="display-text">What's on your mind?</span>
+            <div id="display-text">Type something...</div>
             <div id="music-tag">
-                <div style="display: flex; align-items: center; gap: 4px;">
-                   <svg viewBox="0 0 24 24" style="width:14px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                   <span id="song-name"></span>
-                </div>
-                <span id="song-artist"></span>
+                <svg viewBox="0 0 24 24" style="width:12px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                <span id="song-name"></span>
             </div>
         </div>
         
@@ -241,20 +263,34 @@
             <img id="user-pfp" src="https://via.placeholder.com/110" alt="Profile">
         </div>
 
-        <input type="text" id="note-input" maxlength="60" autocomplete="off" autofocus>
-    </div>
-
-    <div class="tools">
-        <div class="music-btn" onclick="vibrate(); pickMusic(event)">
-            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-        </div>
+        <input type="text" id="note-input" maxlength="60" autocomplete="off">
     </div>
 </div>
 
+<div class="bottom-controls">
+    <div class="tool-dock">
+        <div class="tool-btn" onclick="vibrate(); toggleColors(event)">
+            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        </div>
+        
+        <div class="tool-btn" onclick="vibrate(); pickMusic(event)">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </div>
+
+        <div class="tool-btn" id="align-btn" onclick="vibrate(); toggleAlign(event)">
+            <svg id="align-icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg> </div>
+    </div>
+
+    <button class="share-btn" id="share-btn" onclick="publishNote(event)">
+        <span>Share Note</span>
+        <svg viewBox="0 0 24 24" style="width:20px; fill:currentColor;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+</div>
+
 <div class="color-sheet" id="color-sheet">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-        <span style="font-size:1.1rem; font-weight:700;">Bubble Color</span>
-        <div onclick="vibrate(); toggleColors(event)" style="background:#333; padding:8px 16px; border-radius:20px; font-size:0.9rem; font-weight:600; cursor:pointer;">Done</div>
+    <div class="sheet-header">
+        <span class="sheet-title">Bubble Style</span>
+        <div class="sheet-close" onclick="vibrate(); toggleColors()">Done</div>
     </div>
     <div class="color-grid" id="palette"></div>
 </div>
@@ -262,7 +298,7 @@
 <song-picker id="music-picker"></song-picker>
 
 <script>
-    // 1. Firebase Logic
+    // 1. Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -274,105 +310,136 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 2. Mobile Keyboard & Paste Management
+    // 2. State & Variables
     const input = document.getElementById('note-input');
     const display = document.getElementById('display-text');
     const shareBtn = document.getElementById('share-btn');
-    
-    function focusInput() {
-        input.focus();
-    }
+    const wrapper = document.getElementById('thought-wrapper');
+    const alignBtn = document.getElementById('align-btn');
+    const alignIcon = document.getElementById('align-icon');
 
-    // Auto-focus on load
-    window.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => input.focus(), 100);
-    });
-
-    // Handle Input and Paste events cleanly
-    function updateText() {
-        const val = input.value;
-        if(val.length > 0) {
-            display.innerText = val;
-        } else {
-            // Only show placeholder if no song selected
-            if (!currentSongData) display.innerText = "What's on your mind?";
-            else display.innerText = ""; // Hide placeholder if song exists
-        }
-        validateShare();
-    }
-
-    input.addEventListener('input', updateText);
-    input.addEventListener('paste', () => setTimeout(updateText, 0)); // Slight delay to catch pasted content
-
-    function validateShare() {
-        const hasText = input.value.trim().length > 0;
-        const hasSong = currentSongData !== null;
-        shareBtn.classList.toggle('active', hasText || hasSong);
-    }
-
-    // 3. Vibration Utility
-    function vibrate() {
-        if (navigator.vibrate) navigator.vibrate(15); 
-    }
-
+    // Themes including New Gradients
     const themes = [
         {bg: '#262626', text: '#ffffff'},
+        {bg: 'linear-gradient(135deg, #00C9FF 0%, #92FE9D 100%)', text: '#000'}, // Mint Green
+        {bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', text: '#fff'}, // Pinky
+        {bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', text: '#fff'}, // Blue
+        {bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', text: '#fff'}, // Sunset
         {bg: '#ffffff', text: '#000000'},
-        {bg: '#ff3b30', text: '#ffffff'},
-        {bg: '#007aff', text: '#ffffff'},
-        {bg: '#34c759', text: '#ffffff'},
-        {bg: '#af52de', text: '#ffffff'},
-        {bg: '#ffcc00', text: '#000000'},
-        {bg: '#ff9500', text: '#ffffff'},
-        {bg: '#5856d6', text: '#ffffff'},
-        {bg: '#8e8e93', text: '#ffffff'}
+        {bg: '#ff3b30', text: '#ffffff'}, // Red
+        {bg: '#007aff', text: '#ffffff'}, // Blue flat
+        {bg: '#ffcc00', text: '#000000'}, // Yellow
+        {bg: '#5856d6', text: '#ffffff'}  // Purple
     ];
 
     let currentTheme = themes[0];
     let currentSongData = null;
+    let textAlignment = 'center'; // 'center' or 'left'
 
-    // Load User Profile
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            try {
-                const userDoc = await db.collection("users").doc(user.uid).get();
-                const pfp = userDoc.exists && userDoc.data().photoURL ? userDoc.data().photoURL : user.photoURL;
-                if(pfp) document.getElementById('user-pfp').src = pfp;
-            } catch(e) {
-                console.log("Error loading PFP", e);
+    // 3. Initialization
+    function init() {
+        // Load User Data
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const userDoc = await db.collection("users").doc(user.uid).get();
+                    const pfp = userDoc.exists && userDoc.data().photoURL ? userDoc.data().photoURL : user.photoURL;
+                    if(pfp) document.getElementById('user-pfp').src = pfp;
+                } catch(e) { console.error("PFP Load Error", e); }
             }
-        }
+        });
+
+        buildPalette();
+    }
+
+    // 4. Input Logic (No Auto-Focus)
+    function focusInput() {
+        input.focus();
+        wrapper.classList.add('typing');
+    }
+
+    input.addEventListener('blur', () => {
+        wrapper.classList.remove('typing');
     });
 
-    // Build Palette
-    const palette = document.getElementById('palette');
-    themes.forEach((t, i) => {
-        const dot = document.createElement('div');
-        dot.className = `color-dot ${i===0?'active':''}`;
-        dot.style.background = t.bg;
-        dot.onclick = (e) => {
-            e.stopPropagation();
-            vibrate();
-            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-            dot.classList.add('active');
-            currentTheme = t;
-            updatePreview();
-        };
-        palette.appendChild(dot);
-    });
+    input.addEventListener('input', updateText);
+    
+    function updateText() {
+        const val = input.value;
+        if(val.length > 0) {
+            display.innerText = val;
+            display.style.opacity = "1";
+        } else {
+            // Placeholder logic
+            display.innerText = currentSongData ? "" : "Type something...";
+            display.style.opacity = currentSongData ? "1" : "0.5";
+        }
+        validateShare();
+    }
+
+    function validateShare() {
+        const hasText = input.value.trim().length > 0;
+        const hasSong = currentSongData !== null;
+        
+        if (hasText || hasSong) {
+            shareBtn.classList.add('ready');
+        } else {
+            shareBtn.classList.remove('ready');
+        }
+    }
+
+    // 5. Utility Functions
+    function vibrate() {
+        if (navigator.vibrate) navigator.vibrate(10); 
+    }
+
+    // 6. Tool: Color Picker
+    function buildPalette() {
+        const palette = document.getElementById('palette');
+        palette.innerHTML = '';
+        themes.forEach((t, i) => {
+            const dot = document.createElement('div');
+            dot.className = `color-dot ${i===0?'active':''}`;
+            dot.style.background = t.bg;
+            dot.onclick = (e) => {
+                e.stopPropagation();
+                vibrate();
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+                currentTheme = t;
+                applyTheme();
+            };
+            palette.appendChild(dot);
+        });
+    }
 
     function toggleColors(e) {
         if(e) e.stopPropagation();
         document.getElementById('color-sheet').classList.toggle('open');
     }
 
-    function updatePreview() {
+    function applyTheme() {
         const b = document.getElementById('preview-bubble');
         b.style.background = currentTheme.bg;
         b.style.color = currentTheme.text;
     }
 
-    // Music Integration
+    // 7. Tool: Text Alignment (New Feature)
+    function toggleAlign(e) {
+        if(e) e.stopPropagation();
+        
+        if (textAlignment === 'center') {
+            textAlignment = 'left';
+            alignIcon.innerHTML = '<path d="M3 15h18v-2H3v2zm0 4h12v-2H3v2zm0-8h18v-2H3v2zm0-6v2h18V5H3z"/>'; // Left icon
+        } else {
+            textAlignment = 'center';
+            alignIcon.innerHTML = '<path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/>'; // Center icon
+        }
+        
+        document.getElementById('preview-bubble').style.textAlign = textAlignment;
+    }
+
+    // 8. Tool: Music
     const picker = document.getElementById('music-picker');
     function pickMusic(e) { 
         e.stopPropagation(); 
@@ -382,44 +449,43 @@
     picker.addEventListener('song-selected', (e) => {
         vibrate();
         currentSongData = e.detail;
-        document.getElementById('music-tag').style.display = 'flex';
-        document.getElementById('song-name').innerText = currentSongData.trackName;
-        document.getElementById('song-artist').innerText = currentSongData.artistName;
-        updateText(); // Re-run to potentially clear placeholder
+        const tag = document.getElementById('music-tag');
+        tag.style.display = 'flex';
+        document.getElementById('song-name').innerText = currentSongData.trackName.length > 20 ? currentSongData.trackName.substring(0,20)+"..." : currentSongData.trackName;
+        updateText();
     });
 
-    // Share & Save (UPDATED: Fetches complete user details)
+    // 9. Publish Logic
     async function publishNote(e) {
         if(e) e.stopPropagation();
+        if(!shareBtn.classList.contains('ready')) return;
+        
         vibrate();
         const user = firebase.auth().currentUser;
-        if(!user) {
-            alert("You need to be logged in to share.");
-            return;
-        }
+        if(!user) return alert("Login required");
 
-        shareBtn.innerText = "Sharing...";
-        shareBtn.disabled = true;
-
+        const originalText = shareBtn.innerHTML;
+        shareBtn.innerHTML = `<span>Posting...</span>`;
+        
         try {
-            // Fetch fresh profile data to ensure PFP, Name, and Verified status are correct
             const userDoc = await db.collection("users").doc(user.uid).get();
             const userData = userDoc.exists ? userDoc.data() : {};
             
             const now = new Date();
-            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24-hour expiry
+            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); 
 
             const noteData = {
                 uid: user.uid,
-                // ViewNotes uses 'username' field for the Display Name in some contexts, so we store Name there.
                 username: userData.name || user.displayName || "User", 
-                handle: userData.username || "", // Storing handle separately for future proofing
+                handle: userData.username || "",
                 pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150',
-                verified: userData.verified === true, // Store boolean verified status
+                verified: userData.verified === true,
                 
                 text: input.value.trim(),
                 bgColor: currentTheme.bg,
                 textColor: currentTheme.text,
+                textAlign: textAlignment, // Saving new alignment property
+                
                 songName: currentSongData?.trackName || null,
                 songArtist: currentSongData?.artistName || null,
                 songPreview: currentSongData?.previewUrl || null,
@@ -427,30 +493,25 @@
                 
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
-                dateString: now.toDateString(), 
-                timeString: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 likes: [],      
                 likeCount: 0    
             };
 
             const batch = db.batch();
-            
-            // 1. Main active notes feed
-            const activeNoteRef = db.collection("active_notes").doc(user.uid);
-            batch.set(activeNoteRef, noteData);
-            
-            // 2. User's personal history
-            const historyRef = db.collection("users").doc(user.uid).collection("notes_history").doc();
-            batch.set(historyRef, noteData);
+            batch.set(db.collection("active_notes").doc(user.uid), noteData);
+            batch.set(db.collection("users").doc(user.uid).collection("notes_history").doc(), noteData);
             
             await batch.commit();
-            history.back();
+            history.back(); // Return to previous screen
         } catch (err) {
             console.error(err);
-            shareBtn.innerText = "Error";
-            shareBtn.disabled = false;
+            alert("Failed to post note");
+            shareBtn.innerHTML = originalText;
         }
     }
+
+    // Start
+    init();
 </script>
 </body>
 </html>
