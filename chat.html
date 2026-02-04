@@ -272,15 +272,7 @@
         .menu-opt { padding: 16px; text-align: center; font-size: 1rem; border-bottom: 1px solid #333; color: #fff; }
         .menu-opt:active { background: #333; }
         
-        #reply-dock, #media-dock { display: none; background: #111; padding: 12px 16px; border-top: 1px solid var(--border); justify-content: space-between; align-items: center; }
-        
-        /* NEW: Media Preview Dock Styles */
-        #media-dock {
-            background: #111; display: none; padding: 10px 16px;
-            align-items: center; gap: 15px; border-top: 1px solid var(--border);
-        }
-        .media-preview-thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #333; }
-        .media-dock-info { flex: 1; font-size: 0.85rem; color: #ccc; }
+        #reply-dock { display: none; background: #111; padding: 12px 16px; border-top: 1px solid var(--border); justify-content: space-between; align-items: center; }
 
         .react-list-container { width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; max-height: 50vh; }
         .react-list-header { padding: 16px; text-align: center; font-weight: 600; font-size: 1.1rem; border-bottom: 1px solid #333; position: relative; color: white;}
@@ -316,7 +308,10 @@
 
         /* NEW: Styles for Media Messages */
         .msg-media-wrapper {
-            overflow: hidden; cursor: pointer; margin-bottom: 4px;
+            overflow: hidden; cursor: pointer; 
+            margin-bottom: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            position: relative;
         }
         .received .msg-media-wrapper { border-radius: 18px; border-bottom-left-radius: 4px; }
         .sent .msg-media-wrapper { border-radius: 18px; border-bottom-right-radius: 4px; }
@@ -419,12 +414,7 @@
     </div>
 
     <div class="input-area-container">
-        <div id="media-dock">
-            <img id="pending-media-img" src="" class="media-preview-thumb">
-            <div class="media-dock-info">Image selected</div>
-            <div onclick="clearPendingMedia()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
-        </div>
-
+        
         <div id="reply-dock">
             <div id="reply-text" style="font-size:0.8rem; color:#aaa; overflow:hidden; text-overflow:ellipsis;"></div>
             <div onclick="cancelInteraction()" style="color:#fff; font-weight:bold; padding:5px; cursor:pointer;">✕</div>
@@ -490,9 +480,6 @@
     
     // NEW: First load flag for header logic
     let isFirstStatusLoad = true;
-
-    // NEW: Pending Image Upload URL
-    let pendingImageUrl = null;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -595,7 +582,11 @@
         this.style.height = (this.scrollHeight) + 'px';
         if(this.value === '') this.style.height = 'auto';
         
-        checkSendButton();
+        if(this.value.trim().length > 0) {
+            sendBtnUI.classList.add('active');
+        } else {
+            sendBtnUI.classList.remove('active');
+        }
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
         
@@ -604,15 +595,6 @@
              scrollToBottom();
         }
     });
-    
-    // NEW: Check send button state (Text OR Image pending)
-    function checkSendButton() {
-        if(mInput.value.trim().length > 0 || pendingImageUrl) {
-            sendBtnUI.classList.add('active');
-        } else {
-            sendBtnUI.classList.remove('active');
-        }
-    }
 
     // Handle Enter key - Modified as per request
     mInput.addEventListener('keydown', (e) => {
@@ -652,21 +634,14 @@
         });
     }
 
-    // NEW: Image Picker Listener
+    // NEW: Image Picker Listener - DIRECT SEND
     if (imagePickerComponent) {
         imagePickerComponent.addEventListener('image-uploaded', (e) => {
             const url = e.detail.url;
-            pendingImageUrl = url;
-            
-            // Show Dock
-            const dock = document.getElementById('media-dock');
-            document.getElementById('pending-media-img').src = url;
-            dock.style.display = 'flex';
-            
-            // Enable send button
-            checkSendButton();
-            mInput.placeholder = "Add a caption...";
-            mInput.focus();
+            if (url) {
+                // Immediately send the message with the image
+                sendImageMessage(url);
+            }
         });
     }
 
@@ -694,13 +669,6 @@
             emojiTray.style.display = 'block';
         }
         scrollToBottom();
-    }
-    
-    function clearPendingMedia() {
-        pendingImageUrl = null;
-        document.getElementById('media-dock').style.display = 'none';
-        mInput.placeholder = "Message...";
-        checkSendButton();
     }
     
     // Reaction Picker Logic (Half Screen Modal Component)
@@ -1145,17 +1113,17 @@
             </div>
         ` : '';
 
-        // NEW: MEDIA (IMAGE) RENDERING
+        // NEW: MEDIA (IMAGE) RENDERING - Clean UI, no bubble
         const mediaHtml = m.imageUrl ? `
             <div class="msg-media-wrapper" onclick="document.getElementById('media-viewer').open('${m.imageUrl}')">
                 <img src="${m.imageUrl}" class="chat-media-img">
+                <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>
         ` : '';
         
-        // If image exists, text bubble becomes optional (caption)
-        // If text exists with image, we style it slightly differently (attached to bottom of image)
+        // If image exists and NO text, we hide the bubble completely
         const bubbleClass = m.imageUrl ? "bubble has-media" : "bubble";
-        const bubbleStyle = (m.imageUrl && !m.text) ? "display:none;" : ""; // Hide text bubble if empty caption
+        const bubbleStyle = (m.imageUrl && !m.text) ? "display:none;" : ""; 
 
         // --- HTML ASSEMBLY ---
         const safeText = linkify(m.text);
@@ -1172,7 +1140,7 @@
                         ${mediaHtml}
                         <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
                             <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                            <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                            ${!m.imageUrl ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
                         </div>
                     </div>
                 </div>`;
@@ -1184,7 +1152,7 @@
                     ${mediaHtml}
                     <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
                         <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                        <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+                         ${!m.imageUrl ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
                     </div>
                 </div>`;
         }
@@ -1266,11 +1234,41 @@
         mInput.focus(); 
     }
 
+    // NEW: Function to send image message immediately
+    async function sendImageMessage(imageUrl) {
+        popSound.play().catch(e => {});
+        scrollToBottom();
+
+        let msgData = {
+            text: "", // No caption for direct send
+            sender: myUid, 
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo, 
+            seen: false, 
+            reactions: {},
+            imageUrl: imageUrl
+        };
+        
+        // Reset reply state if any
+        cancelInteraction();
+
+        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
+        await db.collection("chats").doc(chatId).set({
+            lastMessage: "📷 Image", 
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            participants: [myUid, targetUid], seen: false,
+            [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
+
+        scrollToBottom();
+    }
+
     async function sendMsg() {
         const text = mInput.value.trim();
         
-        // Prevent empty sends unless image is attached
-        if (!text && !pendingImageUrl) {
+        if (!text) {
             inputBox.classList.add('shake-anim');
             setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
             return;
@@ -1290,9 +1288,6 @@
         // FORCE FOCUS TO REMAIN
         mInput.focus(); 
         setTimeout(() => mInput.focus(), 10); 
-        
-        const finalImage = pendingImageUrl; // Capture image url
-        clearPendingMedia(); // Clear UI state
 
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
@@ -1306,17 +1301,11 @@
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
             };
-            
-            if(finalImage) {
-                msgData.imageUrl = finalImage;
-            }
 
             await db.collection("chats").doc(chatId).collection("messages").add(msgData);
             
-            const lastMsgText = finalImage ? (text ? "📷 " + text : "📷 Image") : text;
-            
             await db.collection("chats").doc(chatId).set({
-                lastMessage: lastMsgText, lastSender: myUid,
+                lastMessage: text, lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid], seen: false,
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
