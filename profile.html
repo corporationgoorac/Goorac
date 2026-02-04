@@ -12,6 +12,8 @@
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
 
+    <script src="components/viewMedia.js" defer></script>
+
     <style>
         :root {
             --bg: #000000;
@@ -227,7 +229,7 @@
 
 <div class="profile-hero">
     <div class="pfp-container">
-        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton">
+        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton" onclick="openPFP()">
     </div>
     
     <div class="name-container">
@@ -266,6 +268,8 @@
 </div>
 
 <div id="toast">Copied to Clipboard</div>
+
+<view-media id="pfp-viewer"></view-media>
 
 <main-navbar></main-navbar>
 
@@ -384,6 +388,35 @@
             window.location.href = "login.html";
         });
     };
+
+    // --- Media Viewer Logic (Hides Navbar) ---
+    function openPFP() {
+        const viewer = document.getElementById('pfp-viewer');
+        const img = document.getElementById('pfp-img');
+        const nav = document.querySelector('main-navbar');
+        
+        // 1. Hide Navbar
+        if (nav) nav.style.display = 'none';
+
+        // 2. Open Viewer
+        viewer.open(img.src, 'image');
+
+        // 3. Watch for Close to Restore Navbar
+        const overlay = viewer.querySelector('#vm-overlay');
+        if (overlay) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.attributeName === 'class') {
+                        if (!overlay.classList.contains('open')) {
+                            if (nav) nav.style.display = ''; // Restore default
+                            observer.disconnect();
+                        }
+                    }
+                });
+            });
+            observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
 </script>
 
 <call-notifier></call-notifier>
