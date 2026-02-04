@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Goorac | Profile Setup</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script src="components/imagePicker.js" defer></script>
 
     <style>
         :root { --bg: #050505; --card: #111; --accent: #00d2ff; --success: #00ff88; --error: #ff4444; --border: rgba(255,255,255,0.1); }
@@ -35,9 +38,11 @@
             background: rgba(255,255,255,0.05); border: 1px solid var(--border);
             color: white; width: 40px; height: 40px; border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 1.2rem; transition: 0.3s;
+            cursor: pointer; transition: 0.3s; padding: 0;
         }
-        .back-btn:hover { background: var(--accent); color: black; border-color: var(--accent); }
+        .back-btn svg { width: 20px; height: 20px; fill: white; transition: 0.3s; }
+        .back-btn:hover { background: var(--accent); border-color: var(--accent); }
+        .back-btn:hover svg { fill: black; }
 
         /* DP Glow Ring */
         .pfp-container { position: relative; width: 120px; height: 120px; margin: 10px auto 20px; cursor: pointer; }
@@ -54,8 +59,9 @@
             position: absolute; bottom: 5px; right: 5px;
             background: var(--accent); color: black; border-radius: 50%;
             width: 30px; height: 30px; display: flex; align-items: center; 
-            justify-content: center; font-size: 0.8rem; border: 3px solid #111;
+            justify-content: center; border: 3px solid #111;
         }
+        .edit-badge svg { width: 14px; height: 14px; fill: black; }
 
         .id-label { color: var(--accent); font-size: 0.7rem; font-weight: 900; letter-spacing: 2px; margin-bottom: 25px; display: block; opacity: 0.8; }
 
@@ -67,7 +73,12 @@
         }
         .input-field:focus { border-color: var(--accent); background: #1f1f1f; box-shadow: 0 0 20px rgba(0, 210, 255, 0.1); }
 
-        #status { font-size: 0.75rem; display: block; margin-top: -10px; margin-bottom: 15px; text-align: left; padding-left: 10px; height: 1rem; font-weight: 600; }
+        #status { 
+            font-size: 0.8rem; display: flex; align-items: center; gap: 6px; 
+            margin-top: -10px; margin-bottom: 15px; padding-left: 10px; 
+            height: 1.2rem; font-weight: 600; 
+        }
+        .status-icon { width: 14px; height: 14px; fill: currentColor; }
 
         .btn-launch {
             background: white; color: black; border: none; padding: 18px;
@@ -94,21 +105,27 @@
     <div class="loading-text">Synchronizing Network...</div>
 </div>
 
+<image-picker id="setup-image-picker"></image-picker>
+
 <div class="setup-box">
-    <button class="back-btn" onclick="history.back()">⇠</button>
+    <button class="back-btn" onclick="history.back()">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
     
     <div class="pfp-container" onclick="changePFP()">
         <div class="pfp-ring">
             <img id="user-pfp" src="" class="pfp-image">
         </div>
-        <div class="edit-badge">✎</div>
+        <div class="edit-badge">
+            <svg viewBox="0 0 24 24"><path d="M3 4V1h2v3h3v2H5v3H3V6H0V4h3zm3 6V7h3V4h7l1.83 2H21c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V10h3zm7 9c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0-2c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>
+        </div>
     </div>
 
     <span class="id-label">GOORAC NO: <span id="display-id">--------</span></span>
 
     <input type="text" id="full-name" class="input-field" placeholder="Display Name">
     <input type="text" id="username" class="input-field" placeholder="Username" autocomplete="off">
-    <span id="status"></span>
+    <div id="status"></div>
     <textarea id="bio" class="input-field" placeholder="Write a short bio..." rows="2"></textarea>
 
     <button id="launchBtn" class="btn-launch">Complete Transmission</button>
@@ -131,13 +148,24 @@
     let activeUser = null;
     let finalGooracID = null;
     let currentSavedUsername = "";
-    let isAlreadyVerified = false; // Persistent verification check
+    let isAlreadyVerified = false; 
     let currentPhotoURL = "";
+
+    // Image Picker Setup
+    const picker = document.getElementById('setup-image-picker');
+    picker.addEventListener('image-uploaded', (e) => {
+        currentPhotoURL = e.detail.url;
+        document.getElementById('user-pfp').src = currentPhotoURL;
+    });
+
+    function changePFP() {
+        if(picker) picker.openPicker();
+    }
 
     auth.onAuthStateChanged((user) => {
         if (user) {
             activeUser = user;
-            currentPhotoURL = user.photoURL;
+            currentPhotoURL = user.photoURL || "https://via.placeholder.com/150";
             checkExistingProfile(user);
         } else {
             window.location.href = "login.html";
@@ -173,17 +201,13 @@
         }
     }
 
-    function changePFP() {
-        const newUrl = prompt("Enter new Profile Image URL (or leave blank to use Google photo):", currentPhotoURL);
-        if (newUrl !== null) {
-            currentPhotoURL = newUrl || activeUser.photoURL;
-            document.getElementById('user-pfp').src = currentPhotoURL;
-        }
-    }
-
     const userInp = document.getElementById('username');
     const statusMsg = document.getElementById('status');
     const launchBtn = document.getElementById('launchBtn');
+
+    // SVG Icons for Status
+    const checkIcon = `<svg class="status-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+    const errorIcon = `<svg class="status-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
 
     userInp.addEventListener('input', async () => {
         const val = userInp.value.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -191,13 +215,13 @@
         launchBtn.style.display = "none";
 
         if (val.length < 3) {
-            statusMsg.innerText = "Minimum 3 characters";
+            statusMsg.innerHTML = "Minimum 3 characters";
             statusMsg.style.color = "#555";
             return;
         }
 
         if (currentSavedUsername && val === currentSavedUsername) {
-            statusMsg.innerText = "✔ Your current handle";
+            statusMsg.innerHTML = `${checkIcon} Your current handle`;
             statusMsg.style.color = "#00ff88";
             launchBtn.style.display = "block";
             return;
@@ -205,11 +229,11 @@
 
         const query = await db.collection("users").where("username", "==", val).get();
         if (query.empty) {
-            statusMsg.innerText = "✔ Handle is available";
+            statusMsg.innerHTML = `${checkIcon} Handle is available`;
             statusMsg.style.color = "#00ff88";
             launchBtn.style.display = "block";
         } else {
-            statusMsg.innerText = "✖ Already synchronized";
+            statusMsg.innerHTML = `${errorIcon} Already synchronized`;
             statusMsg.style.color = "#ff4444";
         }
     });
@@ -236,6 +260,13 @@
 
         try {
             await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
+            
+            // Also update Auth Profile for faster loading elsewhere
+            await activeUser.updateProfile({
+                displayName: document.getElementById('full-name').value,
+                photoURL: currentPhotoURL
+            });
+
             window.location.href = "home.html";
         } catch (e) {
             alert("Error: " + e.message);
