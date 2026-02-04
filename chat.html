@@ -155,8 +155,9 @@
         .sent .bubble { background: var(--sent-bg); color: #fff; border-top-right-radius: 18px; border-top-left-radius: 18px; border-bottom-left-radius: 18px; border-bottom-right-radius: 4px; text-align: left; }
         .received .bubble { background: var(--received-bg); color: #fff; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom-right-radius: 18px; border-bottom-left-radius: 4px; text-align: left; }
         
-        /* OWN FEATURE: Link Styling */
+        /* OWN FEATURE: Link Styling & Image Preview */
         .bubble a { color: #87ceeb; text-decoration: underline; cursor: pointer; }
+        .bubble-img-preview { max-width: 100%; border-radius: 12px; margin-top: 8px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
         .sliding-timestamp { position: absolute; top: 50%; transform: translateY(-50%); right: -65px; font-size: 0.7rem; color: #666; font-weight: 500; width: 50px; text-align: center; pointer-events: none; }
         .reaction-badge { position: absolute; bottom: -12px; background: #1a1a1a; border: 2px solid #000; border-radius: 20px; padding: 4px 7px; font-size: 0.85rem; z-index: 10; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -531,7 +532,7 @@
         
         // Own Feature: Auto-Scroll on Typing
         if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
-             scrollToBottom();
+              scrollToBottom();
         }
     });
 
@@ -942,11 +943,17 @@
         likeSound.play().catch(e => {}); 
     }
 
-    // Own Feature: Link Detection
+    // Own Feature: Link Detection & Image Preview
     function linkify(text) {
         if (!text) return "";
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         return text.replace(urlRegex, function(url) {
+            // Check if it's an image
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.match(/\.(jpeg|jpg|gif|png)$/) != null) {
+                return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>
+                        <img src="${url}" class="bubble-img-preview" onclick="event.stopPropagation(); window.open('${url}', '_blank')">`;
+            }
             return `<a onclick="event.stopPropagation(); window.open('${url}', '_blank')">${url}</a>`;
         });
     }
@@ -1002,24 +1009,33 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // NEW: Unique Instagram-like Note Reply UI
-        const noteReplyHtml = m.replyToNote ? `
+        // NEW: Unique Instagram-like Note Reply UI (Fixed Logic)
+        let noteReplyHtml = '';
+        if (m.replyToNote) {
+            // Safe Color Extraction for Notes
+            const nBg = (m.noteMetadata && m.noteMetadata.bgColor) ? m.noteMetadata.bgColor : '#262626';
+            const nTxt = (m.noteMetadata && m.noteMetadata.textColor) ? m.noteMetadata.textColor : '#fff';
+            const nPfp = (m.noteMetadata && m.noteMetadata.pfp) ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20');
+            const nSong = (m.noteMetadata && m.noteMetadata.songName) ? m.noteMetadata.songName : null;
+
+            noteReplyHtml = `
             <div class="note-reply-wrapper">
-                <div class="note-reply-pill" style="background: ${m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626'}; color: ${m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff'}">
+                <div class="note-reply-pill" style="background: ${nBg}; color: ${nTxt}">
                     <div class="note-header-row">
-                        <img src="${m.noteMetadata && m.noteMetadata.pfp ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" class="note-mini-pfp">
+                        <img src="${nPfp}" class="note-mini-pfp">
                         <span class="note-label">Replied to note</span>
                     </div>
                     <div class="note-content-text">"${m.replyToNote}"</div>
-                    ${m.noteMetadata && m.noteMetadata.songName ? `
+                    ${nSong ? `
                     <div class="note-song-tag">
                         <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${m.noteMetadata.songName}</span>
+                        <span>${nSong}</span>
                     </div>` : ''}
                 </div>
                 <div class="note-connector"></div>
             </div>
-        ` : '';
+            `;
+        }
 
         // --- HTML ASSEMBLY ---
         const safeText = linkify(m.text);
@@ -1084,8 +1100,8 @@
                 const currentY = e.touches[0].clientY;
                 
                 if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startX) > 10) { 
-                     clearTimeout(menuTimer);
-                     isScrolling = true;
+                      clearTimeout(menuTimer);
+                      isScrolling = true;
                 }
                 
                 let diff = currentX - startX;
@@ -1293,15 +1309,47 @@
     }
 
     async function unsendMsg() { 
-        const idToDelete = activeMenuId; closeMenu();
-        // Optimistic Remove
+        const idToDelete = activeMenuId; 
+        closeMenu();
+
+        // 1. Get the message data before deleting to check if it was seen
+        const msgDoc = await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).get();
+        const wasSeen = msgDoc.exists ? msgDoc.data().seen : true; 
+
+        // Optimistic Remove UI
         if (messagesMap.has(idToDelete)) { messagesMap.delete(idToDelete); renderAll(); }
         
+        // 2. Delete the specific message
         await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
+
+        // 3. Find the NEW last message
         const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
+        
         if (!snapshot.empty) {
             const lastMsg = snapshot.docs[0].data();
-            await db.collection("chats").doc(chatId).update({ lastMessage: lastMsg.text, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
+            
+            // FIX: If the deleted message was NOT seen by the other person, decrement their unread count
+            const updateData = { 
+                lastMessage: lastMsg.text, 
+                lastSender: lastMsg.sender, 
+                lastTimestamp: lastMsg.timestamp,
+                // CRITICAL FIX: Sync the 'seen' status of the Chat Doc to the new last message's status.
+                // This ensures the Inbox reflects the true status of the remaining conversation.
+                seen: lastMsg.seen || false 
+            };
+            
+            if (!wasSeen) {
+                updateData[`unreadCount.${targetUid}`] = firebase.firestore.FieldValue.increment(-1);
+            }
+
+            await db.collection("chats").doc(chatId).update(updateData);
+        } else {
+            // Chat is now empty
+            await db.collection("chats").doc(chatId).update({ 
+                lastMessage: "", 
+                lastSender: "", 
+                seen: true 
+            });
         }
     }
 </script>
