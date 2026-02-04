@@ -117,6 +117,7 @@ class ViewNotes extends HTMLElement {
             .vn-note-text { 
                 font-size: 1.5rem; font-weight: 700; line-height: 1.3; z-index: 2;
                 text-shadow: 0 2px 10px rgba(0,0,0,0.1); word-break: break-word;
+                width: 100%;
             }
 
             .vn-song-pill { 
@@ -284,16 +285,14 @@ class ViewNotes extends HTMLElement {
         }
 
         // BACKGROUND FETCH: Update profile data if needed
+        // We do this to get the absolute latest, but we trust initialNoteData.pfp for the first paint
         if(initialNoteData && initialNoteData.uid) {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
-                    // Re-render header part if you want deeply fresh data, 
-                    // but usually renderContent logic below handles the header using currentUserProfile
-                    // For smoothness, we might skip re-rendering entire body to avoid flicker,
-                    // or just update specific DOM elements. 
-                    // For now, re-render is safe as it's fast.
-                    this.renderContent(); 
+                    // Optional: Re-render if you want to force latest DP even if note has old one
+                    // But to avoid flicker, we usually stick to the one passed unless we really need to update.
+                    // this.renderContent(); 
                 }
             });
         }
@@ -303,7 +302,15 @@ class ViewNotes extends HTMLElement {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
-                        this.currentNote = { ...doc.data(), uid: doc.id };
+                        // Merge but prefer doc data
+                        const freshData = doc.data();
+                        this.currentNote = { ...freshData, uid: doc.id };
+                        
+                        // Handle expiration in real-time
+                        if(freshData.expiresAt && freshData.expiresAt.toDate() < new Date()){
+                             this.close();
+                             return;
+                        }
                         this.renderContent(); 
                     } else if (!this.isOwnNote) {
                         this.close(); 
@@ -328,10 +335,16 @@ class ViewNotes extends HTMLElement {
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
-        const displayPfp = this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        const displayName = this.currentUserProfile?.name || user?.displayName || 'You';
         
-        const isVerified = this.currentUserProfile?.verified === true; 
+        // FIX: Prioritize note.pfp which is saved directly from notes.html to avoid flicker
+        const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
+        const displayName = note.username || this.currentUserProfile?.name || user?.displayName || 'You';
+        
+        const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
+
+        // Handle text alignment saved in note
+        const textAlign = note.textAlign || 'center';
+        const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
 
         return `
             <div class="vn-profile-header">
@@ -346,8 +359,8 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-scroll-content">
-                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                    <div class="vn-note-text">${note.text || 'Share a thought...'}</div>
+                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
+                    <div class="vn-note-text" style="text-align:${textAlign}">${note.text || 'Share a thought...'}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
                             <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -383,10 +396,16 @@ class ViewNotes extends HTMLElement {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
-        const displayPfp = this.currentUserProfile?.photoURL || note.pfp || 'https://via.placeholder.com/85';
-        const displayName = this.currentUserProfile?.name || note.username || 'User';
-        const displayHandle = this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '';
-        const isVerified = this.currentUserProfile?.verified === true;
+        
+        // FIX: Use note.pfp immediately to prevent "Google DP" flicker
+        const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
+        const displayName = note.username || this.currentUserProfile?.name || 'User';
+        const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
+        const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
+
+        // Handle text alignment saved in note
+        const textAlign = note.textAlign || 'center';
+        const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
 
         return `
             <div class="vn-profile-header">
@@ -401,12 +420,12 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-scroll-content">
-                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}">
-                    <div class="vn-note-text">${note.text}</div>
+                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
+                    <div class="vn-note-text" style="text-align:${textAlign}">${note.text}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
                             <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                            <span>${note.songName} • ${note.songArtist}</span>
+                            <span>${note.songName} • ${note.songArtist || ''}</span>
                         </div>
                     ` : ''}
                 </div>
@@ -543,13 +562,18 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
+        // FIX: Construct complete Metadata for chat rendering
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
             textColor: this.currentNote.textColor || "#fff",
+            textAlign: this.currentNote.textAlign || 'center', // Include Alignment
             songName: this.currentNote.songName || null,
+            songArtist: this.currentNote.songArtist || null,
+            songArt: this.currentNote.songArt || null, // Include Song Art
             username: this.currentNote.username || "User",
             pfp: this.currentNote.pfp || null,
+            verified: this.currentNote.verified || false,
             uid: this.currentNote.uid 
         };
 
@@ -705,7 +729,7 @@ const NotesManager = {
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
-                text-align: center;
+                /* text-align handled inline now */
             }
 
             .note-music-tag {
@@ -771,11 +795,12 @@ const NotesManager = {
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
-                preview.style.backgroundColor = data.bgColor || '#262626';
+                preview.style.backgroundColor = data.bgColor || '#262626'; // Supports gradients from notes.html
+                preview.style.background = data.bgColor || '#262626'; // Ensure gradients render
                 preview.style.color = data.textColor || '#fff';
                 
                 preview.innerHTML = `
-                    ${data.text ? `<div class="note-text-content">${data.text}</div>` : ''}
+                    ${data.text ? `<div class="note-text-content" style="text-align:${data.textAlign || 'center'}">${data.text}</div>` : ''}
                     ${data.songName ? `
                         <div class="note-music-tag">
                             <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -791,6 +816,7 @@ const NotesManager = {
                 };
             } else {
                 preview.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                preview.style.background = 'rgba(255,255,255,0.1)';
                 preview.style.color = 'rgba(255,255,255,0.7)';
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
@@ -847,7 +873,7 @@ const NotesManager = {
                                     div.className = 'note-item friend-note has-note';
                                     div.innerHTML = `
                                         <div class="note-bubble visible" style="background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}">
-                                            <div class="note-text-content">${noteData.text}</div>
+                                            <div class="note-text-content" style="text-align:${noteData.textAlign || 'center'}">${noteData.text}</div>
                                             ${noteData.songName ? `
                                                 <div class="note-music-tag">
                                                     <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
