@@ -388,7 +388,7 @@
         updateText(); // Re-run to potentially clear placeholder
     });
 
-    // Share & Save (CLEANED: No friend list calculation needed anymore)
+    // Share & Save (UPDATED: Fetches complete user details)
     async function publishNote(e) {
         if(e) e.stopPropagation();
         vibrate();
@@ -402,17 +402,21 @@
         shareBtn.disabled = true;
 
         try {
-            // Just get the profile info, no friends list logic
+            // Fetch fresh profile data to ensure PFP, Name, and Verified status are correct
             const userDoc = await db.collection("users").doc(user.uid).get();
-            const userData = userDoc.data() || {};
+            const userData = userDoc.exists ? userDoc.data() : {};
             
             const now = new Date();
             const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24-hour expiry
 
             const noteData = {
                 uid: user.uid,
-                username: userData.username || user.displayName || "User",
+                // ViewNotes uses 'username' field for the Display Name in some contexts, so we store Name there.
+                username: userData.name || user.displayName || "User", 
+                handle: userData.username || "", // Storing handle separately for future proofing
                 pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150',
+                verified: userData.verified === true, // Store boolean verified status
+                
                 text: input.value.trim(),
                 bgColor: currentTheme.bg,
                 textColor: currentTheme.text,
@@ -420,9 +424,6 @@
                 songArtist: currentSongData?.artistName || null,
                 songPreview: currentSongData?.previewUrl || null,
                 songArt: currentSongData?.artworkUrl100 || null,
-                
-                // NO 'visibleTo' ARRAY NEEDED HERE anymore.
-                // The Home Page logic handles the privacy check dynamically.
                 
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
