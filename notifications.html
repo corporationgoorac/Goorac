@@ -40,6 +40,9 @@
         .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .page-title { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.3px; }
         .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--text); background:none; border:none; padding:0; display: flex; align-items: center; }
+        
+        /* NEW: Header Action Button */
+        .header-action { font-size: 0.9rem; color: var(--accent); cursor: pointer; background: none; border: none; font-weight: 600; }
 
         /* TABS */
         .tabs-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
@@ -133,7 +136,7 @@
         <div class="top-row">
             <button class="back-btn" onclick="history.back()">‹</button>
             <div class="page-title">Notifications</div>
-            <div style="width: 30px;"></div>
+            <button class="header-action" onclick="markAllRead()" title="Mark all read">✓✓</button>
         </div>
         <div class="tabs-container">
             <div class="tab-pill active" onclick="filterType('all', this)">All</div>
@@ -170,6 +173,7 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
+    let loadedMap = new Map(); // Global map to hold current data
 
     // --- LOCAL STORAGE ---
     function isNotificationRead(id) {
@@ -184,18 +188,23 @@
         if(!myUid) return;
         try {
             let readList = JSON.parse(localStorage.getItem(READ_KEY)) || [];
-            // Only add if not already present
             if(!readList.includes(id)) {
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
-                // Dispatch event so other tabs sync if needed
                 window.dispatchEvent(new Event('storage'));
             }
         } catch(e) {
             console.error("LS Error", e);
-            // Fallback reset if corrupt
             localStorage.setItem(READ_KEY, JSON.stringify([id]));
         }
+    }
+
+    function markAllRead() {
+        document.querySelectorAll('.notif-item.unread').forEach(el => {
+            el.classList.remove('unread');
+            el.classList.add('read');
+            markNotificationRead(el.dataset.id);
+        });
     }
 
     // --- GAZE DETECTION ---
@@ -204,7 +213,6 @@
             if (entry.isIntersecting) {
                 const row = entry.target;
                 const id = row.dataset.id;
-                // If currently visual unread, mark read in background
                 if(id && row.classList.contains('unread')) {
                     markNotificationRead(id);
                     gazeObserver.unobserve(row); 
@@ -233,7 +241,7 @@
     function initListeners() {
         const list = document.getElementById('notif-list');
         list.innerHTML = ''; 
-        let unsortedData = new Map();
+        loadedMap = new Map();
         const now = Date.now();
 
         // 1. LIKES
@@ -248,17 +256,17 @@
                         const notifId = `like_${liker.uid}`;
                         let time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
 
-                        unsortedData.set(notifId, {
+                        loadedMap.set(notifId, {
                             id: notifId,
                             type: 'like',
                             senderId: liker.uid,
                             senderName: liker.displayName || "Someone",
-                            senderUsername: liker.username, // Attempt to capture username if available in array
+                            senderUsername: liker.username, // Might be undefined
                             senderPic: liker.photoURL,
                             isVerified: liker.verified || false,
                             timestamp: time, 
                             text: "liked your note.",
-                            needsFetch: !liker.username, // If username missing, we might need it for URL
+                            needsFetch: !liker.username, 
                             noteData: { 
                                 text: data.text,
                                 songName: data.songName,
@@ -266,12 +274,11 @@
                                 textColor: data.textColor
                             }
                         });
-                        // If username is missing in the like array, we fetch the full user
-                        if(!liker.username) fetchUserInfo(liker.uid, notifId, unsortedData);
+                        if(!liker.username) fetchUserInfo(liker.uid, notifId, loadedMap);
                     });
                 }
             }
-            processAndRender(unsortedData);
+            processAndRender(loadedMap);
         });
 
         // 2. FOLLOWERS
@@ -281,14 +288,14 @@
                 if (data.followers) {
                     data.followers.forEach((follower) => {
                         const followerId = typeof follower === 'string' ? follower : follower.uid;
-                        // FILTER: STRICTLY REQUIRE TIMESTAMP (If string only, no timestamp = skip)
+                        // FILTER: STRICTLY REQUIRE TIMESTAMP
                         if (typeof follower !== 'object' || !follower.timestamp) return;
 
                         const notifId = `follow_${followerId}`;
                         let time = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
 
-                        if (!unsortedData.has(notifId)) {
-                            unsortedData.set(notifId, {
+                        if (!loadedMap.has(notifId)) {
+                            loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
                                 senderId: followerId,
@@ -300,12 +307,12 @@
                                 text: "started following you.",
                                 needsFetch: true 
                             });
-                            fetchUserInfo(followerId, notifId, unsortedData);
+                            fetchUserInfo(followerId, notifId, loadedMap);
                         }
                     });
                 }
             }
-            processAndRender(unsortedData);
+            processAndRender(loadedMap);
         });
 
         // 3. GENERAL NOTIFICATIONS
@@ -316,10 +323,9 @@
             .onSnapshot(snap => {
                 snap.forEach(doc => {
                     let d = doc.data();
-                    // FILTER: Check timestamp
                     if (!d.timestamp) return;
                     
-                    unsortedData.set(doc.id, {
+                    loadedMap.set(doc.id, {
                         id: doc.id,
                         type: d.type,
                         senderId: d.senderId,
@@ -329,11 +335,11 @@
                         timestamp: d.timestamp ? d.timestamp.toMillis() : now,
                         text: getNotifText(d.type),
                         meta: d.meta,
-                        needsFetch: !d.senderUsername // Fetch if username missing
+                        needsFetch: !d.senderUsername 
                     });
-                    if(!d.senderUsername) fetchUserInfo(d.senderId, doc.id, unsortedData);
+                    if(!d.senderUsername) fetchUserInfo(d.senderId, doc.id, loadedMap);
                 });
-                processAndRender(unsortedData);
+                processAndRender(loadedMap);
             });
     }
 
@@ -350,25 +356,30 @@
                 const item = map.get(notifId);
                 if(item) {
                     item.senderName = uData.name || uData.username || "User";
-                    item.senderUsername = uData.username || uData.name; // Store username specifically
+                    item.senderUsername = uData.username || uData.name; 
                     item.senderPic = uData.photoURL;
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
+                    // Update DOM elements dynamically if they exist
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
+                    const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
+
                     if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                     if(pfpEl) pfpEl.src = item.senderPic;
+                    
+                    // IMPORTANT: Update the data attribute so the click handler works!
+                    if(rowEl && item.senderUsername) {
+                        rowEl.dataset.username = item.senderUsername;
+                    }
                 }
             }
         });
     }
 
     function processAndRender(mapData) {
-        // FILTER: Remove items that ended up with no timestamp even after logic
-        // (Though previous steps should have caught them, this is a double check)
         rawNotifications = Array.from(mapData.values()).filter(n => n.timestamp);
-        
         rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
         
         displayedCount = 0;
@@ -410,17 +421,21 @@
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         
+        // Store username in dataset for robust retrieval
+        const safeUsername = notif.senderUsername || notif.senderName || notif.senderId;
+        div.dataset.username = safeUsername;
+
         if(!isRead) gazeObserver.observe(div);
 
-        // LOGIC FOR USER REDIRECT
-        const userParam = notif.senderUsername || notif.senderName || notif.senderId;
+        // --- GLOBAL CLICK REDIRECT ---
+        div.onclick = function(e) {
+            // Prevent redirect if clicking buttons
+            if(e.target.closest('button')) return;
 
-        div.onclick = (e) => {
-            if(!e.target.closest('button')) {
-                markNotificationRead(notif.id); 
-                // CHANGED: Redirect using ?user=
-                window.location.href = `userProfile.html?user=${userParam}`;
-            }
+            markNotificationRead(this.dataset.id);
+            // Read latest username from dataset (updated by fetch)
+            const latestUser = this.dataset.username || notif.senderId;
+            window.location.href = `userProfile.html?user=${latestUser}`;
         };
 
         let actionHtml = '';
@@ -453,9 +468,9 @@
              extraContentHtml = `<div style="font-style:italic; color:#ccc; margin-top:2px;">"${notif.meta?.content || '...'}"</div>`;
         }
 
-        // CHANGED: Update onclick for Avatar to use username
+        // PFP Click also redirects using dynamic getter
         div.innerHTML = `
-            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${userParam}'">
+            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); this.parentElement.click()">
             <div class="n-content">
                 <span class="n-username" id="name-${notif.id}">${notif.senderName} ${verifyIcon}</span>
                 <span class="n-text">${notif.text}</span>
@@ -472,7 +487,7 @@
     // --- ACTIONS ---
 
     function toggleFollow(btn, targetUid) {
-        event.stopPropagation();
+        event.stopPropagation(); // STOP REDIRECT
         const isFollowing = btn.innerText === "Following";
         
         if (isFollowing) {
