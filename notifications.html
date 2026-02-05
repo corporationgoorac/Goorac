@@ -22,7 +22,7 @@
             --text-secondary: #a8a8a8;
             --border: #262626;
             --item-hover: #121212;
-            --unread-bg: rgba(0, 149, 246, 0.08); /* Subtle highlight for unread */
+            --unread-bg: rgba(0, 149, 246, 0.08); 
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
@@ -73,7 +73,7 @@
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
             margin-left: auto; flex-shrink: 0;
             box-shadow: 0 0 8px var(--accent);
-            display: none; /* Hidden by default */
+            display: none; 
         }
         .notif-item.unread .unread-dot { display: block; }
 
@@ -174,21 +174,27 @@
     // --- LOCAL STORAGE ---
     function isNotificationRead(id) {
         if(!myUid) return false;
-        const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-        return readList.includes(id);
+        try {
+            const readList = JSON.parse(localStorage.getItem(READ_KEY)) || [];
+            return readList.includes(id);
+        } catch(e) { return false; }
     }
 
     function markNotificationRead(id) {
         if(!myUid) return;
-        let readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-        if(!readList.includes(id)) {
-            readList.push(id);
-            localStorage.setItem(READ_KEY, JSON.stringify(readList));
-            // We update storage, BUT WE DO NOT UPDATE DOM HERE.
-            // This ensures the "Blue Dot" persists until page reload.
-            
-            // Sync with other tabs if open
-            window.dispatchEvent(new Event('storage'));
+        try {
+            let readList = JSON.parse(localStorage.getItem(READ_KEY)) || [];
+            // Only add if not already present
+            if(!readList.includes(id)) {
+                readList.push(id);
+                localStorage.setItem(READ_KEY, JSON.stringify(readList));
+                // Dispatch event so other tabs sync if needed
+                window.dispatchEvent(new Event('storage'));
+            }
+        } catch(e) {
+            console.error("LS Error", e);
+            // Fallback reset if corrupt
+            localStorage.setItem(READ_KEY, JSON.stringify([id]));
         }
     }
 
@@ -198,11 +204,10 @@
             if (entry.isIntersecting) {
                 const row = entry.target;
                 const id = row.dataset.id;
-                // If it is currently displayed as unread, mark it as read in storage
-                // But leave the visual class alone for this session.
+                // If currently visual unread, mark read in background
                 if(id && row.classList.contains('unread')) {
                     markNotificationRead(id);
-                    gazeObserver.unobserve(row); // Done for this item
+                    gazeObserver.unobserve(row); 
                 }
             }
         });
@@ -236,25 +241,24 @@
             if (doc.exists) {
                 const data = doc.data();
                 if (data.likes && Array.isArray(data.likes)) {
-                    const total = data.likes.length;
-                    data.likes.forEach((liker, index) => {
+                    data.likes.forEach((liker) => {
+                        // FILTER: STRICTLY REQUIRE TIMESTAMP
+                        if (!liker.timestamp) return;
+
                         const notifId = `like_${liker.uid}`;
-                        let time = now;
-                        if(liker.timestamp) {
-                             time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                        } else {
-                             time = now - ((total - 1 - index) * 60000); 
-                        }
+                        let time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
 
                         unsortedData.set(notifId, {
                             id: notifId,
                             type: 'like',
                             senderId: liker.uid,
                             senderName: liker.displayName || "Someone",
+                            senderUsername: liker.username, // Attempt to capture username if available in array
                             senderPic: liker.photoURL,
                             isVerified: liker.verified || false,
                             timestamp: time, 
                             text: "liked your note.",
+                            needsFetch: !liker.username, // If username missing, we might need it for URL
                             noteData: { 
                                 text: data.text,
                                 songName: data.songName,
@@ -262,6 +266,8 @@
                                 textColor: data.textColor
                             }
                         });
+                        // If username is missing in the like array, we fetch the full user
+                        if(!liker.username) fetchUserInfo(liker.uid, notifId, unsortedData);
                     });
                 }
             }
@@ -273,16 +279,13 @@
             if (doc.exists) {
                 const data = doc.data();
                 if (data.followers) {
-                    const total = data.followers.length;
-                    data.followers.forEach((follower, index) => {
+                    data.followers.forEach((follower) => {
                         const followerId = typeof follower === 'string' ? follower : follower.uid;
+                        // FILTER: STRICTLY REQUIRE TIMESTAMP (If string only, no timestamp = skip)
+                        if (typeof follower !== 'object' || !follower.timestamp) return;
+
                         const notifId = `follow_${followerId}`;
-                        let time = now;
-                        if (typeof follower === 'object' && follower.timestamp) {
-                            time = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
-                        } else {
-                            time = now - ((total - 1 - index) * 60000);
-                        }
+                        let time = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
 
                         if (!unsortedData.has(notifId)) {
                             unsortedData.set(notifId, {
@@ -290,6 +293,7 @@
                                 type: 'follow',
                                 senderId: followerId,
                                 senderName: "User",
+                                senderUsername: "", // Will fetch
                                 senderPic: "https://via.placeholder.com/50",
                                 isVerified: false,
                                 timestamp: time,
@@ -312,16 +316,22 @@
             .onSnapshot(snap => {
                 snap.forEach(doc => {
                     let d = doc.data();
+                    // FILTER: Check timestamp
+                    if (!d.timestamp) return;
+                    
                     unsortedData.set(doc.id, {
                         id: doc.id,
                         type: d.type,
                         senderId: d.senderId,
                         senderName: d.senderName || "User",
+                        senderUsername: d.senderUsername || "", 
                         senderPic: d.senderPic || "https://via.placeholder.com/50",
                         timestamp: d.timestamp ? d.timestamp.toMillis() : now,
                         text: getNotifText(d.type),
-                        meta: d.meta
+                        meta: d.meta,
+                        needsFetch: !d.senderUsername // Fetch if username missing
                     });
+                    if(!d.senderUsername) fetchUserInfo(d.senderId, doc.id, unsortedData);
                 });
                 processAndRender(unsortedData);
             });
@@ -340,6 +350,7 @@
                 const item = map.get(notifId);
                 if(item) {
                     item.senderName = uData.name || uData.username || "User";
+                    item.senderUsername = uData.username || uData.name; // Store username specifically
                     item.senderPic = uData.photoURL;
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
@@ -354,7 +365,10 @@
     }
 
     function processAndRender(mapData) {
-        rawNotifications = Array.from(mapData.values());
+        // FILTER: Remove items that ended up with no timestamp even after logic
+        // (Though previous steps should have caught them, this is a double check)
+        rawNotifications = Array.from(mapData.values()).filter(n => n.timestamp);
+        
         rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
         
         displayedCount = 0;
@@ -390,20 +404,22 @@
     }
 
     function createNotificationElement(notif) {
-        // Initial Read Check (from previous sessions)
         const isRead = isNotificationRead(notif.id);
         
         const div = document.createElement('div');
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         
-        // Attach Observer: Marks as read in background, but doesn't change UI
         if(!isRead) gazeObserver.observe(div);
+
+        // LOGIC FOR USER REDIRECT
+        const userParam = notif.senderUsername || notif.senderName || notif.senderId;
 
         div.onclick = (e) => {
             if(!e.target.closest('button')) {
-                markNotificationRead(notif.id); // Ensure read on click
-                window.location.href = `userProfile.html?uid=${notif.senderId}`;
+                markNotificationRead(notif.id); 
+                // CHANGED: Redirect using ?user=
+                window.location.href = `userProfile.html?user=${userParam}`;
             }
         };
 
@@ -437,8 +453,9 @@
              extraContentHtml = `<div style="font-style:italic; color:#ccc; margin-top:2px;">"${notif.meta?.content || '...'}"</div>`;
         }
 
+        // CHANGED: Update onclick for Avatar to use username
         div.innerHTML = `
-            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?uid=${notif.senderId}'">
+            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${userParam}'">
             <div class="n-content">
                 <span class="n-username" id="name-${notif.id}">${notif.senderName} ${verifyIcon}</span>
                 <span class="n-text">${notif.text}</span>
