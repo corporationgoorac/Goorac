@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000"> 
+    <title>Notifications | Goorac</title>
+
+    <script src="config.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root { 
+            --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
+            --header-bg: rgba(0,0,0,0.96);
+            --accent: #0095f6; 
+            --border: #262626; 
+            --text: #ffffff; 
+            --text-secondary: #a8a8a8;
+            --item-hover: #121212;
+            --unread-bg: rgba(0, 149, 246, 0.08);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
+        
+        html, body { height: 100%; width: 100%; background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+        /* --- HEADER --- */
+        header { 
+            position: sticky; top: 0; z-index: 100;
+            padding: 15px 16px; padding-top: calc(env(safe-area-inset-top) + 15px);
+            background: var(--header-bg); border-bottom: 1px solid var(--border);
+            display: flex; flex-direction: column; gap: 15px;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+
+        .top-row { display: flex; align-items: center; justify-content: space-between; }
+        .page-title { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.5px; }
+        .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--accent); background:none; border:none; padding:0; display: flex; align-items: center; justify-content: center; height: 30px; width: 30px; }
+
+        /* --- FILTER TABS --- */
+        .tabs-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        .tabs-container::-webkit-scrollbar { display: none; }
+        
+        .tab-pill {
+            background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 8px 20px; border-radius: 20px;
+            font-size: 0.9rem; font-weight: 600; white-space: nowrap;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .tab-pill.active { background: var(--text); color: #000; border-color: var(--text); }
+
+        /* --- LIST --- */
+        #notif-list { padding-bottom: 80px; }
+        
+        .notif-item {
+            display: flex; align-items: center; gap: 14px;
+            padding: 16px; border-bottom: 1px solid #1a1a1a;
+            transition: background 0.2s; position: relative;
+            cursor: pointer;
+        }
+        .notif-item:active { background: var(--item-hover); }
+        
+        /* Highlight Unread */
+        .notif-item.unread { background: var(--unread-bg); }
+        .unread-dot {
+            width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
+            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .n-avatar { 
+            width: 48px; height: 48px; border-radius: 50%; object-fit: cover; 
+            border: 1px solid #333; background: #222; flex-shrink: 0;
+        }
+        
+        .n-content { flex: 1; font-size: 0.95rem; line-height: 1.4; color: #ddd; padding-right: 20px; }
+        .n-username { font-weight: 700; color: #fff; margin-right: 4px; }
+        .n-text { color: #ccc; }
+        .n-time { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: block; font-weight: 500; }
+
+        /* --- ACTION PREVIEWS --- */
+        .n-action { flex-shrink: 0; }
+
+        .btn-follow {
+            background: var(--accent); color: white; border: none;
+            padding: 6px 18px; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; transition: transform 0.1s;
+        }
+        .btn-follow:active { transform: scale(0.95); }
+        .btn-following {
+            background: transparent; color: var(--text); border: 1px solid var(--border);
+        }
+
+        .post-thumb {
+            width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #222; border: 1px solid #333;
+        }
+
+        /* --- EMPTY STATE --- */
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 60vh; color: var(--text-secondary); text-align: center; gap: 15px;
+        }
+        .empty-icon { font-size: 4rem; opacity: 0.3; margin-bottom: 5px; filter: grayscale(1); }
+        .empty-text { font-size: 1.1rem; font-weight: 500; }
+
+        /* Loading Skeleton */
+        .skeleton { background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); background-size: 400px 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="top-row">
+            <button class="back-btn" onclick="history.back()">‹</button>
+            <div class="page-title">Notifications</div>
+            <div style="width: 30px;"></div> </div>
+        <div class="tabs-container">
+            <div class="tab-pill active" onclick="filterType('all', this)">All</div>
+            <div class="tab-pill" onclick="filterType('follow', this)">Follows</div>
+            <div class="tab-pill" onclick="filterType('like', this)">Likes</div>
+            <div class="tab-pill" onclick="filterType('comment', this)">Comments</div>
+        </div>
+    </header>
+
+    <div id="notif-list">
+        <div class="notif-item">
+            <div class="n-avatar skeleton"></div>
+            <div class="n-content">
+                <div class="skeleton" style="width: 60%; height: 14px; margin-bottom: 8px;"></div>
+                <div class="skeleton" style="width: 30%; height: 10px;"></div>
+            </div>
+        </div>
+        <div class="notif-item">
+            <div class="n-avatar skeleton"></div>
+            <div class="n-content">
+                <div class="skeleton" style="width: 50%; height: 14px; margin-bottom: 8px;"></div>
+                <div class="skeleton" style="width: 25%; height: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- INIT CONFIG & FIREBASE ---
+    let fbConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
+
+    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
+        fbConfig = window.CONFIG.firebase;
+    }
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp(fbConfig);
+    }
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    let myUid = null;
+    let currentFilter = 'all';
+    let allNotifications = [];
+
+    // --- HELPERS ---
+    function timeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "w";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m";
+        return "now";
+    }
+
+    // --- MAIN LOGIC ---
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            myUid = user.uid;
+            listenForNotifications();
+        } else {
+            window.location.href = 'login.html';
+        }
+    });
+
+    function listenForNotifications() {
+        // Query: 'notifications' collection where recipient is Me, ordered by time
+        db.collection('notifications')
+            .where('recipientId', '==', myUid)
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .onSnapshot(snapshot => {
+                const list = document.getElementById('notif-list');
+                
+                if (snapshot.empty) {
+                    list.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">🔔</div>
+                            <div class="empty-text">No notifications yet</div>
+                            <div style="font-size:0.8rem; opacity:0.5;">When people interact with you, they'll show up here.</div>
+                        </div>`;
+                    return;
+                }
+
+                allNotifications = [];
+                snapshot.forEach(doc => {
+                    let data = doc.data();
+                    data.id = doc.id;
+                    allNotifications.push(data);
+                });
+
+                renderNotifications();
+            });
+    }
+
+    function filterType(type, element) {
+        currentFilter = type;
+        
+        // UI Update
+        document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+
+        renderNotifications();
+    }
+
+    async function renderNotifications() {
+        const list = document.getElementById('notif-list');
+        list.innerHTML = '';
+
+        const filtered = allNotifications.filter(n => {
+            if (currentFilter === 'all') return true;
+            return n.type.includes(currentFilter);
+        });
+
+        if (filtered.length === 0) {
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No ${currentFilter}s found</div></div>`;
+            return;
+        }
+
+        for (const notif of filtered) {
+            // Setup Sender Data
+            let senderData = { photoURL: 'https://via.placeholder.com/50', username: 'User' };
+            
+            // Optimization: If notification doc has snapshot data, use it. Else fetch user.
+            // Ideally, your backend should save 'senderName' and 'senderPic' in the notification doc.
+            if(notif.senderName) {
+                senderData.username = notif.senderName;
+                senderData.photoURL = notif.senderPic;
+            } else if (notif.senderId) {
+                try {
+                    const userDoc = await db.collection('users').doc(notif.senderId).get();
+                    if(userDoc.exists) senderData = userDoc.data();
+                } catch(e) {}
+            }
+
+            const item = document.createElement('div');
+            // Add 'unread' class if isRead is false
+            item.className = `notif-item ${!notif.isRead ? 'unread' : ''}`;
+            
+            // Click to mark read
+            item.onclick = (e) => {
+                if(!e.target.closest('button')) { // Don't trigger if clicking Follow button
+                    handleItemClick(notif);
+                }
+            };
+
+            let actionHtml = '';
+            let textHtml = '';
+
+            // --- Logic per Notification Type ---
+            if (notif.type === 'follow') {
+                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">started following you.</span>`;
+                actionHtml = `<button class="btn-follow" onclick="followUser(event, '${notif.senderId}', this)">Follow</button>`;
+            } 
+            else if (notif.type.includes('like')) {
+                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">liked your note.</span>`;
+                if (notif.meta && notif.meta.imageUrl) {
+                    actionHtml = `<img src="${notif.meta.imageUrl}" class="post-thumb">`;
+                } else {
+                     actionHtml = `<span style="font-size:1.5rem;">❤️</span>`;
+                }
+            } 
+            else if (notif.type === 'comment') {
+                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">commented: "${notif.meta ? notif.meta.content : '...'}"</span>`;
+                actionHtml = `<span style="font-size:1.5rem;">💬</span>`;
+            }
+            else {
+                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">interacted with you.</span>`;
+            }
+
+            const timeString = notif.timestamp ? timeAgo(notif.timestamp.toDate()) : '';
+
+            item.innerHTML = `
+                <img src="${senderData.photoURL || 'https://via.placeholder.com/50'}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?uid=${notif.senderId}'">
+                <div class="n-content">
+                    <div>${textHtml}</div>
+                    <span class="n-time">${timeString}</span>
+                </div>
+                <div class="n-action">
+                    ${actionHtml}
+                </div>
+                ${!notif.isRead ? '<div class="unread-dot"></div>' : ''}
+            `;
+
+            list.appendChild(item);
+        }
+    }
+
+    // --- ACTIONS ---
+    
+    function handleItemClick(notif) {
+        // 1. Mark as read in DB
+        if (!notif.isRead) {
+            db.collection('notifications').doc(notif.id).update({ isRead: true }).catch(e=>{});
+        }
+
+        // 2. Navigate based on type
+        if (notif.type === 'follow') {
+            window.location.href = `userProfile.html?uid=${notif.senderId}`;
+        } else if (notif.type.includes('like') || notif.type === 'comment') {
+            // Assuming you have a way to view a specific note/post
+            // window.location.href = `viewNote.html?id=${notif.contentId}`;
+        }
+    }
+
+    function followUser(event, uid, btn) {
+        event.stopPropagation(); // Stop bubbling to item click
+        
+        // Simple UI toggle for visual feedback
+        if (btn.classList.contains('btn-following')) {
+            btn.classList.remove('btn-following');
+            btn.classList.add('btn-follow');
+            btn.innerText = "Follow";
+            // TODO: Call your actual Firebase un-follow function here
+        } else {
+            btn.classList.add('btn-following');
+            btn.classList.remove('btn-follow');
+            btn.innerText = "Following";
+            // TODO: Call your actual Firebase follow function here
+        }
+    }
+
+</script>
+</body>
+</html>
