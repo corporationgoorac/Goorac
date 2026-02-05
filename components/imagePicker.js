@@ -3,12 +3,14 @@ class ImagePicker extends HTMLElement {
         super();
         
         // Load credentials from global CONFIG object
-        // Removed hardcoded fallback as requested
-        if (typeof CONFIG !== 'undefined' && CONFIG.imgbbApiKey) {
+        // We check global scope and window explicitly
+        if (typeof CONFIG !== 'undefined') {
             this.apiKey = CONFIG.imgbbApiKey;
+        } else if (window.CONFIG) {
+            this.apiKey = window.CONFIG.imgbbApiKey;
         } else {
-            console.error("CONFIG is not defined or missing imgbbApiKey. Please check config.js");
-            this.apiKey = ""; // Will cause upload failure if not set in config.js
+            // It might load later, we will check again before upload
+            this.apiKey = ""; 
         }
 
         this.selectedFile = null;
@@ -366,6 +368,20 @@ class ImagePicker extends HTMLElement {
              this.previewUrl = canvas.toDataURL('image/jpeg');
              this.currentRotation = 0; // Reset as it's baked in
              this.destroyCropper();
+        }
+
+        // RETRY LOADING API KEY IF MISSING
+        if (!this.apiKey) {
+            if (typeof CONFIG !== 'undefined' && CONFIG.imgbbApiKey) {
+                this.apiKey = CONFIG.imgbbApiKey;
+            } else if (window.CONFIG && window.CONFIG.imgbbApiKey) {
+                this.apiKey = window.CONFIG.imgbbApiKey;
+            }
+        }
+
+        if (!this.apiKey) {
+            alert("API Key missing. Please check config.js");
+            return;
         }
 
         this.isUploading = true;
