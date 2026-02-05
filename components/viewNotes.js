@@ -493,17 +493,25 @@ class ViewNotes extends HTMLElement {
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
+                        // FIX: ADDED TIMESTAMP TO LIKER OBJECT
                         await noteRef.update({
                             likes: firebase.firestore.FieldValue.arrayUnion({ 
                                 uid: user.uid, 
                                 displayName: userData.name || user.displayName, 
-                                photoURL: userData.photoURL || user.photoURL, // Uses DB pic
-                                verified: userData.verified || false // Stores verified status
+                                photoURL: userData.photoURL || user.photoURL, 
+                                verified: userData.verified || false,
+                                timestamp: firebase.firestore.Timestamp.now() // STORED TIME FOR NOTIFICATIONS
                             })
                         });
                     } else {
+                        // FIND AND REMOVE
+                        // Since we added timestamp, exact object match might fail if we don't have it locally.
+                        // We filter the array manually via transaction for safety or just find by UID locally.
+                        // For simple UI speed we try direct removal if we have the exact object in memory.
                         const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
-                        if (likerObj) await noteRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
+                        if (likerObj) {
+                            await noteRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
+                        }
                     }
                 } catch (e) { console.error("Like toggle failed", e); }
             };
@@ -839,7 +847,11 @@ const NotesManager = {
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            const mutualUIDs = myFollowing.filter(uid => myFollowers.includes(uid));
+            // FIX: Normalize array if it contains objects
+            const followingUIDs = myFollowing.map(i => typeof i === 'string' ? i : i.uid);
+            const followersUIDs = myFollowers.map(i => typeof i === 'string' ? i : i.uid);
+
+            const mutualUIDs = followingUIDs.filter(uid => followersUIDs.includes(uid));
 
             if(mutualUIDs.length === 0) {
                 container.querySelectorAll('.friend-note').forEach(e => e.remove());
