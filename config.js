@@ -26,21 +26,7 @@
 const CONFIG = {
     supabaseUrl: "https://ekgsgltykakwopcfyxqu.supabase.co",
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZ3NnbHR5a2Frd29wY2Z5eHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzY3NDcsImV4cCI6MjA4NTg1Mjc0N30.gsh7Zb6JEJcDx_CzVbrPsfcaiyDvl8ws-gUNsQQFWLc",
-    
-    // Added ImgBB API Key
-    imgbbApiKey: "d19129d9da57ced728f293be219f67ef",
-
-    // Added Firebase Config for components
-    firebase: {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        measurementId: "G-M46FEVRYSS",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    }
+    imgbbApiKey: "d19129d9da57ced728f293be219f67ef"
 };
 
 
