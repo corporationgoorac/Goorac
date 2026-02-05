@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac Profile</title>
-    
-    <script src="config.js"></script>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -63,17 +60,14 @@
 
         /* MUTUAL BADGE STYLE */
         .mutual-badge {
-            display: none; /* Hidden by default */
-            align-items: center; gap: 6px;
-            background: rgba(0, 210, 255, 0.1); 
-            border: 1px solid rgba(0, 210, 255, 0.3);
-            color: var(--accent);
+            display: none;
+            align-items: center; gap: 5px;
+            background: rgba(0, 210, 255, 0.1);
+            border: 1px solid rgba(0, 210, 255, 0.2);
             padding: 4px 10px; border-radius: 12px;
-            font-size: 0.7rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 1px;
-            animation: fadeIn 0.5s ease;
+            color: var(--accent); font-size: 0.65rem; font-weight: 800;
+            letter-spacing: 1px; text-transform: uppercase;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         .profile-hero { text-align: center; }
         .pfp-box { width: 110px; height: 110px; border-radius: 35px; margin: 0 auto; position: relative; padding: 3px; background: linear-gradient(var(--accent), transparent); }
@@ -126,13 +120,11 @@
 <div class="app" id="main">
     <header>
         <span class="back" onclick="history.back()">‹</span>
-        <div style="display:flex; flex-direction:column; align-items:center;">
-            <span style="font-weight: 800; font-size: 0.75rem; letter-spacing: 2px;">USER DOSSIER</span>
-            <div id="mutual-badge" class="mutual-badge">
-                <svg viewBox="0 0 24 24" style="width:12px; height:12px; fill:currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-1.07 3.9-2.74 5.08z"/></svg>
-                Mutuals
-            </div>
+        <div id="mutual-badge" class="mutual-badge">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            Mutual
         </div>
+        <span style="font-weight: 800; font-size: 0.75rem; letter-spacing: 2px;">USER DOSSIER</span>
         <div style="width:30px"></div>
     </header>
 
@@ -174,8 +166,7 @@
 <div id="toast">ID Copied</div>
 
 <script>
-    // --- FIREBASE INIT ---
-    let fbConfig = {
+    const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
@@ -184,23 +175,15 @@
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
     };
 
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
-        fbConfig = window.CONFIG.firebase;
-    }
-
-    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
 
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
-    const targetUidParam = params.get('uid'); // Support direct UID access too
-    
     let currentUserUID = "";
     let targetUserUID = "";
     let isActionLocked = false; 
-    let myFollowingList = []; // Array of UIDs
-    let theirFollowingList = []; // Array of UIDs
 
     document.getElementById('main').classList.add('show');
     document.getElementById('loader').style.opacity = '0';
@@ -209,17 +192,6 @@
     auth.onAuthStateChanged(user => {
         if (user) { 
             currentUserUID = user.uid; 
-            // Listen to MY data first to handle mutuals logic
-            db.collection("users").doc(currentUserUID).onSnapshot(doc => {
-                if(doc.exists) {
-                    const data = doc.data();
-                    const rawList = data.following || [];
-                    // Normalize to UIDs
-                    myFollowingList = rawList.map(item => typeof item === 'string' ? item : item.uid);
-                    checkMutuals();
-                    updateFollowButtonState();
-                }
-            });
             loadProfileData(); 
         } else { 
             window.location.href = 'login.html'; 
@@ -227,36 +199,13 @@
     });
 
     async function loadProfileData() {
-        let query;
-        if(targetUidParam) {
-            query = db.collection("users").doc(targetUidParam);
-            // We fetch once to get data, but set listener on snapshot
-        } else if (targetUsername) {
-            query = db.collection("users").where("username", "==", targetUsername);
-        } else {
-            return;
-        }
+        if(!targetUsername) return;
 
-        // Handle the query (either DocRef or Query)
-        const snapshotHandler = async (snap) => {
-            let doc, userData;
-
-            if(targetUidParam) { // Doc Snapshot
-                if(!snap.exists) return;
-                doc = snap;
-                userData = snap.data();
-            } else { // Query Snapshot
-                if (snap.empty) return;
-                doc = snap.docs[0];
-                userData = doc.data();
-            }
-            
+        db.collection("users").where("username", "==", targetUsername).onSnapshot(async (snap) => {
+            if (snap.empty) return;
+            const doc = snap.docs[0];
+            const userData = doc.data();
             targetUserUID = doc.id;
-            
-            // Normalize their following list for mutual check
-            const rawTheirFollowing = userData.following || [];
-            theirFollowingList = rawTheirFollowing.map(item => typeof item === 'string' ? item : item.uid);
-            checkMutuals();
 
             const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
 
@@ -293,7 +242,7 @@
                 fing.innerText = userData.followingCount || 0;
                 fing.classList.remove('skeleton');
                 
-                updateFollowButtonState();
+                await updateFollowButton();
             }
 
             document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
@@ -304,45 +253,40 @@
             document.getElementById('go-followers').onclick = () => window.location.href = `followers.html?user=${userData.username}`;
             document.getElementById('go-following').onclick = () => window.location.href = `following.html?user=${userData.username}`;
             document.getElementById('msg-btn').onclick = () => window.location.href = `chat.html?user=${userData.username}`;
-        };
-
-        if(targetUidParam) {
-            db.collection("users").doc(targetUidParam).onSnapshot(snapshotHandler);
-        } else {
-            db.collection("users").where("username", "==", targetUsername).onSnapshot(snapshotHandler);
-        }
+        });
     }
 
-    function checkMutuals() {
-        if(!targetUserUID || !currentUserUID) return;
-        if(targetUserUID === currentUserUID) return;
-
-        const iFollowThem = myFollowingList.includes(targetUserUID);
-        const theyFollowMe = theirFollowingList.includes(currentUserUID);
-
-        const badge = document.getElementById('mutual-badge');
-        if (iFollowThem && theyFollowMe) {
-            badge.style.display = 'flex';
-        } else {
-            badge.style.display = 'none';
-        }
-    }
-
-    function updateFollowButtonState() {
+    async function updateFollowButton() {
         if (currentUserUID === targetUserUID || !targetUserUID) {
             document.getElementById('follow-action-btn').style.display = "none";
-            document.getElementById('msg-btn').style.display = "none"; // Optional: Hide msg button on own profile
             return;
         }
 
+        const myDoc = await db.collection("users").doc(currentUserUID).get();
+        const myData = myDoc.data();
+        const myFollowingList = myData.following || [];
         const btn = document.getElementById('follow-action-btn');
 
-        if (myFollowingList.includes(targetUserUID)) {
+        // Check if following (handle both string and object formats)
+        const isFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === targetUserUID);
+
+        if (isFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
         } else {
             btn.innerText = "Follow";
             btn.className = "btn btn-f";
+        }
+
+        // --- MUTUAL FRIEND BADGE LOGIC ---
+        const targetDoc = await db.collection("users").doc(targetUserUID).get();
+        const targetFollowingList = targetDoc.data().following || [];
+        const theyFollowMe = targetFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === currentUserUID);
+        
+        if(isFollowing && theyFollowMe) {
+            document.getElementById('mutual-badge').style.display = 'flex';
+        } else {
+            document.getElementById('mutual-badge').style.display = 'none';
         }
     }
 
@@ -351,84 +295,88 @@
         
         const btn = this;
         const isCurrentlyFollowing = btn.innerText === "Following";
-        
-        // Optimistic UI Update
+        const followersCountLabel = document.getElementById('c-followers');
+        let currentCount = parseInt(followersCountLabel.innerText);
+
         if (navigator.vibrate) navigator.vibrate(10);
         isActionLocked = true;
 
         if (!isCurrentlyFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
+            followersCountLabel.innerText = currentCount + 1;
         } else {
             btn.innerText = "Follow";
             btn.className = "btn btn-f";
+            followersCountLabel.innerText = Math.max(0, currentCount - 1);
+            document.getElementById('mutual-badge').style.display = 'none';
         }
 
-        // Data Objects with Timestamp
-        const timestamp = firebase.firestore.Timestamp.now();
+        const now = firebase.firestore.Timestamp.now();
         const dateStr = new Date().toISOString();
-        
-        const myFollowData = { uid: targetUserUID, timestamp: timestamp, date: dateStr, type: 'following' };
-        const theirFollowerData = { uid: currentUserUID, timestamp: timestamp, date: dateStr, type: 'follower' };
+
+        // Data for Notifications & Future use
+        const followDataForMe = {
+            uid: targetUserUID,
+            timestamp: now,
+            date: dateStr,
+            type: 'following'
+        };
+
+        const followerDataForThem = {
+            uid: currentUserUID,
+            timestamp: now,
+            date: dateStr,
+            type: 'follower'
+        };
 
         try {
             if (!isCurrentlyFollowing) {
-                // FOLLOW Logic (Use Union for objects)
-                const batch = db.batch();
-                batch.update(db.collection("users").doc(currentUserUID), {
-                    following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
-                    followingCount: firebase.firestore.FieldValue.increment(1)
-                });
-                batch.update(db.collection("users").doc(targetUserUID), {
-                    followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
-                    followerCount: firebase.firestore.FieldValue.increment(1)
-                });
-                await batch.commit();
-
-            } else {
-                // UNFOLLOW Logic (Complex Remove)
-                // Since we store objects, arrayRemove only works if we know the Exact Object (including timestamp).
-                // We don't know the exact timestamp of when we followed them.
-                // So we must Read -> Filter -> Write (Transaction)
-                
                 await Promise.all([
-                    removeFromList(currentUserUID, 'following', targetUserUID),
-                    removeFromList(targetUserUID, 'followers', currentUserUID)
+                    db.collection("users").doc(currentUserUID).update({
+                        following: firebase.firestore.FieldValue.arrayUnion(followDataForMe),
+                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    }),
+                    db.collection("users").doc(targetUserUID).update({
+                        followers: firebase.firestore.FieldValue.arrayUnion(followerDataForThem),
+                        followerCount: firebase.firestore.FieldValue.increment(1)
+                    })
+                ]);
+            } else {
+                // Robust removal for objects (using transaction to ensure we filter correctly)
+                await Promise.all([
+                    removeUserFromArray(currentUserUID, 'following', targetUserUID),
+                    removeUserFromArray(targetUserUID, 'followers', currentUserUID)
                 ]);
             }
+            await updateFollowButton(); // Sync mutual badge
         } catch (err) {
             console.error("Action failed", err);
-            // Revert UI on error (simple reload essentially)
-            updateFollowButtonState();
+            await updateFollowButton(); 
         } finally {
             isActionLocked = false;
         }
     };
 
-    // Helper: Safely remove item from array whether it's stored as String or Object
-    async function removeFromList(docUid, field, uidToRemove) {
-        const docRef = db.collection("users").doc(docUid);
-        try {
-            await db.runTransaction(async (t) => {
-                const doc = await t.get(docRef);
-                if (!doc.exists) return;
-                
-                const currentArray = doc.data()[field] || [];
-                // Filter out the item matching the UID
-                const newArray = currentArray.filter(item => {
-                    const id = typeof item === 'string' ? item : item.uid;
-                    return id !== uidToRemove;
-                });
-                
-                if (newArray.length !== currentArray.length) {
-                    const countField = field === 'followers' ? 'followerCount' : 'followingCount';
-                    t.update(docRef, { 
-                        [field]: newArray,
-                        [countField]: newArray.length
-                    });
-                }
+    // Helper function to remove user from array regardless of stored format (String or Object)
+    async function removeUserFromArray(docId, field, targetUid) {
+        const docRef = db.collection("users").doc(docId);
+        return db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(docRef);
+            if (!doc.exists) return;
+            
+            const currentArray = doc.data()[field] || [];
+            const newArray = currentArray.filter(item => {
+                const id = typeof item === 'string' ? item : item.uid;
+                return id !== targetUid;
             });
-        } catch (e) { console.error("Transaction failed", e); }
+            
+            const countField = field === 'followers' ? 'followerCount' : 'followingCount';
+            transaction.update(docRef, { 
+                [field]: newArray,
+                [countField]: firebase.firestore.FieldValue.increment(-1)
+            });
+        });
     }
 
     function copyID() {
