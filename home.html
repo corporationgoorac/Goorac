@@ -77,29 +77,34 @@
         .notif-btn:active { transform: scale(0.9); }
 
         .notif-icon {
-            width: 26px; height: 26px; fill: var(--text-main);
-            transition: fill 0.3s;
+            width: 26px; height: 26px; fill: none; stroke: var(--text-main); stroke-width: 2;
+            transition: all 0.3s ease;
         }
         
+        .notif-btn.has-new .notif-icon {
+            fill: var(--text-main); stroke: none; /* Filled icon when active */
+        }
+
         /* Badge Styling */
         .notif-badge {
-            position: absolute; top: -1px; right: -2px;
+            position: absolute; top: -2px; right: -2px;
             background: var(--danger); color: white;
             font-size: 0.6rem; font-weight: 700;
-            min-width: 15px; height: 15px;
+            min-width: 16px; height: 16px;
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             border: 2px solid #000; opacity: 0; transform: scale(0);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 0 8px var(--danger-glow);
+            pointer-events: none;
         }
         .notif-badge.visible { 
             opacity: 1; transform: scale(1); 
-            animation: badgePulse 2s infinite;
+            animation: badgePulse 3s infinite;
         }
 
         @keyframes badgePulse {
             0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
-            70% { box-shadow: 0 0 0 4px rgba(255, 68, 68, 0); }
+            50% { box-shadow: 0 0 0 4px rgba(255, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
         }
 
@@ -274,7 +279,7 @@
     <div class="logo">GOORAC</div>
     
     <div class="header-right">
-        <div class="notif-btn" onclick="window.location.href='notifications.html'">
+        <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
             <svg id="bell-icon" class="notif-icon" viewBox="0 0 24 24">
                 <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
             </svg>
@@ -329,14 +334,16 @@
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    // Config Loader
+    // --- FIREBASE INIT ---
     let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
         storageBucket: "goorac-c3b59.firebasestorage.app",
         messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        measurementId: "G-M46FEVRYSS",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
 
     if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
@@ -347,7 +354,9 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const prog = document.getElementById('progress-bar');
-    const READ_KEY = "goorac_read_notifs";
+    
+    // Key used for checking read status
+    const READ_KEY = "goorac_read_notifs"; 
 
     function formatTime(timestamp) {
         if (!timestamp) return "";
@@ -375,7 +384,7 @@
             if (doc.exists) {
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
-                listenNotifications(user.uid); // Start smart notification check
+                listenNotifications(user.uid);
             } else { window.location.href = "setup.html"; }
         } else { window.location.href = "login.html"; }
     });
@@ -387,7 +396,6 @@
 
         nameEl.classList.remove('skeleton');
         
-        // FEATURE: Time-based Greeting
         const hour = new Date().getHours();
         let greeting = "Welcome";
         if (hour < 12) greeting = "Good Morning";
@@ -400,7 +408,6 @@
         pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
         document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
         
-        // FEATURE: Typer Effect for Welcome Text
         textEl.classList.remove('skeleton');
         typeWriterEffect(textEl, "All neural-links are operational. Your communication is currently isolated and secure.");
 
@@ -410,73 +417,87 @@
 
     // --- SMART NOTIFICATION COUNTER ---
     function listenNotifications(uid) {
-        // Collect unread IDs from multiple sources
-        const unreadSet = new Set();
-        const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+        // Sets to track unique IDs from 3 disparate sources
+        let unreadGeneral = new Set();
+        let unreadLikes = new Set();
+        let unreadFollows = new Set();
 
-        // 1. General Notifications
+        const updateTotal = () => {
+            // Re-read local storage every time to ensure sync with notifications.html
+            const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+            let total = 0;
+
+            unreadGeneral.forEach(id => { if(!readList.includes(id)) total++; });
+            unreadLikes.forEach(id => { if(!readList.includes(id)) total++; });
+            unreadFollows.forEach(id => { if(!readList.includes(id)) total++; });
+
+            updateBadge(total);
+        };
+
+        // 1. General Notifications (Comments, etc)
         db.collection('notifications')
             .where('recipientId', '==', uid)
             .orderBy('timestamp', 'desc')
             .limit(10)
             .onSnapshot(snap => {
-                snap.forEach(doc => {
-                    if (!readList.includes(doc.id)) unreadSet.add(doc.id);
-                });
-                updateBadge(unreadSet.size);
+                unreadGeneral.clear();
+                snap.forEach(doc => unreadGeneral.add(doc.id));
+                updateTotal();
             });
 
         // 2. New Likes
         db.collection("active_notes").doc(uid).onSnapshot(doc => {
+            unreadLikes.clear();
             if (doc.exists) {
                 const data = doc.data();
                 if (data.likes) {
-                    data.likes.forEach(liker => {
-                        const id = `like_${liker.uid}`;
-                        if (!readList.includes(id)) unreadSet.add(id);
-                    });
-                    updateBadge(unreadSet.size);
+                    data.likes.forEach(liker => unreadLikes.add(`like_${liker.uid}`));
                 }
             }
+            updateTotal();
         });
 
         // 3. New Followers
         db.collection("users").doc(uid).onSnapshot(doc => {
+            unreadFollows.clear();
             if (doc.exists) {
                 const data = doc.data();
                 if (data.followers) {
                     data.followers.forEach(follower => {
                         const fid = typeof follower === 'string' ? follower : follower.uid;
-                        const id = `follow_${fid}`;
-                        if (!readList.includes(id)) unreadSet.add(id);
+                        unreadFollows.add(`follow_${fid}`);
                     });
-                    updateBadge(unreadSet.size);
                 }
             }
+            updateTotal();
+        });
+        
+        // Listen to storage changes (in case user reads notif in another tab)
+        window.addEventListener('storage', (e) => {
+            if(e.key === READ_KEY) updateTotal();
         });
     }
 
     function updateBadge(count) {
         const badge = document.getElementById('notif-count');
         const icon = document.getElementById('bell-icon');
+        const btn = document.getElementById('notif-btn');
 
         if (count > 0) {
             badge.innerText = count > 9 ? '9+' : count;
             badge.classList.add('visible');
+            btn.classList.add('has-new');
             // Filled Bell Icon
             icon.innerHTML = '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>';
-            icon.style.fill = "#fff"; // Make filled icon solid white
+            icon.setAttribute('viewBox', '0 0 24 24'); // Reset viewBox just in case
         } else {
             badge.classList.remove('visible');
+            btn.classList.remove('has-new');
             // Outlined Bell Icon
             icon.innerHTML = '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>';
-            icon.style.fill = "none";
-            icon.style.stroke = "#fff";
-            icon.style.strokeWidth = "2";
         }
     }
 
-    // FEATURE: Typer Effect Function
     function typeWriterEffect(element, text, speed = 30) {
         element.innerHTML = "";
         let i = 0;
