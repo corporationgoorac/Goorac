@@ -352,7 +352,7 @@ class ViewNotes extends HTMLElement {
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         
-        // Gradient Support
+        // Gradient Support - Use 'background' property for compatibility
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -468,21 +468,28 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
+    // --- NEW: Handle Redirection Robustly ---
     async handleProfileRedirect() {
         if (!this.currentNote) return;
         const uid = this.currentNote.uid;
+        
+        // 1. Try to get username from the fetched profile (most accurate)
         let username = this.currentUserProfile ? this.currentUserProfile.username : null;
 
+        // 2. If not found, check the note data itself (might be stale, but better than nothing)
         if (!username && this.currentNote.username && !this.currentNote.username.includes(" ")) {
+            // Basic check: if it has spaces, it's likely a Display Name, ignore it.
             username = this.currentNote.username;
         }
 
+        // 3. Fetch from DB if absolutely missing
         if (!username) {
             try {
-                if(navigator.vibrate) navigator.vibrate(5);
+                if(navigator.vibrate) navigator.vibrate(5); // Little feedback we are doing something
                 const doc = await this.db.collection('users').doc(uid).get();
                 if (doc.exists) {
                     username = doc.data().username;
+                    // Cache it for this session
                     if(!this.currentUserProfile) this.currentUserProfile = doc.data();
                 }
             } catch (e) {
@@ -499,6 +506,7 @@ class ViewNotes extends HTMLElement {
         if (!user) return;
         const icons = this.getIcons();
 
+        // --- ATTACH REDIRECT LISTENER ---
         const headerClick = this.querySelector('#vn-header-click');
         if (headerClick) {
             headerClick.onclick = () => this.handleProfileRedirect();
@@ -511,14 +519,16 @@ class ViewNotes extends HTMLElement {
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - this.lastTap;
                 if (tapLength < 300 && tapLength > 0) {
+                    // Double Tap Detected
                     const popHeart = this.querySelector('#vn-pop-heart');
                     const likeBtn = this.querySelector('#like-toggle-btn');
                     
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    if(navigator.vibrate) navigator.vibrate([10, 30]);
+                    if(navigator.vibrate) navigator.vibrate([10, 30]); // VIBRATION ADDED
 
+                    // Only trigger if not already liked
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
                          likeBtn.click();
                     }
@@ -654,7 +664,6 @@ class ViewNotes extends HTMLElement {
         });
     }
 
-    // === CRITICAL FIX: SEND FULL DETAILS FOR CHAT ===
     async handleSendReply(text) {
         if(navigator.vibrate) navigator.vibrate(20);
 
@@ -674,7 +683,8 @@ class ViewNotes extends HTMLElement {
             username: this.currentNote.username || "User",
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
-            uid: this.currentNote.uid 
+            uid: this.currentNote.uid,
+            font: this.currentNote.font || 'system-ui' // Include Font!
         };
 
         try {
@@ -868,7 +878,6 @@ const NotesManager = {
         document.head.appendChild(style);
     },
 
-    // === CRITICAL FIX: QUERY "notes" COLLECTION ===
     setupMyNote: function(user) {
         const db = firebase.firestore();
         db.collection("notes")
@@ -898,7 +907,7 @@ const NotesManager = {
                 preview.classList.add('visible');
 
                 if(data && (data.text || data.songName)) {
-                    // Use 'background' for gradients
+                    // Use 'background' for gradients and add Font Family
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
@@ -915,10 +924,10 @@ const NotesManager = {
                     
                     btn.onclick = () => {
                         const viewer = document.querySelector('view-notes');
-                        // Pass ID correctly
                         if(data) viewer.open({ ...data, id: noteId }, true);
                     };
                 } else {
+                    // Empty State Logic
                     preview.style.background = 'rgba(255,255,255,0.1)';
                     preview.style.color = 'rgba(255,255,255,0.7)';
                     preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
@@ -956,14 +965,13 @@ const NotesManager = {
             while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 10)); // Limit 10
 
             chunks.forEach(chunk => {
-                // Query "notes" collection
                 db.collection("notes")
                     .where("uid", "in", chunk) 
                     .where("isActive", "==", true)
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(change => {
                             const noteData = change.doc.data();
-                            const uid = change.doc.id; // Note ID
+                            const uid = change.doc.id;
                             
                             const existingEl = document.getElementById(`note-${uid}`);
                             if(existingEl) existingEl.remove();
@@ -998,7 +1006,6 @@ const NotesManager = {
                                     const nav = document.querySelector('main-navbar');
                                     if(nav) nav.classList.add('hidden');
                                     if(navigator.vibrate) navigator.vibrate(10);
-                                    // Pass note data with ID
                                     viewer.open({ ...noteData, id: uid }, false);
                                 };
                                 container.appendChild(div);
