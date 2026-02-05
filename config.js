@@ -21,6 +21,8 @@
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
 
+</script>
+
 
 // config.js
 const CONFIG = {
@@ -28,6 +30,3 @@ const CONFIG = {
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZ3NnbHR5a2Frd29wY2Z5eHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzY3NDcsImV4cCI6MjA4NTg1Mjc0N30.gsh7Zb6JEJcDx_CzVbrPsfcaiyDvl8ws-gUNsQQFWLc",
     imgbbApiKey: "d19129d9da57ced728f293be219f67ef"
 };
-
-
-</script>
