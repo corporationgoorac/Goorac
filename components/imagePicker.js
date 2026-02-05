@@ -1,7 +1,15 @@
 class ImagePicker extends HTMLElement {
     constructor() {
         super();
-        this.apiKey = 'd19129d9da57ced728f293be219f67ef'; // Your ImgBB Key
+        
+        // Load credentials from global CONFIG object
+        if (typeof CONFIG !== 'undefined') {
+            this.apiKey = CONFIG.imgbbApiKey;
+        } else {
+            console.error("CONFIG is not defined. Please load config.js");
+            this.apiKey = ""; // Fallback or handle error
+        }
+
         this.selectedFile = null;
         this.previewUrl = null;
         this.isUploading = false;
