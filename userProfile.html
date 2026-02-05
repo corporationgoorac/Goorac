@@ -3,169 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac Profile</title>
+    <meta name="theme-color" content="#000000">
+    <title>Profile | Goorac</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
     <style>
         :root {
-            --bg: #000;
-            --surface: #0a0a0a;
-            --accent: #00d2ff;
+            --bg: #050505;
+            --card-bg: rgba(20, 20, 20, 0.6);
+            --accent: #0095f6;
+            --accent-glow: rgba(0, 149, 246, 0.4);
             --text: #ffffff;
-            --dim: #666;
-            --border: rgba(255, 255, 255, 0.08);
+            --text-sec: #a8a8a8;
+            --border: rgba(255, 255, 255, 0.1);
             --danger: #ff3b30;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
-        body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; padding-bottom: 100px; }
+        body { background: var(--bg); color: var(--text); overflow-x: hidden; padding-bottom: 80px; }
 
-        /* Skeleton Animation */
+        /* --- SKELETON LOADING ANIMATION --- */
         .skeleton {
-            position: relative;
-            overflow: hidden;
-            background: #111 !important;
-            border-color: transparent !important;
+            background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
             color: transparent !important;
         }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        .skeleton::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-            animation: shimmer 1.5s infinite;
+        /* --- HEADER --- */
+        header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
         }
+        .back-btn { background: none; border: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .header-title { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.5px; text-transform: uppercase; }
 
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        #loader { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; justify-content: center; align-items: center; transition: 0.3s; }
-        .spin { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: s 0.6s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
-
-        .app { max-width: 450px; margin: 0 auto; padding: 20px; opacity: 0; transition: 0.5s; }
-        .app.show { opacity: 1; }
-
-        header { height: 50px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .back { font-size: 30px; cursor: pointer; color: var(--accent); }
-
-        /* MUTUAL BADGE STYLE */
-        .mutual-badge {
-            display: none;
-            align-items: center; gap: 5px;
-            background: rgba(0, 210, 255, 0.1);
-            border: 1px solid rgba(0, 210, 255, 0.2);
-            padding: 4px 10px; border-radius: 12px;
-            color: var(--accent); font-size: 0.65rem; font-weight: 800;
-            letter-spacing: 1px; text-transform: uppercase;
-        }
-
-        .profile-hero { text-align: center; }
-        .pfp-box { width: 110px; height: 110px; border-radius: 35px; margin: 0 auto; position: relative; padding: 3px; background: linear-gradient(var(--accent), transparent); }
-        .pfp-img { width: 100%; height: 100%; border-radius: 32px; object-fit: cover; background: #111; border: 3px solid #000; }
+        /* --- HERO SECTION --- */
+        .hero { position: relative; margin-top: 60px; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
         
-        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.6rem; font-weight: 800; margin-top: 15px; min-height: 32px; }
-        .v-tick { width: 20px; height: 20px; }
-        .handle { color: var(--accent); font-size: 0.9rem; font-weight: 600; min-height: 20px; margin-bottom: 5px; }
+        /* Dynamic Banner */
+        .banner {
+            width: 100%; height: 120px; border-radius: 20px;
+            background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+            position: relative; overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .banner::after {
+            content:''; position: absolute; inset:0;
+            background: radial-gradient(circle at 50% 120%, var(--accent-glow), transparent 70%);
+            opacity: 0.6;
+        }
+
+        /* Avatar */
+        .pfp-container {
+            margin-top: -50px; position: relative;
+            width: 100px; height: 100px;
+        }
+        .pfp {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 4px solid var(--bg);
+            background: #111; position: relative; z-index: 2;
+        }
         
-        .g-num { display: inline-block; background: #111; padding: 5px 15px; border-radius: 20px; color: var(--dim); font-size: 0.75rem; margin-top: 10px; border: 1px solid var(--border); cursor: pointer; transition: 0.2s; }
-        .g-num:active { transform: scale(0.95); opacity: 0.7; }
+        /* Name & Info */
+        .info-section { text-align: center; margin-top: 10px; width: 100%; }
+        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.4rem; font-weight: 800; }
+        .badge { width: 16px; height: 16px; display: inline-block; }
+        
+        .username { color: var(--text-sec); font-size: 0.9rem; margin-top: 2px; font-weight: 500; }
+        
+        .id-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.05); padding: 4px 12px;
+            border-radius: 12px; font-size: 0.7rem; color: var(--text-sec);
+            margin-top: 10px; border: 1px solid var(--border); cursor: pointer;
+        }
+        .id-badge:active { background: rgba(255,255,255,0.1); }
 
-        .bio { margin: 20px 0; color: #bbb; font-size: 0.95rem; line-height: 1.5; min-height: 40px; }
+        /* Mutual Badge */
+        .mutual-tag {
+            display: none; align-items: center; gap: 4px;
+            background: rgba(0, 149, 246, 0.15); color: var(--accent);
+            padding: 4px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700;
+            margin-top: 10px;
+        }
 
-        .stats { display: flex; gap: 10px; margin-bottom: 25px; }
-        .stat-card { flex: 1; background: var(--surface); border: 1px solid var(--border); padding: 15px; border-radius: 20px; text-align: center; cursor: pointer; transition: 0.2s; }
-        .stat-card:active { background: #151515; transform: scale(0.98); }
-        .s-val { display: block; font-size: 1.2rem; font-weight: 800; pointer-events: none; }
-        .s-lbl { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; pointer-events: none; }
+        .bio {
+            margin: 15px 0 20px; font-size: 0.95rem; line-height: 1.5; color: #ddd;
+            max-width: 90%; text-align: center;
+        }
 
-        .actions { display: flex; gap: 10px; }
-        .btn { flex: 1; height: 52px; border-radius: 16px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; }
-        .btn-msg { background: #fff; color: #000; }
-        .btn-f { background: var(--accent); color: #000; }
-        .btn-following { background: #1a1a1a; color: #666; border: 1px solid var(--border); }
+        /* --- STATS GRID --- */
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            background: var(--card-bg); padding: 15px; border-radius: 16px;
+            text-align: center; border: 1px solid var(--border);
+            cursor: pointer; transition: 0.2s;
+        }
+        .stat-item:active { transform: scale(0.98); background: rgba(255,255,255,0.05); }
+        .stat-num { font-size: 1.2rem; font-weight: 800; display: block; color: var(--text); }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-sec); letter-spacing: 0.5px; margin-top: 4px; }
+
+        /* --- ACTIONS --- */
+        .action-row { display: flex; gap: 10px; width: 100%; margin-bottom: 25px; }
+        .btn {
+            flex: 1; padding: 12px; border-radius: 12px; border: none;
+            font-weight: 600; font-size: 0.9rem; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        
+        .btn-follow { background: var(--accent); color: #fff; box-shadow: 0 4px 15px var(--accent-glow); }
+        .btn-following { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-msg { background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(10px); }
+        
         .btn:active { transform: scale(0.96); }
 
-        /* Toast Styling */
-        #toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #fff;
-            color: #000;
-            padding: 8px 20px;
-            border-radius: 50px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            display: none;
-            z-index: 2000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        /* --- TABS (New) --- */
+        .tabs {
+            display: flex; width: 100%; border-bottom: 1px solid var(--border);
+            margin-bottom: 1px;
         }
+        .tab {
+            flex: 1; padding: 15px; text-align: center;
+            font-size: 0.9rem; color: var(--text-sec); font-weight: 600;
+            position: relative; cursor: pointer;
+        }
+        .tab.active { color: var(--text); }
+        .tab.active::after {
+            content:''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 2px;
+            background: var(--accent); border-radius: 2px;
+        }
+
+        .content-area {
+            padding: 40px 20px; text-align: center; color: var(--text-sec);
+            font-size: 0.9rem;
+        }
+
+        /* --- TOAST --- */
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #fff; color: #000; padding: 10px 24px; border-radius: 50px;
+            font-weight: 600; font-size: 0.85rem; opacity: 0; pointer-events: none;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
     </style>
 </head>
 <body>
 
-<div id="loader"><div class="spin"></div></div>
-
-<div class="app" id="main">
     <header>
-        <span class="back" onclick="history.back()">‹</span>
-        <div id="mutual-badge" class="mutual-badge">
-            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            Mutual
-        </div>
-        <span style="font-weight: 800; font-size: 0.75rem; letter-spacing: 2px;">USER DOSSIER</span>
-        <div style="width:30px"></div>
+        <button class="back-btn" onclick="history.back()">
+            <span class="material-icons-round">arrow_back_ios_new</span>
+        </button>
+        <span class="header-title" id="nav-username">Profile</span>
+        <div style="width: 24px;"></div>
     </header>
 
-    <div class="profile-hero">
-        <div class="pfp-box skeleton" id="pfp-wrap">
-            <img id="pfp" src="" class="pfp-img" style="opacity:0;">
-        </div>
-
-        <div class="name-row">
-            <span id="d-name" class="skeleton">User Name Loading</span>
-            <img id="res-v" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="v-tick" style="display:none;">
-        </div>
-        <div class="handle skeleton" id="d-handle" style="width:100px; margin: 0 auto 10px auto;">@username</div>
+    <div class="hero">
+        <div class="banner"></div>
         
-        <div id="g-num-wrap" class="skeleton" style="border-radius: 20px; display: inline-block;">
-             <div class="g-num" onclick="copyID()">ID: <span id="d-gn">----------</span></div>
+        <div class="pfp-container skeleton" id="sk-pfp">
+            <img id="pfp" class="pfp" src="" style="opacity: 0;">
         </div>
 
-        <div class="bio skeleton" id="d-bio">Bio loading from the Goorac database servers...</div>
-
-        <div class="stats">
-            <div class="stat-card" id="go-followers">
-                <span class="s-val skeleton" id="c-followers">00</span>
-                <span class="s-lbl">Followers</span>
+        <div class="info-section">
+            <div class="name-row skeleton" id="sk-name" style="width: 150px; margin: 0 auto;">
+                <span id="display-name">Loading</span>
+                <img id="verified-badge" class="badge" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" style="display:none;">
             </div>
-            <div class="stat-card" id="go-following">
-                <span class="s-val skeleton" id="c-following">00</span>
-                <span class="s-lbl">Following</span>
+            
+            <div class="username skeleton" id="sk-user" style="width: 100px; margin: 4px auto 0;">@username</div>
+            
+            <div class="mutual-tag" id="mutual-tag">
+                <span class="material-icons-round" style="font-size:12px;">group</span> Mutual
+            </div>
+
+            <div class="id-badge skeleton" id="sk-id" onclick="copyID()" style="width: 120px; margin: 10px auto 0;">
+                <span class="material-icons-round" style="font-size:14px;">fingerprint</span>
+                ID: <span id="goorac-id">------</span>
+            </div>
+
+            <p class="bio skeleton" id="sk-bio" style="width: 80%; margin: 15px auto;">Fetching user details...</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-item skeleton" id="sk-fol" onclick="openFollowers()">
+                <span class="stat-num" id="count-followers">0</span>
+                <span class="stat-label">Followers</span>
+            </div>
+            <div class="stat-item skeleton" id="sk-fing" onclick="openFollowing()">
+                <span class="stat-num" id="count-following">0</span>
+                <span class="stat-label">Following</span>
             </div>
         </div>
 
-        <div class="actions">
-            <button class="btn btn-msg skeleton" id="msg-btn">Message</button>
-            <button class="btn btn-f skeleton" id="follow-action-btn">Follow</button>
+        <div class="action-row">
+            <button class="btn btn-follow skeleton" id="btn-follow" style="display:none;">Follow</button>
+            <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
+                <span class="material-icons-round" style="font-size:18px;">chat_bubble_outline</span> Message
+            </button>
         </div>
     </div>
-</div>
 
-<div id="toast">ID Copied</div>
+    <div class="tabs">
+        <div class="tab active">Notes</div>
+        <div class="tab">Media</div>
+        <div class="tab">About</div>
+    </div>
+    
+    <div class="content-area">
+        <span class="material-icons-round" style="font-size: 30px; opacity: 0.5; margin-bottom: 10px;">grid_view</span>
+        <br>No posts yet
+    </div>
+
+    <div id="toast">ID Copied to clipboard</div>
 
 <script>
+    // --- CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -175,226 +245,224 @@
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
 
+    // --- PARAMS ---
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
-    let currentUserUID = "";
-    let targetUserUID = "";
-    let isActionLocked = false; 
+    let myUid = null;
+    let targetUid = null;
+    let targetUserData = null;
+    let actionLock = false;
 
-    document.getElementById('main').classList.add('show');
-    document.getElementById('loader').style.opacity = '0';
-    setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
-
+    // --- INIT ---
     auth.onAuthStateChanged(user => {
-        if (user) { 
-            currentUserUID = user.uid; 
-            loadProfileData(); 
-        } else { 
-            window.location.href = 'login.html'; 
+        if (user) {
+            myUid = user.uid;
+            if(targetUsername) fetchProfile();
+        } else {
+            window.location.href = 'login.html';
         }
     });
 
-    async function loadProfileData() {
-        if(!targetUsername) return;
+    async function fetchProfile() {
+        // Query by username to get UID and Data
+        // Using Snapshot to get real-time Array Lengths!
+        db.collection("users").where("username", "==", targetUsername)
+        .onSnapshot(async (snapshot) => {
+            if(snapshot.empty) return;
+            
+            const doc = snapshot.docs[0];
+            targetUserData = doc.data();
+            targetUid = doc.id;
 
-        db.collection("users").where("username", "==", targetUsername).onSnapshot(async (snap) => {
-            if (snap.empty) return;
-            const doc = snap.docs[0];
-            const userData = doc.data();
-            targetUserUID = doc.id;
-
-            const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
-
-            const pfp = document.getElementById('pfp');
-            const pfpWrap = document.getElementById('pfp-wrap');
-            pfp.src = userData.photoURL || 'https://via.placeholder.com/150';
-            pfp.onload = () => {
-                pfpWrap.classList.remove('skeleton');
-                pfp.style.opacity = '1';
-            };
-
-            const nameEl = document.getElementById('d-name');
-            nameEl.innerText = userData.name || userData.username;
-            nameEl.classList.remove('skeleton');
-
-            const handleEl = document.getElementById('d-handle');
-            handleEl.innerText = `@${userData.username}`;
-            handleEl.classList.remove('skeleton');
-            handleEl.style.width = 'auto';
-
-            document.getElementById('d-gn').innerText = userData.gooracNumber || "----------";
-            removeSkeleton('g-num-wrap');
-
-            const bioEl = document.getElementById('d-bio');
-            bioEl.innerText = userData.bio || "No bio available.";
-            bioEl.classList.remove('skeleton');
-
-            if (!isActionLocked) {
-                const fers = document.getElementById('c-followers');
-                fers.innerText = userData.followerCount || 0;
-                fers.classList.remove('skeleton');
-
-                const fing = document.getElementById('c-following');
-                fing.innerText = userData.followingCount || 0;
-                fing.classList.remove('skeleton');
-                
-                await updateFollowButton();
-            }
-
-            document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
-
-            removeSkeleton('msg-btn');
-            removeSkeleton('follow-action-btn');
-
-            document.getElementById('go-followers').onclick = () => window.location.href = `followers.html?user=${userData.username}`;
-            document.getElementById('go-following').onclick = () => window.location.href = `following.html?user=${userData.username}`;
-            document.getElementById('msg-btn').onclick = () => window.location.href = `chat.html?user=${userData.username}`;
+            renderProfile(targetUserData);
+            checkRelation();
         });
     }
 
-    async function updateFollowButton() {
-        if (currentUserUID === targetUserUID || !targetUserUID) {
-            document.getElementById('follow-action-btn').style.display = "none";
-            return;
-        }
+    function renderProfile(data) {
+        // Stop Skeletons
+        document.querySelectorAll('.skeleton').forEach(el => {
+            el.classList.remove('skeleton');
+            el.style.width = 'auto';
+            el.style.color = '';
+            el.style.margin = '';
+        });
 
-        const myDoc = await db.collection("users").doc(currentUserUID).get();
-        const myData = myDoc.data();
-        const myFollowingList = myData.following || [];
-        const btn = document.getElementById('follow-action-btn');
+        // 1. Images
+        const pfpEl = document.getElementById('pfp');
+        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
+        pfpEl.onload = () => pfpEl.style.opacity = '1';
 
-        // Check if following (handle both string and object formats)
-        const isFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === targetUserUID);
+        // 2. Text
+        document.getElementById('display-name').innerText = data.name || data.username;
+        document.getElementById('nav-username').innerText = (data.name || "Profile").toUpperCase();
+        document.getElementById('sk-user').innerText = `@${data.username}`;
+        document.getElementById('sk-bio').innerText = data.bio || "No bio available.";
+        document.getElementById('goorac-id').innerText = data.gooracNumber || "N/A";
 
-        if (isFollowing) {
-            btn.innerText = "Following";
-            btn.className = "btn btn-following";
-        } else {
-            btn.innerText = "Follow";
-            btn.className = "btn btn-f";
-        }
+        // 3. Badge
+        if(data.verified) document.getElementById('verified-badge').style.display = 'inline-block';
 
-        // --- MUTUAL FRIEND BADGE LOGIC ---
-        const targetDoc = await db.collection("users").doc(targetUserUID).get();
-        const targetFollowingList = targetDoc.data().following || [];
-        const theyFollowMe = targetFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === currentUserUID);
+        // 4. Counts (USING ARRAY LENGTH - ZERO READ COST HERE)
+        const followersList = data.followers || [];
+        const followingList = data.following || [];
         
-        if(isFollowing && theyFollowMe) {
-            document.getElementById('mutual-badge').style.display = 'flex';
+        document.getElementById('count-followers').innerText = followersList.length;
+        document.getElementById('count-following').innerText = followingList.length;
+
+        // 5. Buttons
+        if(myUid !== targetUid) {
+            document.getElementById('btn-follow').style.display = 'flex';
+            document.getElementById('btn-msg').style.display = 'flex';
         } else {
-            document.getElementById('mutual-badge').style.display = 'none';
+            // My Profile
+            document.getElementById('btn-follow').style.display = 'none';
+            document.getElementById('btn-msg').style.display = 'none';
         }
     }
 
-    document.getElementById('follow-action-btn').onclick = async function() {
-        if (isActionLocked || !targetUserUID || currentUserUID === targetUserUID) return;
+    async function checkRelation() {
+        if(!myUid || !targetUid || myUid === targetUid) return;
+
+        // Fetch My Data to see if I follow them
+        const myDoc = await db.collection("users").doc(myUid).get();
+        const myData = myDoc.data();
+        const myFollowing = myData.following || [];
+
+        // Check Logic (Handle Objects or Strings)
+        const isFollowing = myFollowing.some(u => (typeof u === 'string' ? u : u.uid) === targetUid);
+
+        // Check Mutual (They follow me?)
+        const theirFollowing = targetUserData.following || [];
+        const isMutual = theirFollowing.some(u => (typeof u === 'string' ? u : u.uid) === myUid);
+
+        updateFollowBtnUI(isFollowing);
         
-        const btn = this;
-        const isCurrentlyFollowing = btn.innerText === "Following";
-        const followersCountLabel = document.getElementById('c-followers');
-        let currentCount = parseInt(followersCountLabel.innerText);
+        const badge = document.getElementById('mutual-tag');
+        if(isFollowing && isMutual) {
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
 
-        if (navigator.vibrate) navigator.vibrate(10);
-        isActionLocked = true;
-
-        if (!isCurrentlyFollowing) {
+    function updateFollowBtnUI(isFollowing) {
+        const btn = document.getElementById('btn-follow');
+        if(isFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
-            followersCountLabel.innerText = currentCount + 1;
         } else {
             btn.innerText = "Follow";
-            btn.className = "btn btn-f";
-            followersCountLabel.innerText = Math.max(0, currentCount - 1);
-            document.getElementById('mutual-badge').style.display = 'none';
+            btn.className = "btn btn-follow";
         }
+    }
 
-        const now = firebase.firestore.Timestamp.now();
-        const dateStr = new Date().toISOString();
+    // --- ACTIONS ---
 
-        // Data for Notifications & Future use
-        const followDataForMe = {
-            uid: targetUserUID,
-            timestamp: now,
-            date: dateStr,
-            type: 'following'
-        };
+    document.getElementById('btn-follow').onclick = async function() {
+        if(actionLock || !targetUid) return;
+        if(navigator.vibrate) navigator.vibrate(15);
+        
+        actionLock = true;
+        const btn = this;
+        const isUnfollowing = btn.innerText === "Following";
+        
+        // Optimistic UI Update
+        updateFollowBtnUI(!isUnfollowing);
+        
+        // Update Local Count for UI instant feedback
+        const countEl = document.getElementById('count-followers');
+        let current = parseInt(countEl.innerText);
+        countEl.innerText = isUnfollowing ? Math.max(0, current - 1) : current + 1;
 
-        const followerDataForThem = {
-            uid: currentUserUID,
-            timestamp: now,
-            date: dateStr,
-            type: 'follower'
-        };
+        const ts = firebase.firestore.Timestamp.now();
 
         try {
-            if (!isCurrentlyFollowing) {
+            if(!isUnfollowing) {
+                // FOLLOW
                 await Promise.all([
-                    db.collection("users").doc(currentUserUID).update({
-                        following: firebase.firestore.FieldValue.arrayUnion(followDataForMe),
-                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    db.collection("users").doc(myUid).update({
+                        following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
                     }),
-                    db.collection("users").doc(targetUserUID).update({
-                        followers: firebase.firestore.FieldValue.arrayUnion(followerDataForThem),
-                        followerCount: firebase.firestore.FieldValue.increment(1)
+                    db.collection("users").doc(targetUid).update({
+                        followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
+                    }),
+                    // Send Notification
+                    db.collection("notifications").add({
+                        recipientId: targetUid,
+                        senderId: myUid,
+                        type: "follow",
+                        timestamp: ts,
+                        seen: false
                     })
                 ]);
             } else {
-                // Robust removal for objects (using transaction to ensure we filter correctly)
+                // UNFOLLOW (Requires Transaction for clean Object removal)
                 await Promise.all([
-                    removeUserFromArray(currentUserUID, 'following', targetUserUID),
-                    removeUserFromArray(targetUserUID, 'followers', currentUserUID)
+                    removeFromList(myUid, 'following', targetUid),
+                    removeFromList(targetUid, 'followers', myUid)
                 ]);
+                document.getElementById('mutual-tag').style.display = 'none';
             }
-            await updateFollowButton(); // Sync mutual badge
-        } catch (err) {
-            console.error("Action failed", err);
-            await updateFollowButton(); 
-        } finally {
-            isActionLocked = false;
+        } catch(e) {
+            console.error(e);
+            // Revert on error
+            updateFollowBtnUI(isUnfollowing);
+            countEl.innerText = current;
         }
+        actionLock = false;
     };
 
-    // Helper function to remove user from array regardless of stored format (String or Object)
-    async function removeUserFromArray(docId, field, targetUid) {
-        const docRef = db.collection("users").doc(docId);
-        return db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(docRef);
-            if (!doc.exists) return;
+    async function removeFromList(docId, field, idToRemove) {
+        const ref = db.collection("users").doc(docId);
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(ref);
+            if(!doc.exists) return;
             
-            const currentArray = doc.data()[field] || [];
-            const newArray = currentArray.filter(item => {
-                const id = typeof item === 'string' ? item : item.uid;
-                return id !== targetUid;
+            const list = doc.data()[field] || [];
+            const newList = list.filter(item => {
+                const uid = typeof item === 'string' ? item : item.uid;
+                return uid !== idToRemove;
             });
             
-            const countField = field === 'followers' ? 'followerCount' : 'followingCount';
-            transaction.update(docRef, { 
-                [field]: newArray,
-                [countField]: firebase.firestore.FieldValue.increment(-1)
-            });
+            t.update(ref, { [field]: newList });
         });
     }
+
+    // --- NAVIGATION ---
 
     function copyID() {
-        if(document.getElementById('g-num-wrap').classList.contains('skeleton')) return;
-        const idText = document.getElementById('d-gn').innerText;
-        if (idText.includes("-")) return;
-
-        navigator.clipboard.writeText(idText).then(() => {
-            const toast = document.getElementById('toast');
-            toast.style.display = 'block';
-            if (navigator.vibrate) navigator.vibrate(50);
-            setTimeout(() => { toast.style.display = 'none'; }, 2000);
-        });
+        const txt = document.getElementById('goorac-id').innerText;
+        if(txt.includes('-')) return;
+        navigator.clipboard.writeText(txt);
+        showToast("ID Copied");
     }
+
+    function openChat() {
+        if(navigator.vibrate) navigator.vibrate(10);
+        window.location.href = `chat.html?user=${targetUserData.username}`;
+    }
+
+    function openFollowers() {
+        window.location.href = `followers.html?user=${targetUserData.username}`;
+    }
+    
+    function openFollowing() {
+        window.location.href = `following.html?user=${targetUserData.username}`;
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        if(navigator.vibrate) navigator.vibrate(10);
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
 </script>
-
-<script src="components/call-notifier.js" defer></script>
-<call-notifier></call-notifier>
-
 </body>
 </html>
