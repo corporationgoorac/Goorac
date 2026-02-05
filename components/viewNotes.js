@@ -7,7 +7,7 @@ class ViewNotes extends HTMLElement {
     constructor() {
         super();
         this.currentNote = null;
-        this.currentUserProfile = null;
+        this.currentUserProfile = null; // Stores fetched profile data
         this.isOwnNote = false;
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
@@ -44,7 +44,6 @@ class ViewNotes extends HTMLElement {
         return `${diffInDays}d ago`;
     }
 
-    // SVG Icons Helper
     getIcons() {
         return {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
@@ -97,11 +96,15 @@ class ViewNotes extends HTMLElement {
             .vn-profile-header {
                 display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-shrink: 0;
             }
+            /* Add pointer to indicate clickable */
+            .vn-clickable { cursor: pointer; transition: opacity 0.2s; }
+            .vn-clickable:active { opacity: 0.7; }
+
             .vn-friend-pfp {
                 width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
-                border: 1px solid #333; cursor: pointer;
+                border: 1px solid #333;
             }
-            .vn-friend-info { display: flex; flex-direction: column; cursor: pointer; }
+            .vn-friend-info { display: flex; flex-direction: column; }
             .vn-friend-name { 
                 font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; 
             }
@@ -117,6 +120,9 @@ class ViewNotes extends HTMLElement {
                 min-height: 140px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
                 transition: transform 0.1s;
                 cursor: default;
+                /* Robust Background Logic */
+                background-size: cover;
+                background-position: center;
             }
             .vn-note-card:active { transform: scale(0.98); }
 
@@ -134,7 +140,7 @@ class ViewNotes extends HTMLElement {
 
             .vn-note-text { 
                 font-size: 1.5rem; font-weight: 700; line-height: 1.3; z-index: 2;
-                text-shadow: 0 2px 10px rgba(0,0,0,0.1); word-break: break-word; width: 100%;
+                word-break: break-word; width: 100%;
             }
 
             .vn-song-pill { 
@@ -142,7 +148,7 @@ class ViewNotes extends HTMLElement {
                 background: rgba(255,255,255,0.1); padding: 8px 16px; 
                 border-radius: 100px; font-size: 0.8rem; font-weight: 600;
                 margin-top: 20px; border: 1px solid rgba(255,255,255,0.1);
-                backdrop-filter: blur(10px); color: rgba(255,255,255,0.9);
+                backdrop-filter: blur(10px); color: inherit; opacity: 0.9;
             }
             .vn-music-icon { width: 12px; height: 12px; fill: currentColor; }
 
@@ -273,7 +279,7 @@ class ViewNotes extends HTMLElement {
 
         this.isOwnNote = isOwnNote;
         this.currentNote = initialNoteData;
-        this.currentUserProfile = null; 
+        this.currentUserProfile = null; // Reset previous profile data
         
         this.renderContent();
 
@@ -290,10 +296,13 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
+        // BACKGROUND FETCH: Update profile data if needed
         if(initialNoteData && initialNoteData.uid) {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
+                    // Re-render to update username/links if they were missing
+                    this.renderContent(); 
                 }
             });
         }
@@ -329,6 +338,14 @@ class ViewNotes extends HTMLElement {
         this.attachDynamicListeners();
     }
 
+    // Helper to determine text shadow based on brightness
+    getTextShadow(color) {
+        // Simple heuristic: if color is white/light, dark shadow. If dark, light shadow.
+        // For simplicity, we assume white text usually unless specified black.
+        if (color === '#000000' || color === '#000') return '0 1px 15px rgba(255,255,255,0.4)';
+        return '0 2px 10px rgba(0,0,0,0.3)';
+    }
+
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
@@ -340,10 +357,14 @@ class ViewNotes extends HTMLElement {
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
+        
+        const bgColor = note.bgColor || '#262626';
+        const txtColor = note.textColor || '#fff';
+        const textShadow = this.getTextShadow(txtColor);
 
         return `
-            <div class="vn-profile-header">
-                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='profile.html'">
+            <div class="vn-profile-header vn-clickable" id="vn-header-click">
+                <img src="${displayPfp}" class="vn-friend-pfp">
                 <div class="vn-friend-info">
                     <div class="vn-friend-name">
                         ${displayName} (You)
@@ -354,8 +375,8 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-scroll-content">
-                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
-                    <div class="vn-note-text" style="text-align:${textAlign}">${note.text || 'Share a thought...'}</div>
+                <div class="vn-note-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
+                    <div class="vn-note-text" style="text-align:${textAlign}; text-shadow:${textShadow};">${note.text || 'Share a thought...'}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
                             <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -373,7 +394,7 @@ class ViewNotes extends HTMLElement {
                                 <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
                                 <span style="font-weight:600; display:flex; align-items:center; gap:4px;">
                                     ${liker.displayName || 'User'}
-                                    ${liker.verified ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>' : ''}
+                                    ${liker.verified ? icons.verified : ''}
                                 </span>
                             </div>
                             <span style="color:#ff3b30;">${icons.heartFilled}</span>
@@ -398,16 +419,18 @@ class ViewNotes extends HTMLElement {
         const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
 
-        // Redirect Fix: Prioritize Username
-        const redirectUser = note.username || this.currentUserProfile?.username || note.uid;
-
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
+        
+        // Style Enhancement: Prioritize 'background' property for gradients
+        const bgColor = note.bgColor || '#262626';
+        const txtColor = note.textColor || '#fff';
+        const textShadow = this.getTextShadow(txtColor);
 
         return `
-            <div class="vn-profile-header">
-                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='userProfile.html?user=${redirectUser}'">
-                <div class="vn-friend-info" onclick="window.location.href='userProfile.html?user=${redirectUser}'">
+            <div class="vn-profile-header vn-clickable" id="vn-header-click">
+                <img src="${displayPfp}" class="vn-friend-pfp">
+                <div class="vn-friend-info">
                     <div class="vn-friend-name">
                         ${displayName}
                         ${isVerified ? icons.verified : ''}
@@ -417,9 +440,9 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-scroll-content">
-                <div class="vn-note-card" id="vn-active-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
+                <div class="vn-note-card" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
                     <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
-                    <div class="vn-note-text" style="text-align:${textAlign}">${note.text}</div>
+                    <div class="vn-note-text" style="text-align:${textAlign}; text-shadow:${textShadow};">${note.text}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
                             <svg class="vn-music-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -450,10 +473,48 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
+    // --- NEW: Handle Redirection Robustly ---
+    async handleProfileRedirect() {
+        if (!this.currentNote) return;
+        const uid = this.currentNote.uid;
+        
+        // 1. Try Note Data
+        let username = this.currentNote.username;
+        
+        // 2. Try Fetched Profile Data
+        if (!username && this.currentUserProfile) {
+            username = this.currentUserProfile.username;
+        }
+
+        // 3. Fetch from DB if still missing
+        if (!username) {
+            try {
+                const doc = await this.db.collection('users').doc(uid).get();
+                if (doc.exists) {
+                    username = doc.data().username;
+                    // Cache it for this session
+                    if(!this.currentUserProfile) this.currentUserProfile = doc.data();
+                }
+            } catch (e) {
+                console.error("Error fetching user for redirect:", e);
+            }
+        }
+
+        // 4. Redirect
+        const param = username || uid;
+        window.location.href = `userProfile.html?user=${param}`;
+    }
+
     attachDynamicListeners() {
         const user = firebase.auth().currentUser;
         if (!user) return;
         const icons = this.getIcons();
+
+        // --- ATTACH REDIRECT LISTENER ---
+        const headerClick = this.querySelector('#vn-header-click');
+        if (headerClick) {
+            headerClick.onclick = () => this.handleProfileRedirect();
+        }
 
         // Double Tap Logic
         const card = this.querySelector('#vn-active-card');
@@ -717,6 +778,8 @@ const NotesManager = {
                 box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 box-sizing: border-box;
                 border: 1px solid rgba(255,255,255,0.1);
+                /* New: Gradient Support in Bubbles */
+                background-size: cover;
             }
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
@@ -820,7 +883,7 @@ const NotesManager = {
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
-                preview.style.backgroundColor = data.bgColor || '#262626'; 
+                // Ensure Gradient Background support by using 'background' shorthand property
                 preview.style.background = data.bgColor || '#262626'; 
                 preview.style.color = data.textColor || '#fff';
                 
@@ -840,7 +903,6 @@ const NotesManager = {
                     if(data) viewer.open({ ...data, uid: user.uid }, true);
                 };
             } else {
-                preview.style.backgroundColor = 'rgba(255,255,255,0.1)';
                 preview.style.background = 'rgba(255,255,255,0.1)';
                 preview.style.color = 'rgba(255,255,255,0.7)';
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
@@ -897,8 +959,12 @@ const NotesManager = {
                                     const div = document.createElement('div');
                                     div.id = `note-${uid}`; 
                                     div.className = 'note-item friend-note has-note';
+                                    
+                                    // Robust Background support
+                                    const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
+
                                     div.innerHTML = `
-                                        <div class="note-bubble visible" style="background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}">
+                                        <div class="note-bubble visible" style="${bgStyle}">
                                             <div class="note-text-content" style="text-align:${noteData.textAlign || 'center'}">${noteData.text}</div>
                                             ${noteData.songName ? `
                                                 <div class="note-music-tag">
