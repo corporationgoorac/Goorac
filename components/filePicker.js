@@ -1,16 +1,19 @@
+// ==========================================
+// ⚙️ CONFIGURATION (EDIT HERE)
+// ==========================================
+const SUPABASE_URL = "https://ekgsgltykakwopcfyxqu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZ3NnbHR5a2Frd29wY2Z5eHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzY3NDcsImV4cCI6MjA4NTg1Mjc0N30.gsh7Zb6JEJcDx_CzVbrPsfcaiyDvl8ws-gUNsQQFWLc";
+const THEME_COLOR = "#ff6600"; // Orange Theme
+const STORAGE_BUCKET = "public-files"; // Ensure this bucket exists in Supabase
+// ==========================================
+
 class FilePicker extends HTMLElement {
     constructor() {
         super();
         
-        // Load credentials from global CONFIG object
-        if (typeof CONFIG !== 'undefined') {
-            this.supabaseUrl = CONFIG.supabaseUrl;
-            this.supabaseKey = CONFIG.supabaseKey;
-        } else {
-            console.error("CONFIG is not defined. Please load config.js");
-            this.supabaseUrl = "";
-            this.supabaseKey = "";
-        }
+        // Use hardcoded credentials
+        this.supabaseUrl = SUPABASE_URL;
+        this.supabaseKey = SUPABASE_KEY;
         
         this.selectedFile = null;
         this.fileType = null; // 'video', 'image', 'pdf', 'audio', 'file'
@@ -20,6 +23,8 @@ class FilePicker extends HTMLElement {
         this.videoDuration = 0;
         this.trimStart = 0;
         this.trimEnd = 0;
+        
+        this.sbClient = null;
     }
 
     connectedCallback() {
@@ -29,16 +34,21 @@ class FilePicker extends HTMLElement {
     }
 
     ensureSupabase() {
+        // Dynamically load Supabase SDK if not present
         if (!window.supabase) {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
             document.head.appendChild(script);
             script.onload = () => {
-                if(this.supabaseUrl && this.supabaseKey) {
-                    this.sbClient = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
-                }
+                this.initSupabaseClient();
             };
-        } else if(this.supabaseUrl && this.supabaseKey) {
+        } else {
+            this.initSupabaseClient();
+        }
+    }
+
+    initSupabaseClient() {
+        if(this.supabaseUrl && this.supabaseKey && window.supabase) {
             this.sbClient = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
         }
     }
@@ -61,12 +71,12 @@ class FilePicker extends HTMLElement {
 
             /* Card */
             .fp-card {
-                width: 100%; max-width: 500px; height: 85vh;
-                background: #1c1c1c; 
+                width: 100%; max-width: 500px; height: 90vh;
+                background: #121212; 
                 border-top-left-radius: 20px; border-top-right-radius: 20px;
                 display: flex; flex-direction: column; overflow: hidden;
                 box-shadow: 0 -5px 30px rgba(0,0,0,0.5);
-                border: 1px solid #333;
+                border: 1px solid #333; position: relative;
             }
 
             /* Header */
@@ -74,71 +84,102 @@ class FilePicker extends HTMLElement {
                 padding: 15px 20px; border-bottom: 1px solid #333;
                 display: flex; justify-content: space-between; align-items: center;
                 color: white; font-weight: 600; font-size: 1.1rem;
+                background: rgba(30,30,30,0.5); backdrop-filter: blur(10px);
             }
-            .fp-close-btn { background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; }
+            .fp-close-btn { 
+                background: rgba(255,255,255,0.1); border: none; color: #fff; 
+                width: 32px; height: 32px; border-radius: 50%; display: flex; 
+                align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; 
+            }
 
             /* Preview Area */
             .fp-preview-container {
                 flex: 1; padding: 20px; overflow-y: auto;
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-                position: relative;
+                display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+                position: relative; gap: 20px;
             }
 
             /* Media Types UI */
-            .fp-video-wrapper { width: 100%; max-height: 40vh; border-radius: 12px; overflow: hidden; background: #000; display:none;}
+            .fp-video-wrapper { 
+                width: 100%; max-height: 40vh; border-radius: 12px; overflow: hidden; 
+                background: #000; display:none; border: 1px solid #333;
+            }
             video { width: 100%; height: 100%; object-fit: contain; }
 
             .fp-file-icon-wrapper {
-                width: 120px; height: 120px; background: #2a2a2a; border-radius: 20px;
-                display: none; align-items: center; justify-content: center; margin-bottom: 15px;
+                width: 100px; height: 100px; background: #2a2a2a; border-radius: 20px;
+                display: none; align-items: center; justify-content: center;
                 font-size: 3rem; color: #fff; border: 1px solid #444;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             }
-            .fp-file-info { color: #ccc; text-align: center; font-size: 0.9rem; margin-top: 10px;}
-            .fp-file-name { color: white; font-weight: 600; margin-bottom: 4px; word-break: break-all; }
+            .fp-file-info-box { text-align: center; width: 100%; }
+            .fp-file-name { color: white; font-weight: 600; margin-bottom: 4px; word-break: break-all; font-size: 1rem;}
+            .fp-file-meta { color: #888; font-size: 0.85rem; }
 
             /* Trimmer UI */
             .fp-trimmer-box {
-                width: 100%; padding: 15px; background: #262626; border-radius: 12px;
-                margin-top: 15px; display: none;
+                width: 100%; padding: 15px; background: #1e1e1e; border-radius: 12px;
+                display: none; border: 1px solid #333;
             }
-            .fp-trim-label { font-size: 0.8rem; color: #aaa; margin-bottom: 8px; display: flex; justify-content: space-between; }
-            .fp-range-wrapper { position: relative; height: 30px; }
+            .fp-trim-label { font-size: 0.8rem; color: #aaa; margin-bottom: 12px; display: flex; justify-content: space-between; }
+            .fp-range-wrapper { position: relative; height: 30px; padding: 0 10px; }
             input[type=range] {
                 position: absolute; pointer-events: none; -webkit-appearance: none;
-                width: 100%; height: 6px; background: transparent; top: 12px; z-index: 5;
+                width: calc(100% - 20px); height: 4px; background: transparent; top: 12px; z-index: 5;
             }
             input[type=range]::-webkit-slider-thumb {
                 pointer-events: auto; -webkit-appearance: none;
-                width: 16px; height: 24px; background: #0095f6; border-radius: 4px; cursor: ew-resize; border: 2px solid white;
+                width: 16px; height: 24px; background: ${THEME_COLOR}; 
+                border-radius: 4px; cursor: ew-resize; border: 2px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.5);
             }
             .fp-track-bg {
-                position: absolute; top: 12px; height: 6px; width: 100%; background: #444; border-radius: 3px;
+                position: absolute; top: 12px; height: 4px; width: calc(100% - 20px); 
+                background: #444; border-radius: 2px;
             }
             .fp-track-fill {
-                position: absolute; top: 12px; height: 6px; background: #0095f6; z-index: 2;
+                position: absolute; top: 12px; height: 4px; background: ${THEME_COLOR}; z-index: 2;
             }
 
             /* Caption Input */
-            .fp-caption-box { padding: 15px 20px; border-top: 1px solid #333; background: #1c1c1c; }
+            .fp-caption-box { padding: 15px 20px; border-top: 1px solid #333; background: #121212; }
             .fp-caption-input {
-                width: 100%; background: #2a2a2a; border: 1px solid #333; color: white;
-                padding: 12px; border-radius: 12px; font-size: 1rem; outline: none; resize: none;
+                width: 100%; background: #1e1e1e; border: 1px solid #333; color: white;
+                padding: 14px; border-radius: 12px; font-size: 1rem; outline: none; resize: none;
+                transition: border-color 0.2s; box-sizing: border-box;
             }
+            .fp-caption-input:focus { border-color: ${THEME_COLOR}; }
 
             /* Footer */
-            .fp-footer { padding: 15px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+            .fp-footer { padding: 15px 20px; display: flex; gap: 10px; justify-content: flex-end; background: #121212;}
             .fp-btn {
                 padding: 12px 24px; border-radius: 30px; font-weight: 600; border: none; cursor: pointer; font-size: 1rem;
+                transition: transform 0.1s, opacity 0.2s;
             }
+            .fp-btn:active { transform: scale(0.96); }
             .fp-btn-cancel { background: #2a2a2a; color: white; }
-            .fp-btn-send { background: #0095f6; color: white; display: flex; align-items: center; gap: 8px; }
-            .fp-btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+            .fp-btn-send { 
+                background: ${THEME_COLOR}; color: white; display: flex; align-items: center; gap: 8px; 
+                box-shadow: 0 4px 15px rgba(255, 102, 0, 0.3);
+            }
+            .fp-btn-send:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
+
+            /* Toast Notification */
+            .fp-toast {
+                position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+                background: rgba(30, 30, 30, 0.95); color: white; padding: 10px 20px;
+                border-radius: 30px; font-size: 0.9rem; pointer-events: none;
+                opacity: 0; transition: opacity 0.3s; border: 1px solid #444;
+                display: flex; align-items: center; gap: 8px; z-index: 60;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            }
+            .fp-toast.show { opacity: 1; }
 
             /* Progress Bar */
             .fp-progress-container {
-                position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: transparent; z-index: 100;
+                position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: transparent; z-index: 100;
             }
-            .fp-progress-bar { height: 100%; width: 0%; background: #00e676; transition: width 0.2s; }
+            .fp-progress-bar { height: 100%; width: 0%; background: ${THEME_COLOR}; transition: width 0.4s ease-out; box-shadow: 0 0 10px ${THEME_COLOR}; }
 
             /* Hidden Input */
             #fp-file-input { display: none; }
@@ -155,6 +196,8 @@ class FilePicker extends HTMLElement {
                     <button class="fp-close-btn" id="fp-close">×</button>
                 </div>
 
+                <div class="fp-toast" id="fp-toast"><span></span></div>
+
                 <div class="fp-preview-container">
                     
                     <div class="fp-video-wrapper" id="fp-vid-wrap">
@@ -165,12 +208,12 @@ class FilePicker extends HTMLElement {
                         <span id="fp-type-emoji">📄</span>
                     </div>
 
-                    <div class="fp-file-info" id="fp-info-text"></div>
+                    <div class="fp-file-info-box" id="fp-info-text"></div>
 
                     <div class="fp-trimmer-box" id="fp-trimmer">
                         <div class="fp-trim-label">
-                            <span>Trim Video</span>
-                            <span id="fp-time-display">00:00 - 00:00</span>
+                            <span style="display:flex; align-items:center; gap:6px;">✂️ Trim Video</span>
+                            <span id="fp-time-display" style="font-family:monospace; color:white;">00:00 - 00:00</span>
                         </div>
                         <div class="fp-range-wrapper">
                             <div class="fp-track-bg"></div>
@@ -211,10 +254,27 @@ class FilePicker extends HTMLElement {
             }
         });
 
-        // Close / Cancel
-        const closeAction = () => this.close();
+        // Close / Cancel Logic
+        const closeAction = () => {
+            // Check if we pushed history state before going back
+            if (history.state && history.state.filePickerOpen) {
+                history.back(); // This triggers popstate, which calls close()
+            } else {
+                this.close(); // Fallback if no history state
+            }
+        };
+
         closeBtn.addEventListener('click', closeAction);
         cancelBtn.addEventListener('click', closeAction);
+        
+        // Mobile Back Button Support
+        window.addEventListener('popstate', (event) => {
+            if (overlay.classList.contains('open')) {
+                this.close();
+            }
+        });
+
+        // Click outside to close
         overlay.addEventListener('click', (e) => {
             if(e.target === overlay) closeAction();
         });
@@ -228,6 +288,8 @@ class FilePicker extends HTMLElement {
         const video = this.querySelector('#fp-video-el');
 
         video.addEventListener('loadedmetadata', () => {
+            if(this.fileType !== 'video') return;
+            
             this.videoDuration = video.duration;
             this.trimStart = 0;
             this.trimEnd = video.duration;
@@ -235,6 +297,7 @@ class FilePicker extends HTMLElement {
             startRange.max = video.duration;
             endRange.max = video.duration;
             endRange.value = video.duration;
+            startRange.value = 0;
             
             this.updateTrimmerUI();
         });
@@ -243,15 +306,21 @@ class FilePicker extends HTMLElement {
             let s = parseFloat(startRange.value);
             let e = parseFloat(endRange.value);
 
+            // Prevent crossing
             if (s > e - 1) {
-                if (isStart) startRange.value = e - 1;
-                else endRange.value = s + 1;
+                if (isStart) {
+                    startRange.value = e - 1;
+                    s = e - 1;
+                } else {
+                    endRange.value = s + 1;
+                    e = s + 1;
+                }
             }
 
-            this.trimStart = parseFloat(startRange.value);
-            this.trimEnd = parseFloat(endRange.value);
+            this.trimStart = s;
+            this.trimEnd = e;
             
-            // Snap video to changed time
+            // Snap video to preview trim point
             video.currentTime = isStart ? this.trimStart : this.trimEnd;
             this.updateTrimmerUI();
         };
@@ -295,6 +364,14 @@ class FilePicker extends HTMLElement {
         // Detect Type
         const mime = file.type;
         const sizeStr = (file.size / (1024*1024)).toFixed(2) + " MB";
+        
+        // Set metadata text
+        const setMeta = (name, type) => {
+            infoText.innerHTML = `
+                <div class="fp-file-name">${name}</div>
+                <div class="fp-file-meta">${type} • ${sizeStr}</div>
+            `;
+        };
 
         if (mime.startsWith('video/')) {
             this.fileType = 'video';
@@ -306,28 +383,36 @@ class FilePicker extends HTMLElement {
             vidWrap.style.display = 'block';
             trimmer.style.display = 'block';
             video.src = URL.createObjectURL(file);
-            infoText.innerHTML = `<div class="fp-file-name">${file.name}</div>${sizeStr}`;
+            setMeta(file.name, 'Video File');
 
         } else if (mime === 'application/pdf') {
             this.fileType = 'pdf';
             title.innerText = 'Send PDF';
             this.showIcon('📄', '#ff3b30');
-            infoText.innerHTML = `<div class="fp-file-name">${file.name}</div>PDF Document • ${sizeStr}`;
+            setMeta(file.name, 'PDF Document');
 
         } else if (mime.startsWith('audio/')) {
             this.fileType = 'audio';
             title.innerText = 'Send Audio';
             this.showIcon('🎵', '#00e676');
-            infoText.innerHTML = `<div class="fp-file-name">${file.name}</div>Audio File • ${sizeStr}`;
+            setMeta(file.name, 'Audio File');
+
+        } else if (mime.startsWith('image/')) {
+            this.fileType = 'image';
+            title.innerText = 'Send Image';
+            this.showIcon('🖼️', '#ff6600');
+            setMeta(file.name, 'Image File');
 
         } else {
             this.fileType = 'file';
             title.innerText = 'Send File';
             this.showIcon('📁', '#0095f6');
-            infoText.innerHTML = `<div class="fp-file-name">${file.name}</div>${sizeStr}`;
+            setMeta(file.name, 'Generic File');
         }
 
+        // Open Overlay & Push History
         overlay.classList.add('open');
+        window.history.pushState({ filePickerOpen: true }, document.title);
     }
 
     showIcon(emoji, color) {
@@ -335,16 +420,30 @@ class FilePicker extends HTMLElement {
         const icon = this.querySelector('#fp-type-emoji');
         wrap.style.display = 'flex';
         wrap.style.borderColor = color;
+        wrap.style.boxShadow = `0 0 15px ${color}33`; // Glow effect
         icon.innerText = emoji;
+    }
+
+    showToast(message) {
+        const toast = this.querySelector('#fp-toast');
+        toast.querySelector('span').textContent = message;
+        toast.classList.add('show');
+        
+        if(this.toastTimeout) clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
     }
 
     async uploadFile() {
         if (!this.selectedFile || this.isUploading) return;
         
         if (!this.sbClient) {
-            alert("Database connection initializing... try again in a second.");
-            this.ensureSupabase();
-            return;
+            this.initSupabaseClient();
+            if(!this.sbClient) {
+               this.showToast("Connection failed. Check API Keys.");
+               return;
+            }
         }
 
         this.isUploading = true;
@@ -354,14 +453,18 @@ class FilePicker extends HTMLElement {
         
         sendBtn.disabled = true;
         sendText.innerText = "Uploading...";
+        bar.style.width = "30%"; // Fake start progress
 
         const file = this.selectedFile;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.floor(Math.random()*1000)}.${fileExt}`;
+        // Clean filename
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const fileName = `${Date.now()}_${cleanName}`;
 
         try {
+            bar.style.width = "60%"; // Fake progress
+
             const { data, error } = await this.sbClient.storage
-                .from('public-files')
+                .from(STORAGE_BUCKET)
                 .upload(fileName, file, {
                     cacheControl: '3600',
                     upsert: false
@@ -370,9 +473,11 @@ class FilePicker extends HTMLElement {
             if (error) throw error;
 
             bar.style.width = "100%";
+            sendText.innerText = "Done!";
 
+            // Get Public URL
             const { data: publicData } = this.sbClient.storage
-                .from('public-files')
+                .from(STORAGE_BUCKET)
                 .getPublicUrl(fileName);
 
             const downloadUrl = publicData.publicUrl;
@@ -391,6 +496,7 @@ class FilePicker extends HTMLElement {
                 metadata.duration = this.videoDuration;
             }
 
+            // Dispatch Event
             this.dispatchEvent(new CustomEvent('file-uploaded', {
                 detail: {
                     url: downloadUrl,
@@ -400,16 +506,19 @@ class FilePicker extends HTMLElement {
                 composed: true
             }));
 
-            this.close();
+            // Short delay to show 100% bar before closing
+            setTimeout(() => {
+                this.close();
+            }, 500);
 
         } catch (error) {
             console.error('Upload error:', error);
-            alert('Upload failed: ' + error.message);
+            this.showToast("Upload failed: " + error.message);
             sendText.innerText = "Retry";
             bar.style.width = "0%";
-        } finally {
-            this.isUploading = false;
             sendBtn.disabled = false;
+        } finally {
+            if(!sendBtn.disabled) this.isUploading = false;
         }
     }
 
@@ -425,6 +534,7 @@ class FilePicker extends HTMLElement {
         this.querySelector('#fp-send-text').innerText = "Send";
         this.selectedFile = null;
         this.isUploading = false;
+        this.querySelector('#fp-send').disabled = false;
         
         const video = this.querySelector('#fp-video-el');
         video.pause();
