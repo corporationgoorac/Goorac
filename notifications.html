@@ -97,6 +97,7 @@
             background-size: cover; background-position: center;
             overflow: hidden;
         }
+        .mini-note span { font-size: 0.6rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 90%; padding: 0 2px;}
 
         /* BUTTONS */
         .btn-follow {
@@ -148,15 +149,18 @@
         databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
 
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) fbConfig = window.CONFIG.firebase;
-    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
-    
+    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
+        fbConfig = window.CONFIG.firebase;
+    }
+
+    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
     const db = firebase.firestore();
     const auth = firebase.auth();
     
     let myUid = null;
     let myFollowingList = []; 
     let currentFilter = 'all';
+    
     let rawNotifications = []; 
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
@@ -208,7 +212,7 @@
                 }
             }
         });
-    }, { threshold: 0.6 }); // Wait until 60% visible
+    }, { threshold: 0.6 });
 
     // --- INIT ---
     auth.onAuthStateChanged(async (user) => {
@@ -233,11 +237,11 @@
         loadedMap = new Map();
         const now = Date.now();
 
-        // 1. LIKES FROM NOTES COLLECTION
-        // We query the last 20 active notes to check for new likes
+        // 1. LIKES FROM 'NOTES' COLLECTION (FIXED)
+        // We query all notes where I am the author
         db.collection("notes")
             .where("uid", "==", myUid)
-            .orderBy("createdAt", "desc")
+            .orderBy("createdAt", "desc") // Ensure we check recent notes
             .limit(20)
             .onSnapshot(snapshot => {
                 snapshot.forEach(doc => {
@@ -246,7 +250,7 @@
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp) return;
 
-                            // UNIQUE ID CONSTRUCTION: Like + UserID + Timestamp (Prevents merging)
+                            // Create unique ID for this specific like interaction
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const notifId = `like_${liker.uid}_${timeMillis}`;
 
@@ -262,6 +266,7 @@
                                 text: "liked your note.",
                                 noteData: { 
                                     text: noteData.text,
+                                    songName: noteData.songName,
                                     bgColor: noteData.bgColor,
                                     textColor: noteData.textColor
                                 }
@@ -272,25 +277,22 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS
+        // 2. FOLLOWERS (Collection: 'users' -> array 'followers')
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                if (data.followers) {
-                    data.followers.forEach((follower) => {
-                        // Ensure we have an object with timestamp
-                        if (typeof follower !== 'object' || !follower.timestamp) return;
-
-                        const followerId = follower.uid;
-                        const timeMillis = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
-                        const notifId = `follow_${followerId}_${timeMillis}`; // Unique ID
-
-                        if (!loadedMap.has(notifId)) {
+                if (data.followers && Array.isArray(data.followers)) {
+                    data.followers.slice(-10).forEach(f => {
+                        // Ensure we handle both Object and String formats gracefully
+                        if (typeof f === 'object' && f.timestamp) {
+                            const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                            const notifId = `follow_${f.uid}_${timeMillis}`;
+                            
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
-                                senderId: followerId,
-                                senderName: "User",
+                                senderId: f.uid,
+                                senderName: "User", // Will fetch
                                 senderUsername: "",
                                 senderPic: "https://via.placeholder.com/50",
                                 isVerified: false,
@@ -298,16 +300,15 @@
                                 text: "started following you.",
                                 needsFetch: true 
                             });
-                            // Fetch details since followers array might be sparse
-                            fetchUserInfo(followerId, notifId);
+                            fetchUserInfo(f.uid, notifId);
                         }
                     });
+                    processAndRender();
                 }
             }
-            processAndRender();
         });
 
-        // 3. GENERAL NOTIFICATIONS (Comments, etc)
+        // 3. GENERAL NOTIFICATIONS (Collection: 'notifications')
         db.collection('notifications')
             .where('recipientId', '==', myUid)
             .orderBy('timestamp', 'desc')
@@ -355,7 +356,6 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // Direct DOM update for instant refresh
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
@@ -369,7 +369,6 @@
     }
 
     function processAndRender() {
-        // Debounce slightly to prevent flicker
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
             rawNotifications = Array.from(loadedMap.values());
@@ -378,7 +377,7 @@
             displayedCount = 0;
             document.getElementById('notif-list').innerHTML = '';
             renderNextBatch();
-        }, 100);
+        }, 150);
     }
 
     function renderNextBatch() {
@@ -414,15 +413,12 @@
         const div = document.createElement('div');
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
-        div.dataset.username = notif.senderUsername || notif.senderId;
+        div.dataset.username = notif.senderUsername || notif.senderName || notif.senderId;
 
-        // Auto-read observer
         if(!isRead) gazeObserver.observe(div);
 
-        // Click Handler
         div.onclick = function(e) {
-            if(e.target.closest('button')) return; // Ignore button clicks
-
+            if(e.target.closest('button')) return;
             markNotificationRead(this.dataset.id);
             const user = this.dataset.username || notif.senderId;
             window.location.href = `userProfile.html?user=${user}`;
@@ -432,7 +428,6 @@
         let extraContentHtml = '';
         const verifyIcon = notif.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">` : '';
 
-        // Content Logic
         if (notif.type === 'follow') {
             const isFollowing = myFollowingList.includes(notif.senderId);
             const btnText = isFollowing ? "Following" : "Follow";
@@ -441,13 +436,18 @@
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
-                let textContent = '';
-                if(notif.noteData.text) textContent = `<span style="font-size:0.5rem; display:block;">${notif.noteData.text}</span>`;
-                else if(notif.noteData.songName) textContent = `<span style="font-size:1rem;">🎵</span>`;
+                // Use 'background' for full gradient support
+                let bgStyle = notif.noteData.bgColor.includes('gradient') 
+                    ? `background: ${notif.noteData.bgColor}` 
+                    : `background-color: ${notif.noteData.bgColor}`;
+
+                let content = '';
+                if(notif.noteData.text) content = `<span style="font-size:0.5rem; display:block;">${notif.noteData.text}</span>`;
+                else if(notif.noteData.songName) content = `<span style="font-size:1rem;">🎵</span>`;
                 
                 actionHtml = `
-                    <div class="mini-note" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
-                        ${textContent}
+                    <div class="mini-note" style="${bgStyle}; color:${notif.noteData.textColor}">
+                        ${content}
                     </div>
                 `;
             }
@@ -482,18 +482,10 @@
         } else {
             btn.innerText = "Following"; btn.classList.add("btn-following");
             const ts = firebase.firestore.Timestamp.now();
-            // Object push for followers array
-            const followObj = { 
-                uid: myUid, 
-                timestamp: ts,
-                date: new Date().toISOString()
-            };
+            const fObj = { uid: myUid, timestamp: ts, date: new Date().toISOString() };
             
-            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }) // Simple string for 'following'
-                .catch(() => {});
-
-            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(followObj) }) // Object for 'followers'
-                .catch(() => {});
+            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }).catch(()=>{});
+            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(fObj) }).catch(()=>{});
         }
     }
 
