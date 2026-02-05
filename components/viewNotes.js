@@ -44,6 +44,7 @@ class ViewNotes extends HTMLElement {
         return `${diffInDays}d ago`;
     }
 
+    // SVG Icons Helper
     getIcons() {
         return {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
@@ -97,8 +98,8 @@ class ViewNotes extends HTMLElement {
                 display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-shrink: 0;
             }
             /* Add pointer to indicate clickable */
-            .vn-clickable { cursor: pointer; transition: opacity 0.2s; }
-            .vn-clickable:active { opacity: 0.7; }
+            .vn-clickable { cursor: pointer; transition: opacity 0.2s; -webkit-tap-highlight-color: transparent; }
+            .vn-clickable:active { opacity: 0.6; }
 
             .vn-friend-pfp {
                 width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
@@ -165,7 +166,7 @@ class ViewNotes extends HTMLElement {
             }
             .vn-quick-emoji {
                 font-size: 2.2rem; cursor: pointer; transition: transform 0.2s;
-                user-select: none;
+                user-select: none; -webkit-tap-highlight-color: transparent;
             }
             .vn-quick-emoji:active { transform: scale(1.4); }
 
@@ -358,6 +359,7 @@ class ViewNotes extends HTMLElement {
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         
+        // Gradient Support
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -422,7 +424,7 @@ class ViewNotes extends HTMLElement {
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         
-        // Style Enhancement: Prioritize 'background' property for gradients
+        // Gradient Support
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -478,17 +480,19 @@ class ViewNotes extends HTMLElement {
         if (!this.currentNote) return;
         const uid = this.currentNote.uid;
         
-        // 1. Try Note Data
-        let username = this.currentNote.username;
-        
-        // 2. Try Fetched Profile Data
-        if (!username && this.currentUserProfile) {
-            username = this.currentUserProfile.username;
+        // 1. Try to get username from the fetched profile (most accurate)
+        let username = this.currentUserProfile ? this.currentUserProfile.username : null;
+
+        // 2. If not found, check the note data itself (might be stale, but better than nothing)
+        if (!username && this.currentNote.username && !this.currentNote.username.includes(" ")) {
+            // Basic check: if it has spaces, it's likely a Display Name, ignore it.
+            username = this.currentNote.username;
         }
 
-        // 3. Fetch from DB if still missing
+        // 3. Fetch from DB if absolutely missing
         if (!username) {
             try {
+                if(navigator.vibrate) navigator.vibrate(5); // Little feedback we are doing something
                 const doc = await this.db.collection('users').doc(uid).get();
                 if (doc.exists) {
                     username = doc.data().username;
@@ -500,7 +504,7 @@ class ViewNotes extends HTMLElement {
             }
         }
 
-        // 4. Redirect
+        // 4. Redirect (Fallback to UID only if absolutely necessary)
         const param = username || uid;
         window.location.href = `userProfile.html?user=${param}`;
     }
@@ -530,7 +534,7 @@ class ViewNotes extends HTMLElement {
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    if(navigator.vibrate) navigator.vibrate([10, 30]);
+                    if(navigator.vibrate) navigator.vibrate([10, 30]); // VIBRATION ADDED
 
                     // Only trigger if not already liked
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
@@ -544,6 +548,7 @@ class ViewNotes extends HTMLElement {
         const leaveNoteBtn = this.querySelector('#vn-leave-new-note');
         if(leaveNoteBtn) {
             leaveNoteBtn.onclick = () => {
+                if(navigator.vibrate) navigator.vibrate(10);
                 window.location.href = 'notes.html';
             };
         }
@@ -551,6 +556,7 @@ class ViewNotes extends HTMLElement {
         const deleteBtn = this.querySelector('#delete-note-btn');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
+                if(navigator.vibrate) navigator.vibrate(10);
                 if(confirm("Delete this note?")) {
                     try {
                         await this.db.collection("active_notes").doc(user.uid).delete();
@@ -564,7 +570,7 @@ class ViewNotes extends HTMLElement {
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
-                if(navigator.vibrate) navigator.vibrate(10);
+                if(navigator.vibrate) navigator.vibrate(10); // VIBRATION ADDED
                 const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30'); // Check if filled
                 
                 // Visual Update Immediately
@@ -639,7 +645,7 @@ class ViewNotes extends HTMLElement {
         emojis.forEach(emojiEl => {
             emojiEl.onclick = () => {
                 const emoji = emojiEl.dataset.emoji;
-                if(navigator.vibrate) navigator.vibrate(25);
+                if(navigator.vibrate) navigator.vibrate(25); // VIBRATION ADDED
                 emojiEl.classList.add('popped');
                 setTimeout(() => emojiEl.classList.remove('popped'), 500);
                 this.handleSendReply(emoji);
@@ -648,6 +654,8 @@ class ViewNotes extends HTMLElement {
     }
 
     async handleSendReply(text) {
+        if(navigator.vibrate) navigator.vibrate(20); // VIBRATION ADDED
+
         const myUid = firebase.auth().currentUser.uid;
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
@@ -780,6 +788,7 @@ const NotesManager = {
                 border: 1px solid rgba(255,255,255,0.1);
                 /* New: Gradient Support in Bubbles */
                 background-size: cover;
+                background-position: center;
             }
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
@@ -984,6 +993,7 @@ const NotesManager = {
                                         const viewer = document.querySelector('view-notes');
                                         const nav = document.querySelector('main-navbar');
                                         if(nav) nav.classList.add('hidden');
+                                        if(navigator.vibrate) navigator.vibrate(10);
                                         viewer.open({ ...noteData, uid: uid }, false);
                                     };
                                     container.appendChild(div);
