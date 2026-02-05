@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
+    <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -57,7 +59,36 @@
         .logo { 
             font-size: 1.2rem; font-weight: 900; color: var(--accent); 
             letter-spacing: 3px; text-shadow: 0 0 10px var(--accent-glow);
+            flex: 1;
         }
+
+        /* --- RIGHT HEADER GROUP --- */
+        .header-right {
+            display: flex; align-items: center; gap: 18px;
+        }
+
+        /* NOTIFICATION BELL STYLE */
+        .notif-btn {
+            position: relative; cursor: pointer;
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .notif-icon {
+            width: 24px; height: 24px; fill: var(--text-main);
+            transition: transform 0.2s;
+        }
+        .notif-btn:active .notif-icon { transform: scale(0.9) rotate(-10deg); }
+        
+        .notif-badge {
+            position: absolute; top: -2px; right: -2px;
+            background: var(--danger); color: white;
+            font-size: 0.65rem; font-weight: 700;
+            min-width: 16px; height: 16px;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            border: 2px solid #000; opacity: 0; transform: scale(0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .notif-badge.visible { opacity: 1; transform: scale(1); }
 
         .header-pfp { 
             width: 38px; height: 38px; border-radius: 12px; 
@@ -139,7 +170,12 @@
         .welcome-card p { 
             color: var(--text-dim); margin-top: 12px; 
             font-size: 0.95rem; line-height: 1.6; font-weight: 400;
+            min-height: 48px; /* Reserve space for typer */
         }
+
+        /* Cursor for typewriter effect */
+        .cursor { display: inline-block; width: 6px; height: 14px; background: var(--accent); animation: blink 1s infinite; margin-left: 2px; vertical-align: middle; }
+        @keyframes blink { 50% { opacity: 0; } }
 
         .activity-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px;
@@ -223,7 +259,17 @@
 
 <header>
     <div class="logo">GOORAC</div>
-    <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
+    
+    <div class="header-right">
+        <div class="notif-btn" onclick="window.location.href='notifications.html'">
+            <svg class="notif-icon" viewBox="0 0 24 24">
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+            </svg>
+            <div id="notif-count" class="notif-badge">0</div>
+        </div>
+
+        <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
+    </div>
 </header>
 
 <div class="notes-wrapper" id="notes-container">
@@ -270,7 +316,8 @@
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    const firebaseConfig = {
+    // Config Loader
+    let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
@@ -279,7 +326,11 @@
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
     };
 
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
+        fbConfig = window.CONFIG.firebase;
+    }
+
+    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
     const auth = firebase.auth();
     const db = firebase.firestore();
     const prog = document.getElementById('progress-bar');
@@ -310,6 +361,7 @@
             if (doc.exists) {
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
+                listenNotifications(user.uid);
             } else { window.location.href = "setup.html"; }
         } else { window.location.href = "login.html"; }
     });
@@ -320,20 +372,62 @@
         const pfpEl = document.getElementById('header-pfp');
 
         nameEl.classList.remove('skeleton');
-        nameEl.innerText = "Welcome, " + (data.name.split(' ')[0] || "Agent");
-        textEl.classList.remove('skeleton');
-        textEl.innerText = "All neural-links are operational. Your communication is currently isolated and secure.";
+        
+        // FEATURE: Time-based Greeting
+        const hour = new Date().getHours();
+        let greeting = "Welcome";
+        if (hour < 12) greeting = "Good Morning";
+        else if (hour < 18) greeting = "Good Afternoon";
+        else greeting = "Good Evening";
+
+        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
         
         pfpEl.classList.remove('skeleton');
         pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
-
         document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
         
+        // FEATURE: Typer Effect for Welcome Text
+        textEl.classList.remove('skeleton');
+        typeWriterEffect(textEl, "All neural-links are operational. Your communication is currently isolated and secure.");
+
         prog.style.width = '100%';
         setTimeout(() => prog.style.opacity = '0', 400);
     }
 
     // Logic for Notes System is now handled in viewNotes.js automatically
+
+    // FEATURE: Listen for Notification Count
+    function listenNotifications(uid) {
+        db.collection('notifications')
+            .where('recipientId', '==', uid)
+            .where('isRead', '==', false)
+            .onSnapshot(snap => {
+                const count = snap.size;
+                const badge = document.getElementById('notif-count');
+                if (count > 0) {
+                    badge.innerText = count > 9 ? '9+' : count;
+                    badge.classList.add('visible');
+                } else {
+                    badge.classList.remove('visible');
+                }
+            });
+    }
+
+    // FEATURE: Typer Effect Function
+    function typeWriterEffect(element, text, speed = 30) {
+        element.innerHTML = "";
+        let i = 0;
+        function type() {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+                setTimeout(type, speed);
+            } else {
+                element.innerHTML += '<span class="cursor"></span>';
+            }
+        }
+        type();
+    }
 
     function startLiveCounters(uid) {
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
