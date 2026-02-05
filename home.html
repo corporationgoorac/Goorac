@@ -10,7 +10,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
@@ -18,561 +17,408 @@
 
     <style>
         :root {
-            --bg: #000;
-            --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.3);
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
+            --bg: #050505;
+            --accent: #00e5ff; /* Electric Cyan */
+            --accent-dim: rgba(0, 229, 255, 0.15);
+            --card-bg: rgba(20, 20, 20, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
             --text-main: #ffffff;
-            --text-dim: #a0a0a0;
-            --danger: #ff4444;
-            --danger-glow: rgba(255, 68, 68, 0.2);
+            --text-secondary: #888888;
+            --danger: #ff3b30;
+            --success: #34c759;
+            --safe-area-top: env(safe-area-inset-top);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
 
         body {
             background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(0, 229, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 100% 40%, rgba(100, 50, 255, 0.08) 0%, transparent 40%);
             color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            margin: 0;
+            margin: 0; padding: 0;
             padding-bottom: 100px;
-            overflow-x: hidden;
-            background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
+        /* --- HEADER --- */
         header {
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            background: rgba(0,0,0,0.7);
-            position: sticky;
-            top: 0;
-            border-bottom: 1px solid var(--border);
-            z-index: 1000;
+            padding: 16px 24px;
+            padding-top: calc(var(--safe-area-top) + 16px);
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100;
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            background: rgba(5, 5, 5, 0.7);
+            border-bottom: 1px solid var(--card-border);
         }
 
-        .logo { 
-            font-size: 1.2rem; font-weight: 900; color: var(--accent); 
-            letter-spacing: 3px; text-shadow: 0 0 10px var(--accent-glow);
-            flex: 1;
-        }
+        .logo { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; color: #fff; }
+        .logo span { color: var(--accent); }
 
-        /* --- RIGHT HEADER GROUP --- */
-        .header-right {
-            display: flex; align-items: center; gap: 20px;
-        }
+        .header-actions { display: flex; align-items: center; gap: 20px; }
 
-        /* NOTIFICATION BELL STYLE */
-        .notif-btn {
-            position: relative; cursor: pointer;
-            width: 26px; height: 26px;
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s;
-        }
-        .notif-btn:active { transform: scale(0.9); }
-
-        .notif-icon {
-            width: 26px; height: 26px; fill: none; stroke: var(--text-main); stroke-width: 2;
-            transition: all 0.3s ease;
-        }
+        .notif-btn { position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .notif-icon { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2; transition: 0.3s; }
         
-        .notif-btn.has-new .notif-icon {
-            fill: var(--text-main); stroke: none; /* Filled icon when active */
-        }
-
-        /* Badge Styling */
-        .notif-badge {
+        .badge {
             position: absolute; top: -2px; right: -2px;
-            background: var(--danger); color: white;
-            font-size: 0.6rem; font-weight: 700;
-            min-width: 16px; height: 16px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            border: 2px solid #000; opacity: 0; transform: scale(0);
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 0 8px var(--danger-glow);
-            pointer-events: none;
+            background: var(--danger); color: #fff;
+            font-size: 10px; font-weight: 700;
+            min-width: 16px; height: 16px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid var(--bg);
+            transform: scale(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .notif-badge.visible { 
-            opacity: 1; transform: scale(1); 
-            animation: badgePulse 3s infinite;
-        }
+        .badge.active { transform: scale(1); }
 
-        @keyframes badgePulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
-            50% { box-shadow: 0 0 0 4px rgba(255, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        .pfp { 
+            width: 40px; height: 40px; border-radius: 12px; object-fit: cover; 
+            border: 1px solid var(--card-border); background: #1a1a1a;
         }
 
-        .header-pfp { 
-            width: 38px; height: 38px; border-radius: 12px; 
-            object-fit: cover; border: 1px solid var(--border);
-            cursor: pointer; background: #111;
-            transition: transform 0.2s;
+        /* --- NOTES --- */
+        .notes-rail {
+            display: flex; gap: 16px; padding: 20px 24px;
+            overflow-x: auto; scrollbar-width: none;
         }
-        .header-pfp:active { transform: scale(0.9); }
+        .notes-rail::-webkit-scrollbar { display: none; }
 
-        #progress-bar {
-            position: fixed; top: 0; left: 0; height: 2px;
-            background: var(--accent); width: 0%; z-index: 1001;
-            transition: width 0.4s ease, opacity 0.3s;
-            box-shadow: 0 0 10px var(--accent);
+        .my-note { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .my-note img { 
+            width: 68px; height: 68px; border-radius: 22px; 
+            border: 2px solid var(--card-border); padding: 3px; 
+            object-fit: cover; transition: 0.2s;
         }
+        .my-note.active img { border-color: var(--accent); }
+        .note-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
 
-        /* --- NOTES UI SECTION --- */
-        .notes-wrapper {
-            padding: 15px 0 5px 0;
-            overflow-x: auto;
-            display: flex;
-            gap: 15px;
-            padding-left: 20px;
-            scrollbar-width: none;
+        /* --- MAIN DASHBOARD --- */
+        .dashboard { padding: 10px 24px; animation: fadeInUp 0.6s ease-out; }
+
+        .welcome-section { margin-bottom: 30px; }
+        .greeting-time { 
+            font-size: 14px; color: var(--accent); text-transform: uppercase; 
+            letter-spacing: 1px; font-weight: 700; display: block; margin-bottom: 4px;
         }
-        .notes-wrapper::-webkit-scrollbar { display: none; }
-
-        .note-item {
-            display: flex; flex-direction: column; align-items: center;
-            min-width: 75px; position: relative; cursor: pointer;
-        }
-
-        .note-bubble {
-            position: absolute; top: -10px;
-            background: #262626; color: white;
-            padding: 6px 10px; border-radius: 15px;
-            font-size: 10px; max-width: 80px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            border: 1px solid var(--border);
-            z-index: 2;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-
-        .note-pfp {
-            width: 65px; height: 65px; border-radius: 50%;
-            padding: 2px; border: 2px solid var(--border);
-            object-fit: cover;
-        }
-        .note-item.has-note .note-pfp { border-color: var(--accent); }
-
-        .note-username {
-            font-size: 0.7rem; color: var(--text-dim); margin-top: 8px;
-            text-align: center; width: 70px;
-            overflow: hidden; text-overflow: ellipsis;
-        }
-
-        /* Content & Cards */
-        .content { padding: 10px 20px; max-width: 500px; margin: 0 auto; }
-
-        .section-label {
-            font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim);
-            font-weight: 800; letter-spacing: 2px; margin-bottom: 20px;
-            display: block; opacity: 0.7;
-        }
-
-        .welcome-card {
-            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
-            border: 1px solid var(--border); padding: 30px 25px;
-            border-radius: 32px; margin-bottom: 25px;
-            backdrop-filter: blur(10px); position: relative; overflow: hidden;
-        }
-
-        .welcome-card h1 { 
-            margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;
-            background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
+        .user-name { 
+            font-size: 32px; font-weight: 700; margin: 0; letter-spacing: -0.5px;
+            background: linear-gradient(180deg, #fff 0%, #aaa 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-
-        .welcome-card p { 
-            color: var(--text-dim); margin-top: 12px; 
-            font-size: 0.95rem; line-height: 1.6; font-weight: 400;
-            min-height: 48px; /* Reserve space for typer */
+        .status-text { 
+            font-size: 14px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5;
+            min-height: 22px; display: flex; align-items: center;
         }
 
-        /* Cursor for typewriter effect */
-        .cursor { display: inline-block; width: 6px; height: 14px; background: var(--accent); animation: blink 1s infinite; margin-left: 2px; vertical-align: middle; }
+        /* --- GRID --- */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 25px; }
+
+        .card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 24px; padding: 20px;
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: space-between;
+            min-height: 140px; transition: all 0.2s;
+        }
+        .card:active { transform: scale(0.97); background: rgba(255,255,255,0.08); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .card-icon { 
+            width: 36px; height: 36px; background: rgba(255,255,255,0.05); 
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: #fff; border: 1px solid var(--card-border);
+        }
+
+        .stat-value { font-size: 26px; font-weight: 700; color: #fff; display: block; margin-bottom: 4px; }
+        .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; }
+
+        /* Message Card Variants */
+        .card.has-new { 
+            background: linear-gradient(145deg, rgba(0, 229, 255, 0.1), rgba(20,20,20,0.6)); 
+            border-color: rgba(0, 229, 255, 0.3);
+        }
+        .card.has-new .stat-value { color: var(--accent); }
+        .card.has-new .card-icon { background: var(--accent); color: #000; border: none; }
+
+        .card.missed { 
+            background: linear-gradient(145deg, rgba(255, 59, 48, 0.1), rgba(20,20,20,0.6)); 
+            border-color: rgba(255, 59, 48, 0.3);
+        }
+        .card.missed .stat-value { color: var(--danger); }
+
+        /* Skeleton */
+        .skeleton { 
+            background: #1a1a1a; 
+            animation: pulse 1.5s infinite ease-in-out; 
+            color: transparent !important; 
+        }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Typewriter Cursor */
+        .cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); margin-left: 4px; animation: blink 1s infinite; vertical-align: middle; }
         @keyframes blink { 50% { opacity: 0; } }
 
-        .activity-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px;
-        }
-
-        .activity-card {
-            background: var(--card-bg); border: 1px solid var(--border);
-            padding: 18px; border-radius: 24px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            text-align: left; position: relative; min-height: 120px;
-            display: flex; flex-direction: column; justify-content: flex-end;
-        }
-        .activity-card:active { transform: scale(0.96); background: rgba(255,255,255,0.1); }
-
-        .card-icon-area {
-            position: absolute; top: 18px; right: 18px;
-            width: 32px; height: 32px; border-radius: 10px;
-            background: rgba(255,255,255,0.05);
-            display: flex; align-items: center; justify-content: center;
-            overflow: hidden; border: 1px solid var(--border);
-        }
-        .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
-
-        .count-num {
-            font-size: 1.1rem; font-weight: 800; display: block;
-            margin-bottom: 2px; color: #fff;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .count-label {
-            font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase;
-            font-weight: 700; letter-spacing: 0.5px;
-        }
-        .time-badge {
-            font-size: 0.6rem; color: var(--text-dim); margin-bottom: 8px;
-            display: block; opacity: 0.6;
-        }
-
-        .activity-card.has-count { 
-            border-color: var(--accent);
-            background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%);
-        }
-        .has-count .count-num { color: var(--accent); }
-        .has-count .card-icon-area { border-color: var(--accent); }
-        
-        .activity-card.missed-alert {
-            border-color: var(--danger-glow);
-            background: linear-gradient(145deg, rgba(255, 68, 68, 0.05) 0%, transparent 100%);
-        }
-        .missed-alert .count-num { color: var(--danger); }
-        .missed-alert .card-icon-area { border-color: var(--danger); }
-
-        .status-badge {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(0, 210, 255, 0.1); color: var(--accent);
-            padding: 6px 14px; border-radius: 100px;
-            font-size: 0.7rem; font-weight: 800; margin-bottom: 18px;
-            border: 1px solid rgba(0, 210, 255, 0.2);
-        }
-
-        .dot {
-            width: 8px; height: 8px; background: var(--accent);
-            border-radius: 50%; box-shadow: 0 0 10px var(--accent);
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
-        .skeleton {
-            background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite linear;
-            border-radius: 12px;
-        }
-        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-        main-navbar.hidden { display: none !important; }
     </style>
 </head>
-<body oncontextmenu="return false;"> 
-
-<div id="progress-bar"></div>
+<body>
 
 <header>
-    <div class="logo">GOORAC</div>
-    
-    <div class="header-right">
-        <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
-            <svg id="bell-icon" class="notif-icon" viewBox="0 0 24 24">
-                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
-            </svg>
-            <div id="notif-count" class="notif-badge">0</div>
+    <div class="logo">GOO<span>RAC</span></div>
+    <div class="header-actions">
+        <div class="notif-btn" onclick="window.location.href='notifications.html'">
+            <svg class="notif-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <div id="notif-badge" class="badge">0</div>
         </div>
-
-        <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
+        <img id="header-pfp" class="pfp skeleton" src="" onclick="window.location.href='profile.html'">
     </div>
 </header>
 
-<div class="notes-wrapper" id="notes-container">
-    <div class="note-item" id="my-note-btn">
-        <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
-        <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
-        <span class="note-username">Your Note</span>
+<div class="notes-rail">
+    <div class="my-note" id="my-note-container">
+        <img id="note-pfp" class="skeleton" src="">
+        <span class="note-label">Your Note</span>
     </div>
-</div>
+    </div>
 
-<div class="content">
-    <span class="section-label">Quantum Terminal</span>
+<div class="dashboard">
     
-    <div class="welcome-card">
-        <div class="status-badge"><div class="dot"></div> ENCRYPTION ACTIVE</div>
-        
-        <h1 id="welcome-name" class="skeleton" style="height: 35px; width: 70%;"></h1>
-        <p id="welcome-text" class="skeleton" style="height: 50px; width: 100%; margin-top: 15px;"></p>
-        
-        <div class="activity-grid">
-            <div class="activity-card" id="msg-card" onclick="window.location.href='messages.html'">
-                <div class="card-icon-area" id="msg-pfp-area">
-                    <div style="color:var(--text-dim); font-size:10px;">MSG</div>
-                </div>
-                <span id="msg-time" class="time-badge">No active data</span>
-                <span id="msg-header" class="count-num">Recent</span>
-                <span id="msg-subtext" class="count-label">History</span>
+    <div class="welcome-section">
+        <span class="greeting-time" id="greeting">Loading...</span>
+        <h1 class="user-name skeleton" id="username">User</h1>
+        <div class="status-text" id="typewriter"></div>
+    </div>
+
+    <div class="grid">
+        <div class="card" id="msg-card" onclick="window.location.href='messages.html'">
+            <div class="card-header">
+                <div class="card-icon" id="msg-icon">💬</div>
+                <span class="stat-label" id="msg-time">--</span>
             </div>
-            
-            <div class="activity-card" id="call-card" onclick="window.location.href='calls.html'">
-                <div class="card-icon-area" id="call-pfp-area">
-                    <div style="color:var(--text-dim); font-size:10px;">LOG</div>
-                </div>
-                <span id="call-time" class="time-badge">No active data</span>
-                <span id="call-count" class="count-num">Log</span>
-                <span id="call-label" class="count-label">History</span>
+            <div>
+                <span class="stat-value" id="msg-count">0</span>
+                <span class="stat-label" id="msg-label">New Messages</span>
+            </div>
+        </div>
+
+        <div class="card" id="call-card" onclick="window.location.href='calls.html'">
+            <div class="card-header">
+                <div class="card-icon" id="call-icon">📞</div>
+                <span class="stat-label" id="call-time">--</span>
+            </div>
+            <div>
+                <span class="stat-value" id="call-text">History</span>
+                <span class="stat-label" id="call-label">Call Log</span>
             </div>
         </div>
     </div>
+
 </div>
 
-<main-navbar id="main-nav"></main-navbar>
+<main-navbar></main-navbar>
 <call-notifier></call-notifier>
-<view-notes id="note-viewer"></view-notes>
+<view-notes></view-notes>
 
 <script>
-    // --- FIREBASE INIT ---
+    // --- SETUP ---
     let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        measurementId: "G-M46FEVRYSS",
         databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
-
+    
     if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
         fbConfig = window.CONFIG.firebase;
     }
 
-    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
-    const auth = firebase.auth();
+    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
     const db = firebase.firestore();
-    const prog = document.getElementById('progress-bar');
-    
-    // Key used for checking read status
-    const READ_KEY = "goorac_read_notifs"; 
+    const auth = firebase.auth();
 
-    function formatTime(timestamp) {
-        if (!timestamp) return "";
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const seconds = Math.floor((new Date() - date) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + "y ago";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + "mo ago";
-        interval = seconds / 604800;
-        if (interval > 1) return Math.floor(interval) + "w ago";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + "d ago";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + "h ago";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m ago";
-        return "Just now";
-    }
+    // --- HELPERS ---
+    const formatTime = (ts) => {
+        if(!ts) return "";
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        const diff = (new Date() - date) / 1000;
+        if(diff < 60) return "Just now";
+        if(diff < 3600) return Math.floor(diff/60) + "m ago";
+        if(diff < 86400) return Math.floor(diff/3600) + "h ago";
+        return Math.floor(diff/86400) + "d ago";
+    };
 
+    // --- AUTH LISTENER ---
     auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            prog.style.width = '60%';
-            const doc = await db.collection("users").doc(user.uid).get();
-            if (doc.exists) {
-                updateUI(doc.data());
-                startLiveCounters(user.uid);
-                listenNotifications(user.uid);
-            } else { window.location.href = "setup.html"; }
-        } else { window.location.href = "login.html"; }
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // 1. Initial Profile Fetch
+        const userDoc = await db.collection("users").doc(user.uid).get();
+        if(userDoc.exists) {
+            setupProfile(userDoc.data());
+        }
+
+        // 2. Start Listeners
+        listenMessages(user.uid);
+        listenCalls(user.uid);
+        listenNotifications(user.uid);
     });
 
-    function updateUI(data) {
-        const nameEl = document.getElementById('welcome-name');
-        const textEl = document.getElementById('welcome-text');
-        const pfpEl = document.getElementById('header-pfp');
-
-        nameEl.classList.remove('skeleton');
-        
+    // --- 1. PROFILE & GREETING ---
+    function setupProfile(data) {
+        // Fix: "As 'Good' only showing now"
+        // Logic: Get hour for greeting, safe parse name
         const hour = new Date().getHours();
-        let greeting = "Welcome";
-        if (hour < 12) greeting = "Good Morning";
-        else if (hour < 18) greeting = "Good Afternoon";
-        else greeting = "Good Evening";
-
-        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+        const greetText = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+        const firstName = data.name ? data.name.split(' ')[0] : "Agent";
         
-        pfpEl.classList.remove('skeleton');
-        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
+        document.getElementById('greeting').innerText = greetText;
         
-        textEl.classList.remove('skeleton');
-        typeWriterEffect(textEl, "All neural-links are operational. Your communication is currently isolated and secure.");
+        const nameEl = document.getElementById('username');
+        nameEl.innerText = firstName;
+        nameEl.classList.remove('skeleton');
 
-        prog.style.width = '100%';
-        setTimeout(() => prog.style.opacity = '0', 400);
+        // PFP
+        const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
+        const pfpEl = document.getElementById('header-pfp');
+        const notePfp = document.getElementById('note-pfp');
+        
+        pfpEl.src = pfpUrl; pfpEl.classList.remove('skeleton');
+        notePfp.src = pfpUrl; notePfp.classList.remove('skeleton');
+
+        // Typewriter
+        typeWriter("System Online. Secure Connection Established.");
     }
 
-    // --- SMART NOTIFICATION COUNTER ---
-    function listenNotifications(uid) {
-        // Sets to track unique IDs from 3 disparate sources
-        let unreadGeneral = new Set();
-        let unreadLikes = new Set();
-        let unreadFollows = new Set();
-
-        const updateTotal = () => {
-            // Re-read local storage every time to ensure sync with notifications.html
-            const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-            let total = 0;
-
-            unreadGeneral.forEach(id => { if(!readList.includes(id)) total++; });
-            unreadLikes.forEach(id => { if(!readList.includes(id)) total++; });
-            unreadFollows.forEach(id => { if(!readList.includes(id)) total++; });
-
-            updateBadge(total);
-        };
-
-        // 1. General Notifications (Comments, etc)
-        db.collection('notifications')
-            .where('recipientId', '==', uid)
-            .orderBy('timestamp', 'desc')
-            .limit(10)
-            .onSnapshot(snap => {
-                unreadGeneral.clear();
-                snap.forEach(doc => unreadGeneral.add(doc.id));
-                updateTotal();
-            });
-
-        // 2. New Likes
-        db.collection("active_notes").doc(uid).onSnapshot(doc => {
-            unreadLikes.clear();
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.likes) {
-                    data.likes.forEach(liker => unreadLikes.add(`like_${liker.uid}`));
-                }
-            }
-            updateTotal();
-        });
-
-        // 3. New Followers
-        db.collection("users").doc(uid).onSnapshot(doc => {
-            unreadFollows.clear();
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.followers) {
-                    data.followers.forEach(follower => {
-                        const fid = typeof follower === 'string' ? follower : follower.uid;
-                        unreadFollows.add(`follow_${fid}`);
-                    });
-                }
-            }
-            updateTotal();
-        });
-        
-        // Listen to storage changes (in case user reads notif in another tab)
-        window.addEventListener('storage', (e) => {
-            if(e.key === READ_KEY) updateTotal();
-        });
-    }
-
-    function updateBadge(count) {
-        const badge = document.getElementById('notif-count');
-        const icon = document.getElementById('bell-icon');
-        const btn = document.getElementById('notif-btn');
-
-        if (count > 0) {
-            badge.innerText = count > 9 ? '9+' : count;
-            badge.classList.add('visible');
-            btn.classList.add('has-new');
-            // Filled Bell Icon
-            icon.innerHTML = '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>';
-            icon.setAttribute('viewBox', '0 0 24 24'); // Reset viewBox just in case
-        } else {
-            badge.classList.remove('visible');
-            btn.classList.remove('has-new');
-            // Outlined Bell Icon
-            icon.innerHTML = '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>';
-        }
-    }
-
-    function typeWriterEffect(element, text, speed = 30) {
-        element.innerHTML = "";
+    function typeWriter(text) {
+        const el = document.getElementById('typewriter');
+        el.innerHTML = "";
         let i = 0;
-        function type() {
-            if (i < text.length) {
-                element.innerHTML += text.charAt(i);
+        const interval = setInterval(() => {
+            if(i < text.length) {
+                el.innerHTML += text.charAt(i);
                 i++;
-                setTimeout(type, speed);
             } else {
-                element.innerHTML += '<span class="cursor"></span>';
+                el.innerHTML += '<span class="cursor"></span>';
+                clearInterval(interval);
             }
-        }
-        type();
+        }, 35);
     }
 
-    function startLiveCounters(uid) {
-        db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
-            let latestUnreadChat = null;
-            for (const doc of snap.docs) {
-                const d = doc.data();
-                const isUnread = (d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0);
-                if (isUnread) { latestUnreadChat = d; break; }
-            }
-            const header = document.getElementById('msg-header');
-            const subtext = document.getElementById('msg-subtext');
-            const time = document.getElementById('msg-time');
-            const card = document.getElementById('msg-card');
-            const pfpArea = document.getElementById('msg-pfp-area');
+    // --- 2. MESSAGES (FIXED COUNT LOGIC) ---
+    function listenMessages(uid) {
+        // Order by lastTimestamp to get recent time, but we need to scan for unreads
+        db.collection("chats")
+            .where("participants", "array-contains", uid)
+            .orderBy("lastTimestamp", "desc")
+            .limit(20) 
+            .onSnapshot(snap => {
+                let totalUnread = 0;
+                let lastTime = null;
 
-            if (latestUnreadChat) {
-                header.innerText = "New Message";
-                subtext.innerText = "From " + (latestUnreadChat.lastSenderName || "User");
-                time.innerText = formatTime(latestUnreadChat.lastTimestamp);
-                card.classList.add('has-count');
-                if (latestUnreadChat.lastSenderPfp) pfpArea.innerHTML = `<img src="${latestUnreadChat.lastSenderPfp}">`;
-            } else {
-                header.innerText = "Recent";
-                subtext.innerText = "History";
-                time.innerText = snap.empty ? "No data" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                card.classList.remove('has-count');
-                pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">MSG</div>`;
-            }
-        });
+                snap.docs.forEach(doc => {
+                    const d = doc.data();
+                    // Fix: Sum up the specific unread count for THIS user
+                    // Check if unreadCount object exists and has value for my uid
+                    if (d.unreadCount && d.unreadCount[uid] && d.unreadCount[uid] > 0) {
+                        totalUnread += d.unreadCount[uid];
+                    }
+                    if(!lastTime) lastTime = d.lastTimestamp; // Capture most recent time
+                });
 
-        db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
-            const el = document.getElementById('call-count');
-            const label = document.getElementById('call-label');
-            const time = document.getElementById('call-time');
-            const card = document.getElementById('call-card');
-            const pfpArea = document.getElementById('call-pfp-area');
-            if (!snap.empty) {
-                const call = snap.docs[0].data();
-                const isReceiver = (call.receiverId === uid);
-                time.innerText = formatTime(call.timestamp);
-                if (isReceiver && (call.status === "missed" || call.status === "cancelled")) {
-                    el.innerText = "Missed";
-                    label.innerText = call.callerName || "Recent Call";
-                    card.classList.add('missed-alert');
-                    if (call.callerPfp) pfpArea.innerHTML = `<img src="${call.callerPfp}">`;
+                const card = document.getElementById('msg-card');
+                const countEl = document.getElementById('msg-count');
+                const labelEl = document.getElementById('msg-label');
+                const timeEl = document.getElementById('msg-time');
+
+                timeEl.innerText = formatTime(lastTime);
+
+                if(totalUnread > 0) {
+                    // Active State
+                    card.classList.add('has-new');
+                    countEl.innerText = totalUnread;
+                    labelEl.innerText = "New Messages";
+                    document.getElementById('msg-icon').innerText = "💬";
                 } else {
-                    el.innerText = "Log";
-                    label.innerText = "History";
-                    card.classList.remove('missed-alert');
-                    pfpArea.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">LOG</div>`;
+                    // Idle State
+                    card.classList.remove('has-new');
+                    countEl.innerText = "Recent"; // Or "No New"
+                    labelEl.innerText = "Inbox Clear";
+                    document.getElementById('msg-icon').innerText = "📩";
                 }
-            }
-        });
+            });
     }
 
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (e) => {
-        const now = (new Date()).getTime();
-        if (now - lastTouchEnd <= 300) e.preventDefault();
-        lastTouchEnd = now;
-    }, false);
+    // --- 3. CALLS ---
+    function listenCalls(uid) {
+        db.collection("call_logs")
+            .where("participants", "array-contains", uid)
+            .orderBy("timestamp", "desc")
+            .limit(1)
+            .onSnapshot(snap => {
+                if(snap.empty) return;
+                
+                const d = snap.docs[0].data();
+                const card = document.getElementById('call-card');
+                const valEl = document.getElementById('call-text');
+                const timeEl = document.getElementById('call-time');
+
+                timeEl.innerText = formatTime(d.timestamp);
+
+                // Check for Missed Call where I was the receiver
+                if (d.receiverId === uid && (d.status === 'missed' || d.status === 'rejected')) {
+                    card.classList.add('missed');
+                    valEl.innerText = "Missed";
+                    document.getElementById('call-icon').innerText = "📞";
+                } else {
+                    card.classList.remove('missed');
+                    valEl.innerText = "Recent";
+                    document.getElementById('call-icon').innerText = "📱";
+                }
+            });
+    }
+
+    // --- 4. NOTIFICATIONS (COMPARE TOP 5 LOGIC) ---
+    function listenNotifications(uid) {
+        const READ_KEY = "goorac_read_notifs"; // Key used in LocalStorage
+
+        // Fetch exactly the first 5 recent notifications
+        db.collection("notifications")
+            .where("recipientId", "==", uid)
+            .orderBy("timestamp", "desc")
+            .limit(5)
+            .onSnapshot(snapshot => {
+                
+                // 1. Get IDs from Firestore
+                const firestoreIds = snapshot.docs.map(doc => doc.id);
+
+                // 2. Get IDs from LocalStorage
+                const localData = localStorage.getItem(READ_KEY);
+                const localIds = localData ? JSON.parse(localData) : [];
+
+                // 3. Compare: Count how many Firestore IDs are NOT in LocalStorage
+                // This fulfills: "compare with last 5... if miss match show count"
+                let newCount = 0;
+                firestoreIds.forEach(id => {
+                    if (!localIds.includes(id)) {
+                        newCount++;
+                    }
+                });
+
+                // 4. Update Badge
+                const badge = document.getElementById('notif-badge');
+                if (newCount > 0) {
+                    badge.innerText = newCount;
+                    badge.classList.add('active');
+                } else {
+                    badge.classList.remove('active');
+                }
+            });
+    }
 </script>
 </body>
 </html>
