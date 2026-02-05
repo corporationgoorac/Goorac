@@ -49,8 +49,8 @@
             padding-top: calc(var(--safe-area-top) + 16px);
             display: flex; justify-content: space-between; align-items: center;
             position: sticky; top: 0; z-index: 100;
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            background: rgba(5, 5, 5, 0.7);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            background: rgba(5, 5, 5, 0.8);
             border-bottom: 1px solid var(--card-border);
         }
 
@@ -76,6 +76,7 @@
         .pfp { 
             width: 40px; height: 40px; border-radius: 12px; object-fit: cover; 
             border: 1px solid var(--card-border); background: #1a1a1a;
+            transition: opacity 0.3s ease;
         }
 
         /* --- NOTES --- */
@@ -89,12 +90,13 @@
         .my-note img { 
             width: 68px; height: 68px; border-radius: 22px; 
             border: 2px solid var(--card-border); padding: 3px; 
-            object-fit: cover; transition: 0.2s;
+            object-fit: cover; transition: all 0.2s;
+            background: #1a1a1a;
         }
         .my-note.active img { border-color: var(--accent); }
         .note-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
 
-        /* --- MAIN DASHBOARD --- */
+        /* --- DASHBOARD --- */
         .dashboard { padding: 10px 24px; animation: fadeInUp 0.6s ease-out; }
 
         .welcome-section { margin-bottom: 30px; }
@@ -106,6 +108,7 @@
             font-size: 32px; font-weight: 700; margin: 0; letter-spacing: -0.5px;
             background: linear-gradient(180deg, #fff 0%, #aaa 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            min-height: 40px; /* Prevent collapse */
         }
         .status-text { 
             font-size: 14px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5;
@@ -134,7 +137,7 @@
         .stat-value { font-size: 26px; font-weight: 700; color: #fff; display: block; margin-bottom: 4px; }
         .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; }
 
-        /* Message Card Variants */
+        /* Card States */
         .card.has-new { 
             background: linear-gradient(145deg, rgba(0, 229, 255, 0.1), rgba(20,20,20,0.6)); 
             border-color: rgba(0, 229, 255, 0.3);
@@ -148,13 +151,16 @@
         }
         .card.missed .stat-value { color: var(--danger); }
 
-        /* Skeleton */
+        /* SKELETON ANIMATION */
         .skeleton { 
-            background: #1a1a1a; 
-            animation: pulse 1.5s infinite ease-in-out; 
-            color: transparent !important; 
+            background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+            background-size: 200% 100%;
+            animation: pulse 1.5s infinite linear;
+            color: transparent !important;
+            border-color: transparent !important;
         }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        
+        @keyframes pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Typewriter Cursor */
@@ -172,13 +178,13 @@
             <svg class="notif-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
             <div id="notif-badge" class="badge">0</div>
         </div>
-        <img id="header-pfp" class="pfp skeleton" src="" onclick="window.location.href='profile.html'">
+        <img id="header-pfp" class="pfp skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onclick="window.location.href='profile.html'">
     </div>
 </header>
 
 <div class="notes-rail">
     <div class="my-note" id="my-note-container">
-        <img id="note-pfp" class="skeleton" src="">
+        <img id="note-pfp" class="skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
         <span class="note-label">Your Note</span>
     </div>
     </div>
@@ -187,7 +193,7 @@
     
     <div class="welcome-section">
         <span class="greeting-time" id="greeting">Loading...</span>
-        <h1 class="user-name skeleton" id="username">User</h1>
+        <h1 class="user-name skeleton" id="username">User Name</h1>
         <div class="status-text" id="typewriter"></div>
     </div>
 
@@ -270,27 +276,40 @@
 
     // --- 1. PROFILE & GREETING ---
     function setupProfile(data) {
-        // Fix: "As 'Good' only showing now"
-        // Logic: Get hour for greeting, safe parse name
+        // GREETING
         const hour = new Date().getHours();
         const greetText = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-        const firstName = data.name ? data.name.split(' ')[0] : "Agent";
-        
         document.getElementById('greeting').innerText = greetText;
         
+        // NAME
+        const firstName = data.name ? data.name.split(' ')[0] : "Agent";
         const nameEl = document.getElementById('username');
         nameEl.innerText = firstName;
         nameEl.classList.remove('skeleton');
 
-        // PFP
+        // IMAGES (Robust Loading with OnLoad)
         const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
-        const pfpEl = document.getElementById('header-pfp');
-        const notePfp = document.getElementById('note-pfp');
         
-        pfpEl.src = pfpUrl; pfpEl.classList.remove('skeleton');
-        notePfp.src = pfpUrl; notePfp.classList.remove('skeleton');
+        const headerPfp = document.getElementById('header-pfp');
+        const notePfp = document.getElementById('note-pfp');
 
-        // Typewriter
+        // Helper to handle image loading
+        const loadImage = (imgEl, url) => {
+            // Set up the listener BEFORE setting the src
+            imgEl.onload = () => {
+                imgEl.classList.remove('skeleton');
+            };
+            imgEl.onerror = () => {
+                // If it fails, we remove skeleton anyway to show alt or fallback
+                imgEl.classList.remove('skeleton'); 
+            };
+            imgEl.src = url;
+        };
+
+        loadImage(headerPfp, pfpUrl);
+        loadImage(notePfp, pfpUrl);
+
+        // TYPEWRITER
         typeWriter("System Online. Secure Connection Established.");
     }
 
@@ -309,9 +328,8 @@
         }, 35);
     }
 
-    // --- 2. MESSAGES (FIXED COUNT LOGIC) ---
+    // --- 2. MESSAGES (ACCURATE UNREAD SUM) ---
     function listenMessages(uid) {
-        // Order by lastTimestamp to get recent time, but we need to scan for unreads
         db.collection("chats")
             .where("participants", "array-contains", uid)
             .orderBy("lastTimestamp", "desc")
@@ -322,12 +340,10 @@
 
                 snap.docs.forEach(doc => {
                     const d = doc.data();
-                    // Fix: Sum up the specific unread count for THIS user
-                    // Check if unreadCount object exists and has value for my uid
                     if (d.unreadCount && d.unreadCount[uid] && d.unreadCount[uid] > 0) {
                         totalUnread += d.unreadCount[uid];
                     }
-                    if(!lastTime) lastTime = d.lastTimestamp; // Capture most recent time
+                    if(!lastTime) lastTime = d.lastTimestamp;
                 });
 
                 const card = document.getElementById('msg-card');
@@ -338,15 +354,13 @@
                 timeEl.innerText = formatTime(lastTime);
 
                 if(totalUnread > 0) {
-                    // Active State
                     card.classList.add('has-new');
                     countEl.innerText = totalUnread;
                     labelEl.innerText = "New Messages";
                     document.getElementById('msg-icon').innerText = "💬";
                 } else {
-                    // Idle State
                     card.classList.remove('has-new');
-                    countEl.innerText = "Recent"; // Or "No New"
+                    countEl.innerText = "Recent";
                     labelEl.innerText = "Inbox Clear";
                     document.getElementById('msg-icon').innerText = "📩";
                 }
@@ -369,7 +383,6 @@
 
                 timeEl.innerText = formatTime(d.timestamp);
 
-                // Check for Missed Call where I was the receiver
                 if (d.receiverId === uid && (d.status === 'missed' || d.status === 'rejected')) {
                     card.classList.add('missed');
                     valEl.innerText = "Missed";
@@ -382,34 +395,25 @@
             });
     }
 
-    // --- 4. NOTIFICATIONS (COMPARE TOP 5 LOGIC) ---
+    // --- 4. NOTIFICATIONS (TOP 5 CHECK) ---
     function listenNotifications(uid) {
-        const READ_KEY = "goorac_read_notifs"; // Key used in LocalStorage
+        const READ_KEY = "goorac_read_notifs"; 
 
-        // Fetch exactly the first 5 recent notifications
         db.collection("notifications")
             .where("recipientId", "==", uid)
             .orderBy("timestamp", "desc")
             .limit(5)
             .onSnapshot(snapshot => {
                 
-                // 1. Get IDs from Firestore
                 const firestoreIds = snapshot.docs.map(doc => doc.id);
-
-                // 2. Get IDs from LocalStorage
                 const localData = localStorage.getItem(READ_KEY);
                 const localIds = localData ? JSON.parse(localData) : [];
 
-                // 3. Compare: Count how many Firestore IDs are NOT in LocalStorage
-                // This fulfills: "compare with last 5... if miss match show count"
                 let newCount = 0;
                 firestoreIds.forEach(id => {
-                    if (!localIds.includes(id)) {
-                        newCount++;
-                    }
+                    if (!localIds.includes(id)) newCount++;
                 });
 
-                // 4. Update Badge
                 const badge = document.getElementById('notif-badge');
                 if (newCount > 0) {
                     badge.innerText = newCount;
