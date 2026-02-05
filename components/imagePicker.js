@@ -3,11 +3,12 @@ class ImagePicker extends HTMLElement {
         super();
         
         // Load credentials from global CONFIG object
-        if (typeof CONFIG !== 'undefined') {
+        // Removed hardcoded fallback as requested
+        if (typeof CONFIG !== 'undefined' && CONFIG.imgbbApiKey) {
             this.apiKey = CONFIG.imgbbApiKey;
         } else {
-            console.error("CONFIG is not defined. Please load config.js");
-            this.apiKey = ""; // Fallback or handle error
+            console.error("CONFIG is not defined or missing imgbbApiKey. Please check config.js");
+            this.apiKey = ""; // Will cause upload failure if not set in config.js
         }
 
         this.selectedFile = null;
