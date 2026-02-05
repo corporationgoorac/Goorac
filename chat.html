@@ -1311,7 +1311,7 @@
             if(!m.text) bubbleStyle = "display:none;";
         } 
         // 2. VIDEO
-        else if (m.fileUrl && m.fileMeta && m.fileMeta.type === 'video') {
+        else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('video')) {
             mediaHtml = `
             <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${m.fileUrl}', 'video')">
                 <video src="${m.fileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:200px; background:#000;" preload="metadata"></video>
@@ -1322,11 +1322,11 @@
             if(!m.text) bubbleStyle = "display:none;";
         }
         // 3. AUDIO (Instagram Style + VISUALIZER FIX)
-        else if (m.fileUrl && m.fileMeta && m.fileMeta.type === 'audio') {
+        else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('audio')) {
             const safeId = 'audio-' + id;
             mediaHtml = `
             <div class="msg-audio-pill" id="pill-${safeId}">
-                <div class="audio-control-btn" onclick="toggleAudio('${safeId}')">
+                <div class="audio-control-btn" onclick="event.stopPropagation(); toggleAudio('${safeId}')">
                     <svg id="icon-${safeId}" viewBox="0 0 24 24" style="width:18px; fill:#000;"><path d="M8 5v14l11-7z"/></svg>
                 </div>
                 
@@ -1340,7 +1340,7 @@
                     </div>
                 </div>
 
-                <audio id="${safeId}" src="${m.fileUrl}" crossorigin="anonymous" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
+                <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
                 <div id="react-${id}" class="reaction-badge" style="position:absolute; bottom:-8px; right:10px; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
             </div>`;
             // Audio usually doesn't have caption in this style, or it sits below
@@ -1409,12 +1409,12 @@
         }
         
         // Listeners for Wrappers (Media)
-        if(m.imageUrl || (m.fileUrl && m.fileMeta.type === 'video')) {
+        if(m.imageUrl || (m.fileUrl && m.fileMeta.type.includes('video'))) {
              const mediaEl = rowDiv.querySelector('.msg-media-wrapper') || rowDiv.querySelector('.msg-video-container');
              if(mediaEl) attachMessageListeners(mediaEl, id, m);
         }
         // Listeners for Audio/File pills
-        if(m.fileUrl && (m.fileMeta.type === 'audio' || m.fileMeta.type === 'pdf' || m.fileMeta.type === 'file')) {
+        if(m.fileUrl && (m.fileMeta.type.includes('audio') || m.fileMeta.type.includes('pdf') || m.fileMeta.type.includes('file'))) {
              const pill = rowDiv.querySelector('.msg-audio-pill') || rowDiv.querySelector('.msg-file-pill');
              if(pill) attachMessageListeners(pill, id, m);
         }
@@ -1426,6 +1426,8 @@
         const icon = document.getElementById('icon-' + id);
         const wave = document.getElementById('wave-' + id);
         
+        if (!audio) return;
+
         // Pause all other audios
         document.querySelectorAll('audio').forEach(a => {
             if(a.id !== id) {
@@ -1448,7 +1450,7 @@
     window.updateAudioUI = function(id) {
         const audio = document.getElementById(id);
         const prog = document.getElementById('prog-' + id);
-        if(audio.duration) {
+        if(audio && audio.duration) {
             const pct = (audio.currentTime / audio.duration) * 100;
             prog.style.width = pct + '%';
         }
@@ -1459,8 +1461,8 @@
         const prog = document.getElementById('prog-' + id);
         const wave = document.getElementById('wave-' + id);
         
-        icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-        prog.style.width = '0%';
+        if(icon) icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        if(prog) prog.style.width = '0%';
         if(wave) wave.classList.remove('audio-playing');
     };
 
@@ -1514,8 +1516,8 @@
                     let replyText = m.text;
                     if(!replyText) {
                         if(m.imageUrl) replyText = "📷 Photo";
-                        else if(m.fileMeta && m.fileMeta.type === 'video') replyText = "🎥 Video";
-                        else if(m.fileMeta && m.fileMeta.type === 'audio') replyText = "🎵 Audio";
+                        else if(m.fileMeta && m.fileMeta.type.includes('video')) replyText = "🎥 Video";
+                        else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
                         else if(m.fileUrl) replyText = "📄 File";
                         else replyText = "Attachment";
                     }
@@ -1577,9 +1579,10 @@
 
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
         
+        let type = metadata.type || "";
         let label = "📄 File";
-        if(metadata.type === 'video') label = "🎥 Video";
-        if(metadata.type === 'audio') label = "🎵 Audio";
+        if(type.indexOf('video') !== -1) label = "🎥 Video";
+        else if(type.indexOf('audio') !== -1) label = "🎵 Audio";
         
         updateLastMsg(caption ? label + " " + caption : label);
         scrollToBottom();
@@ -1788,7 +1791,21 @@
         const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
         if (!snapshot.empty) {
             const lastMsg = snapshot.docs[0].data();
-            const txt = lastMsg.imageUrl ? (lastMsg.text ? "📷 "+lastMsg.text : "📷 Image") : lastMsg.text;
+            let txt = lastMsg.text || "";
+            
+            // Logic to determine type of the NEW last message
+            if (lastMsg.imageUrl) {
+                txt = txt ? "📷 " + txt : "📷 Image";
+            } else if (lastMsg.fileUrl) {
+                const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
+                let icon = "📄";
+                let label = "File";
+                if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
+                else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
+                
+                txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
+            }
+            
             await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
         }
     }
