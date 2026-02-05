@@ -4,13 +4,12 @@ class ImagePicker extends HTMLElement {
         
         // Load credentials from global CONFIG object
         // We check global scope and window explicitly
+        this.apiKey = "";
+        
         if (typeof CONFIG !== 'undefined') {
             this.apiKey = CONFIG.imgbbApiKey;
         } else if (window.CONFIG) {
             this.apiKey = window.CONFIG.imgbbApiKey;
-        } else {
-            // It might load later, we will check again before upload
-            this.apiKey = ""; 
         }
 
         this.selectedFile = null;
@@ -370,17 +369,16 @@ class ImagePicker extends HTMLElement {
              this.destroyCropper();
         }
 
-        // RETRY LOADING API KEY IF MISSING
+        // RETRY LOADING API KEY FROM WINDOW.CONFIG IF MISSING
+        // This is the critical fix for the race condition
         if (!this.apiKey) {
-            if (typeof CONFIG !== 'undefined' && CONFIG.imgbbApiKey) {
-                this.apiKey = CONFIG.imgbbApiKey;
-            } else if (window.CONFIG && window.CONFIG.imgbbApiKey) {
+            if (window.CONFIG && window.CONFIG.imgbbApiKey) {
                 this.apiKey = window.CONFIG.imgbbApiKey;
             }
         }
 
         if (!this.apiKey) {
-            alert("API Key missing. Please check config.js");
+            alert("API Key missing. Please check config.js and ensure window.CONFIG is set.");
             return;
         }
 
