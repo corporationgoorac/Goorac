@@ -3,277 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Profile</title>
+    <meta name="theme-color" content="#050505">
+    <title>My Profile | Goorac</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
 
-    <script src="components/viewMedia.js" defer></script>
-
     <style>
         :root {
-            --bg: #000000;
-            --card: #0a0a0a;
-            --accent: #00d2ff;
-            --glass: rgba(255, 255, 255, 0.03);
+            --bg: #050505;
+            --card-bg: rgba(20, 20, 20, 0.6);
+            --accent: #0095f6;
+            --accent-glow: rgba(0, 149, 246, 0.4);
+            --text: #ffffff;
+            --text-sec: #a8a8a8;
             --border: rgba(255, 255, 255, 0.1);
+            --danger: #ff3b30;
         }
 
-        /* Security: Avoid Copy & Selection */
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { background: var(--bg); color: var(--text); overflow-x: hidden; padding-bottom: 80px; }
 
-        body {
-            background-color: var(--bg);
-            color: #fff;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            margin: 0;
-            padding-bottom: 100px;
-            overflow-x: hidden;
-        }
-
-        /* Skeleton Animation */
+        /* --- SKELETON LOADING --- */
         .skeleton {
-            background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%);
+            background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
             background-size: 200% 100%;
-            animation: skeleton-loading 1.5s infinite linear;
-            border-radius: 8px;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
             color: transparent !important;
         }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        @keyframes skeleton-loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        /* Persistent Header */
+        /* --- HEADER --- */
         header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(20px);
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
             padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
-            z-index: 100;
+        }
+        .header-title { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        .settings-btn { background: none; border: none; color: var(--text); opacity: 0.8; cursor: pointer; }
+
+        /* --- HERO SECTION --- */
+        .hero { position: relative; margin-top: 60px; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Dynamic Banner */
+        .banner {
+            width: 100%; height: 120px; border-radius: 20px;
+            background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+            position: relative; overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .banner::after {
+            content:''; position: absolute; inset:0;
+            background: radial-gradient(circle at 50% 120%, var(--accent-glow), transparent 70%);
+            opacity: 0.6;
         }
 
-        .header-username { font-weight: 800; font-size: 1rem; color: #fff; min-width: 80px; }
-
-        .profile-hero {
-            padding: 40px 20px 20px;
-            text-align: center;
-            background: radial-gradient(circle at top, rgba(0, 210, 255, 0.05) 0%, transparent 70%);
-        }
-
-        /* PFP Zoom Effect */
+        /* Avatar */
         .pfp-container {
-            width: 110px;
-            height: 110px;
-            margin: 0 auto 20px;
-            overflow: visible;
+            margin-top: -50px; position: relative;
+            width: 100px; height: 100px;
+        }
+        .pfp {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 4px solid var(--bg);
+            background: #111; position: relative; z-index: 2;
         }
 
-        .pfp-main {
-            width: 100%;
-            height: 100%;
-            border-radius: 38px;
-            object-fit: cover;
-            border: 2px solid var(--border);
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            cursor: pointer;
+        /* Info */
+        .info-section { text-align: center; margin-top: 10px; width: 100%; }
+        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.4rem; font-weight: 800; }
+        .badge { width: 16px; height: 16px; display: inline-block; }
+        .username { color: var(--text-sec); font-size: 0.9rem; margin-top: 2px; font-weight: 500; }
+        
+        /* ID Badge */
+        .id-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.05); padding: 4px 12px;
+            border-radius: 12px; font-size: 0.7rem; color: var(--text-sec);
+            margin-top: 10px; border: 1px solid var(--border); cursor: pointer;
+        }
+        .id-badge:active { background: rgba(255,255,255,0.1); }
+
+        .bio {
+            margin: 15px 0 20px; font-size: 0.95rem; line-height: 1.5; color: #ddd;
+            max-width: 90%; text-align: center;
         }
 
-        .pfp-main:active {
-            transform: scale(1.5);
-            z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .name-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 5px;
-            min-height: 32px;
-        }
-
-        .full-name { font-size: 1.6rem; font-weight: 900; }
-
-        .verify-badge { width: 20px; height: 20px; display: none; }
-
-        .goorac-id-tag {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            padding: 6px 16px;
-            border-radius: 100px;
-            font-size: 0.8rem;
-            color: var(--accent);
-            font-weight: 700;
-            display: inline-block;
-            margin-bottom: 25px;
-            min-width: 120px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .goorac-id-tag:active { 
-            opacity: 0.6; 
-            transform: scale(0.95);
-        }
-
+        /* --- STATS GRID --- */
         .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            padding: 0 20px;
-            margin-bottom: 35px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;
+            margin-bottom: 20px;
         }
-
-        /* Link Styling */
-        .stat-link {
-            text-decoration: none;
-            color: inherit;
-            display: block;
+        .stat-item {
+            background: var(--card-bg); padding: 15px; border-radius: 16px;
+            text-align: center; border: 1px solid var(--border);
+            cursor: pointer; transition: 0.2s;
+            text-decoration: none; display: block;
         }
+        .stat-item:active { transform: scale(0.98); background: rgba(255,255,255,0.05); }
+        .stat-num { font-size: 1.2rem; font-weight: 800; display: block; color: var(--text); }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-sec); letter-spacing: 0.5px; margin-top: 4px; display: block; }
 
-        .stat-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            padding: 18px;
-            border-radius: 24px;
-            transition: transform 0.2s ease, background 0.2s ease;
-        }
-
-        .stat-card:active {
-            transform: scale(0.96);
-            background: var(--glass);
-        }
-
-        .stat-card span { display: block; font-size: 1.3rem; font-weight: 900; margin-bottom: 2px; }
-        .stat-card label { font-size: 0.7rem; color: #666; font-weight: 700; text-transform: uppercase; }
-
-        .bio-section { padding: 0 25px; margin-bottom: 35px; }
-        .bio-section h3 { font-size: 0.75rem; color: #555; text-transform: uppercase; margin-bottom: 10px; }
-        .bio-section p { font-size: 0.95rem; color: #bbb; line-height: 1.6; min-height: 20px; }
-
-        .action-grid {
-            padding: 0 20px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
+        /* --- ACTIONS --- */
+        .action-row { display: flex; gap: 10px; width: 100%; margin-bottom: 25px; }
         .btn {
-            padding: 16px;
-            border-radius: 20px;
-            border: none;
-            font-weight: 800;
-            font-size: 0.9rem;
-            cursor: pointer;
-            text-align: center;
+            flex: 1; padding: 12px; border-radius: 12px; border: none;
+            font-weight: 600; font-size: 0.9rem; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
             text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        }
+        
+        .btn-edit { background: #fff; color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
+        .btn-logout { background: rgba(255, 59, 48, 0.1); color: var(--danger); border: 1px solid rgba(255, 59, 48, 0.2); }
+        .btn:active { transform: scale(0.96); }
+
+        /* --- TABS --- */
+        .tabs {
+            display: flex; width: 100%; border-bottom: 1px solid var(--border);
+            margin-bottom: 1px;
+        }
+        .tab {
+            flex: 1; padding: 15px; text-align: center;
+            font-size: 0.9rem; color: var(--text-sec); font-weight: 600;
+            position: relative; cursor: pointer;
+        }
+        .tab.active { color: var(--text); }
+        .tab.active::after {
+            content:''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 2px;
+            background: var(--accent); border-radius: 2px;
         }
 
-        .btn-edit { background: #fff; color: #000; }
-        .btn-logout { background: #1a1a1a; color: #ff4b4b; border: 1px solid rgba(255, 75, 75, 0.1); }
+        .content-area {
+            padding: 40px 20px; text-align: center; color: var(--text-sec);
+            font-size: 0.9rem;
+        }
 
-        /* Toast Styles */
+        /* --- TOAST --- */
         #toast {
-            position: fixed;
-            bottom: 110px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #fff;
-            color: #000;
-            padding: 10px 24px;
-            border-radius: 50px;
-            font-weight: 800;
-            font-size: 0.8rem;
-            display: none;
-            z-index: 1000;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-            animation: slideUp 0.3s ease;
-            transition: opacity 0.3s ease;
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #fff; color: #000; padding: 10px 24px; border-radius: 50px;
+            font-weight: 600; font-size: 0.85rem; opacity: 0; pointer-events: none;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
         }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        @keyframes slideUp {
-            from { bottom: 80px; opacity: 0; }
-            to { bottom: 110px; opacity: 1; }
-        }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
-<header>
-    <div class="header-username skeleton" id="header-user">@username</div>
-    <div style="font-size: 1.2rem; opacity: 0.4;">⚙️</div>
-</header>
+    <header>
+        <span class="header-title" id="nav-username">MY PROFILE</span>
+        <button class="settings-btn">
+            <span class="material-icons-round">settings</span>
+        </button>
+    </header>
 
-<div class="profile-hero">
-    <div class="pfp-container">
-        <img id="pfp-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-main skeleton" onclick="openPFP()">
+    <div class="hero">
+        <div class="banner"></div>
+        
+        <div class="pfp-container skeleton" id="sk-pfp">
+            <img id="pfp" class="pfp" src="" style="opacity: 0;">
+        </div>
+
+        <div class="info-section">
+            <div class="name-row skeleton" id="sk-name" style="width: 150px; margin: 0 auto;">
+                <span id="display-name">Loading</span>
+                <img id="verified-badge" class="badge" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" style="display:none;">
+            </div>
+            
+            <div class="username skeleton" id="sk-user" style="width: 100px; margin: 4px auto 0;">@username</div>
+
+            <div class="id-badge skeleton" id="sk-id" onclick="copyID()" style="width: 120px; margin: 10px auto 0;">
+                <span class="material-icons-round" style="font-size:14px;">fingerprint</span>
+                ID: <span id="goorac-id">------</span>
+            </div>
+
+            <p class="bio skeleton" id="sk-bio" style="width: 80%; margin: 15px auto;">Fetching your details...</p>
+        </div>
+
+        <div class="stats-grid">
+            <a href="followers.html" class="stat-item skeleton" id="sk-fol">
+                <span class="stat-num" id="count-followers">0</span>
+                <span class="stat-label">Followers</span>
+            </a>
+            <a href="following.html" class="stat-item skeleton" id="sk-fing">
+                <span class="stat-num" id="count-following">0</span>
+                <span class="stat-label">Following</span>
+            </a>
+        </div>
+
+        <div class="action-row">
+            <a href="setup.html" class="btn btn-edit skeleton" id="sk-btn1">Edit Profile</a>
+            <button onclick="logout()" class="btn btn-logout skeleton" id="sk-btn2">
+                <span class="material-icons-round" style="font-size:18px;">logout</span> Logout
+            </button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active">Notes</div>
+        <div class="tab">Media</div>
+        <div class="tab">About</div>
     </div>
     
-    <div class="name-container">
-        <span class="full-name skeleton" id="user-full-name">User Name Placeholder</span>
-        <img id="v-badge" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="verify-badge">
+    <div class="content-area">
+        <span class="material-icons-round" style="font-size: 30px; opacity: 0.5; margin-bottom: 10px;">grid_view</span>
+        <br>Your posts will appear here
     </div>
+
+    <div id="toast">ID Copied to clipboard</div>
     
-    <div class="goorac-id-tag skeleton" id="id-tag-wrap" onclick="copyGooracID()">
-        GOORAC ID: <span id="user-id-num">00000000</span>
-    </div>
-</div>
-
-<div class="stats-grid">
-    <a href="followers.html" class="stat-link">
-        <div class="stat-card">
-            <span id="stat-followers" class="skeleton">00</span>
-            <label>Followers</label>
-        </div>
-    </a>
-    <a href="following.html" class="stat-link">
-        <div class="stat-card">
-            <span id="stat-following" class="skeleton">00</span>
-            <label>Following</label>
-        </div>
-    </a>
-</div>
-
-<div class="bio-section">
-    <h3>Bio</h3>
-    <p id="bio-text" class="skeleton">This is a placeholder bio text that will be replaced.</p>
-</div>
-
-<div class="action-grid">
-    <a href="setup.html" class="btn btn-edit">Edit Profile</a>
-    <button id="logoutBtn" class="btn btn-logout">Logout</button>
-</div>
-
-<div id="toast">Copied to Clipboard</div>
-
-<view-media id="pfp-viewer"></view-media>
-
-<main-navbar></main-navbar>
+    <main-navbar></main-navbar>
+    <call-notifier></call-notifier>
 
 <script>
+    // --- CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -283,142 +238,101 @@
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
 
+    // --- INIT ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            try {
-                const doc = await db.collection("users").doc(user.uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    const removeSkeleton = (id) => document.getElementById(id).classList.remove('skeleton');
-
-                    // Populate UI
-                    const pfp = document.getElementById('pfp-img');
-                    pfp.src = data.photoURL || 'https://via.placeholder.com/150';
-                    pfp.onload = () => pfp.classList.remove('skeleton');
-
-                    document.getElementById('user-full-name').innerText = data.name || "User";
-                    removeSkeleton('user-full-name');
-
-                    document.getElementById('header-user').innerText = "@" + (data.username || "user");
-                    removeSkeleton('header-user');
-
-                    document.getElementById('user-id-num').innerText = data.gooracNumber || "----------";
-                    removeSkeleton('id-tag-wrap');
-
-                    document.getElementById('bio-text').innerText = data.bio || "Welcome to my Goorac profile.";
-                    removeSkeleton('bio-text');
-                    
-                    document.getElementById('stat-followers').innerText = data.followerCount || 0;
-                    removeSkeleton('stat-followers');
-
-                    document.getElementById('stat-following').innerText = data.followingCount || 0;
-                    removeSkeleton('stat-following');
-
-                    if (data.verified === true) {
-                        document.getElementById('v-badge').style.display = 'inline';
-                    }
-
-                } else {
-                    window.location.href = "setup.html";
-                }
-            } catch (err) {
-                console.error("Profile Error:", err);
-            }
+            loadMyProfile(user.uid);
         } else {
-            window.location.href = "login.html";
+            window.location.href = 'login.html';
         }
     });
 
-    // ROBUST COPY FUNCTION
-    function copyGooracID() {
-        const idElement = document.getElementById('user-id-num');
-        const id = idElement.innerText.trim();
-        
-        if (!id || id === "----------" || id === "00000000") return;
-        
-        if (navigator.vibrate) navigator.vibrate(50);
-
-        // Try Modern API first
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(id).then(() => {
-                showToast();
-            }).catch(() => {
-                fallbackCopy(id);
-            });
-        } else {
-            fallbackCopy(id);
-        }
-    }
-
-    function fallbackCopy(text) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed"; 
-        textArea.style.left = "-9999px";
-        textArea.style.top = "0";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-            document.execCommand('copy');
-            showToast();
-        } catch (err) {
-            console.error('Copy failed', err);
-        }
-        document.body.removeChild(textArea);
-    }
-
-    function showToast() {
-        const toast = document.getElementById('toast');
-        toast.style.display = 'block';
-        toast.style.opacity = '1';
-        setTimeout(() => { 
-            toast.style.opacity = '0';
-            setTimeout(() => { toast.style.display = 'none'; }, 300);
-        }, 2000);
-    }
-
-    document.getElementById('logoutBtn').onclick = () => {
-        auth.signOut().then(() => {
-            window.location.href = "login.html";
+    async function loadMyProfile(uid) {
+        // Use Snapshot for real-time updates without page reload
+        db.collection("users").doc(uid).onSnapshot((doc) => {
+            if (doc.exists) {
+                renderProfile(doc.data());
+            } else {
+                // User document doesn't exist, redirect to setup
+                window.location.href = "setup.html";
+            }
         });
-    };
+    }
 
-    // --- Media Viewer Logic (Hides Navbar) ---
-    function openPFP() {
-        const viewer = document.getElementById('pfp-viewer');
-        const img = document.getElementById('pfp-img');
-        const nav = document.querySelector('main-navbar');
+    function renderProfile(data) {
+        // Stop Skeletons
+        document.querySelectorAll('.skeleton').forEach(el => {
+            el.classList.remove('skeleton');
+            el.style.width = 'auto';
+            el.style.color = '';
+            el.style.margin = '';
+        });
+
+        // 1. Images
+        const pfpEl = document.getElementById('pfp');
+        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
+        pfpEl.onload = () => pfpEl.style.opacity = '1';
+
+        // 2. Text
+        document.getElementById('display-name').innerText = data.name || "User";
+        document.getElementById('sk-user').innerText = `@${data.username}`;
+        document.getElementById('sk-bio').innerText = data.bio || "Welcome to my Goorac profile.";
+        document.getElementById('goorac-id').innerText = data.gooracNumber || "----------";
+
+        // 3. Badge
+        if(data.verified) document.getElementById('verified-badge').style.display = 'inline-block';
+
+        // 4. Counts (USING ARRAY LENGTH - ZERO READ COST)
+        // Check if arrays exist, if not use empty array to prevent error
+        const followersList = data.followers || [];
+        const followingList = data.following || [];
         
-        // 1. Hide Navbar
-        if (nav) nav.style.display = 'none';
+        document.getElementById('count-followers').innerText = followersList.length;
+        document.getElementById('count-following').innerText = followingList.length;
+    }
 
-        // 2. Open Viewer
-        viewer.open(img.src, 'image');
+    // --- ACTIONS ---
 
-        // 3. Watch for Close to Restore Navbar
-        const overlay = viewer.querySelector('#vm-overlay');
-        if (overlay) {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.attributeName === 'class') {
-                        if (!overlay.classList.contains('open')) {
-                            if (nav) nav.style.display = ''; // Restore default
-                            observer.disconnect();
-                        }
-                    }
-                });
-            });
-            observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    function copyID() {
+        const txt = document.getElementById('goorac-id').innerText;
+        if(txt.includes('-')) return;
+
+        if(navigator.vibrate) navigator.vibrate(10);
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(txt).then(() => showToast("ID Copied"));
+        } else {
+            // Fallback
+            const textArea = document.createElement("textarea");
+            textArea.value = txt;
+            textArea.style.position = "fixed"; textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); showToast("ID Copied"); } catch (err) {}
+            document.body.removeChild(textArea);
         }
     }
-</script>
 
-<call-notifier></call-notifier>
+    function logout() {
+        if(confirm("Are you sure you want to log out?")) {
+            if(navigator.vibrate) navigator.vibrate(10);
+            auth.signOut().then(() => {
+                window.location.href = "login.html";
+            });
+        }
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+</script>
 </body>
 </html>
