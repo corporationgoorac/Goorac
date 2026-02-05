@@ -32,14 +32,17 @@
             -webkit-touch-callout: none;
         }
 
+        /* HEADER */
         header {
             position: sticky; top: 0; background: rgba(0,0,0,0.9);
             padding: 15px 20px; display: flex; justify-content: space-between;
             align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
             backdrop-filter: blur(20px);
+            padding-top: max(15px, env(safe-area-inset-top));
         }
         .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
+        /* SEARCH */
         .search-wrap { padding: 12px 20px; }
         .search-input {
             width: 100%; background: #111; border: 1px solid var(--border);
@@ -49,6 +52,7 @@
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
 
+        /* SKELETON LOADER */
         .skeleton-item {
             display: flex; align-items: center; padding: 15px 20px; opacity: 0.5;
             animation: quantumPulse 1.5s infinite ease-in-out;
@@ -57,6 +61,7 @@
         .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
         @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
 
+        /* CHAT LIST ITEM */
         .chat-item { 
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
@@ -97,7 +102,7 @@
             flex-shrink: 0;
         }
 
-        /* NEW Professional Action Sheet Styles */
+        /* MODAL / ACTION SHEET */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: var(--sheet-bg); border-top: 1px solid var(--border);
@@ -108,12 +113,29 @@
         }
         #delete-menu.active { bottom: 0; }
         
+        /* PC RESPONSIVENESS */
+        @media (min-width: 768px) {
+            #delete-menu {
+                width: 400px;
+                left: 50%;
+                transform: translateX(-50%);
+                bottom: -100%; /* Hidden state */
+                border-radius: 24px;
+                border: 1px solid var(--border);
+                padding-bottom: 20px;
+            }
+            #delete-menu.active {
+                bottom: 50%;
+                transform: translate(-50%, 50%);
+            }
+        }
+        
         .menu-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
             z-index: 99999; display: none; backdrop-filter: blur(8px);
         }
 
-        /* Chat Selection Context UI */
+        /* Context UI */
         .sheet-context {
             display: flex; flex-direction: column; align-items: center;
             padding-bottom: 25px; margin-bottom: 10px;
@@ -163,7 +185,7 @@
     </div>
 </div>
 
-<div class="menu-overlay" id="overlay" onclick="closeDeleteMenu()"></div>
+<div class="menu-overlay" id="overlay" onclick="closeDeleteMenu(true)"></div>
 <div id="delete-menu">
     <div class="sheet-context" id="sheet-user-info">
         <img src="" class="context-pfp" id="active-pfp">
@@ -174,7 +196,7 @@
     <div class="action-list">
         <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
         <button class="btn-action del-btn-big" id="confirm-delete">Erase History For Both</button>
-        <button class="btn-action cancel-btn" onclick="closeDeleteMenu()">Close Options</button>
+        <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
     </div>
 </div>
 
@@ -269,7 +291,14 @@
                     const num = chat.unreadCount[myUid];
                     displayCount = num > 99 ? "99+" : num;
                 }
-                const amIFollowing = myFollowingList.includes(otherUid);
+
+                // FIXED: MUTUAL CHECK LOGIC
+                // Works with both array of strings and array of objects {uid: "...", timestamp: ...}
+                const amIFollowing = myFollowingList.some(item => {
+                    const uid = typeof item === 'string' ? item : item.uid;
+                    return uid === otherUid;
+                });
+
                 const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
                 const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
                 const item = document.createElement('div');
@@ -315,11 +344,14 @@
         });
     }
 
-    // UPDATED: Professional Menu Opening with Selected User Data
+    // UPDATED: Professional Menu with Back Button Support
     function openDeleteMenu(chatId, isPinned, userObj) {
         activeChatId = chatId;
         
-        // Populate UI with selected user data
+        // Push state for Back Button Handling
+        history.pushState({ menuOpen: true }, "", "#menu");
+
+        // Populate UI
         document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
         document.getElementById('active-name').innerHTML = `${userObj.name || userObj.username} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
         document.getElementById('active-username').innerText = `@${userObj.username}`;
@@ -336,8 +368,15 @@
         if (window.navigator.vibrate) window.navigator.vibrate(30);
     }
 
+    // Listen for Back Button to Close Menu
+    window.onpopstate = (e) => {
+        if(document.getElementById('delete-menu').classList.contains('active')) {
+            closeDeleteMenu(false); // false = don't go back, just close
+        }
+    };
+
     async function togglePin(chatId, isPinned) {
-        closeDeleteMenu();
+        closeDeleteMenu(true); // true = go back if needed
         const userRef = db.collection("users").doc(myUid);
         if (isPinned) {
             await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
@@ -346,18 +385,23 @@
         }
     }
 
-    function closeDeleteMenu() {
+    function closeDeleteMenu(shouldGoBack) {
         activeChatId = null;
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
+        
+        // Remove hash if manually closed
+        if(shouldGoBack && window.location.hash === "#menu") {
+            history.back();
+        }
     }
 
     document.getElementById('confirm-delete').onclick = async () => {
         if(!activeChatId) return;
         const cid = activeChatId; 
-        closeDeleteMenu();
+        closeDeleteMenu(true);
         try {
             const messagesRef = db.collection("chats").doc(cid).collection("messages");
             const snapshot = await messagesRef.get();
@@ -381,11 +425,19 @@
         if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
         results.style.display = 'block'; content.style.display = 'none';
         const queryText = val.toLowerCase();
-        const myContacts = [...new Set([...myFollowingList, ...myFollowersList])];
+        
+        // Extract UIDs safely
+        const flatFollowing = myFollowingList.map(f => typeof f === 'string' ? f : f.uid);
+        const flatFollowers = myFollowersList.map(f => typeof f === 'string' ? f : f.uid);
+        
+        const myContacts = [...new Set([...flatFollowing, ...flatFollowers])];
+        
         if (myContacts.length === 0) {
             results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>Frequency empty.</p>";
             return;
         }
+        
+        // Firestore 'in' query limit is 10, slice it
         db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', myContacts.slice(0, 10)).get().then(snap => {
             results.innerHTML = snap.docs
             .filter(doc => {
