@@ -18,6 +18,9 @@ class ViewNotes extends HTMLElement {
         this.startY = 0;
         this.currentY = 0;
         this.isDragging = false;
+        
+        // Double Tap Logic
+        this.lastTap = 0;
     }
 
     connectedCallback() {
@@ -39,6 +42,16 @@ class ViewNotes extends HTMLElement {
         if (diffInHours < 24) return `${diffInHours}h ago`;
         const diffInDays = Math.floor(diffInHours / 24);
         return `${diffInDays}d ago`;
+    }
+
+    // SVG Icons Helper
+    getIcons() {
+        return {
+            heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
+            heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
+            send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
+            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`
+        };
     }
 
     render() {
@@ -66,15 +79,11 @@ class ViewNotes extends HTMLElement {
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
-            /* --- PC RESPONSIVENESS --- */
             @media (min-width: 768px) {
                 .vn-overlay { align-items: center; } 
                 .vn-sheet {
-                    border-radius: 24px; 
-                    width: 420px;
-                    max-height: 80vh;
-                    transform: scale(0.95); opacity: 0;
-                    margin: 0 auto;
+                    border-radius: 24px; width: 420px; max-height: 80vh;
+                    transform: scale(0.95); opacity: 0; margin: 0 auto;
                     border: 1px solid #333;
                 }
                 .vn-overlay.open .vn-sheet { transform: scale(1); opacity: 1; }
@@ -90,21 +99,14 @@ class ViewNotes extends HTMLElement {
             }
             .vn-friend-pfp {
                 width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
-                border: 1px solid #333;
+                border: 1px solid #333; cursor: pointer;
             }
-            .vn-friend-info { display: flex; flex-direction: column; }
+            .vn-friend-info { display: flex; flex-direction: column; cursor: pointer; }
             .vn-friend-name { 
                 font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; 
             }
             .vn-friend-handle { color: #888; font-size: 0.85rem; }
             
-            /* Verification Badge (General) */
-            .vn-verify-badge {
-                width: 14px; height: 14px; background: #00d2ff; display: inline-block; border-radius: 50%;
-                mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
-                -webkit-mask: url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg') no-repeat center / contain;
-            }
-
             .vn-scroll-content { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
             .vn-scroll-content::-webkit-scrollbar { display: none; }
 
@@ -113,11 +115,26 @@ class ViewNotes extends HTMLElement {
                 text-align: center; position: relative; overflow: hidden;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 min-height: 140px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                transition: transform 0.1s;
+                cursor: default;
             }
+            .vn-note-card:active { transform: scale(0.98); }
+
+            /* Double Tap Heart Animation */
+            .vn-pop-heart {
+                position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+                opacity: 0; pointer-events: none; z-index: 10;
+            }
+            .vn-pop-heart.animate { animation: popHeart 0.8s ease-out forwards; }
+            @keyframes popHeart {
+                0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+                20% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+            }
+
             .vn-note-text { 
                 font-size: 1.5rem; font-weight: 700; line-height: 1.3; z-index: 2;
-                text-shadow: 0 2px 10px rgba(0,0,0,0.1); word-break: break-word;
-                width: 100%;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.1); word-break: break-word; width: 100%;
             }
 
             .vn-song-pill { 
@@ -134,7 +151,6 @@ class ViewNotes extends HTMLElement {
                 margin-top: 5px; margin-bottom: 20px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
             }
 
-            /* --- REPLY SECTION & EMOJIS --- */
             .vn-footer-actions { margin-top: auto; padding-top: 10px; }
             
             .vn-emoji-bar {
@@ -142,11 +158,10 @@ class ViewNotes extends HTMLElement {
                 padding: 0 5px;
             }
             .vn-quick-emoji {
-                font-size: 2.2rem; cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                user-select: none; -webkit-tap-highlight-color: transparent;
+                font-size: 2.2rem; cursor: pointer; transition: transform 0.2s;
+                user-select: none;
             }
             .vn-quick-emoji:active { transform: scale(1.4); }
-            .vn-quick-emoji.popped { animation: emojiPop 0.5s ease forwards; }
 
             .vn-interaction-bar { 
                 display: flex; align-items: center; gap: 10px; 
@@ -160,29 +175,23 @@ class ViewNotes extends HTMLElement {
             .vn-reply-input::placeholder { color: #666; }
             
             .vn-send-btn {
-                color: #0095f6; font-weight: 700; font-size: 0.95rem; border: none; background: transparent;
-                padding: 0 12px; cursor: pointer; display: none;
+                background: transparent; border: none; padding: 8px; cursor: pointer; display: none;
+                align-items: center; justify-content: center;
             }
-            .vn-send-btn.visible { display: block; }
+            .vn-send-btn.visible { display: flex; }
 
             .vn-heart-btn { 
-                background: transparent; border: none; font-size: 1.6rem; cursor: pointer; 
+                background: transparent; border: none; cursor: pointer; 
                 width: 44px; height: 44px; display: flex; justify-content: center; align-items: center; 
                 transition: transform 0.1s; -webkit-tap-highlight-color: transparent;
+                color: #888;
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- OWN NOTE STYLES --- */
             .vn-likers-section { 
                 margin-top: 20px; border-top: 1px solid #222; padding-top: 15px;
-                max-height: 250px; /* SCROLL LIMIT */
-                overflow-y: auto; /* SCROLL ENABLED */
-                scrollbar-width: thin; 
-                scrollbar-color: #333 #121212;
+                max-height: 250px; overflow-y: auto; scrollbar-width: thin; 
             }
-            .vn-likers-section::-webkit-scrollbar { width: 4px; }
-            .vn-likers-section::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-right: 5px; }
             
             .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
@@ -257,7 +266,6 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(initialNoteData, isOwnNote = false) {
-        // FAST OPEN: Clear logic then render immediately with passed data
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -267,7 +275,6 @@ class ViewNotes extends HTMLElement {
         this.currentNote = initialNoteData;
         this.currentUserProfile = null; 
         
-        // RENDER IMMEDIATELY (Prevents lag)
         this.renderContent();
 
         const overlay = this.querySelector('#vn-overlay');
@@ -278,35 +285,25 @@ class ViewNotes extends HTMLElement {
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
 
-        // Play Audio if exists
         if (initialNoteData && initialNoteData.songPreview) {
             this.audioPlayer.src = initialNoteData.songPreview;
             this.audioPlayer.play().catch(err => console.log("Audio play deferred"));
         }
 
-        // BACKGROUND FETCH: Update profile data if needed
-        // We do this to get the absolute latest, but we trust initialNoteData.pfp for the first paint
         if(initialNoteData && initialNoteData.uid) {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
-                    // Optional: Re-render if you want to force latest DP even if note has old one
-                    // But to avoid flicker, we usually stick to the one passed unless we really need to update.
-                    // this.renderContent(); 
                 }
             });
         }
 
-        // REAL-TIME LISTENER
         if (initialNoteData && initialNoteData.uid) {
             this.unsubscribe = this.db.collection("active_notes").doc(initialNoteData.uid)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
-                        // Merge but prefer doc data
                         const freshData = doc.data();
                         this.currentNote = { ...freshData, uid: doc.id };
-                        
-                        // Handle expiration in real-time
                         if(freshData.expiresAt && freshData.expiresAt.toDate() < new Date()){
                              this.close();
                              return;
@@ -335,14 +332,12 @@ class ViewNotes extends HTMLElement {
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
+        const icons = this.getIcons();
         
-        // FIX: Prioritize note.pfp which is saved directly from notes.html to avoid flicker
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
         const displayName = note.username || this.currentUserProfile?.name || user?.displayName || 'You';
         
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
-
-        // Handle text alignment saved in note
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
 
@@ -352,7 +347,7 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-friend-info">
                     <div class="vn-friend-name">
                         ${displayName} (You)
-                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                        ${isVerified ? icons.verified : ''}
                     </div>
                     <div class="vn-friend-handle">Your Note</div>
                 </div>
@@ -376,12 +371,12 @@ class ViewNotes extends HTMLElement {
                         <div class="vn-liker-item">
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
-                                <span style="font-weight:600; display:flex; align-items:center;">
+                                <span style="font-weight:600; display:flex; align-items:center; gap:4px;">
                                     ${liker.displayName || 'User'}
-                                    ${liker.verified ? '<span class="vn-verify-badge" style="width:12px;height:12px;margin-left:4px;"></span>' : ''}
+                                    ${liker.verified ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>' : ''}
                                 </span>
                             </div>
-                            <span style="color:#ff3b30;">❤️</span>
+                            <span style="color:#ff3b30;">${icons.heartFilled}</span>
                         </div>
                     `).join('') : `<div style="text-align:center; color:#555;">No likes yet</div>`}
                 </div>
@@ -396,31 +391,34 @@ class ViewNotes extends HTMLElement {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
+        const icons = this.getIcons();
         
-        // FIX: Use note.pfp immediately to prevent "Google DP" flicker
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
         const displayName = note.username || this.currentUserProfile?.name || 'User';
         const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
 
-        // Handle text alignment saved in note
+        // Redirect Fix: Prioritize Username
+        const redirectUser = note.username || this.currentUserProfile?.username || note.uid;
+
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
 
         return `
             <div class="vn-profile-header">
-                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='userProfile.html?user=${this.currentUserProfile?.username || ''}'">
-                <div class="vn-friend-info">
+                <img src="${displayPfp}" class="vn-friend-pfp" onclick="window.location.href='userProfile.html?user=${redirectUser}'">
+                <div class="vn-friend-info" onclick="window.location.href='userProfile.html?user=${redirectUser}'">
                     <div class="vn-friend-name">
                         ${displayName}
-                        ${isVerified ? '<span class="vn-verify-badge"></span>' : ''}
+                        ${isVerified ? icons.verified : ''}
                     </div>
                     <div class="vn-friend-handle">${displayHandle}</div>
                 </div>
             </div>
 
             <div class="vn-scroll-content">
-                <div class="vn-note-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
+                <div class="vn-note-card" id="vn-active-card" style="background:${note.bgColor || '#262626'}; color:${note.textColor || '#fff'}; align-items:${alignItems};">
+                    <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
                     <div class="vn-note-text" style="text-align:${textAlign}">${note.text}</div>
                     ${note.songName ? `
                         <div class="vn-song-pill">
@@ -443,9 +441,9 @@ class ViewNotes extends HTMLElement {
                 </div>
                 <div class="vn-interaction-bar">
                     <input type="text" id="vn-reply-input" class="vn-reply-input" placeholder="Reply to ${displayName}..." autocomplete="off">
-                    <button id="vn-send-text-btn" class="vn-send-btn">Send</button>
+                    <button id="vn-send-text-btn" class="vn-send-btn">${icons.send}</button>
                     <button class="vn-heart-btn" id="like-toggle-btn">
-                        ${isLiked ? '❤️' : '🤍'}
+                        ${isLiked ? icons.heartFilled : icons.heartEmpty}
                     </button>
                 </div>
             </div>
@@ -455,6 +453,32 @@ class ViewNotes extends HTMLElement {
     attachDynamicListeners() {
         const user = firebase.auth().currentUser;
         if (!user) return;
+        const icons = this.getIcons();
+
+        // Double Tap Logic
+        const card = this.querySelector('#vn-active-card');
+        if(card && !this.isOwnNote) {
+            card.addEventListener('click', (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - this.lastTap;
+                if (tapLength < 300 && tapLength > 0) {
+                    // Double Tap Detected
+                    const popHeart = this.querySelector('#vn-pop-heart');
+                    const likeBtn = this.querySelector('#like-toggle-btn');
+                    
+                    popHeart.classList.add('animate');
+                    setTimeout(() => popHeart.classList.remove('animate'), 1000);
+                    
+                    if(navigator.vibrate) navigator.vibrate([10, 30]);
+
+                    // Only trigger if not already liked
+                    if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
+                         likeBtn.click();
+                    }
+                }
+                this.lastTap = currentTime;
+            });
+        }
 
         const leaveNoteBtn = this.querySelector('#vn-leave-new-note');
         if(leaveNoteBtn) {
@@ -480,8 +504,10 @@ class ViewNotes extends HTMLElement {
         if(likeBtn) {
             likeBtn.onclick = async () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                const isCurrentlyLiked = likeBtn.innerText === '❤️';
-                likeBtn.innerText = isCurrentlyLiked ? '🤍' : '❤️'; 
+                const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30'); // Check if filled
+                
+                // Visual Update Immediately
+                likeBtn.innerHTML = isCurrentlyLiked ? icons.heartEmpty : icons.heartFilled;
                 
                 likeBtn.style.transform = "scale(1.3)";
                 setTimeout(() => likeBtn.style.transform = "scale(1)", 150);
@@ -489,25 +515,20 @@ class ViewNotes extends HTMLElement {
                 const noteRef = this.db.collection("active_notes").doc(this.currentNote.uid);
                 try {
                     if (!isCurrentlyLiked) {
-                        // FETCH REAL DB USER DATA BEFORE LIKING (UPDATED)
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
-                        // FIX: ADDED TIMESTAMP TO LIKER OBJECT
                         await noteRef.update({
                             likes: firebase.firestore.FieldValue.arrayUnion({ 
                                 uid: user.uid, 
-                                displayName: userData.name || user.displayName, 
+                                displayName: userData.name || user.displayName,
+                                username: userData.username || user.displayName,
                                 photoURL: userData.photoURL || user.photoURL, 
                                 verified: userData.verified || false,
-                                timestamp: firebase.firestore.Timestamp.now() // STORED TIME FOR NOTIFICATIONS
+                                timestamp: firebase.firestore.Timestamp.now()
                             })
                         });
                     } else {
-                        // FIND AND REMOVE
-                        // Since we added timestamp, exact object match might fail if we don't have it locally.
-                        // We filter the array manually via transaction for safety or just find by UID locally.
-                        // For simple UI speed we try direct removal if we have the exact object in memory.
                         const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
                         if (likerObj) {
                             await noteRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
@@ -570,15 +591,14 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // FIX: Construct complete Metadata for chat rendering
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
             textColor: this.currentNote.textColor || "#fff",
-            textAlign: this.currentNote.textAlign || 'center', // Include Alignment
+            textAlign: this.currentNote.textAlign || 'center',
             songName: this.currentNote.songName || null,
             songArtist: this.currentNote.songArtist || null,
-            songArt: this.currentNote.songArt || null, // Include Song Art
+            songArt: this.currentNote.songArt || null,
             username: this.currentNote.username || "User",
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
@@ -603,7 +623,7 @@ class ViewNotes extends HTMLElement {
                 lastSender: myUid,
                 lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 participants: [myUid, targetUid],
-                seen: false, // Ensures UNREAD state
+                seen: false, 
                 [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
 
@@ -714,20 +734,21 @@ const NotesManager = {
                 z-index: -1;
             }
 
-            /* --- NEW: Like Indicator OUTSIDE Note Bubble (Bottom Right of PFP) --- */
+            /* --- SLEEK HEART INDICATOR --- */
             .note-like-indicator {
                 position: absolute;
-                top: 72px; /* Positioned relative to .note-item (which includes bubble height implicitly) */
+                top: 72px; 
                 right: 0px;  
-                font-size: 11px;
                 background: #1c1c1e;
                 border-radius: 50%;
-                width: 20px; height: 20px;
+                width: 22px; height: 22px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.4);
                 border: 2px solid #000; 
                 z-index: 20;
             }
+            /* Small SVG heart inside bubble */
+            .note-like-indicator svg { width: 12px; height: 12px; fill: #ff3b30; stroke: none; }
 
             .note-text-content {
                 line-height: 1.25;
@@ -737,7 +758,6 @@ const NotesManager = {
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
-                /* text-align handled inline now */
             }
 
             .note-music-tag {
@@ -787,24 +807,21 @@ const NotesManager = {
             const preview = document.getElementById('my-note-preview');
             if (!btn || !preview) return; 
 
-            // CHANGED: Use 'let' instead of 'const' to allow modification if expired
             let data = doc.exists ? doc.data() : null;
             
-            // --- FIX FOR OWN NOTE EXPIRATION ---
             if (data && data.expiresAt) {
                 const now = new Date();
                 const expires = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
                 if (now > expires) {
-                    data = null; // Treat as expired (removed) like friend notes
+                    data = null; 
                 }
             }
-            // -----------------------------------
 
             preview.classList.add('visible');
 
             if(data && (data.text || data.songName)) {
-                preview.style.backgroundColor = data.bgColor || '#262626'; // Supports gradients from notes.html
-                preview.style.background = data.bgColor || '#262626'; // Ensure gradients render
+                preview.style.backgroundColor = data.bgColor || '#262626'; 
+                preview.style.background = data.bgColor || '#262626'; 
                 preview.style.color = data.textColor || '#fff';
                 
                 preview.innerHTML = `
@@ -829,7 +846,6 @@ const NotesManager = {
                 preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                 btn.classList.remove('has-note');
                 btn.onclick = () => {
-                    // Direct redirect if no note exists
                     window.location.href = 'notes.html';
                 };
             }
@@ -847,7 +863,6 @@ const NotesManager = {
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            // FIX: Normalize array if it contains objects
             const followingUIDs = myFollowing.map(i => typeof i === 'string' ? i : i.uid);
             const followersUIDs = myFollowers.map(i => typeof i === 'string' ? i : i.uid);
 
@@ -862,7 +877,6 @@ const NotesManager = {
             let tempUIDs = [...mutualUIDs];
             while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 30));
 
-            // REAL-TIME UPDATES FOR FRIENDS NOTES
             chunks.forEach(chunk => {
                 db.collection("active_notes")
                     .where(firebase.firestore.FieldPath.documentId(), "in", chunk) 
@@ -876,7 +890,7 @@ const NotesManager = {
 
                             if (change.type === "added" || change.type === "modified") {
                                 const now = new Date();
-                                const isActive = noteData.expiresAt ? noteData.expiresAt.toDate() > now : true;
+                                const isActive = noteData.expiresAt ? (noteData.expiresAt.toDate ? noteData.expiresAt.toDate() : new Date(noteData.expiresAt)) > now : true;
                                 
                                 if(isActive) {
                                     const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
@@ -894,7 +908,10 @@ const NotesManager = {
                                             ` : ''}
                                         </div>
                                         <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
-                                        ${isLiked ? '<div class="note-like-indicator">❤️</div>' : ''}
+                                        ${isLiked ? `
+                                            <div class="note-like-indicator">
+                                                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                            </div>` : ''}
                                         <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
                                     `;
                                     div.onclick = () => {
