@@ -11,7 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
         :root { 
@@ -40,8 +39,6 @@
         .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .page-title { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.3px; }
         .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--text); background:none; border:none; padding:0; display: flex; align-items: center; }
-        
-        /* NEW: Header Action Button */
         .header-action { font-size: 0.9rem; color: var(--accent); cursor: pointer; background: none; border: none; font-weight: 600; }
 
         /* TABS */
@@ -71,7 +68,6 @@
         /* Unread Styling */
         .notif-item.unread { background: var(--unread-bg); }
         
-        /* The Blue Dot */
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
             margin-left: auto; flex-shrink: 0;
@@ -101,7 +97,6 @@
             background-size: cover; background-position: center;
             overflow: hidden;
         }
-        .mini-note span { font-size: 0.6rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 90%; padding: 0 2px;}
 
         /* BUTTONS */
         .btn-follow {
@@ -124,10 +119,6 @@
         #loader { display: none; justify-content: center; padding: 20px; }
         .spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: var(--text); border-radius: 50%; animation: spin 0.8s infinite linear; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
-        .skeleton { background: #1a1a1a; animation: pulse 1.5s infinite; border-radius: 4px; }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-
     </style>
 </head>
 <body>
@@ -157,25 +148,22 @@
         databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
 
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
-        fbConfig = window.CONFIG.firebase;
-    }
-
-    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
+    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) fbConfig = window.CONFIG.firebase;
+    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    
     const db = firebase.firestore();
     const auth = firebase.auth();
     
     let myUid = null;
     let myFollowingList = []; 
     let currentFilter = 'all';
-    
     let rawNotifications = []; 
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    let loadedMap = new Map(); // Global map to hold current data
+    let loadedMap = new Map();
 
-    // --- LOCAL STORAGE ---
+    // --- LOCAL STORAGE READ LOGIC ---
     function isNotificationRead(id) {
         if(!myUid) return false;
         try {
@@ -193,21 +181,22 @@
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
             }
-        } catch(e) {
-            console.error("LS Error", e);
-            localStorage.setItem(READ_KEY, JSON.stringify([id]));
-        }
+        } catch(e) { console.error("LS Error", e); }
     }
 
     function markAllRead() {
-        document.querySelectorAll('.notif-item.unread').forEach(el => {
+        const unreadItems = document.querySelectorAll('.notif-item.unread');
+        if(unreadItems.length === 0) return;
+        
+        if(navigator.vibrate) navigator.vibrate(10);
+        unreadItems.forEach(el => {
             el.classList.remove('unread');
             el.classList.add('read');
             markNotificationRead(el.dataset.id);
         });
     }
 
-    // --- GAZE DETECTION ---
+    // --- GAZE DETECTION (AUTO READ) ---
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -219,7 +208,7 @@
                 }
             }
         });
-    }, { threshold: 0.5 });
+    }, { threshold: 0.6 }); // Wait until 60% visible
 
     // --- INIT ---
     auth.onAuthStateChanged(async (user) => {
@@ -244,42 +233,44 @@
         loadedMap = new Map();
         const now = Date.now();
 
-        // 1. LIKES
-        db.collection("active_notes").doc(myUid).onSnapshot(doc => {
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.likes && Array.isArray(data.likes)) {
-                    data.likes.forEach((liker) => {
-                        // FILTER: STRICTLY REQUIRE TIMESTAMP
-                        if (!liker.timestamp) return;
+        // 1. LIKES FROM NOTES COLLECTION
+        // We query the last 20 active notes to check for new likes
+        db.collection("notes")
+            .where("uid", "==", myUid)
+            .orderBy("createdAt", "desc")
+            .limit(20)
+            .onSnapshot(snapshot => {
+                snapshot.forEach(doc => {
+                    const noteData = doc.data();
+                    if (noteData.likes && Array.isArray(noteData.likes)) {
+                        noteData.likes.forEach((liker) => {
+                            if (!liker.timestamp) return;
 
-                        const notifId = `like_${liker.uid}`;
-                        let time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                            // UNIQUE ID CONSTRUCTION: Like + UserID + Timestamp (Prevents merging)
+                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                            const notifId = `like_${liker.uid}_${timeMillis}`;
 
-                        loadedMap.set(notifId, {
-                            id: notifId,
-                            type: 'like',
-                            senderId: liker.uid,
-                            senderName: liker.displayName || "Someone",
-                            senderUsername: liker.username, // Might be undefined
-                            senderPic: liker.photoURL,
-                            isVerified: liker.verified || false,
-                            timestamp: time, 
-                            text: "liked your note.",
-                            needsFetch: !liker.username, 
-                            noteData: { 
-                                text: data.text,
-                                songName: data.songName,
-                                bgColor: data.bgColor,
-                                textColor: data.textColor
-                            }
+                            loadedMap.set(notifId, {
+                                id: notifId,
+                                type: 'like',
+                                senderId: liker.uid,
+                                senderName: liker.displayName || "Someone",
+                                senderUsername: liker.username,
+                                senderPic: liker.photoURL,
+                                isVerified: liker.verified || false,
+                                timestamp: timeMillis, 
+                                text: "liked your note.",
+                                noteData: { 
+                                    text: noteData.text,
+                                    bgColor: noteData.bgColor,
+                                    textColor: noteData.textColor
+                                }
+                            });
                         });
-                        if(!liker.username) fetchUserInfo(liker.uid, notifId, loadedMap);
-                    });
-                }
-            }
-            processAndRender(loadedMap);
-        });
+                    }
+                });
+                processAndRender();
+            });
 
         // 2. FOLLOWERS
         db.collection("users").doc(myUid).onSnapshot(doc => {
@@ -287,12 +278,12 @@
                 const data = doc.data();
                 if (data.followers) {
                     data.followers.forEach((follower) => {
-                        const followerId = typeof follower === 'string' ? follower : follower.uid;
-                        // FILTER: STRICTLY REQUIRE TIMESTAMP
+                        // Ensure we have an object with timestamp
                         if (typeof follower !== 'object' || !follower.timestamp) return;
 
-                        const notifId = `follow_${followerId}`;
-                        let time = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
+                        const followerId = follower.uid;
+                        const timeMillis = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
+                        const notifId = `follow_${followerId}_${timeMillis}`; // Unique ID
 
                         if (!loadedMap.has(notifId)) {
                             loadedMap.set(notifId, {
@@ -300,22 +291,23 @@
                                 type: 'follow',
                                 senderId: followerId,
                                 senderName: "User",
-                                senderUsername: "", // Will fetch
+                                senderUsername: "",
                                 senderPic: "https://via.placeholder.com/50",
                                 isVerified: false,
-                                timestamp: time,
+                                timestamp: timeMillis,
                                 text: "started following you.",
                                 needsFetch: true 
                             });
-                            fetchUserInfo(followerId, notifId, loadedMap);
+                            // Fetch details since followers array might be sparse
+                            fetchUserInfo(followerId, notifId);
                         }
                     });
                 }
             }
-            processAndRender(loadedMap);
+            processAndRender();
         });
 
-        // 3. GENERAL NOTIFICATIONS
+        // 3. GENERAL NOTIFICATIONS (Comments, etc)
         db.collection('notifications')
             .where('recipientId', '==', myUid)
             .orderBy('timestamp', 'desc')
@@ -325,6 +317,8 @@
                     let d = doc.data();
                     if (!d.timestamp) return;
                     
+                    const timeMillis = d.timestamp.toMillis ? d.timestamp.toMillis() : Date.now();
+
                     loadedMap.set(doc.id, {
                         id: doc.id,
                         type: d.type,
@@ -332,14 +326,14 @@
                         senderName: d.senderName || "User",
                         senderUsername: d.senderUsername || "", 
                         senderPic: d.senderPic || "https://via.placeholder.com/50",
-                        timestamp: d.timestamp ? d.timestamp.toMillis() : now,
+                        timestamp: timeMillis,
                         text: getNotifText(d.type),
                         meta: d.meta,
-                        needsFetch: !d.senderUsername 
+                        needsFetch: !d.senderName
                     });
-                    if(!d.senderUsername) fetchUserInfo(d.senderId, doc.id, loadedMap);
+                    if(!d.senderName) fetchUserInfo(d.senderId, doc.id);
                 });
-                processAndRender(loadedMap);
+                processAndRender();
             });
     }
 
@@ -349,11 +343,11 @@
         return "interacted with you.";
     }
 
-    function fetchUserInfo(uid, notifId, map) {
+    function fetchUserInfo(uid, notifId) {
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
                 const uData = uDoc.data();
-                const item = map.get(notifId);
+                const item = loadedMap.get(notifId);
                 if(item) {
                     item.senderName = uData.name || uData.username || "User";
                     item.senderUsername = uData.username || uData.name; 
@@ -361,30 +355,30 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // Update DOM elements dynamically if they exist
+                    // Direct DOM update for instant refresh
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
 
                     if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                     if(pfpEl) pfpEl.src = item.senderPic;
-                    
-                    // IMPORTANT: Update the data attribute so the click handler works!
-                    if(rowEl && item.senderUsername) {
-                        rowEl.dataset.username = item.senderUsername;
-                    }
+                    if(rowEl) rowEl.dataset.username = item.senderUsername;
                 }
             }
         });
     }
 
-    function processAndRender(mapData) {
-        rawNotifications = Array.from(mapData.values()).filter(n => n.timestamp);
-        rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
-        
-        displayedCount = 0;
-        document.getElementById('notif-list').innerHTML = '';
-        renderNextBatch();
+    function processAndRender() {
+        // Debounce slightly to prevent flicker
+        if (window.renderTimeout) clearTimeout(window.renderTimeout);
+        window.renderTimeout = setTimeout(() => {
+            rawNotifications = Array.from(loadedMap.values());
+            rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
+            
+            displayedCount = 0;
+            document.getElementById('notif-list').innerHTML = '';
+            renderNextBatch();
+        }, 100);
     }
 
     function renderNextBatch() {
@@ -397,7 +391,7 @@
         });
 
         if (filtered.length === 0 && displayedCount === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications</div></div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
             loader.style.display = 'none';
             return;
         }
@@ -420,29 +414,25 @@
         const div = document.createElement('div');
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
-        
-        // Store username in dataset for robust retrieval
-        const safeUsername = notif.senderUsername || notif.senderName || notif.senderId;
-        div.dataset.username = safeUsername;
+        div.dataset.username = notif.senderUsername || notif.senderId;
 
+        // Auto-read observer
         if(!isRead) gazeObserver.observe(div);
 
-        // --- GLOBAL CLICK REDIRECT ---
+        // Click Handler
         div.onclick = function(e) {
-            // Prevent redirect if clicking buttons
-            if(e.target.closest('button')) return;
+            if(e.target.closest('button')) return; // Ignore button clicks
 
             markNotificationRead(this.dataset.id);
-            // Read latest username from dataset (updated by fetch)
-            const latestUser = this.dataset.username || notif.senderId;
-            window.location.href = `userProfile.html?user=${latestUser}`;
+            const user = this.dataset.username || notif.senderId;
+            window.location.href = `userProfile.html?user=${user}`;
         };
 
         let actionHtml = '';
         let extraContentHtml = '';
         const verifyIcon = notif.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">` : '';
 
-        // UI Logic
+        // Content Logic
         if (notif.type === 'follow') {
             const isFollowing = myFollowingList.includes(notif.senderId);
             const btnText = isFollowing ? "Following" : "Follow";
@@ -451,24 +441,21 @@
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
-                let content = '';
-                if(notif.noteData.text) content = `<span style="font-size:0.5rem;">${notif.noteData.text}</span>`;
-                else if(notif.noteData.songName) content = `<span style="font-size:1.2rem;">🎵</span>`;
+                let textContent = '';
+                if(notif.noteData.text) textContent = `<span style="font-size:0.5rem; display:block;">${notif.noteData.text}</span>`;
+                else if(notif.noteData.songName) textContent = `<span style="font-size:1rem;">🎵</span>`;
                 
                 actionHtml = `
                     <div class="mini-note" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
-                        ${content}
+                        ${textContent}
                     </div>
                 `;
-            } else {
-                 actionHtml = `<img src="${notif.meta?.imageUrl || 'https://via.placeholder.com/40'}" style="width:44px;height:44px;object-fit:cover;border-radius:10px;border:1px solid #333;">`;
             }
         }
         else if (notif.type === 'comment') {
              extraContentHtml = `<div style="font-style:italic; color:#ccc; margin-top:2px;">"${notif.meta?.content || '...'}"</div>`;
         }
 
-        // PFP Click also redirects using dynamic getter
         div.innerHTML = `
             <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); this.parentElement.click()">
             <div class="n-content">
@@ -484,10 +471,8 @@
         return div;
     }
 
-    // --- ACTIONS ---
-
     function toggleFollow(btn, targetUid) {
-        event.stopPropagation(); // STOP REDIRECT
+        event.stopPropagation();
         const isFollowing = btn.innerText === "Following";
         
         if (isFollowing) {
@@ -497,14 +482,18 @@
         } else {
             btn.innerText = "Following"; btn.classList.add("btn-following");
             const ts = firebase.firestore.Timestamp.now();
-            const fObj = { uid: myUid, timestamp: ts };
-            const uObj = { uid: targetUid, timestamp: ts };
+            // Object push for followers array
+            const followObj = { 
+                uid: myUid, 
+                timestamp: ts,
+                date: new Date().toISOString()
+            };
             
-            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(uObj) })
-                .catch(()=> db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }));
+            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }) // Simple string for 'following'
+                .catch(() => {});
 
-            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(fObj) })
-                .catch(()=> db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(myUid) }));
+            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(followObj) }) // Object for 'followers'
+                .catch(() => {});
         }
     }
 
