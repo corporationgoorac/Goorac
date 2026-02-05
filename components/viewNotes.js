@@ -304,13 +304,11 @@ class ViewNotes extends HTMLElement {
             });
         }
 
-        // === FIXED: LISTEN TO SPECIFIC NOTE ID IN 'notes' COLLECTION ===
         if (initialNoteData.id) {
             this.unsubscribe = this.db.collection("notes").doc(initialNoteData.id)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         const data = doc.data();
-                        // Close if note is no longer active (deleted or overwritten)
                         if (data.isActive === false) { this.close(); return; }
                         
                         this.currentNote = { ...data, id: doc.id };
@@ -352,7 +350,6 @@ class ViewNotes extends HTMLElement {
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         
-        // Gradient Support - Use 'background' property for compatibility
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -417,7 +414,6 @@ class ViewNotes extends HTMLElement {
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         
-        // Gradient Support
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -468,28 +464,22 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
-    // --- NEW: Handle Redirection Robustly ---
     async handleProfileRedirect() {
         if (!this.currentNote) return;
         const uid = this.currentNote.uid;
         
-        // 1. Try to get username from the fetched profile (most accurate)
         let username = this.currentUserProfile ? this.currentUserProfile.username : null;
 
-        // 2. If not found, check the note data itself (might be stale, but better than nothing)
         if (!username && this.currentNote.username && !this.currentNote.username.includes(" ")) {
-            // Basic check: if it has spaces, it's likely a Display Name, ignore it.
             username = this.currentNote.username;
         }
 
-        // 3. Fetch from DB if absolutely missing
         if (!username) {
             try {
-                if(navigator.vibrate) navigator.vibrate(5); // Little feedback we are doing something
+                if(navigator.vibrate) navigator.vibrate(5);
                 const doc = await this.db.collection('users').doc(uid).get();
                 if (doc.exists) {
                     username = doc.data().username;
-                    // Cache it for this session
                     if(!this.currentUserProfile) this.currentUserProfile = doc.data();
                 }
             } catch (e) {
@@ -506,29 +496,25 @@ class ViewNotes extends HTMLElement {
         if (!user) return;
         const icons = this.getIcons();
 
-        // --- ATTACH REDIRECT LISTENER ---
         const headerClick = this.querySelector('#vn-header-click');
         if (headerClick) {
             headerClick.onclick = () => this.handleProfileRedirect();
         }
 
-        // Double Tap Logic
         const card = this.querySelector('#vn-active-card');
         if(card && !this.isOwnNote) {
             card.addEventListener('click', (e) => {
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - this.lastTap;
                 if (tapLength < 300 && tapLength > 0) {
-                    // Double Tap Detected
                     const popHeart = this.querySelector('#vn-pop-heart');
                     const likeBtn = this.querySelector('#like-toggle-btn');
                     
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    if(navigator.vibrate) navigator.vibrate([10, 30]); // VIBRATION ADDED
+                    if(navigator.vibrate) navigator.vibrate([10, 30]);
 
-                    // Only trigger if not already liked
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
                          likeBtn.click();
                     }
@@ -551,7 +537,6 @@ class ViewNotes extends HTMLElement {
                 if(navigator.vibrate) navigator.vibrate(10);
                 if(confirm("Delete this note?")) {
                     try {
-                        // Mark as inactive in 'notes' collection (this is the correct collection now)
                         await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
                         this.close();
                         window.location.reload(); 
@@ -587,7 +572,6 @@ class ViewNotes extends HTMLElement {
                             })
                         });
                         
-                        // ADD NOTIFICATION
                         if (this.currentNote.uid !== user.uid) {
                             await this.db.collection('notifications').add({
                                 recipientId: this.currentNote.uid,
@@ -651,7 +635,7 @@ class ViewNotes extends HTMLElement {
                 sendBtn.classList.remove('visible');
                 heartBtn.style.display = 'flex';
             }
-        };
+        });
 
         emojis.forEach(emojiEl => {
             emojiEl.onclick = () => {
@@ -671,7 +655,6 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // Full Metadata for Chat Bubble
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
@@ -684,7 +667,7 @@ class ViewNotes extends HTMLElement {
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
             uid: this.currentNote.uid,
-            font: this.currentNote.font || 'system-ui' // Include Font!
+            font: this.currentNote.font || 'system-ui'
         };
 
         try {
@@ -880,16 +863,33 @@ const NotesManager = {
 
     setupMyNote: function(user) {
         const db = firebase.firestore();
+        // 1. Get the container
+        const btn = document.getElementById('my-note-btn');
+        
+        // If the Main Container is missing, we can't do anything
+        if (!btn) return;
+
+        // 2. === FIX START ===
+        // Check if the preview bubble exists. If NOT, create it dynamically.
+        let preview = document.getElementById('my-note-preview');
+        if (!preview) {
+            preview = document.createElement('div');
+            preview.id = 'my-note-preview';
+            btn.appendChild(preview);
+            
+            // Ensure parent allows absolute positioning of the bubble
+            if(window.getComputedStyle(btn).position === 'static') {
+                btn.style.position = 'relative';
+            }
+        }
+        // === FIX END ===
+
         db.collection("notes")
             .where("uid", "==", user.uid)
             .where("isActive", "==", true)
             .orderBy("createdAt", "desc")
             .limit(1)
             .onSnapshot(snapshot => {
-                const btn = document.getElementById('my-note-btn');
-                const preview = document.getElementById('my-note-preview');
-                if (!btn || !preview) return; 
-
                 let data = null;
                 let noteId = null;
 
@@ -904,9 +904,10 @@ const NotesManager = {
                     }
                 }
 
-                preview.classList.add('visible');
-
+                // Make visible only if data exists
                 if(data && (data.text || data.songName)) {
+                    preview.classList.add('visible'); // Show it
+                    
                     // Use 'background' for gradients and add Font Family
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
@@ -927,10 +928,8 @@ const NotesManager = {
                         if(data) viewer.open({ ...data, id: noteId }, true);
                     };
                 } else {
-                    // Empty State Logic
-                    preview.style.background = 'rgba(255,255,255,0.1)';
-                    preview.style.color = 'rgba(255,255,255,0.7)';
-                    preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
+                    // Empty State Logic - Hide Bubble
+                    preview.classList.remove('visible'); 
                     btn.classList.remove('has-note');
                     btn.onclick = () => {
                         window.location.href = 'notes.html';
