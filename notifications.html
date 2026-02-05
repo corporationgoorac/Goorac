@@ -17,13 +17,12 @@
         :root { 
             --bg: #000000;
             --header-bg: rgba(0,0,0,0.9);
-            --accent: #0095f6; /* Instagram Blue */
-            --accent-dim: rgba(0, 149, 246, 0.15);
+            --accent: #0095f6;
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
             --border: #262626;
-            --btn-gray: #262626;
             --item-hover: #121212;
+            --unread-bg: rgba(0, 149, 246, 0.05);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
@@ -56,72 +55,73 @@
         .tab-pill.active { background: var(--text); color: #000; border-color: var(--text); }
 
         /* LIST */
-        #notif-list { padding: 5px 0 80px 0; }
+        #notif-list { padding: 0 0 80px 0; }
         
         .notif-item {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px;
-            transition: background 0.2s; position: relative;
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 14px 16px;
+            transition: background 0.3s ease; position: relative;
             cursor: pointer;
+            border-bottom: 1px solid #1a1a1a;
         }
         .notif-item:active { background: var(--item-hover); }
+        .notif-item.unread { background: var(--unread-bg); }
         
-        /* UNREAD INDICATOR */
+        /* UNREAD DOT */
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            margin-left: auto; flex-shrink: 0;
+            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
             box-shadow: 0 0 6px var(--accent);
+            transition: opacity 0.5s ease;
         }
+        .notif-item.read .unread-dot { opacity: 0; }
+        .notif-item.read { background: transparent; }
 
         .n-avatar { 
             width: 44px; height: 44px; border-radius: 50%; object-fit: cover; 
             border: 1px solid #333; background: #222; flex-shrink: 0;
         }
         
-        .n-content { flex: 1; font-size: 0.9rem; line-height: 1.35; color: #fff; padding-right: 8px; }
-        .n-username { font-weight: 700; color: #fff; cursor: pointer;}
-        .n-text { color: var(--text); font-weight: 400; }
-        .n-meta { font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px; }
+        .n-content { flex: 1; font-size: 0.9rem; line-height: 1.35; color: #fff; padding-right: 20px; }
+        .n-username { font-weight: 700; color: #fff; cursor: pointer; margin-right: 4px; }
+        .n-text { color: var(--text-secondary); font-weight: 400; }
+        .n-time { font-size: 0.75rem; color: #666; margin-left: 4px; }
 
-        .n-action { flex-shrink: 0; margin-left: 4px; }
+        .n-action { flex-shrink: 0; margin-left: 4px; display: flex; align-items: center; }
 
-        /* NOTE PREVIEW (Right Side) */
-        .note-preview-box {
-            width: 44px; height: 44px;
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem;
+        /* MINI NOTE PREVIEW */
+        .mini-note {
+            margin-top: 6px; padding: 8px 12px; border-radius: 12px;
+            font-size: 0.8rem; color: #fff; max-width: fit-content;
             border: 1px solid rgba(255,255,255,0.1);
-            background-size: cover; background-position: center;
+            display: flex; flex-direction: column; gap: 2px;
         }
-        .note-preview-box span { font-size: 0.6rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 90%; padding: 0 2px;}
+        .mini-note-song { 
+            font-size: 0.65rem; opacity: 0.8; display: flex; align-items: center; gap: 4px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+        }
 
-        /* FOLLOW BUTTONS */
+        /* BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
-            padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            padding: 6px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
             cursor: pointer; transition: transform 0.1s;
         }
-        .btn-follow:active { transform: scale(0.95); opacity: 0.8; }
-        
         .btn-following {
-            background: var(--btn-gray); color: var(--text); border: none;
+            background: transparent; color: var(--text); border: 1px solid var(--border);
         }
 
         .v-badge { width: 13px; height: 13px; vertical-align: -2px; margin-left: 2px; }
 
-        /* LOADING & EMPTY */
+        /* LOADING */
         .empty-state {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             height: 50vh; color: var(--text-secondary); text-align: center; gap: 15px;
         }
-        .empty-icon { font-size: 3rem; opacity: 0.4; }
-        
         #loader { display: none; justify-content: center; padding: 20px; }
         .spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: var(--text); border-radius: 50%; animation: spin 0.8s infinite linear; }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* Skeleton */
         .skeleton { background: #1a1a1a; animation: pulse 1.5s infinite; border-radius: 4px; }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 
@@ -169,9 +169,9 @@
     let rawNotifications = []; 
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
-    let READ_KEY = "goorac_read_notifs"; // Will append UID later
+    let READ_KEY = "goorac_read_notifs"; 
 
-    // --- LOCAL STORAGE HELPERS ---
+    // --- LOCAL STORAGE READ HELPER ---
     function isNotificationRead(id) {
         if(!myUid) return false;
         const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
@@ -184,16 +184,38 @@
         if(!readList.includes(id)) {
             readList.push(id);
             localStorage.setItem(READ_KEY, JSON.stringify(readList));
+            // Dispatch event for other tabs/pages to sync
+            window.dispatchEvent(new Event('storage'));
         }
     }
 
-    // --- AUTH & INIT ---
+    // --- GAZE DETECTION (Intersection Observer) ---
+    // This marks items as read when they scroll into view (Auto-Read)
+    const gazeObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const row = entry.target;
+                const id = row.dataset.id;
+                if(id && !isNotificationRead(id)) {
+                    // Mark read in storage
+                    markNotificationRead(id);
+                    // Update UI visually
+                    row.classList.add('read');
+                    row.classList.remove('unread');
+                    // Stop observing this one
+                    gazeObserver.unobserve(row);
+                }
+            }
+        });
+    }, { threshold: 0.5 }); // Trigger when 50% visible
+
+    // --- INIT ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
-            READ_KEY = `goorac_read_${myUid}`; // User-specific key
+            READ_KEY = `goorac_read_${myUid}`; // Unique key per user
 
-            // Get My Following List (for button states)
+            // Get Following list for buttons
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -208,26 +230,21 @@
     function initListeners() {
         const list = document.getElementById('notif-list');
         list.innerHTML = ''; 
-        
         let unsortedData = new Map();
         const now = Date.now();
 
-        // 1. LISTEN TO LIKES (From active_notes array)
+        // 1. LIKES
         db.collection("active_notes").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
                 if (data.likes && Array.isArray(data.likes)) {
                     const total = data.likes.length;
                     data.likes.forEach((liker, index) => {
-                        // Generate consistent ID: "like_USERID"
                         const notifId = `like_${liker.uid}`;
-                        
-                        // Time Logic: Prefer stored time, else calculate approximation
                         let time = now;
                         if(liker.timestamp) {
                              time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                         } else {
-                             // Fallback: subtract index minutes to keep order
                              time = now - ((total - 1 - index) * 60000); 
                         }
 
@@ -240,7 +257,6 @@
                             isVerified: liker.verified || false,
                             timestamp: time, 
                             text: "liked your note.",
-                            // Store note style for preview bubble
                             noteData: { 
                                 text: data.text,
                                 songName: data.songName,
@@ -254,16 +270,15 @@
             processAndRender(unsortedData);
         });
 
-        // 2. LISTEN TO FOLLOWERS (From users array)
+        // 2. FOLLOWERS
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                if (data.followers && Array.isArray(data.followers)) {
+                if (data.followers) {
                     const total = data.followers.length;
                     data.followers.forEach((follower, index) => {
                         const followerId = typeof follower === 'string' ? follower : follower.uid;
                         const notifId = `follow_${followerId}`;
-                        
                         let time = now;
                         if (typeof follower === 'object' && follower.timestamp) {
                             time = follower.timestamp.toMillis ? follower.timestamp.toMillis() : follower.timestamp;
@@ -276,12 +291,12 @@
                                 id: notifId,
                                 type: 'follow',
                                 senderId: followerId,
-                                senderName: "User", // Placeholder until fetched
+                                senderName: "User",
                                 senderPic: "https://via.placeholder.com/50",
                                 isVerified: false,
                                 timestamp: time,
                                 text: "started following you.",
-                                needsFetch: true // Flag to fetch profile
+                                needsFetch: true 
                             });
                             fetchUserInfo(followerId, notifId, unsortedData);
                         }
@@ -290,9 +305,36 @@
             }
             processAndRender(unsortedData);
         });
+
+        // 3. GENERAL NOTIFICATIONS
+        db.collection('notifications')
+            .where('recipientId', '==', myUid)
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .onSnapshot(snap => {
+                snap.forEach(doc => {
+                    let d = doc.data();
+                    unsortedData.set(doc.id, {
+                        id: doc.id,
+                        type: d.type,
+                        senderId: d.senderId,
+                        senderName: d.senderName || "User",
+                        senderPic: d.senderPic || "https://via.placeholder.com/50",
+                        timestamp: d.timestamp ? d.timestamp.toMillis() : now,
+                        text: getNotifText(d.type),
+                        meta: d.meta
+                    });
+                });
+                processAndRender(unsortedData);
+            });
     }
 
-    // Async fetch for missing user details
+    function getNotifText(type) {
+        if(type === 'comment') return "commented: ";
+        if(type === 'mention') return "mentioned you.";
+        return "interacted with you.";
+    }
+
     function fetchUserInfo(uid, notifId, map) {
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
@@ -304,25 +346,19 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // DOM Update if already rendered
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
-                    if(nameEl) {
-                        nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
-                    }
+                    if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                     if(pfpEl) pfpEl.src = item.senderPic;
                 }
             }
         });
     }
 
-    // --- RENDERING ---
     function processAndRender(mapData) {
         rawNotifications = Array.from(mapData.values());
-        // Sort Newest First
         rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
         
-        // Refresh View
         displayedCount = 0;
         document.getElementById('notif-list').innerHTML = '';
         renderNextBatch();
@@ -332,20 +368,17 @@
         const list = document.getElementById('notif-list');
         const loader = document.getElementById('loader');
         
-        // Apply Filter
         const filtered = rawNotifications.filter(n => {
             if (currentFilter === 'all') return true;
             return n.type === currentFilter;
         });
 
-        // Empty State
         if (filtered.length === 0 && displayedCount === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div class="empty-text">No notifications yet</div></div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-text">No notifications yet</div></div>`;
             loader.style.display = 'none';
             return;
         }
 
-        // Pagination Slice
         const nextBatch = filtered.slice(displayedCount, displayedCount + BATCH_SIZE);
         
         if (nextBatch.length > 0) {
@@ -355,8 +388,6 @@
             });
             displayedCount += nextBatch.length;
         }
-
-        // Loader visibility
         loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
     }
 
@@ -364,39 +395,48 @@
         const isRead = isNotificationRead(notif.id);
         
         const div = document.createElement('div');
-        div.className = `notif-item`;
-        div.id = `row-${notif.id}`;
+        div.className = `notif-item ${!isRead ? 'unread' : 'read'}`;
+        div.dataset.id = notif.id; // For Observer
         
-        // Auto-read on click
+        // --- ATTACH OBSERVER FOR AUTO-READ ---
+        if(!isRead) gazeObserver.observe(div);
+
         div.onclick = (e) => {
-            if(!e.target.closest('button')) handleItemClick(notif);
+            if(!e.target.closest('button')) {
+                // If clicked, also mark read immediately
+                markNotificationRead(notif.id);
+                div.classList.add('read'); div.classList.remove('unread');
+                window.location.href = `userProfile.html?uid=${notif.senderId}`;
+            }
         };
 
         let actionHtml = '';
+        let extraContentHtml = '';
         const verifyIcon = notif.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">` : '';
 
-        // --- 1. FOLLOW UI ---
+        // UI Logic
         if (notif.type === 'follow') {
             const isFollowing = myFollowingList.includes(notif.senderId);
             const btnText = isFollowing ? "Following" : "Follow";
             const btnClass = isFollowing ? "btn-following" : "btn-follow";
             actionHtml = `<button class="${btnClass}" onclick="toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
         } 
-        // --- 2. LIKE UI ---
         else if (notif.type === 'like') {
-            // Show mini note preview instead of a button
             if (notif.noteData) {
-                // Determine text or music content
-                let content = '';
-                if(notif.noteData.text) content = `<span style="font-size:0.5rem;">${notif.noteData.text}</span>`;
-                else if(notif.noteData.songName) content = `<span style="font-size:1.2rem;">🎵</span>`;
-                
-                actionHtml = `
-                    <div class="note-preview-box" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
-                        ${content}
+                // Mini Note Visualization
+                extraContentHtml = `
+                    <div class="mini-note" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
+                        ${notif.noteData.text ? `<span style="font-weight:500;">${notif.noteData.text}</span>` : ''}
+                        ${notif.noteData.songName ? `<span class="mini-note-song">🎵 ${notif.noteData.songName}</span>` : ''}
                     </div>
                 `;
+            } else {
+                // Fallback for image likes
+                 actionHtml = `<img src="${notif.meta?.imageUrl || 'https://via.placeholder.com/40'}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`;
             }
+        }
+        else if (notif.type === 'comment') {
+             extraContentHtml = `<div style="font-style:italic; color:#ccc; margin-top:2px;">"${notif.meta?.content || '...'}"</div>`;
         }
 
         div.innerHTML = `
@@ -404,63 +444,35 @@
             <div class="n-content">
                 <span class="n-username" id="name-${notif.id}">${notif.senderName} ${verifyIcon}</span>
                 <span class="n-text">${notif.text}</span>
-                <span class="n-meta">${timeAgo(notif.timestamp)}</span>
+                <span class="n-time">${timeAgo(notif.timestamp)}</span>
+                ${extraContentHtml}
             </div>
             <div class="n-action">${actionHtml}</div>
-            ${!isRead ? '<div class="unread-dot"></div>' : ''}
+            <div class="unread-dot"></div>
         `;
 
         return div;
-    }
-
-    // --- ACTIONS ---
-
-    function handleItemClick(notif) {
-        // Instant Local Read
-        markNotificationRead(notif.id);
-        const row = document.getElementById(`row-${notif.id}`);
-        if(row) {
-            const dot = row.querySelector('.unread-dot');
-            if(dot) dot.remove();
-        }
-        if(notif.senderId) window.location.href = `userProfile.html?uid=${notif.senderId}`;
     }
 
     function toggleFollow(btn, targetUid) {
         event.stopPropagation();
         const isFollowing = btn.innerText === "Following";
         
-        // Optimistic UI Update
         if (isFollowing) {
-            btn.innerText = "Follow";
-            btn.className = "btn-follow";
-            // DB Update (Unfollow)
-            db.collection("users").doc(myUid).update({
-                following: firebase.firestore.FieldValue.arrayRemove(targetUid)
-            });
-            db.collection("users").doc(targetUid).update({
-                followers: firebase.firestore.FieldValue.arrayRemove(myUid)
-            });
+            btn.innerText = "Follow"; btn.className = "btn-follow";
+            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
+            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
         } else {
-            btn.innerText = "Following";
-            btn.className = "btn-following";
-            // DB Update (Follow)
-            const followerObj = { uid: myUid, timestamp: firebase.firestore.Timestamp.now() };
-            const followingObj = { uid: targetUid, timestamp: firebase.firestore.Timestamp.now() };
+            btn.innerText = "Following"; btn.className = "btn-following";
+            const ts = firebase.firestore.Timestamp.now();
+            const fObj = { uid: myUid, timestamp: ts };
+            const uObj = { uid: targetUid, timestamp: ts };
+            
+            db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(uObj) })
+                .catch(()=> db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }));
 
-            db.collection("users").doc(myUid).update({
-                following: firebase.firestore.FieldValue.arrayUnion(followingObj)
-            }).catch(()=>{ 
-                // Fallback for simple string array
-                db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
-            });
-
-            db.collection("users").doc(targetUid).update({
-                followers: firebase.firestore.FieldValue.arrayUnion(followerObj)
-            }).catch(()=>{
-                // Fallback
-                db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(myUid) });
-            });
+            db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(fObj) })
+                .catch(()=> db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion(myUid) }));
         }
     }
 
@@ -468,17 +480,14 @@
         currentFilter = type;
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-        
         displayedCount = 0;
         document.getElementById('notif-list').innerHTML = '';
         renderNextBatch();
     }
 
-    // --- UTILS ---
     function timeAgo(millis) {
         if(!millis || isNaN(millis)) return "Just now";
         const seconds = Math.floor((Date.now() - millis) / 1000);
-        
         if (seconds < 60) return `${Math.max(0, seconds)}s`;
         const minutes = Math.floor(seconds / 60);
         if (minutes < 60) return `${minutes}m`;
@@ -489,14 +498,11 @@
         return `${Math.floor(days/7)}w`;
     }
 
-    // Infinite Scroll
-    const observer = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-            renderNextBatch();
-        }
+    // Scroll Load
+    const scrollObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) renderNextBatch();
     }, { root: null, threshold: 0.1 });
-
-    observer.observe(document.getElementById('loader'));
+    scrollObserver.observe(document.getElementById('loader'));
 
 </script>
 </body>
