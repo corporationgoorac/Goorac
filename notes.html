@@ -1,517 +1,431 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Create Note</title>
+    <title>New Note | Goorac</title>
+    
+    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
     <script src="components/songPicker.js"></script>
 
     <style>
         :root { 
-            --bg: #000000; 
-            --surface: #121212;
-            --accent: #007AFF; 
-            --bubble-bg: #262626; 
-            --text-primary: #ffffff;
-            --text-secondary: #8e8e93;
+            --bg: #000; 
+            --surface: #1c1c1e;
+            --accent: #00d2ff; 
+            --text: #ffffff;
+            --danger: #ff3b30;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; outline: none; }
         
         body { 
-            background: var(--bg); 
-            color: var(--text-primary); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            height: 100dvh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
+            background: var(--bg); color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; 
+            height: 100dvh; display: flex; flex-direction: column; overflow: hidden; 
         }
 
         /* --- HEADER --- */
         header { 
-            padding: 15px 20px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            padding-top: env(safe-area-inset-top, 20px); 
-            z-index: 100;
-            flex-shrink: 0; 
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+            padding-top: max(15px, env(safe-area-inset-top)); z-index: 100;
         }
 
-        .close-btn { 
-            width: 40px; height: 40px; 
-            background: rgba(255,255,255,0.1); 
-            border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px; font-weight: 500; 
-            cursor: pointer; backdrop-filter: blur(10px);
-            transition: background 0.2s;
-        }
-        .close-btn:active { background: rgba(255,255,255,0.2); }
+        .cancel-btn { font-size: 1rem; color: #fff; opacity: 0.7; cursor: pointer; padding: 10px; }
         
-        .header-title { font-weight: 600; font-size: 1rem; opacity: 0.8; letter-spacing: 0.5px; }
+        .post-btn { 
+            background: var(--text); color: #000; border: none; 
+            padding: 8px 20px; border-radius: 20px; font-weight: 700; font-size: 0.9rem;
+            opacity: 0.5; pointer-events: none; transition: 0.2s;
+        }
+        .post-btn.ready { opacity: 1; pointer-events: auto; }
+        .post-btn:active { transform: scale(0.95); }
 
-        /* --- EDITOR CANVAS --- */
-        .editor-space { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            position: relative;
-            padding-bottom: 120px; /* Space for bottom controls */
-            width: 100%;
+        /* --- EDITOR AREA --- */
+        .editor-container { 
+            flex: 1; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            position: relative; width: 100%;
         }
 
-        .thought-wrapper { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            width: 100%; 
-            position: relative;
-            z-index: 5;
-            gap: 20px; 
-            transform: scale(1);
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* Note Bubble Preview */
+        .bubble-wrapper {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; align-items: center;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        
-        /* Interactive scale effect when typing */
-        .thought-wrapper.typing { transform: scale(1.02); }
+        .bubble-wrapper.typing { transform: scale(1.05); }
 
-        /* --- NOTE BUBBLE (Enhanced) --- */
         .note-bubble {
-            background: var(--bubble-bg); 
-            padding: 20px 28px; 
-            border-radius: 32px;
-            min-width: 120px; 
-            max-width: 82%; 
-            text-align: center; 
-            position: relative;
+            background: #262626; color: #fff;
+            padding: 24px 32px; border-radius: 36px;
+            min-width: 140px; max-width: 85vw;
+            text-align: center; position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             transition: all 0.3s ease;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
-            z-index: 2;
             cursor: text;
         }
-
-        /* Bubble Tails */
+        /* Bubble Tail */
         .note-bubble::after {
             content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
-            width: 18px; height: 18px; background: inherit; border-radius: 50%;
-            z-index: -1;
+            width: 20px; height: 20px; background: inherit; border-radius: 50%; z-index: -1;
         }
         .note-bubble::before {
-            content: ''; position: absolute; bottom: -24px; left: 45%;
-            width: 10px; height: 10px; background: inherit; border-radius: 50%; opacity: 0.6;
-            z-index: -1;
+            content: ''; position: absolute; bottom: -22px; left: 46%;
+            width: 12px; height: 12px; background: inherit; border-radius: 50%; opacity: 0.6; z-index: -2;
         }
 
-        #display-text { 
-            font-size: 1.15rem; 
-            font-weight: 600;
-            line-height: 1.35; 
-            min-height: 1.35em;
-            word-wrap: break-word; 
-            white-space: pre-wrap; /* Preserves newlines */
+        .display-text { 
+            font-size: 1.3rem; font-weight: 600; line-height: 1.3; 
+            min-height: 1.3em; white-space: pre-wrap; word-break: break-word;
         }
-        
-        /* Music Tag Pill */
-        #music-tag {
-            display: none; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 8px;
-            font-size: 0.75rem; 
-            font-weight: 600; 
-            margin-top: 12px; 
-            background: rgba(255,255,255,0.15);
-            padding: 6px 14px;
-            border-radius: 20px;
-            backdrop-filter: blur(5px);
-            width: fit-content;
-            margin-left: auto; margin-right: auto;
-        }
-        
-        /* Profile Picture */
-        .pfp-container {
-            width: 70px; height: 70px; 
-            border-radius: 50%; 
-            border: 3px solid #1c1c1e;
-            overflow: hidden; 
-            background: #111;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            flex-shrink: 0;
-            margin-top: 10px;
-        }
-        .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Hidden Input */
-        #note-input { 
+        .music-pill {
+            display: none; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.15); padding: 6px 12px;
+            border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+            margin-top: 12px; width: fit-content; margin-left: auto; margin-right: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Profile Pic Below Bubble */
+        .pfp-preview {
+            width: 60px; height: 60px; border-radius: 50%; 
+            border: 3px solid #1c1c1e; margin-top: 25px;
+            background: #222; object-fit: cover;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+
+        #hidden-input {
             position: absolute; opacity: 0; width: 100%; height: 100%; 
-            top: 0; left: 0; z-index: 10; cursor: text;
+            top: 0; left: 0; z-index: 20; font-size: 16px;
         }
 
-        /* --- BOTTOM CONTROLS (New Layout) --- */
-        .bottom-controls {
-            position: fixed; bottom: 0; left: 0; width: 100%;
-            display: flex; flex-direction: column; align-items: center;
-            padding: 0 20px 30px;
-            z-index: 50;
-            background: linear-gradient(to top, rgba(0,0,0,1) 20%, rgba(0,0,0,0));
+        /* --- TOOLBAR --- */
+        .toolbar {
+            width: 100%; padding: 20px; 
             padding-bottom: max(30px, env(safe-area-inset-bottom));
-        }
-
-        /* Floating Tool Dock */
-        .tool-dock {
-            display: flex; gap: 15px;
-            margin-bottom: 20px;
-            background: rgba(28, 28, 30, 0.8);
-            backdrop-filter: blur(20px);
-            padding: 10px 20px;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: rgba(28, 28, 30, 0.6);
+            backdrop-filter: blur(30px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-around; align-items: center;
         }
 
         .tool-btn {
-            width: 44px; height: 44px;
-            border-radius: 14px;
+            width: 50px; height: 50px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer;
-            transition: transform 0.1s, background 0.2s;
-            background: transparent;
+            background: rgba(255,255,255,0.05);
+            transition: all 0.2s; cursor: pointer;
         }
-        .tool-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.1); }
-        .tool-btn svg { width: 24px; height: 24px; fill: white; }
-        .tool-btn.active svg { fill: var(--accent); }
+        .tool-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.15); }
+        .tool-btn svg { width: 24px; height: 24px; fill: #fff; }
+        .tool-btn.active { background: var(--text); }
+        .tool-btn.active svg { fill: #000; }
 
-        /* Main Share Button */
-        .share-btn { 
-            width: 100%; max-width: 400px;
-            height: 56px;
-            background: #fff; 
-            color: #000; 
-            border-radius: 28px;
-            font-weight: 700; 
-            font-size: 1.05rem; 
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            border: none; cursor: pointer;
-            box-shadow: 0 5px 20px rgba(255,255,255,0.2);
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            opacity: 0.5; pointer-events: none; transform: scale(0.98);
+        /* --- MENUS (Sheets) --- */
+        .sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: #1c1c1e; border-radius: 24px 24px 0 0;
+            padding: 25px; padding-bottom: max(30px, env(safe-area-inset-bottom));
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 200; border-top: 1px solid rgba(255,255,255,0.1);
         }
+        .sheet.open { transform: translateY(0); }
         
-        .share-btn.ready { opacity: 1; pointer-events: auto; transform: scale(1); }
-        .share-btn:active { transform: scale(0.95); }
+        .sheet-label { font-size: 0.85rem; color: #888; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
 
-        /* --- COLOR SHEET --- */
-        .color-sheet {
-            position: fixed; bottom: -100%; left: 0; width: 100%; 
-            background: #1c1c1e;
-            border-radius: 24px 24px 0 0; 
-            padding: 24px 20px; 
-            transition: bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
-            z-index: 200;
-            padding-bottom: max(30px, env(safe-area-inset-bottom));
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        /* Color Grid */
+        .color-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
+        .color-opt { 
+            aspect-ratio: 1; border-radius: 50%; cursor: pointer; 
+            position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
         }
-        .color-sheet.open { bottom: 0; }
-        
-        .sheet-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-        }
-        .sheet-title { font-weight: 700; font-size: 1.1rem; }
-        .sheet-close { 
-            background: #333; padding: 6px 14px; border-radius: 16px; 
-            font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff;
-        }
+        .color-opt.selected { border: 3px solid #fff; transform: scale(1.1); }
 
-        .color-grid { 
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; 
-            max-height: 250px; overflow-y: auto;
+        /* Font Grid */
+        .font-grid { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
+        .font-opt {
+            padding: 10px 20px; background: #2c2c2e; border-radius: 12px;
+            font-size: 1rem; color: #fff; white-space: nowrap; cursor: pointer;
+            border: 1px solid transparent;
         }
+        .font-opt.selected { background: #fff; color: #000; border-color: #fff; }
 
-        .color-dot { 
-            aspect-ratio: 1/1; border-radius: 50%; 
-            cursor: pointer; position: relative;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+        /* Overlay */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
+            opacity: 0; pointer-events: none; transition: 0.3s; z-index: 150;
         }
-        .color-dot.active { border: 3px solid #fff; transform: scale(1.1); }
+        .overlay.show { opacity: 1; pointer-events: auto; }
+
     </style>
 </head>
 <body>
 
 <header>
-    <div class="close-btn" onclick="vibrate(); history.back()">✕</div>
-    <div class="header-title">New Note</div>
-    <div style="width:40px;"></div> </header>
+    <div class="cancel-btn" onclick="history.back()">Cancel</div>
+    <button class="post-btn" id="post-btn" onclick="publishNote()">Post</button>
+</header>
 
-<div class="editor-space">
-    <div class="thought-wrapper" id="thought-wrapper" onclick="focusInput()">
-        <div class="note-bubble" id="preview-bubble">
-            <div id="display-text">Type something...</div>
-            <div id="music-tag">
+<div class="editor-container">
+    <div class="bubble-wrapper" id="bubble-wrap">
+        <div class="note-bubble" id="preview">
+            <div class="display-text" id="display">Type a note...</div>
+            <div class="music-pill" id="music-pill">
                 <svg viewBox="0 0 24 24" style="width:12px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                 <span id="song-name"></span>
             </div>
         </div>
+        <img id="user-pfp" class="pfp-preview" src="https://via.placeholder.com/150">
         
-        <div class="pfp-container">
-            <img id="user-pfp" src="https://via.placeholder.com/110" alt="Profile">
-        </div>
-
-        <input type="text" id="note-input" maxlength="60" autocomplete="off">
+        <input type="text" id="hidden-input" maxlength="60" autocomplete="off" onfocus="onFocus()" onblur="onBlur()">
     </div>
 </div>
 
-<div class="bottom-controls">
-    <div class="tool-dock">
-        <div class="tool-btn" onclick="vibrate(); toggleColors(event)">
-            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-        </div>
-        
-        <div class="tool-btn" onclick="vibrate(); pickMusic(event)">
-            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-        </div>
-
-        <div class="tool-btn" id="align-btn" onclick="vibrate(); toggleAlign(event)">
-            <svg id="align-icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg> </div>
+<div class="toolbar">
+    <div class="tool-btn" onclick="openSheet('color')">
+        <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
     </div>
-
-    <button class="share-btn" id="share-btn" onclick="publishNote(event)">
-        <span>Share Note</span>
-        <svg viewBox="0 0 24 24" style="width:20px; fill:currentColor;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-    </button>
+    <div class="tool-btn" onclick="openSheet('font')">
+        <svg viewBox="0 0 24 24"><path d="M9 4v3h5v12h3V7h5V4H9zm-6 8h3v7h3v-7h3V9H3v3z"/></svg>
+    </div>
+    <div class="tool-btn" id="align-btn" onclick="toggleAlign()">
+        <svg id="align-icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg>
+    </div>
+    <div class="tool-btn" onclick="document.getElementById('song-picker').open()">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+    </div>
 </div>
 
-<div class="color-sheet" id="color-sheet">
-    <div class="sheet-header">
-        <span class="sheet-title">Bubble Style</span>
-        <div class="sheet-close" onclick="vibrate(); toggleColors()">Done</div>
-    </div>
-    <div class="color-grid" id="palette"></div>
+<div class="overlay" id="overlay" onclick="closeSheets()"></div>
+
+<div class="sheet" id="color-sheet">
+    <div class="sheet-label">Bubble Color</div>
+    <div class="color-grid" id="color-grid"></div>
 </div>
 
-<song-picker id="music-picker"></song-picker>
+<div class="sheet" id="font-sheet">
+    <div class="sheet-label">Font Style</div>
+    <div class="font-grid">
+        <div class="font-opt selected" onclick="setFont('system-ui')" style="font-family:system-ui">System</div>
+        <div class="font-opt" onclick="setFont('serif')" style="font-family:serif">Serif</div>
+        <div class="font-opt" onclick="setFont('monospace')" style="font-family:monospace">Mono</div>
+        <div class="font-opt" onclick="setFont('cursive')" style="font-family:cursive">Script</div>
+        <div class="font-opt" onclick="setFont('fantasy')" style="font-family:fantasy">Bold</div>
+    </div>
+</div>
+
+<song-picker id="song-picker"></song-picker>
 
 <script>
-    // 1. Firebase Config
-    const firebaseConfig = {
+    // --- INIT ---
+    let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
         storageBucket: "goorac-c3b59.firebasestorage.app",
         messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
 
-    // 2. State & Variables
-    const input = document.getElementById('note-input');
-    const display = document.getElementById('display-text');
-    const shareBtn = document.getElementById('share-btn');
-    const wrapper = document.getElementById('thought-wrapper');
-    const alignBtn = document.getElementById('align-btn');
-    const alignIcon = document.getElementById('align-icon');
+    // --- STATE ---
+    let state = {
+        text: '',
+        bgColor: '#262626',
+        textColor: '#fff',
+        align: 'center',
+        font: 'system-ui',
+        song: null
+    };
 
-    // Themes including New Gradients
     const themes = [
-        {bg: '#262626', text: '#ffffff'},
-        {bg: 'linear-gradient(135deg, #00C9FF 0%, #92FE9D 100%)', text: '#000'}, // Mint Green
-        {bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', text: '#fff'}, // Pinky
-        {bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', text: '#fff'}, // Blue
-        {bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', text: '#fff'}, // Sunset
-        {bg: '#ffffff', text: '#000000'},
-        {bg: '#ff3b30', text: '#ffffff'}, // Red
-        {bg: '#007aff', text: '#ffffff'}, // Blue flat
-        {bg: '#ffcc00', text: '#000000'}, // Yellow
-        {bg: '#5856d6', text: '#ffffff'}  // Purple
+        {bg:'#262626', t:'#fff'}, 
+        {bg:'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', t:'#000'},
+        {bg:'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', t:'#fff'},
+        {bg:'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', t:'#000'},
+        {bg:'#fff', t:'#000'},
+        {bg:'#007AFF', t:'#fff'},
+        {bg:'#FF3B30', t:'#fff'},
+        {bg:'#FFCC00', t:'#000'},
+        {bg:'#5856D6', t:'#fff'}
     ];
 
-    let currentTheme = themes[0];
-    let currentSongData = null;
-    let textAlignment = 'center'; // 'center' or 'left'
+    // --- DOM ELEMENTS ---
+    const els = {
+        input: document.getElementById('hidden-input'),
+        display: document.getElementById('display'),
+        preview: document.getElementById('preview'),
+        pfp: document.getElementById('user-pfp'),
+        postBtn: document.getElementById('post-btn'),
+        wrap: document.getElementById('bubble-wrap'),
+        musicPill: document.getElementById('music-pill'),
+        songName: document.getElementById('song-name')
+    };
 
-    // 3. Initialization
-    function init() {
-        // Load User Data
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                try {
-                    const userDoc = await db.collection("users").doc(user.uid).get();
-                    const pfp = userDoc.exists && userDoc.data().photoURL ? userDoc.data().photoURL : user.photoURL;
-                    if(pfp) document.getElementById('user-pfp').src = pfp;
-                } catch(e) { console.error("PFP Load Error", e); }
-            }
-        });
-
-        buildPalette();
-    }
-
-    // 4. Input Logic (No Auto-Focus)
-    function focusInput() {
-        input.focus();
-        wrapper.classList.add('typing');
-    }
-
-    input.addEventListener('blur', () => {
-        wrapper.classList.remove('typing');
+    // --- LOAD USER ---
+    auth.onAuthStateChanged(async (user) => {
+        if(user) {
+            const doc = await db.collection("users").doc(user.uid).get();
+            const data = doc.data() || {};
+            els.pfp.src = data.photoURL || user.photoURL || 'https://via.placeholder.com/150';
+        }
     });
 
-    input.addEventListener('input', updateText);
-    
-    function updateText() {
-        const val = input.value;
-        if(val.length > 0) {
-            display.innerText = val;
-            display.style.opacity = "1";
+    // --- INPUT HANDLING ---
+    els.input.addEventListener('input', (e) => {
+        state.text = e.target.value;
+        if(state.text.length > 0) {
+            els.display.innerText = state.text;
+            els.display.style.opacity = '1';
+            els.postBtn.classList.add('ready');
         } else {
-            // Placeholder logic
-            display.innerText = currentSongData ? "" : "Type something...";
-            display.style.opacity = currentSongData ? "1" : "0.5";
+            els.display.innerText = "Type a note...";
+            els.display.style.opacity = '0.5';
+            if(!state.song) els.postBtn.classList.remove('ready');
         }
-        validateShare();
+    });
+
+    function onFocus() { els.wrap.classList.add('typing'); }
+    function onBlur() { els.wrap.classList.remove('typing'); }
+
+    // --- TOOLS ---
+    function openSheet(id) {
+        if(navigator.vibrate) navigator.vibrate(10);
+        document.getElementById('overlay').classList.add('show');
+        document.getElementById(`${id}-sheet`).classList.add('open');
     }
 
-    function validateShare() {
-        const hasText = input.value.trim().length > 0;
-        const hasSong = currentSongData !== null;
-        
-        if (hasText || hasSong) {
-            shareBtn.classList.add('ready');
-        } else {
-            shareBtn.classList.remove('ready');
-        }
+    function closeSheets() {
+        document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+        document.getElementById('overlay').classList.remove('show');
     }
 
-    // 5. Utility Functions
-    function vibrate() {
-        if (navigator.vibrate) navigator.vibrate(10); 
-    }
+    // Color Logic
+    const colorGrid = document.getElementById('color-grid');
+    themes.forEach((t, i) => {
+        const d = document.createElement('div');
+        d.className = `color-opt ${i===0?'selected':''}`;
+        d.style.background = t.bg;
+        d.onclick = () => {
+            document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('selected'));
+            d.classList.add('selected');
+            state.bgColor = t.bg;
+            state.textColor = t.t;
+            els.preview.style.background = t.bg;
+            els.preview.style.color = t.t;
+        };
+        colorGrid.appendChild(d);
+    });
 
-    // 6. Tool: Color Picker
-    function buildPalette() {
-        const palette = document.getElementById('palette');
-        palette.innerHTML = '';
-        themes.forEach((t, i) => {
-            const dot = document.createElement('div');
-            dot.className = `color-dot ${i===0?'active':''}`;
-            dot.style.background = t.bg;
-            dot.onclick = (e) => {
-                e.stopPropagation();
-                vibrate();
-                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-                dot.classList.add('active');
-                currentTheme = t;
-                applyTheme();
-            };
-            palette.appendChild(dot);
+    // Font Logic
+    function setFont(font) {
+        state.font = font;
+        els.display.style.fontFamily = font;
+        document.querySelectorAll('.font-opt').forEach(el => {
+            el.classList.toggle('selected', el.innerText === font || el.style.fontFamily === font);
         });
     }
 
-    function toggleColors(e) {
-        if(e) e.stopPropagation();
-        document.getElementById('color-sheet').classList.toggle('open');
-    }
-
-    function applyTheme() {
-        const b = document.getElementById('preview-bubble');
-        b.style.background = currentTheme.bg;
-        b.style.color = currentTheme.text;
-    }
-
-    // 7. Tool: Text Alignment (New Feature)
-    function toggleAlign(e) {
-        if(e) e.stopPropagation();
-        
-        if (textAlignment === 'center') {
-            textAlignment = 'left';
-            alignIcon.innerHTML = '<path d="M3 15h18v-2H3v2zm0 4h12v-2H3v2zm0-8h18v-2H3v2zm0-6v2h18V5H3z"/>'; // Left icon
+    // Alignment Logic
+    function toggleAlign() {
+        if(navigator.vibrate) navigator.vibrate(10);
+        const icon = document.getElementById('align-icon');
+        if(state.align === 'center') {
+            state.align = 'left';
+            els.preview.style.textAlign = 'left';
+            icon.innerHTML = '<path d="M3 15h18v-2H3v2zm0 4h12v-2H3v2zm0-8h18v-2H3v2zm0-6v2h18V5H3z"/>';
         } else {
-            textAlignment = 'center';
-            alignIcon.innerHTML = '<path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/>'; // Center icon
+            state.align = 'center';
+            els.preview.style.textAlign = 'center';
+            icon.innerHTML = '<path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/>';
         }
-        
-        document.getElementById('preview-bubble').style.textAlign = textAlignment;
     }
 
-    // 8. Tool: Music
-    const picker = document.getElementById('music-picker');
-    function pickMusic(e) { 
-        e.stopPropagation(); 
-        picker.open(); 
-    }
-
-    picker.addEventListener('song-selected', (e) => {
-        vibrate();
-        currentSongData = e.detail;
-        const tag = document.getElementById('music-tag');
-        tag.style.display = 'flex';
-        document.getElementById('song-name').innerText = currentSongData.trackName.length > 20 ? currentSongData.trackName.substring(0,20)+"..." : currentSongData.trackName;
-        updateText();
+    // Music Picker
+    const songPicker = document.getElementById('song-picker');
+    songPicker.addEventListener('song-selected', (e) => {
+        state.song = e.detail;
+        els.musicPill.style.display = 'flex';
+        els.songName.innerText = state.song.trackName;
+        els.postBtn.classList.add('ready');
     });
 
-    // 9. Publish Logic
-    async function publishNote(e) {
-        if(e) e.stopPropagation();
-        if(!shareBtn.classList.contains('ready')) return;
-        
-        vibrate();
-        const user = firebase.auth().currentUser;
-        if(!user) return alert("Login required");
+    // --- PUBLISH LOGIC (THE FIX) ---
+    async function publishNote() {
+        if(!els.postBtn.classList.contains('ready')) return;
+        const user = auth.currentUser;
+        if(!user) return;
 
-        const originalText = shareBtn.innerHTML;
-        shareBtn.innerHTML = `<span>Posting...</span>`;
-        
+        // Visual Feedback
+        els.postBtn.innerHTML = 'Posting...';
+        els.postBtn.style.opacity = '0.7';
+
         try {
             const userDoc = await db.collection("users").doc(user.uid).get();
             const userData = userDoc.exists ? userDoc.data() : {};
-            
-            const now = new Date();
-            const expiryDate = new Date(now.getTime() + (24 * 60 * 60 * 1000)); 
+            const expiry = new Date(Date.now() + 86400000); // 24h
 
-            const noteData = {
+            const notePayload = {
                 uid: user.uid,
-                username: userData.name || user.displayName || "User", 
+                username: userData.name || user.displayName || "User",
                 handle: userData.username || "",
-                pfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/150',
-                verified: userData.verified === true,
+                pfp: userData.photoURL || user.photoURL,
+                verified: userData.verified || false,
                 
-                text: input.value.trim(),
-                bgColor: currentTheme.bg,
-                textColor: currentTheme.text,
-                textAlign: textAlignment, // Saving new alignment property
+                text: state.text,
+                bgColor: state.bgColor,
+                textColor: state.textColor,
+                textAlign: state.align,
+                font: state.font,
                 
-                songName: currentSongData?.trackName || null,
-                songArtist: currentSongData?.artistName || null,
-                songPreview: currentSongData?.previewUrl || null,
-                songArt: currentSongData?.artworkUrl100 || null,
+                songName: state.song?.trackName || null,
+                songArtist: state.song?.artistName || null,
+                songPreview: state.song?.previewUrl || null,
+                songArt: state.song?.artworkUrl100 || null,
                 
+                isActive: true, // Key flag
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
-                likes: [],      
-                likeCount: 0    
+                expiresAt: firebase.firestore.Timestamp.fromDate(expiry),
+                likes: []
             };
 
             const batch = db.batch();
-            batch.set(db.collection("active_notes").doc(user.uid), noteData);
-            batch.set(db.collection("users").doc(user.uid).collection("notes_history").doc(), noteData);
+
+            // 1. Find OLD active notes and deactivate them
+            const oldNotes = await db.collection("notes")
+                .where("uid", "==", user.uid)
+                .where("isActive", "==", true)
+                .get();
             
+            oldNotes.forEach(doc => {
+                batch.update(doc.ref, { isActive: false });
+            });
+
+            // 2. Create NEW note doc (Auto-ID)
+            const newNoteRef = db.collection("notes").doc();
+            batch.set(newNoteRef, notePayload);
+
+            // 3. Commit
             await batch.commit();
-            history.back(); // Return to previous screen
-        } catch (err) {
-            console.error(err);
-            alert("Failed to post note");
-            shareBtn.innerHTML = originalText;
+            
+            // 4. Return home
+            window.location.href = 'home.html';
+
+        } catch(e) {
+            console.error(e);
+            alert("Error posting note");
+            els.postBtn.innerHTML = 'Post';
         }
     }
-
-    // Start
-    init();
 </script>
 </body>
 </html>
