@@ -29,7 +29,6 @@
         
         html, body { height: 100%; width: 100%; background: var(--bg); color: var(--text); overflow-x: hidden; }
 
-        /* --- HEADER --- */
         header { 
             position: sticky; top: 0; z-index: 100;
             padding: 15px 16px; padding-top: calc(env(safe-area-inset-top) + 15px);
@@ -42,7 +41,6 @@
         .page-title { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.5px; }
         .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--accent); background:none; border:none; padding:0; display: flex; align-items: center; justify-content: center; height: 30px; width: 30px; }
 
-        /* --- FILTER TABS --- */
         .tabs-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
         .tabs-container::-webkit-scrollbar { display: none; }
         
@@ -55,64 +53,70 @@
         }
         .tab-pill.active { background: var(--text); color: #000; border-color: var(--text); }
 
-        /* --- LIST --- */
-        #notif-list { padding-bottom: 80px; }
+        #notif-list { padding-bottom: 40px; }
         
         .notif-item {
-            display: flex; align-items: center; gap: 14px;
+            display: flex; align-items: flex-start; gap: 14px;
             padding: 16px; border-bottom: 1px solid #1a1a1a;
             transition: background 0.2s; position: relative;
             cursor: pointer;
         }
         .notif-item:active { background: var(--item-hover); }
-        
-        /* Highlight Unread */
         .notif-item.unread { background: var(--unread-bg); }
+        
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+            position: absolute; right: 16px; top: 20px;
             box-shadow: 0 0 8px var(--accent);
         }
 
         .n-avatar { 
-            width: 48px; height: 48px; border-radius: 50%; object-fit: cover; 
+            width: 44px; height: 44px; border-radius: 50%; object-fit: cover; 
             border: 1px solid #333; background: #222; flex-shrink: 0;
         }
         
-        .n-content { flex: 1; font-size: 0.95rem; line-height: 1.4; color: #ddd; padding-right: 20px; }
+        .n-content { flex: 1; font-size: 0.9rem; line-height: 1.4; color: #ddd; padding-right: 15px; }
         .n-username { font-weight: 700; color: #fff; margin-right: 4px; }
         .n-text { color: #ccc; }
         .n-time { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: block; font-weight: 500; }
 
-        /* --- ACTION PREVIEWS --- */
-        .n-action { flex-shrink: 0; }
+        .n-action { flex-shrink: 0; padding-top: 5px; }
+
+        /* --- NOTE BUBBLE PREVIEW UI --- */
+        .mini-note-bubble {
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #fff;
+            max-width: fit-content;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .mini-note-text { font-weight: 500; }
+        .mini-note-song { 
+            font-size: 0.65rem; opacity: 0.8; display: flex; align-items: center; gap: 4px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+        }
 
         .btn-follow {
             background: var(--accent); color: white; border: none;
-            padding: 6px 18px; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+            padding: 6px 16px; border-radius: 8px; font-weight: 600; font-size: 0.8rem;
             cursor: pointer; transition: transform 0.1s;
         }
-        .btn-follow:active { transform: scale(0.95); }
         .btn-following {
             background: transparent; color: var(--text); border: 1px solid var(--border);
         }
 
-        .post-thumb {
-            width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #222; border: 1px solid #333;
-        }
+        /* Loading Spinner */
+        #loader { display: none; justify-content: center; padding: 20px; }
+        .spinner { width: 24px; height: 24px; border: 3px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin 1s infinite linear; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* --- EMPTY STATE --- */
         .empty-state {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 60vh; color: var(--text-secondary); text-align: center; gap: 15px;
+            height: 50vh; color: var(--text-secondary); text-align: center; gap: 15px;
         }
-        .empty-icon { font-size: 4rem; opacity: 0.3; margin-bottom: 5px; filter: grayscale(1); }
-        .empty-text { font-size: 1.1rem; font-weight: 500; }
-
-        /* Loading Skeleton */
-        .skeleton { background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); background-size: 400px 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
-        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
-
     </style>
 </head>
 <body>
@@ -121,34 +125,19 @@
         <div class="top-row">
             <button class="back-btn" onclick="history.back()">‹</button>
             <div class="page-title">Notifications</div>
-            <div style="width: 30px;"></div> </div>
+            <div style="width: 30px;"></div>
+        </div>
         <div class="tabs-container">
             <div class="tab-pill active" onclick="filterType('all', this)">All</div>
             <div class="tab-pill" onclick="filterType('follow', this)">Follows</div>
             <div class="tab-pill" onclick="filterType('like', this)">Likes</div>
-            <div class="tab-pill" onclick="filterType('comment', this)">Comments</div>
         </div>
     </header>
 
-    <div id="notif-list">
-        <div class="notif-item">
-            <div class="n-avatar skeleton"></div>
-            <div class="n-content">
-                <div class="skeleton" style="width: 60%; height: 14px; margin-bottom: 8px;"></div>
-                <div class="skeleton" style="width: 30%; height: 10px;"></div>
-            </div>
-        </div>
-        <div class="notif-item">
-            <div class="n-avatar skeleton"></div>
-            <div class="n-content">
-                <div class="skeleton" style="width: 50%; height: 14px; margin-bottom: 8px;"></div>
-                <div class="skeleton" style="width: 25%; height: 10px;"></div>
-            </div>
-        </div>
-    </div>
+    <div id="notif-list"></div>
+    <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- INIT CONFIG & FIREBASE ---
     let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -165,192 +154,260 @@
     }
     const db = firebase.firestore();
     const auth = firebase.auth();
+    
     let myUid = null;
     let currentFilter = 'all';
-    let allNotifications = [];
+    
+    // Data Storage
+    let rawNotifications = []; // Stores all fetched objects
+    let displayedCount = 0;    // How many are currently shown
+    const BATCH_SIZE = 10;     // Load 10 at a time
+    const READ_KEY = "goorac_read_notifs"; // Local Storage Key
 
-    // --- HELPERS ---
-    function timeAgo(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + "y";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + "w";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + "d";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + "h";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m";
-        return "now";
+    // --- READ RECEIPT LOGIC ---
+    function isNotificationRead(id) {
+        const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+        return readList.includes(id);
     }
 
-    // --- MAIN LOGIC ---
+    function markNotificationRead(id) {
+        let readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+        if(!readList.includes(id)) {
+            readList.push(id);
+            localStorage.setItem(READ_KEY, JSON.stringify(readList));
+        }
+    }
+
+    // --- MAIN ---
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            listenForNotifications();
+            initListeners();
         } else {
             window.location.href = 'login.html';
         }
     });
 
-    function listenForNotifications() {
-        // Query: 'notifications' collection where recipient is Me, ordered by time
-        db.collection('notifications')
-            .where('recipientId', '==', myUid)
-            .orderBy('timestamp', 'desc')
-            .limit(50)
-            .onSnapshot(snapshot => {
-                const list = document.getElementById('notif-list');
-                
-                if (snapshot.empty) {
-                    list.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-icon">🔔</div>
-                            <div class="empty-text">No notifications yet</div>
-                            <div style="font-size:0.8rem; opacity:0.5;">When people interact with you, they'll show up here.</div>
-                        </div>`;
-                    return;
+    // We fetch everything into memory (arrays don't cost extra reads per item)
+    // Then we handle pagination locally for UI performance
+    function initListeners() {
+        const list = document.getElementById('notif-list');
+        list.innerHTML = ''; // Clear start
+        
+        let unsortedData = new Map();
+
+        // 1. LISTEN TO LIKES (active_notes)
+        db.collection("active_notes").doc(myUid).onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.likes && Array.isArray(data.likes)) {
+                    data.likes.forEach(liker => {
+                        const notifId = `like_${liker.uid}`;
+                        unsortedData.set(notifId, {
+                            id: notifId,
+                            type: 'like',
+                            senderId: liker.uid,
+                            senderName: liker.displayName || "Someone",
+                            senderPic: liker.photoURL,
+                            timestamp: Date.now(), // Array has no timestamp, so we assume recent
+                            text: "liked your note.",
+                            noteData: { // Pass note styles for preview
+                                text: data.text,
+                                songName: data.songName,
+                                bgColor: data.bgColor,
+                                textColor: data.textColor
+                            }
+                        });
+                    });
                 }
+            }
+            processAndRender(unsortedData);
+        });
 
-                allNotifications = [];
-                snapshot.forEach(doc => {
-                    let data = doc.data();
-                    data.id = doc.id;
-                    allNotifications.push(data);
-                });
+        // 2. LISTEN TO FOLLOWERS (users collection)
+        db.collection("users").doc(myUid).onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.followers && Array.isArray(data.followers)) {
+                    data.followers.forEach(followerUid => {
+                        const notifId = `follow_${followerUid}`;
+                        // Avoid overwriting if existing
+                        if (!unsortedData.has(notifId)) {
+                            unsortedData.set(notifId, {
+                                id: notifId,
+                                type: 'follow',
+                                senderId: followerUid,
+                                senderName: "User", // Placeholder
+                                senderPic: "https://via.placeholder.com/50",
+                                timestamp: Date.now(),
+                                text: "started following you.",
+                                needsFetch: true
+                            });
+                            // Fetch real user info for followers
+                            fetchUserInfo(followerUid, notifId, unsortedData);
+                        }
+                    });
+                }
+            }
+            processAndRender(unsortedData);
+        });
+    }
 
-                renderNotifications();
+    function fetchUserInfo(uid, notifId, map) {
+        db.collection("users").doc(uid).get().then(uDoc => {
+            if(uDoc.exists) {
+                const uData = uDoc.data();
+                const item = map.get(notifId);
+                if(item) {
+                    item.senderName = uData.name || uData.username || "User";
+                    item.senderPic = uData.photoURL;
+                    item.needsFetch = false;
+                    
+                    // Update DOM specifically if visible
+                    const nameEl = document.getElementById(`name-${notifId}`);
+                    const pfpEl = document.getElementById(`pfp-${notifId}`);
+                    if(nameEl) nameEl.innerText = item.senderName;
+                    if(pfpEl) pfpEl.src = item.senderPic;
+                }
+            }
+        });
+    }
+
+    function processAndRender(mapData) {
+        // Convert Map to Array & Sort
+        rawNotifications = Array.from(mapData.values());
+        // Sort (Likes/Follows without timestamps will group at top/bottom, logic depends on use case)
+        // Here we just keep them, in a real app you'd store timestamp in the array object.
+        
+        // Reset and Render First Batch
+        displayedCount = 0;
+        document.getElementById('notif-list').innerHTML = '';
+        renderNextBatch();
+    }
+
+    function renderNextBatch() {
+        const list = document.getElementById('notif-list');
+        const loader = document.getElementById('loader');
+        
+        // Filter first
+        const filtered = rawNotifications.filter(n => {
+            if (currentFilter === 'all') return true;
+            return n.type === currentFilter;
+        });
+
+        if (filtered.length === 0 && displayedCount === 0) {
+            list.innerHTML = `<div class="empty-state"><div class="empty-text">No notifications</div></div>`;
+            return;
+        }
+
+        const nextBatch = filtered.slice(displayedCount, displayedCount + BATCH_SIZE);
+        
+        if (nextBatch.length > 0) {
+            nextBatch.forEach(notif => {
+                const el = createNotificationElement(notif);
+                list.appendChild(el);
             });
+            displayedCount += nextBatch.length;
+        }
+
+        // Hide/Show Loader based on if more exist
+        loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
+    }
+
+    function createNotificationElement(notif) {
+        const isRead = isNotificationRead(notif.id);
+        
+        const div = document.createElement('div');
+        div.className = `notif-item ${!isRead ? 'unread' : ''}`;
+        div.id = `row-${notif.id}`;
+        
+        div.onclick = (e) => {
+            if(!e.target.closest('button')) handleItemClick(notif);
+        };
+
+        // UI Logic
+        let actionHtml = '';
+        let extraContentHtml = '';
+
+        // 1. Follow Type
+        if (notif.type === 'follow') {
+            actionHtml = `<button class="btn-follow" onclick="toggleFollow(this)">Follow</button>`;
+        } 
+        // 2. Like Type (SHOW MINI NOTE BUBBLE)
+        else if (notif.type === 'like') {
+            actionHtml = `<span style="font-size:1.4rem;">❤️</span>`;
+            if (notif.noteData && (notif.noteData.text || notif.noteData.songName)) {
+                extraContentHtml = `
+                    <div class="mini-note-bubble" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
+                        ${notif.noteData.text ? `<span class="mini-note-text">${notif.noteData.text}</span>` : ''}
+                        ${notif.noteData.songName ? `
+                            <span class="mini-note-song">
+                                <svg viewBox="0 0 24 24" style="width:10px;fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg> 
+                                ${notif.noteData.songName}
+                            </span>
+                        ` : ''}
+                    </div>
+                `;
+            }
+        }
+
+        div.innerHTML = `
+            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?uid=${notif.senderId}'">
+            <div class="n-content">
+                <div><span class="n-username" id="name-${notif.id}">${notif.senderName}</span> <span class="n-text">${notif.text}</span></div>
+                ${extraContentHtml}
+                <span class="n-time">Just now</span>
+            </div>
+            <div class="n-action">${actionHtml}</div>
+            ${!isRead ? '<div class="unread-dot"></div>' : ''}
+        `;
+
+        return div;
+    }
+
+    function handleItemClick(notif) {
+        // Mark Read Locally
+        markNotificationRead(notif.id);
+        const row = document.getElementById(`row-${notif.id}`);
+        if(row) {
+            row.classList.remove('unread');
+            const dot = row.querySelector('.unread-dot');
+            if(dot) dot.remove();
+        }
+        // Navigate
+        if(notif.senderId) window.location.href = `userProfile.html?uid=${notif.senderId}`;
     }
 
     function filterType(type, element) {
         currentFilter = type;
-        
-        // UI Update
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-
-        renderNotifications();
-    }
-
-    async function renderNotifications() {
-        const list = document.getElementById('notif-list');
-        list.innerHTML = '';
-
-        const filtered = allNotifications.filter(n => {
-            if (currentFilter === 'all') return true;
-            return n.type.includes(currentFilter);
-        });
-
-        if (filtered.length === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No ${currentFilter}s found</div></div>`;
-            return;
-        }
-
-        for (const notif of filtered) {
-            // Setup Sender Data
-            let senderData = { photoURL: 'https://via.placeholder.com/50', username: 'User' };
-            
-            // Optimization: If notification doc has snapshot data, use it. Else fetch user.
-            // Ideally, your backend should save 'senderName' and 'senderPic' in the notification doc.
-            if(notif.senderName) {
-                senderData.username = notif.senderName;
-                senderData.photoURL = notif.senderPic;
-            } else if (notif.senderId) {
-                try {
-                    const userDoc = await db.collection('users').doc(notif.senderId).get();
-                    if(userDoc.exists) senderData = userDoc.data();
-                } catch(e) {}
-            }
-
-            const item = document.createElement('div');
-            // Add 'unread' class if isRead is false
-            item.className = `notif-item ${!notif.isRead ? 'unread' : ''}`;
-            
-            // Click to mark read
-            item.onclick = (e) => {
-                if(!e.target.closest('button')) { // Don't trigger if clicking Follow button
-                    handleItemClick(notif);
-                }
-            };
-
-            let actionHtml = '';
-            let textHtml = '';
-
-            // --- Logic per Notification Type ---
-            if (notif.type === 'follow') {
-                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">started following you.</span>`;
-                actionHtml = `<button class="btn-follow" onclick="followUser(event, '${notif.senderId}', this)">Follow</button>`;
-            } 
-            else if (notif.type.includes('like')) {
-                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">liked your note.</span>`;
-                if (notif.meta && notif.meta.imageUrl) {
-                    actionHtml = `<img src="${notif.meta.imageUrl}" class="post-thumb">`;
-                } else {
-                     actionHtml = `<span style="font-size:1.5rem;">❤️</span>`;
-                }
-            } 
-            else if (notif.type === 'comment') {
-                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">commented: "${notif.meta ? notif.meta.content : '...'}"</span>`;
-                actionHtml = `<span style="font-size:1.5rem;">💬</span>`;
-            }
-            else {
-                textHtml = `<span class="n-username">${senderData.username}</span> <span class="n-text">interacted with you.</span>`;
-            }
-
-            const timeString = notif.timestamp ? timeAgo(notif.timestamp.toDate()) : '';
-
-            item.innerHTML = `
-                <img src="${senderData.photoURL || 'https://via.placeholder.com/50'}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?uid=${notif.senderId}'">
-                <div class="n-content">
-                    <div>${textHtml}</div>
-                    <span class="n-time">${timeString}</span>
-                </div>
-                <div class="n-action">
-                    ${actionHtml}
-                </div>
-                ${!notif.isRead ? '<div class="unread-dot"></div>' : ''}
-            `;
-
-            list.appendChild(item);
-        }
-    }
-
-    // --- ACTIONS ---
-    
-    function handleItemClick(notif) {
-        // 1. Mark as read in DB
-        if (!notif.isRead) {
-            db.collection('notifications').doc(notif.id).update({ isRead: true }).catch(e=>{});
-        }
-
-        // 2. Navigate based on type
-        if (notif.type === 'follow') {
-            window.location.href = `userProfile.html?uid=${notif.senderId}`;
-        } else if (notif.type.includes('like') || notif.type === 'comment') {
-            // Assuming you have a way to view a specific note/post
-            // window.location.href = `viewNote.html?id=${notif.contentId}`;
-        }
-    }
-
-    function followUser(event, uid, btn) {
-        event.stopPropagation(); // Stop bubbling to item click
         
-        // Simple UI toggle for visual feedback
-        if (btn.classList.contains('btn-following')) {
-            btn.classList.remove('btn-following');
-            btn.classList.add('btn-follow');
-            btn.innerText = "Follow";
-            // TODO: Call your actual Firebase un-follow function here
-        } else {
-            btn.classList.add('btn-following');
-            btn.classList.remove('btn-follow');
+        // Reset Render
+        displayedCount = 0;
+        document.getElementById('notif-list').innerHTML = '';
+        renderNextBatch();
+    }
+
+    function toggleFollow(btn) {
+        event.stopPropagation();
+        if (btn.innerText === "Follow") {
             btn.innerText = "Following";
-            // TODO: Call your actual Firebase follow function here
+            btn.classList.add("btn-following");
+        } else {
+            btn.innerText = "Follow";
+            btn.classList.remove("btn-following");
         }
     }
+
+    // --- INFINITE SCROLL OBSERVER ---
+    const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            renderNextBatch(); // Load next 10
+        }
+    }, { root: null, threshold: 0.1 });
+
+    observer.observe(document.getElementById('loader'));
 
 </script>
 </body>
