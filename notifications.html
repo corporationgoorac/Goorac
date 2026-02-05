@@ -16,13 +16,13 @@
     <style>
         :root { 
             --bg: #000000;
-            --header-bg: rgba(0,0,0,0.9);
+            --header-bg: rgba(0,0,0,0.85);
             --accent: #0095f6;
             --text: #ffffff; 
             --text-secondary: #a8a8a8;
             --border: #262626;
             --item-hover: #121212;
-            --unread-bg: rgba(0, 149, 246, 0.05);
+            --unread-bg: rgba(0, 149, 246, 0.08); /* Subtle highlight for unread */
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
@@ -32,23 +32,23 @@
         /* HEADER */
         header { 
             position: sticky; top: 0; z-index: 100;
-            padding: 10px 16px; padding-top: calc(env(safe-area-inset-top) + 10px);
+            padding: 10px 16px; padding-top: calc(env(safe-area-inset-top) + 12px);
             background: var(--header-bg); border-bottom: 1px solid var(--border);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         }
 
-        .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
-        .page-title { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.3px; }
+        .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .page-title { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.3px; }
         .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--text); background:none; border:none; padding:0; display: flex; align-items: center; }
 
         /* TABS */
-        .tabs-container { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        .tabs-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
         .tabs-container::-webkit-scrollbar { display: none; }
         
         .tab-pill {
-            background: transparent; color: var(--text);
+            background: transparent; color: var(--text-secondary);
             border: 1px solid var(--border);
-            padding: 6px 18px; border-radius: 8px;
+            padding: 7px 20px; border-radius: 20px;
             font-size: 0.9rem; font-weight: 600; white-space: nowrap;
             cursor: pointer; transition: all 0.2s;
         }
@@ -58,65 +58,65 @@
         #notif-list { padding: 0 0 80px 0; }
         
         .notif-item {
-            display: flex; align-items: flex-start; gap: 12px;
-            padding: 14px 16px;
-            transition: background 0.3s ease; position: relative;
+            display: flex; align-items: center; gap: 14px;
+            padding: 14px 16px; border-bottom: 1px solid #1a1a1a;
+            transition: background 0.2s ease; position: relative;
             cursor: pointer;
-            border-bottom: 1px solid #1a1a1a;
         }
         .notif-item:active { background: var(--item-hover); }
+        
+        /* Unread Styling */
         .notif-item.unread { background: var(--unread-bg); }
         
-        /* UNREAD DOT */
+        /* The Blue Dot */
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-            box-shadow: 0 0 6px var(--accent);
-            transition: opacity 0.5s ease;
+            margin-left: auto; flex-shrink: 0;
+            box-shadow: 0 0 8px var(--accent);
+            display: none; /* Hidden by default */
         }
-        .notif-item.read .unread-dot { opacity: 0; }
-        .notif-item.read { background: transparent; }
+        .notif-item.unread .unread-dot { display: block; }
 
         .n-avatar { 
-            width: 44px; height: 44px; border-radius: 50%; object-fit: cover; 
+            width: 48px; height: 48px; border-radius: 50%; object-fit: cover; 
             border: 1px solid #333; background: #222; flex-shrink: 0;
         }
         
-        .n-content { flex: 1; font-size: 0.9rem; line-height: 1.35; color: #fff; padding-right: 20px; }
-        .n-username { font-weight: 700; color: #fff; cursor: pointer; margin-right: 4px; }
-        .n-text { color: var(--text-secondary); font-weight: 400; }
-        .n-time { font-size: 0.75rem; color: #666; margin-left: 4px; }
+        .n-content { flex: 1; font-size: 0.9rem; line-height: 1.4; color: #fff; padding-right: 10px; }
+        .n-username { font-weight: 700; color: #fff; margin-right: 4px; }
+        .n-text { color: #ccc; font-weight: 400; }
+        .n-time { font-size: 0.75rem; color: var(--text-secondary); display: block; margin-top: 2px; }
 
-        .n-action { flex-shrink: 0; margin-left: 4px; display: flex; align-items: center; }
+        .n-action { flex-shrink: 0; margin-left: 4px; }
 
         /* MINI NOTE PREVIEW */
         .mini-note {
-            margin-top: 6px; padding: 8px 12px; border-radius: 12px;
-            font-size: 0.8rem; color: #fff; max-width: fit-content;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 44px; height: 44px; border-radius: 10px;
+            font-size: 1.2rem;
             border: 1px solid rgba(255,255,255,0.1);
-            display: flex; flex-direction: column; gap: 2px;
+            background-size: cover; background-position: center;
+            overflow: hidden;
         }
-        .mini-note-song { 
-            font-size: 0.65rem; opacity: 0.8; display: flex; align-items: center; gap: 4px; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
-        }
+        .mini-note span { font-size: 0.6rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 90%; padding: 0 2px;}
 
         /* BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
-            padding: 6px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
             cursor: pointer; transition: transform 0.1s;
         }
         .btn-following {
             background: transparent; color: var(--text); border: 1px solid var(--border);
         }
+        .btn-follow:active { transform: scale(0.95); opacity: 0.8; }
 
         .v-badge { width: 13px; height: 13px; vertical-align: -2px; margin-left: 2px; }
 
         /* LOADING */
         .empty-state {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 50vh; color: var(--text-secondary); text-align: center; gap: 15px;
+            height: 60vh; color: var(--text-secondary); text-align: center; gap: 15px;
         }
         #loader { display: none; justify-content: center; padding: 20px; }
         .spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: var(--text); border-radius: 50%; animation: spin 0.8s infinite linear; }
@@ -171,7 +171,7 @@
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
 
-    // --- LOCAL STORAGE READ HELPER ---
+    // --- LOCAL STORAGE ---
     function isNotificationRead(id) {
         if(!myUid) return false;
         const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
@@ -184,38 +184,36 @@
         if(!readList.includes(id)) {
             readList.push(id);
             localStorage.setItem(READ_KEY, JSON.stringify(readList));
-            // Dispatch event for other tabs/pages to sync
+            // We update storage, BUT WE DO NOT UPDATE DOM HERE.
+            // This ensures the "Blue Dot" persists until page reload.
+            
+            // Sync with other tabs if open
             window.dispatchEvent(new Event('storage'));
         }
     }
 
-    // --- GAZE DETECTION (Intersection Observer) ---
-    // This marks items as read when they scroll into view (Auto-Read)
+    // --- GAZE DETECTION ---
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const row = entry.target;
                 const id = row.dataset.id;
-                if(id && !isNotificationRead(id)) {
-                    // Mark read in storage
+                // If it is currently displayed as unread, mark it as read in storage
+                // But leave the visual class alone for this session.
+                if(id && row.classList.contains('unread')) {
                     markNotificationRead(id);
-                    // Update UI visually
-                    row.classList.add('read');
-                    row.classList.remove('unread');
-                    // Stop observing this one
-                    gazeObserver.unobserve(row);
+                    gazeObserver.unobserve(row); // Done for this item
                 }
             }
         });
-    }, { threshold: 0.5 }); // Trigger when 50% visible
+    }, { threshold: 0.5 });
 
     // --- INIT ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
-            READ_KEY = `goorac_read_${myUid}`; // Unique key per user
+            READ_KEY = `goorac_read_${myUid}`; 
 
-            // Get Following list for buttons
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -374,7 +372,7 @@
         });
 
         if (filtered.length === 0 && displayedCount === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-text">No notifications yet</div></div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications</div></div>`;
             loader.style.display = 'none';
             return;
         }
@@ -392,20 +390,19 @@
     }
 
     function createNotificationElement(notif) {
+        // Initial Read Check (from previous sessions)
         const isRead = isNotificationRead(notif.id);
         
         const div = document.createElement('div');
-        div.className = `notif-item ${!isRead ? 'unread' : 'read'}`;
-        div.dataset.id = notif.id; // For Observer
+        div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
+        div.dataset.id = notif.id; 
         
-        // --- ATTACH OBSERVER FOR AUTO-READ ---
+        // Attach Observer: Marks as read in background, but doesn't change UI
         if(!isRead) gazeObserver.observe(div);
 
         div.onclick = (e) => {
             if(!e.target.closest('button')) {
-                // If clicked, also mark read immediately
-                markNotificationRead(notif.id);
-                div.classList.add('read'); div.classList.remove('unread');
+                markNotificationRead(notif.id); // Ensure read on click
                 window.location.href = `userProfile.html?uid=${notif.senderId}`;
             }
         };
@@ -419,20 +416,21 @@
             const isFollowing = myFollowingList.includes(notif.senderId);
             const btnText = isFollowing ? "Following" : "Follow";
             const btnClass = isFollowing ? "btn-following" : "btn-follow";
-            actionHtml = `<button class="${btnClass}" onclick="toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
+            actionHtml = `<button class="btn-follow ${btnClass}" onclick="toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
-                // Mini Note Visualization
-                extraContentHtml = `
+                let content = '';
+                if(notif.noteData.text) content = `<span style="font-size:0.5rem;">${notif.noteData.text}</span>`;
+                else if(notif.noteData.songName) content = `<span style="font-size:1.2rem;">🎵</span>`;
+                
+                actionHtml = `
                     <div class="mini-note" style="background:${notif.noteData.bgColor}; color:${notif.noteData.textColor}">
-                        ${notif.noteData.text ? `<span style="font-weight:500;">${notif.noteData.text}</span>` : ''}
-                        ${notif.noteData.songName ? `<span class="mini-note-song">🎵 ${notif.noteData.songName}</span>` : ''}
+                        ${content}
                     </div>
                 `;
             } else {
-                // Fallback for image likes
-                 actionHtml = `<img src="${notif.meta?.imageUrl || 'https://via.placeholder.com/40'}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`;
+                 actionHtml = `<img src="${notif.meta?.imageUrl || 'https://via.placeholder.com/40'}" style="width:44px;height:44px;object-fit:cover;border-radius:10px;border:1px solid #333;">`;
             }
         }
         else if (notif.type === 'comment') {
@@ -454,16 +452,18 @@
         return div;
     }
 
+    // --- ACTIONS ---
+
     function toggleFollow(btn, targetUid) {
         event.stopPropagation();
         const isFollowing = btn.innerText === "Following";
         
         if (isFollowing) {
-            btn.innerText = "Follow"; btn.className = "btn-follow";
+            btn.innerText = "Follow"; btn.classList.remove("btn-following");
             db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
             db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
         } else {
-            btn.innerText = "Following"; btn.className = "btn-following";
+            btn.innerText = "Following"; btn.classList.add("btn-following");
             const ts = firebase.firestore.Timestamp.now();
             const fObj = { uid: myUid, timestamp: ts };
             const uObj = { uid: targetUid, timestamp: ts };
@@ -498,7 +498,6 @@
         return `${Math.floor(days/7)}w`;
     }
 
-    // Scroll Load
     const scrollObserver = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting) renderNextBatch();
     }, { root: null, threshold: 0.1 });
