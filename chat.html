@@ -104,6 +104,13 @@
             to { transform: translateY(0); }
         }
 
+        /* Audio Waveform Animation */
+        @keyframes wavePulse {
+            0% { height: 4px; opacity: 0.6; }
+            50% { height: 10px; opacity: 1; }
+            100% { height: 4px; opacity: 0.6; }
+        }
+
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff3b00 !important; }
 
         .loading-shimmer {
@@ -210,8 +217,8 @@
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        .seen-status { font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px; margin-right: 2px; text-align: right; font-weight: 500; height: 14px; width: 100%; opacity: 0; animation: fadeIn 0.3s forwards; position: relative; z-index: 1; }
-        @keyframes fadeIn { to { opacity: 1; } }
+        /* DISABLED SEEN STATUS AS PER REQUEST */
+        .seen-status { display: none !important; }
 
         .reply-box-ui { background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 12px; margin-bottom: 6px; font-size: 0.88rem; border-left: 4px solid rgba(255, 255, 255, 0.5); color: #e0e0e0; max-width: 100%; cursor: pointer; transition: opacity 0.2s; white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
         .reply-box-ui:active { opacity: 0.7; }
@@ -416,7 +423,18 @@
             flex: 1; height: 4px; background: #444; border-radius: 2px;
             position: relative; overflow: hidden;
         }
+        /* Visualizer Effect using CSS */
+        .audio-waveform.playing {
+            animation: wavePulse 0.5s infinite ease-in-out;
+        }
+
         .audio-progress { height: 100%; background: #fff; width: 0%; transition: width 0.1s linear; }
+
+        .playback-speed {
+            font-size: 0.7rem; font-weight: bold; color: #fff;
+            background: rgba(255,255,255,0.1); padding: 4px 6px;
+            border-radius: 6px; cursor: pointer; width: 30px; text-align: center;
+        }
         
         /* File Card */
         .msg-file-pill {
@@ -720,7 +738,7 @@
         
         // Own Feature: Auto-Scroll on Typing
         if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
-             scrollToBottom();
+              scrollToBottom();
         }
     });
 
@@ -830,9 +848,9 @@
         reactionPicker.style.width = "100%";
         reactionPicker.style.height = "100%";
         reactionPicker.addEventListener('emoji-click', event => {
-             const emoji = event.detail.emoji || event.detail.unicode;
-             applyReaction(emoji);
-             closeReactionPicker(); // Auto-close on selection (Fast Interaction)
+              const emoji = event.detail.emoji || event.detail.unicode;
+              applyReaction(emoji);
+              closeReactionPicker(); // Auto-close on selection (Fast Interaction)
         });
         container.appendChild(reactionPicker);
         reactionModal.style.display = 'flex';
@@ -1228,15 +1246,10 @@
         }
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
+        // DISABLED SEEN TEXT LOGIC AS PER REQUEST
         let seenText = "";
-        if (isLastSeen && side === 'sent') {
-            if (m.seenAt) {
-                seenText = "Seen " + timeAgo(m.seenAt.toDate());
-            } else {
-                seenText = "Seen"; 
-            }
-        }
-        
+        // if (isLastSeen && side === 'sent') { ... } // Removed
+
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
@@ -1251,7 +1264,7 @@
                     <div class="note-content-text">"${m.replyToNote}"</div>
                     ${m.noteMetadata && m.noteMetadata.songName ? `
                     <div class="note-song-tag">
-                        <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                         <span>${m.noteMetadata.songName}</span>
                     </div>` : ''}
                 </div>
@@ -1286,7 +1299,7 @@
             bubbleClass = "bubble has-media";
             if(!m.text) bubbleStyle = "display:none;";
         }
-        // 3. AUDIO (Instagram Style)
+        // 3. AUDIO (Fixed Functionality + New Feature: Speed Control)
         else if (m.fileUrl && m.fileMeta && m.fileMeta.type === 'audio') {
             const safeId = 'audio-' + id;
             mediaHtml = `
@@ -1294,10 +1307,11 @@
                 <div class="audio-control-btn" onclick="toggleAudio('${safeId}', '${m.fileUrl}')">
                     <svg id="icon-${safeId}" viewBox="0 0 24 24" style="width:18px; fill:#000;"><path d="M8 5v14l11-7z"/></svg>
                 </div>
-                <div class="audio-waveform">
+                <div class="audio-waveform" id="wave-${safeId}">
                     <div id="prog-${safeId}" class="audio-progress"></div>
                 </div>
-                <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
+                <div class="playback-speed" onclick="changeSpeed('${safeId}', this)">1x</div>
+                <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')" preload="metadata"></audio>
                 <div id="react-${id}" class="reaction-badge" style="position:absolute; bottom:-8px; right:10px; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
             </div>`;
             // Audio usually doesn't have caption in this style, or it sits below
@@ -1377,10 +1391,11 @@
         }
     }
     
-    // --- AUDIO PLAYER LOGIC ---
+    // --- FIXED AUDIO PLAYER LOGIC & NEW SPEED FEATURE ---
     window.toggleAudio = function(id, url) {
         const audio = document.getElementById(id);
         const icon = document.getElementById('icon-' + id);
+        const wave = document.getElementById('wave-' + id);
         
         // Pause all other audios
         document.querySelectorAll('audio').forEach(a => {
@@ -1391,26 +1406,55 @@
         });
 
         if (audio.paused) {
-            audio.play();
-            icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause Icon
+            audio.play().then(() => {
+                icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause Icon
+                if(wave) wave.classList.add('playing'); // Start visualizer animation
+            }).catch(e => {
+                console.error("Audio play failed", e);
+            });
         } else {
             audio.pause();
             icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play Icon
+            if(wave) wave.classList.remove('playing'); // Stop visualizer
         }
     };
+
+    // Feature: Speed Control
+    window.changeSpeed = function(id, btn) {
+        const audio = document.getElementById(id);
+        if(!audio) return;
+        
+        let currentSpeed = audio.playbackRate;
+        let newSpeed = 1.0;
+        
+        if(currentSpeed === 1.0) newSpeed = 1.5;
+        else if(currentSpeed === 1.5) newSpeed = 2.0;
+        else newSpeed = 1.0;
+        
+        audio.playbackRate = newSpeed;
+        btn.innerText = newSpeed + 'x';
+        event.stopPropagation();
+    }
 
     window.updateAudioUI = function(id) {
         const audio = document.getElementById(id);
         const prog = document.getElementById('prog-' + id);
-        const pct = (audio.currentTime / audio.duration) * 100;
-        prog.style.width = pct + '%';
+        
+        // Check for Infinity/NaN to prevent errors
+        if(audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+            const pct = (audio.currentTime / audio.duration) * 100;
+            prog.style.width = pct + '%';
+        }
     };
 
     window.resetAudioUI = function(id) {
         const icon = document.getElementById('icon-' + id);
         const prog = document.getElementById('prog-' + id);
+        const wave = document.getElementById('wave-' + id);
+        
         icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
         prog.style.width = '0%';
+        if(wave) wave.classList.remove('playing');
     };
 
     // Extracted Listener Logic for re-use on Text Bubble OR Image
@@ -1441,15 +1485,20 @@
                 currentX = e.touches[0].clientX;
                 
                 if (Math.abs(currentX - startX) > 10) { 
-                     clearTimeout(menuTimer);
-                     isScrolling = true;
+                      clearTimeout(menuTimer);
+                      isScrolling = true;
                 }
                 
                 let diff = currentX - startX;
+                // Only allow right swipe
                 if (diff > 0 && diff < 80) {
                     element.style.transform = `translateX(${diff}px)`;
                     element.style.transition = "none";
-                    if (diff > 50 && !swipeTriggered) { vibrate(20); swipeTriggered = true; }
+                    // Snap haptic logic
+                    if (diff > 50 && !swipeTriggered) { 
+                        vibrate(20); 
+                        swipeTriggered = true; 
+                    }
                 }
             }, {passive: true});
 
@@ -1458,7 +1507,19 @@
                 let diff = currentX - startX;
                 element.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
                 element.style.transform = `translateX(0px)`;
-                if (diff > 50 && swipeTriggered) triggerReply(m.text || "Image");
+                
+                if (diff > 50 && swipeTriggered) {
+                    // Logic to get correct reply text based on file type
+                    let replyLabel = m.text;
+                    if(!replyLabel) {
+                        if(m.imageUrl) replyLabel = "📷 Photo";
+                        else if(m.fileMeta && m.fileMeta.type === 'audio') replyLabel = "🎵 Audio";
+                        else if(m.fileMeta && m.fileMeta.type === 'video') replyLabel = "🎥 Video";
+                        else if(m.fileUrl) replyLabel = "📄 File";
+                        else replyLabel = "Message";
+                    }
+                    triggerReply(replyLabel);
+                }
                 startX = 0; currentX = 0;
             });
     }
@@ -1675,7 +1736,20 @@
 
     function initReplyFromActive() {
         const el = document.getElementById('text-'+activeMenuId);
-        const text = el ? el.innerText.split('(edited)')[0].trim() : "Image";
+        // FIX: If text element doesn't exist (e.g. image/audio only), handle it
+        let text = "Message";
+        const msg = messagesMap.get(activeMenuId);
+        
+        if (el) {
+             text = el.innerText.split('(edited)')[0].trim();
+        } else if (msg) {
+             // Fallback for media without caption
+             if(msg.imageUrl) text = "📷 Photo";
+             else if(msg.fileMeta && msg.fileMeta.type === 'audio') text = "🎵 Audio";
+             else if(msg.fileMeta && msg.fileMeta.type === 'video') text = "🎥 Video";
+             else if(msg.fileUrl) text = "📄 File";
+        }
+        
         triggerReply(text);
         closeMenu();
     }
