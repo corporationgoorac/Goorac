@@ -5,13 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000"> 
     <title>Goorac | Quantum</title>
+
+    <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
+
+      // Your web app's Firebase configuration
+      export const firebaseConfig = {
+          apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+          authDomain: "goorac-c3b59.firebaseapp.com",
+          projectId: "goorac-c3b59",
+          storageBucket: "goorac-c3b59.firebasestorage.app",
+          messagingSenderId: "746746595332",
+          appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+          measurementId: "G-M46FEVRYSS"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+    </script>
+
     <script src="components/emojiPicker.js" defer></script>
     <script src="components/imagePicker.js" defer></script>
+    <script src="components/filePicker.js" defer></script>
     <script src="components/viewMedia.js" defer></script>
 
     <style>
@@ -352,12 +376,79 @@
             border-top-left-radius: 4px; border-top-right-radius: 4px;
             margin-top: 2px;
         }
+
+        /* --- NEW STYLES FOR FILES/VIDEO/AUDIO --- */
+        
+        /* Video Container with Overlay Play Button */
+        .msg-video-container {
+            position: relative;
+            max-width: 280px; border-radius: 18px;
+            overflow: hidden;
+        }
+        .play-overlay {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 45px; height: 45px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none; /* Click goes through to wrapper */
+        }
+        
+        /* Audio Pill (Instagram Style) */
+        .msg-audio-pill {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            background: #262626;
+            border-radius: 22px;
+            min-width: 220px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .audio-control-btn {
+            width: 32px; height: 32px;
+            background: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #000; cursor: pointer; flex-shrink: 0;
+        }
+        .audio-waveform {
+            flex: 1; height: 4px; background: #444; border-radius: 2px;
+            position: relative; overflow: hidden;
+        }
+        .audio-progress { height: 100%; background: #fff; width: 0%; transition: width 0.1s linear; }
+        
+        /* File Card */
+        .msg-file-pill {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            background: #262626;
+            border-radius: 16px;
+            min-width: 200px; max-width: 260px;
+            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+        .file-icon {
+            width: 40px; height: 40px;
+            background: #333; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; flex-shrink: 0;
+        }
+        .file-details { flex: 1; min-width: 0; }
+        .file-name {
+            font-size: 0.9rem; font-weight: 500; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+        .file-meta { font-size: 0.75rem; color: #888; }
+        .file-dl-btn { color: #0095f6; font-size: 1.2rem; padding: 5px; }
         
     </style>
 </head>
 <body>
 
 <image-picker id="img-picker"></image-picker>
+<file-picker id="file-picker"></file-picker>
 <view-media id="media-viewer"></view-media>
 
 <div id="heart-overlay">❤️</div>
@@ -456,6 +547,10 @@
                 <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 <span>Camera / Gallery</span>
             </div>
+            <div class="attach-opt" onclick="openFilePicker()">
+                <svg viewBox="0 0 24 24" style="fill:white;"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                <span>File / Video</span>
+            </div>
             <div class="attach-opt" onclick="toggleEmojiTray()">
                 <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
                 <span>Emoji</span>
@@ -473,18 +568,24 @@
 </div>
 
 <script>
-    const firebaseConfig = {
+    // --- FIREBASE INIT ---
+    let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
         projectId: "goorac-c3b59",
         storageBucket: "goorac-c3b59.firebasestorage.app",
         messagingSenderId: "746746595332",
         appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        measurementId: "G-M46FEVRYSS",
         databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
     };
 
+    if (typeof CONFIG !== 'undefined' && CONFIG.firebase) {
+        fbConfig = CONFIG.firebase;
+    }
+
     if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(fbConfig);
     }
     const db = firebase.firestore();
     const rdb = firebase.database();
@@ -650,6 +751,7 @@
     // --- COMPONENT INTEGRATION ---
     const mainPicker = document.getElementById('main-picker');
     const imagePickerComponent = document.getElementById('img-picker');
+    const filePickerComponent = document.getElementById('file-picker');
     const mediaViewerComponent = document.getElementById('media-viewer');
 
     if(mainPicker) {
@@ -672,6 +774,16 @@
         });
     }
 
+    // NEW: File Picker Listener
+    if (filePickerComponent) {
+        filePickerComponent.addEventListener('file-uploaded', (e) => {
+            const { url, metadata } = e.detail;
+            if (url) {
+                sendFileMessage(url, metadata);
+            }
+        });
+    }
+
     function toggleAttachmentMenu() {
         if (attachmentMenu.style.display === 'flex') {
             attachmentMenu.style.display = 'none';
@@ -685,6 +797,13 @@
         attachmentMenu.style.display = 'none';
         if (imagePickerComponent) {
             imagePickerComponent.openPicker();
+        }
+    }
+
+    function openFilePicker() {
+        attachmentMenu.style.display = 'none';
+        if (filePickerComponent) {
+            filePickerComponent.openPicker();
         }
     }
 
@@ -1140,23 +1259,82 @@
             </div>
         ` : '';
 
-        // NEW: MEDIA (IMAGE) RENDERING - Clean UI, no bubble
-        // Added specific classes received-media-img / sent-media-img for border radius control
-        const imgClass = side === 'sent' ? 'sent-media-img' : 'received-media-img';
-        const mediaHtml = m.imageUrl ? `
+        // --- MEDIA TYPES LOGIC ---
+        let mediaHtml = '';
+        let bubbleClass = 'bubble';
+        let bubbleStyle = '';
+
+        // 1. IMAGE (Existing)
+        if (m.imageUrl) {
+            const imgClass = side === 'sent' ? 'sent-media-img' : 'received-media-img';
+            mediaHtml = `
             <div class="msg-media-wrapper" onclick="document.getElementById('media-viewer').open('${m.imageUrl}')">
                 <img src="${m.imageUrl}" class="chat-media-img ${imgClass}">
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
-            </div>
-        ` : '';
-        
-        // If image exists and NO text, we hide the bubble completely
-        const bubbleClass = m.imageUrl ? "bubble has-media" : "bubble";
-        const bubbleStyle = (m.imageUrl && !m.text) ? "display:none;" : ""; 
+            </div>`;
+            bubbleClass = "bubble has-media";
+            if(!m.text) bubbleStyle = "display:none;";
+        } 
+        // 2. VIDEO
+        else if (m.fileUrl && m.fileMeta && m.fileMeta.type === 'video') {
+            mediaHtml = `
+            <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${m.fileUrl}', 'video')">
+                <video src="${m.fileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:200px; background:#000;" preload="metadata"></video>
+                <div class="play-overlay"><svg viewBox="0 0 24 24" fill="white" style="width:24px; height:24px;"><path d="M8 5v14l11-7z"/></svg></div>
+                <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+            </div>`;
+            bubbleClass = "bubble has-media";
+            if(!m.text) bubbleStyle = "display:none;";
+        }
+        // 3. AUDIO (Instagram Style)
+        else if (m.fileUrl && m.fileMeta && m.fileMeta.type === 'audio') {
+            const safeId = 'audio-' + id;
+            mediaHtml = `
+            <div class="msg-audio-pill">
+                <div class="audio-control-btn" onclick="toggleAudio('${safeId}', '${m.fileUrl}')">
+                    <svg id="icon-${safeId}" viewBox="0 0 24 24" style="width:18px; fill:#000;"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+                <div class="audio-waveform">
+                    <div id="prog-${safeId}" class="audio-progress"></div>
+                </div>
+                <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
+                <div id="react-${id}" class="reaction-badge" style="position:absolute; bottom:-8px; right:10px; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
+            </div>`;
+            // Audio usually doesn't have caption in this style, or it sits below
+            bubbleClass = "bubble has-media"; 
+            if(!m.text) bubbleStyle = "display:none;";
+        }
+        // 4. DOCUMENT
+        else if (m.fileUrl) {
+            mediaHtml = `
+            <div class="msg-file-pill" onclick="window.open('${m.fileUrl}', '_blank')">
+                <div class="file-icon">📄</div>
+                <div class="file-details">
+                    <div class="file-name">${m.fileMeta.name || "File"}</div>
+                    <div class="file-meta">${(m.fileMeta.size / (1024*1024)).toFixed(2)} MB • ${m.fileMeta.type.toUpperCase()}</div>
+                </div>
+                <div class="file-dl-btn">⬇</div>
+                <div id="react-${id}" class="reaction-badge" style="right:0; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
+            </div>`;
+            bubbleClass = "bubble has-media";
+            if(!m.text) bubbleStyle = "display:none;";
+        }
 
         // --- HTML ASSEMBLY ---
         const safeText = linkify(m.text);
         let innerHTML = '';
+        
+        // Base content block
+        let contentHTML = `
+            ${noteReplyHtml}
+            ${replyHtml}
+            ${mediaHtml}
+            <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
+                <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
+                ${(!m.imageUrl && !m.fileUrl) ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
+            </div>
+        `;
+
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
             const visibility = isLastInGroup ? 'visible' : 'hidden';
@@ -1164,25 +1342,13 @@
                 <div class="received-inner-row">
                     <img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">
                     <div class="msg-bubble-box" ${boxStyle}>
-                        ${noteReplyHtml}
-                        ${replyHtml}
-                        ${mediaHtml}
-                        <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
-                            <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                            ${!m.imageUrl ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
-                        </div>
+                        ${contentHTML}
                     </div>
                 </div>`;
         } else {
             innerHTML = `
                 <div class="msg-bubble-box" ${boxStyle}>
-                    ${noteReplyHtml}
-                    ${replyHtml}
-                    ${mediaHtml}
-                    <div class="${bubbleClass}" id="bubble-${id}" style="${bubbleStyle}">
-                        <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.4;font-size:0.6rem"> (edited)</small>' : ''}</span>
-                         ${!m.imageUrl ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
-                    </div>
+                    ${contentHTML}
                 </div>`;
         }
 
@@ -1193,19 +1359,60 @@
         `;
         container.appendChild(rowDiv);
 
-        // Add listeners to text bubble ONLY if it exists and is visible
+        // Listeners for text bubbles
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
         if(bubbleEl && bubbleEl.style.display !== 'none') {
             attachMessageListeners(bubbleEl, id, m);
         }
         
-        // Also attach long-press menu to the Image if it exists
-        if(m.imageUrl) {
-             const mediaEl = rowDiv.querySelector('.msg-media-wrapper');
+        // Listeners for Wrappers (Media)
+        if(m.imageUrl || (m.fileUrl && m.fileMeta.type === 'video')) {
+             const mediaEl = rowDiv.querySelector('.msg-media-wrapper') || rowDiv.querySelector('.msg-video-container');
              if(mediaEl) attachMessageListeners(mediaEl, id, m);
+        }
+        // Listeners for Audio/File pills
+        if(m.fileUrl && (m.fileMeta.type === 'audio' || m.fileMeta.type === 'pdf' || m.fileMeta.type === 'file')) {
+             const pill = rowDiv.querySelector('.msg-audio-pill') || rowDiv.querySelector('.msg-file-pill');
+             if(pill) attachMessageListeners(pill, id, m);
         }
     }
     
+    // --- AUDIO PLAYER LOGIC ---
+    window.toggleAudio = function(id, url) {
+        const audio = document.getElementById(id);
+        const icon = document.getElementById('icon-' + id);
+        
+        // Pause all other audios
+        document.querySelectorAll('audio').forEach(a => {
+            if(a.id !== id) {
+                a.pause();
+                resetAudioUI(a.id);
+            }
+        });
+
+        if (audio.paused) {
+            audio.play();
+            icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause Icon
+        } else {
+            audio.pause();
+            icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play Icon
+        }
+    };
+
+    window.updateAudioUI = function(id) {
+        const audio = document.getElementById(id);
+        const prog = document.getElementById('prog-' + id);
+        const pct = (audio.currentTime / audio.duration) * 100;
+        prog.style.width = pct + '%';
+    };
+
+    window.resetAudioUI = function(id) {
+        const icon = document.getElementById('icon-' + id);
+        const prog = document.getElementById('prog-' + id);
+        icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        prog.style.width = '0%';
+    };
+
     // Extracted Listener Logic for re-use on Text Bubble OR Image
     function attachMessageListeners(element, id, m) {
             let reactionsList = [];
@@ -1282,16 +1489,48 @@
         cancelInteraction();
 
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        updateLastMsg("📷 Image");
+        scrollToBottom();
+    }
+
+    // NEW: Function to send File/Video/Audio
+    async function sendFileMessage(fileUrl, metadata) {
+        popSound.play().catch(e => {});
+        scrollToBottom();
+
+        const caption = metadata.caption || "";
         
+        let msgData = {
+            text: caption,
+            sender: myUid,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo,
+            seen: false,
+            reactions: {},
+            fileUrl: fileUrl,
+            fileMeta: metadata
+        };
+
+        cancelInteraction();
+
+        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
+        let label = "📄 File";
+        if(metadata.type === 'video') label = "🎥 Video";
+        if(metadata.type === 'audio') label = "🎵 Audio";
+        
+        updateLastMsg(caption ? label + " " + caption : label);
+        scrollToBottom();
+    }
+
+    async function updateLastMsg(msgText) {
         await db.collection("chats").doc(chatId).set({
-            lastMessage: "📷 Image", 
+            lastMessage: msgText, 
             lastSender: myUid,
             lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
             participants: [myUid, targetUid], seen: false,
             [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
         }, { merge: true });
-
-        scrollToBottom();
     }
 
     async function sendMsg() {
@@ -1332,13 +1571,7 @@
             };
 
             await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-            
-            await db.collection("chats").doc(chatId).set({
-                lastMessage: text, lastSender: myUid,
-                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                participants: [myUid, targetUid], seen: false,
-                [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
-            }, { merge: true });
+            updateLastMsg(text);
         }
         scrollToBottom();
     }
