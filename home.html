@@ -19,14 +19,14 @@
 
     <style>
         :root {
-            --bg: #000;
+            --bg: #000000;
+            --surface: #0a0a0a;
             --accent: #00d2ff;
-            --border: rgba(255, 255, 255, 0.1);
+            --accent-dim: rgba(0, 210, 255, 0.1);
+            --border: #1a1a1a;
             --text-main: #ffffff;
             --text-dim: #888888;
-            --card-bg: #111;
             --danger: #ff4444;
-            --glass: rgba(255, 255, 255, 0.03);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -41,10 +41,10 @@
             -webkit-touch-callout: none;
         }
 
-        /* --- HEADER (Matches Inbox) --- */
+        /* --- HEADER --- */
         header {
             position: sticky; top: 0; 
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             padding: 15px 20px; 
             display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); 
@@ -53,8 +53,8 @@
             padding-top: max(15px, env(safe-area-inset-top));
         }
 
-        .header-logo { 
-            font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; 
+        .logo { 
+            font-size: 1.3rem; font-weight: 900; letter-spacing: -1px;
             background: linear-gradient(to right, #fff, var(--accent)); 
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
         }
@@ -72,31 +72,34 @@
 
         .notif-icon {
             width: 24px; height: 24px; fill: none; stroke: var(--text-main); stroke-width: 1.8;
+            transition: 0.3s;
         }
         
         .notif-btn.has-unread .notif-icon {
             fill: var(--text-main); stroke: none;
-            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.4));
         }
 
         .notif-badge {
             position: absolute; top: -2px; right: -2px;
-            background: var(--accent); color: #000;
-            font-size: 0.6rem; font-weight: 900;
+            background: var(--danger); color: #fff;
+            font-size: 0.6rem; font-weight: 800;
             min-width: 16px; height: 16px;
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             opacity: 0; transform: scale(0);
-            transition: 0.3s; pointer-events: none;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none; border: 2px solid #000;
         }
         .notif-badge.visible { opacity: 1; transform: scale(1); }
 
         .header-pfp { 
-            width: 38px; height: 38px; border-radius: 12px; 
+            width: 38px; height: 38px; min-width: 38px; min-height: 38px;
+            border-radius: 12px; 
             object-fit: cover; border: 1px solid var(--border);
             cursor: pointer; background: #111;
         }
 
-        /* --- NOTES SECTION --- */
+        /* --- NOTES --- */
         #notes-container {
             display: flex; gap: 15px; padding: 15px 20px;
             overflow-x: auto; scrollbar-width: none;
@@ -109,14 +112,13 @@
             min-width: 70px; cursor: pointer; position: relative;
         }
         
-        /* STRICT IMAGE SIZING TO FIX FULL SCREEN BUG */
+        /* STRICT SIZING TO PREVENT BUGS */
         .note-pfp {
             width: 65px; height: 65px; 
-            border-radius: 22px; 
+            border-radius: 24px; 
             object-fit: cover; 
             border: 2px solid var(--border);
-            padding: 2px;
-            background: #000;
+            padding: 2px; background: #000;
             transition: transform 0.2s;
         }
         .note-item:active .note-pfp { transform: scale(0.95); border-color: var(--accent); }
@@ -127,7 +129,7 @@
         }
 
         .note-bubble {
-            position: absolute; top: 0; right: 0; background: var(--card-bg);
+            position: absolute; top: 0; right: 0; background: var(--surface);
             border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px;
             font-size: 0.7rem; max-width: 60px; white-space: nowrap; 
             overflow: hidden; text-overflow: ellipsis; z-index: 2;
@@ -142,7 +144,7 @@
         }
 
         .welcome-card { 
-            background: var(--card-bg); border: 1px solid var(--border); 
+            background: var(--surface); border: 1px solid var(--border); 
             padding: 25px; border-radius: 24px; margin-bottom: 25px; 
             position: relative; overflow: hidden;
         }
@@ -168,17 +170,16 @@
         .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
         
         .activity-card { 
-            background: #0a0a0a; border: 1px solid var(--border); padding: 20px; 
+            background: #0d0d0d; border: 1px solid var(--border); padding: 20px; 
             border-radius: 20px; position: relative; min-height: 130px; 
             display: flex; flex-direction: column; justify-content: flex-end;
             transition: 0.1s; cursor: pointer;
         }
-        .activity-card:active { transform: scale(0.98); background: #111; }
+        .activity-card:active { transform: scale(0.98); background: #151515; }
         
-        /* Icon area fixed size */
         .card-icon-area { 
             position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; 
-            border-radius: 10px; background: #151515; 
+            border-radius: 10px; background: #1a1a1a; 
             display: flex; align-items: center; justify-content: center; 
             overflow: hidden; border: 1px solid var(--border); 
         }
@@ -223,7 +224,7 @@
 <body oncontextmenu="return false;"> 
 
 <header>
-    <div class="header-logo">GOORAC</div>
+    <div class="logo">GOORAC</div>
     <div class="header-right">
         <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
             <svg id="bell-icon" class="notif-icon" viewBox="0 0 24 24">
@@ -423,15 +424,79 @@
         saveHomeState();
     }
 
+    // --- NOTIFICATION LOGIC RESTORED ---
     function listenNotifications(uid) {
-        let count = 0;
-        const btn = document.getElementById('notif-btn'), badge = document.getElementById('notif-count');
-        
-        // Simple listener for now
+        // We use Sets to avoid counting duplicates from rapid updates
+        let likeIds = new Set();
+        let followIds = new Set();
+
+        const updateBadgeUI = () => {
+            // Get IDs user has already seen
+            const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+            let count = 0;
+            
+            // Count unique items NOT in read list
+            likeIds.forEach(id => { if(!readList.includes(id)) count++; });
+            followIds.forEach(id => { if(!readList.includes(id)) count++; });
+
+            const badge = document.getElementById('notif-count');
+            const btn = document.getElementById('notif-btn');
+            
+            if (count > 0) {
+                badge.innerText = count > 9 ? '9+' : count;
+                badge.classList.add('visible');
+                btn.classList.add('has-unread');
+            } else {
+                badge.classList.remove('visible');
+                btn.classList.remove('has-unread');
+            }
+        };
+
+        // 1. Listen for Likes
+        db.collection("notes")
+            .where("uid", "==", uid)
+            .orderBy("createdAt", "desc")
+            .limit(20)
+            .onSnapshot(snapshot => {
+                likeIds.clear(); 
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.likes && Array.isArray(data.likes)) {
+                        data.likes.forEach(liker => {
+                            // Don't notify for self
+                            if (liker.uid !== uid && liker.timestamp) {
+                                // Create unique ID for this like event
+                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                                const notifId = `like_${liker.uid}_${timeMillis}`;
+                                likeIds.add(notifId);
+                            }
+                        });
+                    }
+                });
+                updateBadgeUI();
+            });
+
+        // 2. Listen for Followers
         db.collection("users").doc(uid).onSnapshot(doc => {
-            // (Simplified logic: checks unread array length if implemented, or defaults to visual check)
-            // Real implementation would diff against READ_KEY
+            if (doc.exists) {
+                const data = doc.data();
+                followIds.clear();
+                if (data.followers && Array.isArray(data.followers)) {
+                    data.followers.forEach(f => {
+                        // Check if follower has timestamp (newer format)
+                        if (typeof f === 'object' && f.timestamp) {
+                            const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                            const notifId = `follow_${f.uid}_${timeMillis}`;
+                            followIds.add(notifId);
+                        }
+                    });
+                }
+                updateBadgeUI();
+            }
         });
+
+        // Sync tabs
+        window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
     }
 
     function startLiveCounters(uid) {
