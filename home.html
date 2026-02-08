@@ -20,7 +20,63 @@
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
+<script type="module">
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 
+    // --- 1. PWA Service Worker Registration ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('✅ Service Worker Registered'))
+                .catch(err => console.log('❌ Service Worker Failed', err));
+        });
+    }
+
+    // --- 2. Notification Permissions ---
+    // Ask immediately when the user visits the home page
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    // --- 3. Start Background Worker (When Logged In) ---
+    // We rely on window.firebaseConfig which comes from config.js
+    if (window.firebaseConfig) {
+        const app = initializeApp(window.firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                startNotificationWorker(user.uid);
+            }
+        });
+    } else {
+        console.error("⚠️ Firebase Config not found. Make sure config.js is loaded first.");
+    }
+
+    function startNotificationWorker(uid) {
+        // Prevent starting multiple workers
+        if (window.Worker && !window.notifWorker) {
+            console.log("🚀 Starting Background Notification Worker...");
+            
+            // Create the worker thread
+            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
+            
+            // Send the keys and User ID to the worker
+            window.notifWorker.postMessage({
+                type: 'START',
+                uid: uid,
+                config: window.firebaseConfig
+            });
+
+            // Optional: Listen for logs from worker
+            window.notifWorker.onmessage = (e) => {
+                if (e.data.type === 'LOG') console.log('[Worker]', e.data.msg);
+            };
+        }
+    }
+</script>
+    
     <style>
         :root {
             --bg: #000;
@@ -449,4 +505,5 @@
 </script>
 </body>
 </html>
+
 
