@@ -35,6 +35,7 @@
             -ms-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* HEADER */
@@ -71,12 +72,13 @@
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
             transition: background 0.2s;
-            -webkit-touch-callout: none;
+            touch-action: pan-y; /* Crucial for smooth scrolling */
+            position: relative;
         }
         .chat-item:active { background: var(--glass); }
 
         .chat-pfp { width: 58px; height: 58px; border-radius: 20px; margin-right: 15px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; }
-        .chat-info { flex: 1; min-width: 0; }
+        .chat-info { flex: 1; min-width: 0; pointer-events: none; }
         .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         
         .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
@@ -96,6 +98,7 @@
         .follow-btn { 
             background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
             padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+            pointer-events: auto;
         }
 
         .unread-badge { 
@@ -176,7 +179,7 @@
 <header><div class="header-logo">GOORAC</div></header>
 
 <div class="search-wrap">
-    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="searchUsers(this.value)" autocomplete="off">
+    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
 </div>
 
 <div id="search-results"></div>
@@ -212,7 +215,6 @@
 
 <script>
     // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap) ---
-    // If local storage has data, show it immediately. If not, skeletons remain.
     (function loadInboxCache() {
         const cachedHTML = localStorage.getItem('goorac_inbox_html');
         if (cachedHTML && cachedHTML.trim() !== "") {
@@ -241,8 +243,13 @@
     let myFollowingList = [];
     let myFollowersList = [];
     let myPinnedChats = [];
+    
+    // Interaction Variables
     let longPressTimer;
     let activeChatId = null;
+    let searchTimeout = null;
+    let isLongPressTriggered = false;
+
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
     let inboxListener = null;
 
@@ -297,7 +304,6 @@
                 return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
             });
 
-            // Clear list before rebuilding
             if(results.length > 0) list.innerHTML = "";
 
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
@@ -309,29 +315,47 @@
                     displayCount = num > 99 ? "99+" : num;
                 }
 
-                // FIXED: MUTUAL CHECK LOGIC
                 const amIFollowing = myFollowingList.some(item => {
                     const uid = typeof item === 'string' ? item : item.uid;
                     return uid === otherUid;
                 });
 
-                const finalDisplayName = u.name || u.displayName || u.username || "Unknown User";
-                const lastMsgSnippet = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+                const finalName = u.name || u.displayName || u.username || "Unknown";
+                const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+                
+                // Safe JSON for handlers
+                const safeUserStr = encodeURIComponent(JSON.stringify({
+                    name: finalName,
+                    username: u.username,
+                    photoURL: u.photoURL,
+                    verified: u.verified
+                }));
+
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
-                const handleStart = () => { longPressTimer = setTimeout(() => openDeleteMenu(id, isPinned, u), 600); };
-                const handleEnd = () => { clearTimeout(longPressTimer); };
-                item.ontouchstart = handleStart; item.ontouchend = handleEnd;
-                item.onmousedown = handleStart; item.onmouseup = handleEnd;
-                item.onclick = (e) => { if(activeChatId) return; location.href=`chat.html?user=${u.username}`; };
+                // --- FIXED TOUCH LOGIC ---
+                // We use standard onclick for entry (it handles fast taps correctly)
+                // We use touchstart/touchend ONLY for Long Press detection
                 
+                item.setAttribute("ontouchstart", `startLongPress('${id}', ${isPinned}, '${safeUserStr}')`);
+                item.setAttribute("ontouchend", "endLongPress()");
+                item.setAttribute("ontouchmove", "cancelLongPress()"); // Scrolling kills long press
+                item.onclick = (e) => { 
+                    // Only enter if not scrolling and no menu opened
+                    if(!activeChatId && !isLongPressTriggered) {
+                        location.href = `chat.html?user=${u.username}`;
+                    }
+                    // Reset trigger flag after click processed
+                    setTimeout(() => isLongPressTriggered = false, 200);
+                };
+
                 item.innerHTML = `
                     <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
                     <div class="chat-info">
                         <div class="chat-top-row">
                             <span class="u-name">
-                                ${finalDisplayName} 
+                                ${finalName} 
                                 ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
                                 ${isPinned ? `<span class="pin-indicator"></span>` : ''}
                             </span>
@@ -339,7 +363,7 @@
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                                ${lastMsgSnippet}
+                                ${lastMsg}
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
                                 ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
@@ -349,32 +373,51 @@
                     </div>
                 `;
                 list.appendChild(item);
+                
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
                     if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
-                    else { msgEl.innerHTML = lastMsgSnippet; }
+                    else { msgEl.innerHTML = lastMsg; }
                 });
             });
             
             if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#333; font-weight:700;'>No data in this frequency.</p>";
 
-            // --- SAVE TO CACHE (Live Updates) ---
-            // Stores the entire rendered list every time a new message comes or snapshot changes
             localStorage.setItem('goorac_inbox_html', list.innerHTML);
         });
     }
 
-    // UPDATED: Professional Menu with Back Button Support
+    // --- TOUCH HANDLERS ---
+    
+    function startLongPress(chatId, isPinned, userStr) {
+        isLongPressTriggered = false; // Reset flag
+        const u = JSON.parse(decodeURIComponent(userStr));
+        
+        longPressTimer = setTimeout(() => {
+            isLongPressTriggered = true; // Mark as long press occurred
+            if(navigator.vibrate) navigator.vibrate(30);
+            openDeleteMenu(chatId, isPinned, u);
+        }, 600); // 600ms hold
+    }
+
+    function cancelLongPress() {
+        clearTimeout(longPressTimer);
+    }
+
+    function endLongPress() {
+        clearTimeout(longPressTimer);
+    }
+
+    // --- MENU ACTIONS ---
+
     function openDeleteMenu(chatId, isPinned, userObj) {
         activeChatId = chatId;
         
-        // Push state for Back Button Handling
         history.pushState({ menuOpen: true }, "", "#menu");
 
-        // Populate UI
         document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('active-name').innerHTML = `${userObj.name || userObj.username} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
+        document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
         document.getElementById('active-username').innerText = `@${userObj.username}`;
 
         const pinBtn = document.getElementById('pin-chat-btn');
@@ -385,19 +428,16 @@
         document.getElementById('overlay').style.display = 'block';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
-
-        if (window.navigator.vibrate) window.navigator.vibrate(30);
     }
 
-    // Listen for Back Button to Close Menu
     window.onpopstate = (e) => {
         if(document.getElementById('delete-menu').classList.contains('active')) {
-            closeDeleteMenu(false); // false = don't go back, just close
+            closeDeleteMenu(false);
         }
     };
 
     async function togglePin(chatId, isPinned) {
-        closeDeleteMenu(true); // true = go back if needed
+        closeDeleteMenu(true);
         const userRef = db.collection("users").doc(myUid);
         if (isPinned) {
             await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
@@ -412,8 +452,6 @@
         document.getElementById('overlay').style.display = 'none';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
-        
-        // Remove hash if manually closed
         if(shouldGoBack && window.location.hash === "#menu") {
             history.back();
         }
@@ -424,10 +462,9 @@
         const cid = activeChatId; 
         closeDeleteMenu(true);
         try {
-            const messagesRef = db.collection("chats").doc(cid).collection("messages");
-            const snapshot = await messagesRef.get();
             const batch = db.batch();
-            snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+            const msgs = await db.collection("chats").doc(cid).collection("messages").get();
+            msgs.docs.forEach(d => batch.delete(d.ref));
             batch.delete(db.collection("chats").doc(cid));
             await batch.commit();
             await rdb.ref(`typing/${cid}`).remove();
@@ -440,41 +477,39 @@
         location.href = `userProfile.html?user=${username}`;
     }
 
+    function handleSearch(val) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => searchUsers(val), 400);
+    }
+
     function searchUsers(val) {
         const results = document.getElementById('search-results');
         const content = document.getElementById('inbox-content');
         if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
+        
         results.style.display = 'block'; content.style.display = 'none';
-        const queryText = val.toLowerCase();
+        const q = val.toLowerCase();
         
-        // Extract UIDs safely
-        const flatFollowing = myFollowingList.map(f => typeof f === 'string' ? f : f.uid);
-        const flatFollowers = myFollowersList.map(f => typeof f === 'string' ? f : f.uid);
-        
-        const myContacts = [...new Set([...flatFollowing, ...flatFollowers])];
-        
-        if (myContacts.length === 0) {
-            results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>Frequency empty.</p>";
+        const allContacts = [...new Set([...myFollowingList, ...myFollowersList]
+            .map(f => typeof f === 'string' ? f : f.uid))];
+
+        if(allContacts.length === 0) {
+            results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>";
             return;
         }
-        
-        // Firestore 'in' query limit is 10, slice it
-        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', myContacts.slice(0, 10)).get().then(snap => {
-            results.innerHTML = snap.docs
-            .filter(doc => {
-                const u = doc.data();
-                const name = (u.name || u.displayName || u.username || "").toLowerCase();
-                const username = (u.username || "").toLowerCase();
-                return name.includes(queryText) || username.includes(queryText);
-            })
-            .map(doc => {
-                const u = doc.data();
-                const searchName = u.name || u.displayName || u.username;
+
+        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
+        .get().then(snap => {
+            results.innerHTML = snap.docs.filter(d => {
+                const u = d.data();
+                return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
+            }).map(d => {
+                const u = d.data();
                 return `
                     <div class="chat-item" onclick="location.href='chat.html?user=${u.username}'">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px; border-radius:12px;">
+                        <img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;">
                         <div class="chat-info">
-                            <div class="u-name">${searchName} ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}</div>
+                            <div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div>
                             <div style="font-size:0.8rem; color:#444;">@${u.username}</div>
                         </div>
                     </div>`;
@@ -483,20 +518,11 @@
     }
 
     function formatTime(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + "y";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + "mo";
-        interval = seconds / 604800;
-        if (interval > 1) return Math.floor(interval) + "w";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + "d";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + "h";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + "m";
-        return "now";
+        const sec = Math.floor((new Date() - date) / 1000);
+        if(sec < 60) return "now";
+        if(sec < 3600) return Math.floor(sec/60) + "m";
+        if(sec < 86400) return Math.floor(sec/3600) + "h";
+        return Math.floor(sec/86400) + "d";
     }
 </script>
 </body>
