@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>My Profile | Goorac</title>
+    <title>Profile | Goorac</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -13,9 +13,6 @@
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <script src="components/navbar.js" defer></script>
-    <script src="components/call-notifier.js" defer></script>
 
     <style>
         :root {
@@ -27,7 +24,6 @@
             --secondary: #888888;
             --accent: #3b82f6;
             --danger: #ef4444;
-            --danger-bg: rgba(239, 68, 68, 0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -37,7 +33,7 @@
             color: var(--primary);
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            padding-bottom: 90px; /* Space for Navbar */
+            padding-bottom: 40px;
         }
 
         /* --- HEADER --- */
@@ -48,10 +44,10 @@
             padding: 14px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .header-title { font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
+        .header-title { font-weight: 800; font-size: 16px; letter-spacing: 0.5px; text-transform: uppercase; }
         .icon-btn {
             background: none; border: none; color: var(--primary);
-            padding: 8px; border-radius: 50%; display: flex; align-items: center;
+            padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: background 0.2s;
         }
         .icon-btn:active { background: var(--surface-press); }
@@ -70,10 +66,12 @@
             width: 100%; height: 100%; border-radius: 50%;
             object-fit: cover; background: var(--surface);
             border: 2px solid var(--border);
+            transition: opacity 0.2s;
         }
 
         .user-name { font-size: 24px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-        .verified { color: var(--accent); font-size: 20px; }
+        .verified { color: var(--accent); font-size: 20px; display: none; }
+        .verified.show { display: inline-block; }
         .user-handle { color: var(--secondary); font-size: 15px; font-weight: 500; }
 
         /* --- ID PILL --- */
@@ -92,7 +90,7 @@
 
         .bio {
             margin: 20px 0; color: #d4d4d4; font-size: 14px;
-            line-height: 1.5; max-width: 90%;
+            line-height: 1.5; max-width: 90%; min-height: 20px;
         }
 
         /* --- STATS CARDS --- */
@@ -103,7 +101,7 @@
         .stat-card {
             background: var(--surface); border: 1px solid var(--border);
             padding: 16px; border-radius: 16px; text-align: center;
-            text-decoration: none; color: inherit; transition: 0.1s;
+            text-decoration: none; color: inherit; transition: 0.1s; cursor: pointer;
         }
         .stat-card:active { background: var(--surface-press); transform: scale(0.98); }
         .stat-num { display: block; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
@@ -116,15 +114,17 @@
         .btn {
             flex: 1; padding: 14px; border-radius: 12px;
             font-size: 14px; font-weight: 600; text-align: center;
-            text-decoration: none; cursor: pointer; border: none;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: transform 0.1s;
         }
+        .btn:active { transform: scale(0.97); }
         
-        .btn-edit { background: var(--primary); color: #000; }
-        .btn-edit:active { opacity: 0.9; transform: scale(0.98); }
-
-        .btn-logout { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
-        .btn-logout:active { background: rgba(239, 68, 68, 0.2); transform: scale(0.98); }
+        /* Follow Button States */
+        .btn-follow { background: var(--accent); color: #fff; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .btn-following { background: transparent; border: 1px solid var(--border); color: var(--secondary); }
+        
+        .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
+        .btn-msg:active { background: var(--surface-press); }
 
         /* --- TABS --- */
         .tabs {
@@ -154,10 +154,11 @@
             color: transparent !important; border-radius: 6px;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .hide { display: none !important; }
 
         /* --- TOAST --- */
         #toast {
-            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(20px);
             background: #fff; color: #000; padding: 12px 24px; border-radius: 50px;
             font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none;
             transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
@@ -167,12 +168,15 @@
 
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
     <header>
-        <div class="header-title">MY PROFILE</div>
+        <button class="icon-btn" onclick="history.back()">
+            <span class="material-icons-round">arrow_back</span>
+        </button>
+        <div class="header-title" id="nav-title">PROFILE</div>
         <button class="icon-btn">
-            <span class="material-icons-round">settings</span>
+            <span class="material-icons-round">more_vert</span>
         </button>
     </header>
 
@@ -183,7 +187,7 @@
 
         <div class="user-name">
             <span id="display-name" class="skeleton">Loading...</span>
-            <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
+            <span id="verified-badge" class="material-icons-round verified">verified</span>
         </div>
         
         <div class="user-handle skeleton" id="username" style="width: 100px; margin-top: 4px;">@...</div>
@@ -198,21 +202,19 @@
     </div>
 
     <div class="stats-grid">
-        <a href="followers.html" class="stat-card">
+        <div onclick="viewFollowers()" class="stat-card">
             <span class="stat-num" id="count-followers">0</span>
             <span class="stat-label">Followers</span>
-        </a>
-        <a href="following.html" class="stat-card">
+        </div>
+        <div onclick="viewFollowing()" class="stat-card">
             <span class="stat-num" id="count-following">0</span>
             <span class="stat-label">Following</span>
-        </a>
+        </div>
     </div>
 
-    <div class="action-row">
-        <a href="setup.html" class="btn btn-edit">Edit Profile</a>
-        <button onclick="logout()" class="btn btn-logout">
-            <span class="material-icons-round" style="font-size: 18px;">logout</span> Logout
-        </button>
+    <div class="action-row" id="action-container">
+        <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">Follow</button>
+        <button class="btn btn-msg skeleton" onclick="openChat()">Message</button>
     </div>
 
     <div class="tabs">
@@ -223,16 +225,13 @@
     
     <div class="content-area">
         <span class="material-icons-round" style="font-size: 32px; opacity: 0.3; margin-bottom: 12px;">grid_view</span>
-        <p>Your posts will appear here</p>
+        <p>No posts yet</p>
     </div>
 
     <div id="toast">
         <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
-        ID Copied
+        <span id="toast-msg">Copied</span>
     </div>
-    
-    <main-navbar></main-navbar>
-    <call-notifier></call-notifier>
 
 <script>
     // --- CONFIG ---
@@ -249,45 +248,67 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- 1. IMMEDIATE CACHE LOAD (Run before anything else) ---
-    // This removes the loading gap by painting the screen with stored data instantly.
-    function loadCache() {
-        const cached = localStorage.getItem('my_goorac_profile');
+    // --- GLOBAL STATE ---
+    const params = new URLSearchParams(window.location.search);
+    const targetUsername = params.get('user');
+    
+    let myUid = null;
+    let targetUid = null;
+    let targetUserData = null;
+    let isFollowLocked = false;
+
+    // --- 1. CACHE LOADING (Immediate) ---
+    function loadFromCache() {
+        if(!targetUsername) return;
+        // Unique cache key for each user
+        const key = `goorac_user_${targetUsername}`;
+        const cached = localStorage.getItem(key);
+        
         if (cached) {
             try {
                 console.log("⚡ Loaded from Cache");
                 const data = JSON.parse(cached);
+                targetUserData = data;
+                targetUid = data.uid;
                 renderUI(data);
             } catch (e) {
-                console.error("Cache parse error", e);
+                console.error("Cache error", e);
             }
         }
     }
-    loadCache(); // Execute immediately
+    loadFromCache(); // Execute immediately
 
-    // --- 2. AUTH & NETWORK ---
-    auth.onAuthStateChanged(async (user) => {
+    // --- 2. AUTH & FETCH ---
+    auth.onAuthStateChanged(user => {
         if (user) {
-            initRealtimeListener(user.uid);
+            myUid = user.uid;
+            if(targetUsername) fetchProfileFresh();
         } else {
-            // Wait slightly before redirecting to allow cache to check logic if needed
-            // But usually redirect immediately if strictly required
-            window.location.href = 'login.html';
+            // Optional: Redirect if login required
+            // window.location.href = 'login.html';
         }
     });
 
-    function initRealtimeListener(uid) {
-        // Realtime listener updates the UI AND the Cache whenever DB changes
-        db.collection("users").doc(uid).onSnapshot((doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-                // Update Cache
-                localStorage.setItem('my_goorac_profile', JSON.stringify(data));
-                // Update UI
-                renderUI(data);
-            } else {
-                window.location.href = "setup.html";
-            }
+    function fetchProfileFresh() {
+        // Real-time listener
+        db.collection("users").where("username", "==", targetUsername).limit(1)
+        .onSnapshot((snapshot) => {
+            if(snapshot.empty) return;
+            
+            const doc = snapshot.docs[0];
+            const freshData = doc.data();
+            targetUid = doc.id;
+            targetUserData = freshData;
+
+            // Save to Cache (Full Object with UID)
+            const dataToSave = { ...freshData, uid: targetUid };
+            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(dataToSave));
+
+            // Render
+            renderUI(freshData);
+            
+            // Check Relationship (Only if logged in and not viewing self)
+            if(myUid && myUid !== targetUid) checkFollowStatus();
         });
     }
 
@@ -299,27 +320,33 @@
             el.style.width = ''; el.style.height = '';
         });
 
-        // Safe Text Setters
+        // Text
         safeText('display-name', data.name || "User");
+        safeText('nav-title', (data.name || "PROFILE").toUpperCase());
         safeText('username', `@${data.username}`);
-        safeText('bio', data.bio || "Welcome to my Goorac profile.");
-        safeText('goorac-id', data.gooracNumber || "-------");
+        safeText('bio', data.bio || "No bio available.");
+        safeText('goorac-id', data.gooracNumber || "N/A");
 
-        // Image Handling
-        const pfp = document.getElementById('pfp');
+        // Image
+        const img = document.getElementById('pfp');
         const newSrc = data.photoURL || 'https://via.placeholder.com/150/121212/FFFFFF?text=User';
-        // Only update src if changed to prevent flicker
-        if(pfp.src !== newSrc) pfp.src = newSrc;
+        if(img.src !== newSrc) img.src = newSrc;
 
         // Badge
         const badge = document.getElementById('verified-badge');
-        badge.style.display = data.verified ? 'inline-block' : 'none';
+        if(data.verified) badge.classList.add('show');
+        else badge.classList.remove('show');
 
-        // Stats (using array lengths)
+        // Stats
         const followers = data.followers || [];
         const following = data.following || [];
         safeText('count-followers', followers.length);
         safeText('count-following', following.length);
+
+        // Hide Actions if viewing self
+        if(myUid && targetUid && myUid === targetUid) {
+            document.getElementById('action-container').style.display = 'none';
+        }
     }
 
     function safeText(id, val) {
@@ -327,44 +354,144 @@
         if(el) el.innerText = val;
     }
 
-    // --- 4. ACTIONS ---
+    // --- 4. FOLLOW LOGIC (Strict & Safe) ---
+    async function checkFollowStatus() {
+        // We check "My Following List" to see if Target is in it
+        const myDoc = await db.collection("users").doc(myUid).get();
+        const myFollowing = myDoc.data().following || [];
+
+        // Support string IDs or object {uid: '...', time: ...}
+        const isFollowing = myFollowing.some(item => {
+            const id = typeof item === 'string' ? item : item.uid;
+            return id === targetUid;
+        });
+
+        updateFollowBtnUI(isFollowing);
+    }
+
+    function updateFollowBtnUI(isFollowing) {
+        const btn = document.getElementById('btn-follow');
+        if(isFollowing) {
+            btn.innerText = "Following";
+            btn.className = "btn btn-following";
+        } else {
+            btn.innerText = "Follow";
+            btn.className = "btn btn-follow";
+        }
+    }
+
+    async function handleFollow() {
+        if(isFollowLocked || !myUid || !targetUid) return;
+        
+        const btn = document.getElementById('btn-follow');
+        const isUnfollowing = btn.innerText === "Following"; // Current state in UI
+        
+        // LOCK to prevent spam
+        isFollowLocked = true;
+        if(navigator.vibrate) navigator.vibrate(10);
+
+        // Optimistic Update
+        updateFollowBtnUI(!isUnfollowing);
+
+        // Update visual count immediately
+        const countEl = document.getElementById('count-followers');
+        let curr = parseInt(countEl.innerText);
+        countEl.innerText = isUnfollowing ? Math.max(0, curr - 1) : curr + 1;
+
+        try {
+            const ts = firebase.firestore.Timestamp.now();
+
+            if(!isUnfollowing) {
+                // --- FOLLOW ---
+                // 1. Double Check: Are we ALREADY following? (Server side check to prevent dupes)
+                const myRef = db.collection("users").doc(myUid);
+                const doc = await myRef.get();
+                // Safe check handling legacy string arrays or object arrays
+                const existing = (doc.data().following || []).some(i => (typeof i==='string'?i:i.uid) === targetUid);
+
+                if(!existing) {
+                    const batch = db.batch();
+                    
+                    // Add to My Following
+                    batch.update(myRef, {
+                        following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
+                    });
+                    
+                    // Add to Their Followers
+                    const theirRef = db.collection("users").doc(targetUid);
+                    batch.update(theirRef, {
+                        followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
+                    });
+
+                    // Notification
+                    const notifRef = db.collection("notifications").doc();
+                    batch.set(notifRef, {
+                        recipientId: targetUid,
+                        senderId: myUid,
+                        type: "follow",
+                        timestamp: ts,
+                        seen: false
+                    });
+
+                    await batch.commit();
+                } else {
+                    console.log("Already following.");
+                }
+            } else {
+                // --- UNFOLLOW ---
+                // Safe removal using Transaction to handle objects vs strings cleanly
+                await db.runTransaction(async (t) => {
+                    const myRef = db.collection("users").doc(myUid);
+                    const theirRef = db.collection("users").doc(targetUid);
+                    
+                    const myDoc = await t.get(myRef);
+                    const theirDoc = await t.get(theirRef);
+
+                    // Filter out
+                    const newFollowing = (myDoc.data().following || []).filter(i => (typeof i==='string'?i:i.uid) !== targetUid);
+                    const newFollowers = (theirDoc.data().followers || []).filter(i => (typeof i==='string'?i:i.uid) !== myUid);
+
+                    t.update(myRef, { following: newFollowing });
+                    t.update(theirRef, { followers: newFollowers });
+                });
+            }
+        } catch(e) {
+            console.error("Action failed", e);
+            // Revert UI if failed
+            updateFollowBtnUI(isUnfollowing);
+            countEl.innerText = curr;
+            showToast("Action failed");
+        }
+
+        // Unlock after delay
+        setTimeout(() => { isFollowLocked = false; }, 500);
+    }
+
+    // --- 5. NAVIGATION & UTILS ---
 
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
-        if(txt.includes('-')) return;
+        if(txt === "N/A" || txt.includes("-")) return;
 
-        // Haptics
         if(navigator.vibrate) navigator.vibrate(50);
-
-        // Clipboard
-        navigator.clipboard.writeText(txt).then(() => {
-            showToast("ID Copied");
-        }).catch(() => {
-            // Fallback for older browsers
-            const textArea = document.createElement("textarea");
-            textArea.value = txt;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showToast("ID Copied");
-        });
+        navigator.clipboard.writeText(txt).then(() => showToast("ID Copied"));
     }
 
-    function logout() {
-        if(confirm("Log out of Goorac?")) {
-            if(navigator.vibrate) navigator.vibrate(10);
-            // Clear specific cache items if you want privacy on logout
-            // localStorage.removeItem('my_goorac_profile'); 
-            auth.signOut().then(() => {
-                window.location.href = "login.html";
-            });
-        }
+    function openChat() {
+        if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`;
+    }
+
+    function viewFollowers() {
+        if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`;
+    }
+
+    function viewFollowing() {
+        if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`;
     }
 
     function showToast(msg) {
         const t = document.getElementById('toast');
-        t.innerHTML = `<span class="material-icons-round" style="font-size:16px;">check_circle</span> ${msg}`;
+        document.getElementById('toast-msg').innerText = msg;
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 2000);
     }
