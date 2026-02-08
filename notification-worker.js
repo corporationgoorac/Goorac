@@ -4,121 +4,88 @@ import { getFirestore, collection, query, where, onSnapshot } from "https://www.
 // --- GLOBAL VARIABLES ---
 let db;
 let unsubscribe = null;
-let isFirstRun = true; // Prevents spam on startup
+let isFirstRun = true;
 
-// --- LISTEN FOR COMMANDS ---
+// --- LISTEN FOR START COMMAND ---
 self.onmessage = async (e) => {
     if (e.data.type === 'START') {
-        console.log("✅ [WORKER] Starting Listener for User:", e.data.uid);
+        // console.log("👷 WORKER: Starting listener for User:", e.data.uid);
         startBackgroundListener(e.data.uid, e.data.config);
     }
 };
 
 function startBackgroundListener(myUid, firebaseConfig) {
-    if (unsubscribe) return; // Already running
+    if (unsubscribe) return; // Prevent double listeners
 
-    // 1. Initialize Firebase inside Worker
+    // 1. Initialize Firebase (Worker Instance)
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
 
-    // 2. Query: Find chats where I am a participant
+    // 2. Query: Listen to all chats where I am a participant
     const q = query(
         collection(db, "chats"),
         where("participants", "array-contains", myUid)
     );
 
-    // 3. Start Realtime Listener
+    // 3. Start Real-time Listener
     unsubscribe = onSnapshot(q, (snapshot) => {
         
-        // If this is the very first connection, just mark as loaded and ignore
-        // Otherwise, you get notifications for old unread messages on every refresh.
+        // IGNORE INITIAL LOAD (Prevents spamming notifications for old messages)
         if (isFirstRun) {
-            console.log(`[WORKER] Initial load complete. Found ${snapshot.size} chats.`);
             isFirstRun = false;
             return;
         }
 
         snapshot.docChanges().forEach((change) => {
             const data = change.doc.data();
-            const docId = change.doc.id;
-
-            // We only care if a chat was MODIFIED (New message update)
-            // 'added' is usually just loading old chats we haven't seen in this session
-            if (change.type === "modified") {
+            
+            // We only care if a chat was MODIFIED (New message) or ADDED (New chat)
+            if (change.type === "modified" || change.type === "added") {
                 
-                console.log(`[WORKER] Chat Update Detected: ${docId}`);
-
                 // CHECK 1: Did I send this? (Ignore my own messages)
-                if (data.lastSender === myUid) {
-                    console.log("   -> Ignoring: I am the sender.");
-                    return;
-                }
-
-                // CHECK 2: Do I have unread messages?
-                // Your chat.html uses: unreadCount['myUid']
-                const myUnreadCount = data.unreadCount ? data.unreadCount[myUid] : 0;
-                
-                if (myUnreadCount > 0) {
+                if (data.lastSender && data.lastSender !== myUid) {
                     
-                    // CHECK 3: Is it Recent? (Within last 60 seconds)
-                    // This handles the "background" logic. If the message is 2 days old, don't notify.
-                    let msgTime = 0;
-                    if (data.lastTimestamp && typeof data.lastTimestamp.toMillis === 'function') {
-                        msgTime = data.lastTimestamp.toMillis();
-                    } else {
-                        msgTime = Date.now(); // Fallback if timestamp missing
-                    }
+                    // CHECK 2: Do I have unread messages?
+                    // Your structure uses: unreadCount['uid']
+                    const myUnread = data.unreadCount ? data.unreadCount[myUid] : 0;
 
-                    const timeDiff = Date.now() - msgTime;
-                    console.log(`   -> Unread: ${myUnreadCount}, Age: ${timeDiff}ms`);
+                    if (myUnread > 0) {
+                        
+                        // CHECK 3: Is it Recent? (Sent within last 30 seconds)
+                        // This prevents notifications if you wake up the phone and data syncs from 2 days ago
+                        let msgTime = Date.now();
+                        if (data.lastTimestamp && typeof data.lastTimestamp.toMillis === 'function') {
+                            msgTime = data.lastTimestamp.toMillis();
+                        }
 
-                    if (timeDiff < 60000) { // 60 Seconds Window
-                        console.log("   🔔 TRIGGERING NOTIFICATION!");
-                        sendNotification(data);
-                    } else {
-                        console.log("   -> Ignored: Message too old.");
+                        const timeDiff = Date.now() - msgTime;
+
+                        // Only notify if message is less than 30 seconds old
+                        if (timeDiff < 30000) { 
+                            
+                            // PREPARE NOTIFICATION DATA
+                            let bodyText = data.lastMessage || "New Message";
+                            
+                            // Clean up standard prefixes if present in your lastMessage
+                            // (e.g., if you store "📷 Image", we keep it, otherwise generic)
+                            if(data.imageUrl && !data.text) bodyText = "📷 Sent a photo";
+                            if(data.fileUrl && !data.text) bodyText = "📄 Sent a file";
+
+                            // SEND SIGNAL TO MAIN THREAD
+                            // We bridge to Main Thread -> Service Worker because 
+                            // standard Workers cannot trigger persistent notifications on all Android versions.
+                            self.postMessage({
+                                type: 'FOUND_MESSAGE',
+                                title: "New Message", // You can try fetching user name here if you want, but "New Message" is faster
+                                body: bodyText,
+                                icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png', // Replace with your app icon URL
+                                url: `chat.html?user=${data.lastSender}`, // This opens the specific chat
+                                senderUid: data.lastSender
+                            });
+                        }
                     }
-                } else {
-                    console.log("   -> Ignored: Unread count is 0.");
                 }
             }
         });
     });
-}
-
-function sendNotification(chatData) {
-    const title = "New Message";
-    
-    // Logic to handle "Image", "Video", etc. based on your chat.html logic
-    let body = chatData.lastMessage || "Sent a message";
-    
-    // Check Permission
-    if (Notification.permission === "granted") {
-        try {
-            const notif = new Notification(title, {
-                body: body,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png', // Goorac Icon
-                badge: 'https://cdn-icons-png.flaticon.com/128/3067/3067451.png',
-                tag: 'chat-msg', // Prevents stacking
-                vibrate: [200, 100, 200],
-                requireInteraction: false // Disappear automatically
-            });
-
-            // Handle Click (Focus the window)
-            notif.onclick = function() {
-                self.clients.matchAll({ type: 'window' }).then(clients => {
-                    if (clients && clients.length) {
-                        clients[0].focus(); // Focus existing tab
-                    } else {
-                        self.clients.openWindow('/'); // Open new if closed (PWA style)
-                    }
-                });
-                notif.close();
-            };
-        } catch (e) {
-            console.error("[WORKER] Notification Error:", e);
-        }
-    } else {
-        console.log("[WORKER] Permission not granted.");
-    }
 }
