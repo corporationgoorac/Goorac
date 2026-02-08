@@ -7,8 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
-    <script src="config.js" type="module"></script>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -142,7 +140,7 @@
     }
     
     function pingWorker() {
-        if(!window.notifWorker) return debug("❌ Worker Missing! (Check Config)", "ERR");
+        if(!window.notifWorker) return debug("❌ Worker Missing! (Loading...)", "ERR");
         debug("📡 Pinging worker...");
         window.notifWorker.postMessage({ type: 'PING' });
     }
@@ -162,40 +160,38 @@
 </script>
 
 <script>
-    // Safe Init for UI - Waits for config.js to run
-    function initUI() {
-        // Wait up to 5 seconds for window.firebaseConfig
-        if (typeof window.firebaseConfig === 'undefined') {
-            // Check if we timed out (debug helper)
-            if(!window.configWaitCount) window.configWaitCount = 0;
-            window.configWaitCount++;
-            if(window.configWaitCount > 50) { // 5 seconds
-                debug("❌ Critical: config.js failed to load!", "ERR");
-                return;
-            }
-            setTimeout(initUI, 100);
-            return;
-        }
-        
-        // Init UI Firebase
-        if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
-        const auth = firebase.auth(), db = firebase.firestore();
+    // HARDCODED CONFIG TO FIX MODULE ISSUES
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        measurementId: "G-M46FEVRYSS",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
 
-        // Clock
-        function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
-        setInterval(updateClock, 1000); updateClock();
+    // Make available for Module Script
+    window.firebaseConfig = firebaseConfig;
 
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                document.getElementById('progress-bar').style.width = '60%';
-                const doc = await db.collection("users").doc(user.uid).get();
-                if (doc.exists) updateUI(doc.data());
-                // Start UI listeners
-                startLiveCounters(user.uid, db);
-                listenNotifications(user.uid, db);
-            } else window.location.href = "login.html";
-        });
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth(), db = firebase.firestore();
+
+    // Clock
+    function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
+    setInterval(updateClock, 1000); updateClock();
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            document.getElementById('progress-bar').style.width = '60%';
+            const doc = await db.collection("users").doc(user.uid).get();
+            if (doc.exists) updateUI(doc.data());
+            // Start UI listeners
+            startLiveCounters(user.uid, db);
+            listenNotifications(user.uid, db);
+        } else window.location.href = "login.html";
+    });
 
     function updateUI(data) {
         document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
@@ -310,8 +306,6 @@
             }
         });
     }
-
-    initUI();
 </script>
 
 <script type="module">
@@ -334,26 +328,11 @@
         Notification.requestPermission();
     }
 
-    // 2. WAIT FOR CONFIG (The Fix)
-    async function waitForConfig() {
-        let attempts = 0;
-        while (!window.firebaseConfig) {
-            if(attempts > 50) return null; // 5s timeout
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        return window.firebaseConfig;
-    }
+    // 2. USE EMBEDDED CONFIG (No Waiting)
+    function initWorkerSystem() {
+        const config = window.firebaseConfig; // Config is now definitely available
+        if (!config) return debug("❌ Config Missing!", "ERR");
 
-    async function initWorkerSystem() {
-        debug("⏳ Waiting for Config...");
-        const config = await waitForConfig();
-        
-        if (!config) {
-            debug("❌ Config Load Failed (Check config.js)", "ERR");
-            return;
-        }
-        
         debug("✅ Config Loaded!", "OK");
 
         const app = initializeApp(config);
