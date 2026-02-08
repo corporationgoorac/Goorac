@@ -16,15 +16,6 @@
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
 
-    <div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:250px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
-        <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
-            <button onclick="pingWorker()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">TEST: Ping Worker</button>
-            <button onclick="testSW()" style="background:#000044; color:#fff; border:1px solid #5555ff; padding:5px 10px; border-radius:4px;">TEST: Notification</button>
-            <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
-        </div>
-        <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">Initializing System...</div>
-    </div>
-
     <style>
         :root { --bg: #000; --accent: #00d2ff; --accent-glow: rgba(0, 210, 255, 0.3); --card-bg: rgba(255, 255, 255, 0.05); --border: rgba(255, 255, 255, 0.1); --text-main: #ffffff; --text-dim: #a0a0a0; --danger: #ff4444; --danger-glow: rgba(255, 68, 68, 0.3); }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -130,55 +121,33 @@
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
 
+<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:200px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
+    <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
+        <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
+    </div>
+    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">System Ready.</div>
+</div>
+
 <script>
     const logBox = document.getElementById('debug-logs');
-    function debug(msg, type='INFO') {
-        const color = type === 'ERR' ? '#ff5555' : (type === 'OK' ? '#55ff55' : '#ccc');
-        logBox.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
-        logBox.scrollTop = logBox.scrollHeight;
+    function debug(msg) {
+        logBox.innerHTML += `<div>> ${msg}</div>`;
         console.log(msg);
-    }
-    
-    function pingWorker() {
-        if(!window.notifWorker) return debug("❌ Worker Missing! (Loading...)", "ERR");
-        debug("📡 Pinging worker...");
-        window.notifWorker.postMessage({ type: 'PING' });
-    }
-
-    function testSW() {
-        debug("Testing SW Notification...");
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-                type: 'SHOW_NOTIFICATION',
-                payload: { title: 'Test', body: 'This is a test', icon: 'https://via.placeholder.com/50' }
-            });
-            debug("✅ Request Sent to SW", "OK");
-        } else {
-            debug("❌ SW Not Ready/Controlling", "ERR");
-        }
     }
 </script>
 
-<script>
-    // HARDCODED CONFIG TO FIX MODULE ISSUES
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        measurementId: "G-M46FEVRYSS",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
+<script type="module">
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+    
+    // --- 1. IMPORT CONFIG (Safe Import) ---
+    import { firebaseConfig } from './config.js';
 
-    // Make available for Module Script
-    window.firebaseConfig = firebaseConfig;
+    // --- 2. START UI ---
+    if(firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth(), db = firebase.firestore();
-
-    // Clock
     function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -186,206 +155,60 @@
         if (user) {
             document.getElementById('progress-bar').style.width = '60%';
             const doc = await db.collection("users").doc(user.uid).get();
-            if (doc.exists) updateUI(doc.data());
-            // Start UI listeners
-            startLiveCounters(user.uid, db);
-            listenNotifications(user.uid, db);
+            if (doc.exists) {
+                const data = doc.data();
+                document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
+                document.getElementById('header-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
+                document.getElementById('my-note-pfp').src = data.photoURL;
+                document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
+                document.getElementById('progress-bar').style.width = '100%';
+                setTimeout(()=>document.getElementById('progress-bar').style.opacity='0', 500);
+            }
+            startNotificationWorker(user.uid, firebaseConfig);
         } else window.location.href = "login.html";
     });
 
-    function updateUI(data) {
-        document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
-        document.getElementById('header-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('my-note-pfp').src = data.photoURL;
-        document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
-        document.getElementById('progress-bar').style.width = '100%';
-        setTimeout(()=>document.getElementById('progress-bar').style.opacity='0', 500);
-    }
-
-    // --- LEGACY LISTENERS RESTORED ---
-    let READ_KEY = "goorac_read_notifs"; 
-
-    function listenNotifications(uid, db) {
-        READ_KEY = `goorac_read_${uid}`;
-        let likeIds = new Set();
-        let followIds = new Set();
-
-        const updateBadgeUI = () => {
-            const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-            let count = 0;
-            likeIds.forEach(id => { if(!readList.includes(id)) count++; });
-            followIds.forEach(id => { if(!readList.includes(id)) count++; });
-
-            const badge = document.getElementById('notif-count'), btn = document.getElementById('notif-btn');
-            if (count > 0) {
-                badge.innerText = count > 9 ? '9+' : count;
-                badge.classList.add('visible');
-                btn.classList.add('has-unread');
-            } else {
-                badge.classList.remove('visible');
-                btn.classList.remove('has-unread');
-            }
-        };
-
-        db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20)
-            .onSnapshot(snapshot => {
-                likeIds.clear(); 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.likes && Array.isArray(data.likes)) {
-                        data.likes.forEach(liker => {
-                            if (liker.uid !== uid && liker.timestamp) {
-                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                                likeIds.add(`like_${liker.uid}_${timeMillis}`);
-                            }
-                        });
-                    }
-                });
-                updateBadgeUI();
-            });
-
-        db.collection("users").doc(uid).onSnapshot(doc => {
-            if (doc.exists) {
-                const data = doc.data();
-                followIds.clear();
-                if (data.followers) {
-                    data.followers.forEach(f => {
-                        if (typeof f === 'object' && f.timestamp) {
-                            const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            followIds.add(`follow_${f.uid}_${timeMillis}`);
-                        }
-                    });
-                }
-                updateBadgeUI();
-            }
-        });
-        window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
-    }
-
-    function formatTime(ts) {
-        if (!ts) return "";
-        const date = ts.toDate ? ts.toDate() : new Date(ts);
-        const sec = Math.floor((new Date() - date) / 1000);
-        if (sec < 60) return "Just now";
-        if (sec < 3600) return Math.floor(sec/60) + "m ago";
-        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
-        return Math.floor(sec/86400) + "d ago";
-    }
-
-    function startLiveCounters(uid, db) {
-        db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
-            let latest = null;
-            for (const doc of snap.docs) {
-                const d = doc.data();
-                if ((d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0)) { latest = d; break; }
-            }
-            const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
-            if (latest) {
-                header.innerText = "New Data"; sub.innerText = "From " + (latest.lastSenderName || "User");
-                time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
-                if (latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
-            } else {
-                header.innerText = "Inbox"; sub.innerText = "No new msgs";
-                time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                card.classList.remove('has-count'); pfp.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">MSG</div>`;
-            }
-        });
-
-        db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
-            const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
-            if (!snap.empty) {
-                const call = snap.docs[0].data();
-                time.innerText = formatTime(call.timestamp);
-                if (call.receiverId === uid && (call.status === "missed" || call.status === "cancelled")) {
-                    el.innerText = "Missed"; lbl.innerText = call.callerName || "Recent Call";
-                    card.classList.add('missed-alert'); if (call.callerPfp) pfp.innerHTML = `<img src="${call.callerPfp}">`;
-                } else {
-                    el.innerText = "Calls"; lbl.innerText = "Logs stable";
-                    card.classList.remove('missed-alert'); pfp.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">LOG</div>`;
-                }
-            }
-        });
-    }
-</script>
-
-<script type="module">
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-
-    // 1. Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => {
-                    debug("✅ SW Registered", "OK");
-                    if(reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                })
-                .catch(e => debug("❌ SW Fail: " + e, "ERR"));
-        });
-    }
-
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
-
-    // 2. USE EMBEDDED CONFIG (No Waiting)
-    function initWorkerSystem() {
-        const config = window.firebaseConfig; // Config is now definitely available
-        if (!config) return debug("❌ Config Missing!", "ERR");
-
-        debug("✅ Config Loaded!", "OK");
-
-        const app = initializeApp(config);
-        const auth = getAuth(app);
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                debug("👤 User Logged In. Starting Worker...", "OK");
-                startNotificationWorker(user.uid, config);
-            } else {
-                debug("👤 No User", "ERR");
-            }
-        });
-    }
-
+    // --- 3. WORKER LOGIC (Separated) ---
     function startNotificationWorker(uid, config) {
-        if (window.Worker && !window.notifWorker) {
-            try {
-                window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
-                
-                // Start Worker IMMEDIATELY
-                window.notifWorker.postMessage({
-                    type: 'START',
-                    uid: uid,
-                    config: config
-                });
+        // Register SW for install only
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(reg => debug("SW Registered")).catch(e => debug("SW Error"));
+        }
 
-                // Listen for messages
-                window.notifWorker.onmessage = (e) => {
-                    if (e.data.type === 'LOG') debug("[Worker] " + e.data.msg);
-                    
-                    if (e.data.type === 'FOUND_MESSAGE') {
-                        debug("🔔 Message Found!", "OK");
-                        showPersistentNotification(e.data.payload);
-                    }
-                };
-                debug("✅ Worker Started", "OK");
-            } catch (e) {
-                debug("❌ Worker Error: " + e, "ERR");
-            }
+        // Start Worker for Logic
+        if (window.Worker && !window.notifWorker) {
+            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
+            
+            window.notifWorker.postMessage({
+                type: 'START',
+                uid: uid,
+                config: config
+            });
+
+            // HANDLE MESSAGES HERE (Not in SW)
+            window.notifWorker.onmessage = (e) => {
+                if (e.data.type === 'SHOW_NOTIF') {
+                    debug("🔔 Showing Notification");
+                    showNotification(e.data);
+                }
+            };
         }
     }
 
-    function showPersistentNotification(data) {
+    function showNotification(data) {
+        // Use SW Registration to show notification (Native Android behavior)
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-                type: 'SHOW_NOTIFICATION',
-                payload: data
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(data.title, {
+                    body: data.body,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png',
+                    vibrate: [200, 100, 200],
+                    tag: 'chat-msg',
+                    data: { url: data.url }
+                });
             });
         }
     }
-
-    initWorkerSystem();
 </script>
 
 </body>
