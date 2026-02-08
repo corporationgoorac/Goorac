@@ -3,6 +3,7 @@ import { getFirestore, collection, query, where, onSnapshot } from "https://www.
 
 self.onmessage = async (e) => {
     if (e.data.type === 'START') {
+        // console.log("Worker Started");
         startListening(e.data.uid, e.data.config);
     }
 };
