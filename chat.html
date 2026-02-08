@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000"> 
-    <title>Goorac | Quantum</title>
-
-    <script src="config.js"></script>
+    <title>Chat</title>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -24,485 +22,149 @@
     <script type="module" src="components/chat/chat-input.js"></script>
 
     <style>
-        :root { 
-            --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
-            --header-bg: rgba(0,0,0,0.96);
-            --accent: #0095f6; 
-            --border: #262626; 
-            --sent-bg: linear-gradient(135deg, #ff6b00 0%, #ff3b00 100%);
-            --received-bg: #262626; 
-            --text: #ffffff; 
-            --text-secondary: #a8a8a8;
-        }
-
+        :root { --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); --header-bg: rgba(0,0,0,0.96); --accent: #0095f6; --border: #262626; --sent-bg: linear-gradient(135deg, #ff6b00 0%, #ff3b00 100%); --received-bg: #262626; --text: #ffffff; --text-secondary: #a8a8a8; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+        html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg); font-family: sans-serif; color: var(--text); position: fixed; top: 0; left: 0; }
         
-        html, body {
-            height: 100%; width: 100%; overflow: hidden;
-            background: var(--bg); position: fixed; left: 0; top: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            color: var(--text);
-        }
-
-        /* Heart Animation Overlay */
-        #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 3000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        #menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 4000; justify-content: center; align-items: center; }
+        .menu-card { background: #1c1c1c; border-radius: 16px; width: 280px; overflow: hidden; }
+        .menu-opt { padding: 16px; text-align: center; border-bottom: 1px solid #333; color: white; cursor: pointer; }
+        
+        #reaction-details-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 4000; justify-content: center; align-items: center; }
+        .react-list-container { width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 16px; }
+        .reactor-item { display: flex; align-items: center; padding: 12px; gap: 12px; color: white; border-bottom: 1px solid #333; }
+        .reactor-pfp { width: 30px; height: 30px; border-radius: 50%; }
+        
+        #heart-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; pointer-events: none; z-index: 5000; text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         @keyframes heartPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
-
-        /* Menu Overlay (For Edit/Unsend/Copy) */
-        #menu-overlay { 
-            display: none; position: fixed; inset: 0; 
-            background: rgba(0, 0, 0, 0.6); z-index: 2000; 
-            justify-content: center; align-items: center; backdrop-filter: blur(5px);
-        }
-        .menu-card { background: #1c1c1c; border-radius: 16px; width: 280px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .reaction-bar { display: flex; justify-content: space-evenly; padding: 16px 10px; border-bottom: 1px solid #333; }
-        .reaction-bar span { font-size: 2rem; cursor: pointer; transition: transform 0.1s; }
-        .reaction-bar span:active { transform: scale(1.3); }
-        .menu-opt { padding: 16px; text-align: center; font-size: 1rem; border-bottom: 1px solid #333; color: #fff; }
-        .menu-opt:active { background: #333; }
-
-        /* Reaction Details Overlay */
-        #reaction-details-overlay { 
-            display: none; position: fixed; inset: 0; 
-            background: rgba(0, 0, 0, 0.6); z-index: 2000; 
-            justify-content: center; align-items: center; backdrop-filter: blur(5px); 
-        }
-        .react-list-container { width: 85%; max-width: 340px; background: #1c1c1c; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; max-height: 50vh; }
-        .react-list-header { padding: 16px; text-align: center; font-weight: 600; border-bottom: 1px solid #333; position: relative; color: white;}
-        .react-list-close { position: absolute; right: 16px; top: 16px; cursor: pointer; color: #888; }
-        .reactor-item { display: flex; align-items: center; padding: 12px 16px; gap: 12px; border-bottom: 1px solid #2a2a2a; }
-        .reactor-pfp { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #333; }
-        .reactor-info { flex: 1; }
-        .reactor-name { font-weight: 600; font-size: 0.9rem; color: #fff; }
-        .reactor-time { font-size: 0.7rem; color: #888; }
-        .reactor-emoji { font-size: 1.4rem; }
     </style>
 </head>
 <body>
-
     <chat-header id="main-header"></chat-header>
-
     <chat-list id="main-list"></chat-list>
-
     <chat-input id="main-input"></chat-input>
 
+    <div id="menu-overlay"><div class="menu-card"><div class="menu-opt" id="copy-btn">Copy Text</div><div class="menu-opt" id="reply-btn">Reply</div><div class="menu-opt" id="edit-btn">Edit</div><div class="menu-opt" id="unsend-btn" style="color:red">Unsend</div><div class="menu-opt" onclick="document.getElementById('menu-overlay').style.display='none'" style="color:#888; border:none">Cancel</div></div></div>
+    <div id="reaction-details-overlay"><div class="react-list-container" id="react-list-content"></div></div>
+    <div id="heart-overlay">❤️</div>
+    
     <image-picker id="img-picker"></image-picker>
     <file-picker id="file-picker"></file-picker>
     <view-media id="media-viewer"></view-media>
     <call-notifier></call-notifier>
-    
-    <div id="heart-overlay">❤️</div>
-
-    <div id="menu-overlay">
-        <div class="menu-card" id="menu-card" onclick="event.stopPropagation()">
-            <div class="reaction-bar">
-                <span onclick="applyReaction('❤️')">❤️</span>
-                <span onclick="applyReaction('😂')">😂</span>
-                <span onclick="applyReaction('😮')">😮</span>
-                <span onclick="applyReaction('😢')">😢</span>
-                <span onclick="applyReaction('👍')">👍</span>
-            </div>
-            <div class="menu-opt" onclick="copyMessageText()">Copy Text</div>
-            <div class="menu-opt" onclick="initReplyFromMenu()">Reply</div>
-            <div id="edit-btn" class="menu-opt" onclick="initEditFromMenu()">Edit</div>
-            <div id="unsend-btn" class="menu-opt" style="color:#ff3b30; font-weight: 600;" onclick="unsendMsg()">Unsend</div>
-            <div class="menu-opt" onclick="closeMenu()" style="border-bottom:none; color: #888">Cancel</div>
-        </div>
-    </div>
-
-    <div id="reaction-details-overlay" onclick="this.style.display='none'">
-        <div class="react-list-container" onclick="event.stopPropagation()">
-            <div class="react-list-header">
-                Reactions
-                <div class="react-list-close" onclick="document.getElementById('reaction-details-overlay').style.display='none'">✕</div>
-            </div>
-            <div class="react-list-content" id="react-list-items"></div>
-        </div>
-    </div>
 
 <script>
-    // --- CONFIG & INIT ---
-    let fbConfig = (typeof CONFIG !== 'undefined' && CONFIG.firebase) ? CONFIG.firebase : {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        measurementId: "G-M46FEVRYSS",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE", authDomain: "goorac-c3b59.firebaseapp.com", projectId: "goorac-c3b59", storageBucket: "goorac-c3b59.firebasestorage.app", messagingSenderId: "746746595332", appId: "1:746746595332:web:d3f8527d27fe8ca2530d51", measurementId: "G-M46FEVRYSS", databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore(); const rdb = firebase.database(); const auth = firebase.auth();
 
-    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
-    const db = firebase.firestore();
-    const rdb = firebase.database();
-    const auth = firebase.auth();
-
-    // --- DOM REFERENCES ---
     const header = document.getElementById('main-header');
     const list = document.getElementById('main-list');
     const input = document.getElementById('main-input');
-    const imgPicker = document.getElementById('img-picker');
-    const filePicker = document.getElementById('file-picker');
-    const menuOverlay = document.getElementById('menu-overlay');
-
-    // --- STATE VARIABLES ---
+    
+    let myUid, targetUid, chatId, activeMenuId, activeMenuText;
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
-    let myUid, targetUid, chatId;
-    let activeMenuId = null, activeMenuText = null, activeMenuSender = null;
-    let messagesMap = new Map();
-    let chatTargetData = null, myUserData = null;
-    let isFirstLoad = true;
-    let statusUpdateInterval = null;
-    let unsubscribe = null, lastVisible = null;
 
-    // --- SOUNDS ---
-    const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
-    const likeSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
-
-    // --- AUTH & INIT ---
     auth.onAuthStateChanged(user => {
-        if (user) { 
-            myUid = user.uid; 
-            window.myUid = myUid; // Global helper for components
-            db.collection('users').doc(myUid).get().then(doc => { if(doc.exists) myUserData = doc.data(); });
-            setupMyPresence();
-            initChat(); 
-        } else { 
-            window.location.href = 'login.html'; 
-        }
+        if (user) { myUid = user.uid; window.myUid = myUid; setupPresence(); initChat(); } 
+        else window.location.href = 'login.html';
     });
 
-    function setupMyPresence() {
-        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
-        rdb.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() == false) return;
-            userStatusDatabaseRef.onDisconnect().set({ state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP })
-                .then(() => userStatusDatabaseRef.set({ state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP }));
-        });
+    function setupPresence() {
+        const ref = rdb.ref('/status/' + myUid);
+        rdb.ref('.info/connected').on('value', s => { if(s.val()) ref.onDisconnect().set({state:'offline', last_changed: firebase.database.ServerValue.TIMESTAMP}).then(()=> ref.set({state:'online', last_changed: firebase.database.ServerValue.TIMESTAMP})); });
     }
 
-    // --- CHAT LOGIC ---
     async function initChat() {
         if(!targetUsername) return;
         const snap = await db.collection("users").where("username", "==", targetUsername).get();
-        if (snap.empty) return;
-        
+        if(snap.empty) return;
         targetUid = snap.docs[0].id;
-        chatTargetData = snap.docs[0].data();
+        const targetData = snap.docs[0].data();
         chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
-
-        // 1. Setup Header
-        header.setUserData(chatTargetData);
-        monitorTargetStatus();
-
-        // 2. Mark as Seen
-        db.collection("chats").doc(chatId).update({ [`unreadCount.${myUid}`]: 0, seen: true }).catch(e => {});
-
-        // 3. Listen for Typing
-        rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
-            const isTyping = s.val();
-            list.setTyping(isTyping);
-            if(isTyping) header.setStatus(true); // Override status text
-            else header.setStatus(false, lastStatusData?.state === 'online', lastStatusData?.last_changed);
-        });
-
-        // 4. Start Messages Listener
-        startMessageListener();
-    }
-
-    let lastStatusData = null;
-    function monitorTargetStatus() {
-        if (!targetUid) return;
-        rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
-            lastStatusData = snapshot.val();
-            // Force Update Header if not typing
-            if(list.querySelector('#typing-indicator-bottom').style.display === 'none') {
-                if(lastStatusData) header.setStatus(false, lastStatusData.state === 'online', lastStatusData.last_changed);
-            }
-        });
-    }
-
-    // --- MESSAGE LISTENER ---
-    function startMessageListener() {
-        if (unsubscribe) unsubscribe();
-        unsubscribe = db.collection("chats").doc(chatId).collection("messages")
-            .orderBy("timestamp", "desc").limit(20)
-            .onSnapshot(snapshot => {
-                if (snapshot.empty) return;
-                if (!lastVisible) lastVisible = snapshot.docs[snapshot.docs.length - 1];
-                
-                let isNewIncoming = false;
-                snapshot.docChanges().forEach(change => {
-                    const data = change.doc.data();
-                    const id = change.doc.id;
-                    if (change.type === "added" || change.type === "modified") {
-                        messagesMap.set(id, data);
-                        if(change.type === "added" && data.sender !== myUid) isNewIncoming = true;
-                    } else if (change.type === "removed") {
-                        messagesMap.delete(id);
-                    }
-                    // Mark as seen immediately if incoming
-                    if(data.sender !== myUid && !data.seen) {
-                        db.collection("chats").doc(chatId).collection("messages").doc(id).update({ seen: true, seenAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    }
-                });
-
-                if(isNewIncoming) {
-                    if(navigator.vibrate) navigator.vibrate(20);
-                    list.showNewMessageAlert();
-                }
-
-                renderAllMessages();
-                
-                if (isFirstLoad) {
-                    list.scrollToBottom(false); // Instant
-                    list.reveal();
-                    isFirstLoad = false;
-                }
-            });
-    }
-
-    function renderAllMessages() {
-        list.clear();
-        const sorted = Array.from(messagesMap.entries())
-            .filter(([id, data]) => data.timestamp)
-            .sort((a, b) => a[1].timestamp.toMillis() - b[1].timestamp.toMillis());
-
-        let lastDateLabel = "";
-        let lastSeenMsgId = null;
-
-        // Find last seen message by me
-        for (let i = sorted.length - 1; i >= 0; i--) {
-            if (sorted[i][1].sender === myUid && sorted[i][1].seen === true) {
-                lastSeenMsgId = sorted[i][0];
-                break;
-            }
-        }
-
-        sorted.forEach(([id, data], index) => {
-            const date = data.timestamp.toDate();
-            const dateStr = getDateLabel(date);
-            
-            if (dateStr !== lastDateLabel) {
-                list.addDateDivider(dateStr);
-                lastDateLabel = dateStr;
-            }
-
-            let isLastInGroup = true;
-            if (index + 1 < sorted.length && sorted[index + 1][1].sender === data.sender) {
-                isLastInGroup = false;
-            }
-
-            list.addMessage(id, data, data.sender === myUid, isLastInGroup, id === lastSeenMsgId, chatTargetData);
-        });
-    }
-
-    function getDateLabel(date) {
-        const today = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(today.getDate() - 1);
-        if (date.toDateString() === today.toDateString()) return "Today";
-        if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-    }
-
-    // --- INFINITE SCROLL ---
-    list.addEventListener('load-more', async () => {
-        if (!lastVisible) return;
-        const snap = await db.collection("chats").doc(chatId).collection("messages")
-            .orderBy("timestamp", "desc").startAfter(lastVisible).limit(15).get();
         
-        if (!snap.empty) {
-            snap.forEach(doc => messagesMap.set(doc.id, doc.data()));
-            lastVisible = snap.docs[snap.docs.length - 1];
-            // Render all again to maintain sorting order properly
-            // (Efficient enough for < 1000 messages on modern phones)
-            // But we must preserve scroll position - logic handled by ChatList helper if implemented, 
-            // otherwise simplistic re-render causes jump.
-            // For now, simple re-render:
-            renderAllMessages();
-        }
-    });
+        header.setUserData(targetData);
+        rdb.ref('/status/' + targetUid).on('value', s => header.setStatus(false, s.val()?.state === 'online', s.val()?.last_changed));
+        rdb.ref(`typing/${chatId}/${targetUid}`).on('value', s => { list.setTyping(s.val()); if(s.val()) header.setStatus(true); });
+        
+        // Load Messages
+        let lastVisible = null;
+        db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(20).onSnapshot(snap => {
+            if(snap.empty) return;
+            if(!lastVisible) lastVisible = snap.docs[snap.docs.length-1];
+            
+            list.clear();
+            const msgs = [];
+            snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
+            msgs.sort((a,b) => a.timestamp - b.timestamp);
+            
+            let lastDate = "";
+            msgs.forEach((m, i) => {
+                const d = m.timestamp ? m.timestamp.toDate() : new Date();
+                const dStr = d.toLocaleDateString();
+                if(dStr !== lastDate) { list.addDateDivider(dStr); lastDate = dStr; }
+                const isLast = (i === msgs.length - 1) || (msgs[i+1].sender !== m.sender);
+                list.addMessage(m.id, m, m.sender === myUid, isLast, m.seen, targetData);
+            });
+            list.reveal();
+            if(msgs.length > 0) list.scrollToBottom();
+        });
+    }
 
-    // --- INPUT HANDLING ---
-    
-    // 1. Typing Status
-    input.addEventListener('typing-status', (e) => {
-        rdb.ref(`typing/${chatId}/${myUid}`).set(e.detail.isTyping);
-    });
-
-    // 2. Send Message (Text)
+    // Events
     input.addEventListener('send-message', async (e) => {
         const { text, replyTo, isEdit } = e.detail;
-        popSound.play().catch(e => {});
-        rdb.ref(`typing/${chatId}/${myUid}`).set(false);
-
-        if (isEdit && activeMenuId) {
+        if(isEdit && activeMenuId) {
             await db.collection("chats").doc(chatId).collection("messages").doc(activeMenuId).update({ text, edited: true });
-            activeMenuId = null; // Clear edit state
         } else {
-            const msgData = {
-                text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                replyTo: replyTo, seen: false, reactions: {}
-            };
-            await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-            updateLastMsg(text);
-            list.scrollToBottom();
+            await db.collection("chats").doc(chatId).collection("messages").add({
+                text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo, seen: false
+            });
         }
     });
-
-    // 3. Attachments
-    input.addEventListener('trigger-camera', () => imgPicker.openPicker());
-    input.addEventListener('trigger-file', () => filePicker.openPicker());
+    input.addEventListener('typing-status', (e) => rdb.ref(`typing/${chatId}/${myUid}`).set(e.detail.isTyping));
     
-    // --- ATTACHMENT HANDLERS ---
-    imgPicker.addEventListener('image-uploaded', async (e) => {
-        const url = e.detail.url;
-        popSound.play().catch(e => {});
-        await db.collection("chats").doc(chatId).collection("messages").add({
-            text: "", sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            imageUrl: url, seen: false, reactions: {}
-        });
-        updateLastMsg("📷 Image");
-        list.scrollToBottom();
-    });
-
-    filePicker.addEventListener('file-uploaded', async (e) => {
-        const { url, metadata } = e.detail;
-        popSound.play().catch(e => {});
-        const caption = metadata.caption || "";
-        await db.collection("chats").doc(chatId).collection("messages").add({
-            text: caption, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            fileUrl: url, fileMeta: metadata, seen: false, reactions: {}
-        });
-        
-        let label = "📄 File";
-        if(metadata.type.includes('video')) label = "🎥 Video";
-        else if(metadata.type.includes('audio')) label = "🎵 Audio";
-        updateLastMsg(label);
-        list.scrollToBottom();
-    });
-
-    // --- INTERACTION FROM MESSAGES (Bubbling Up) ---
-
-    // 1. Reply Swipe
-    list.addEventListener('trigger-reply', (e) => {
-        input.setReply(e.detail.text);
-    });
-
-    // 2. Reaction / Like
+    // List Interaction
+    list.addEventListener('trigger-reply', (e) => input.setReply(e.detail.text));
     list.addEventListener('reaction', async (e) => {
         const { id, emoji } = e.detail;
-        likeSound.play().catch(e=>{});
-        await applyReactionToId(id, emoji);
-    });
-
-    // 3. Show Details
-    list.addEventListener('show-reaction-details', (e) => {
-        const { reactions } = e.detail;
-        const container = document.getElementById('react-list-items');
-        container.innerHTML = '';
-        
-        Object.entries(reactions).forEach(([uid, rData]) => {
-            const isMe = uid === myUid;
-            const pfp = isMe ? (myUserData?.photoURL || 'https://via.placeholder.com/40') : chatTargetData.photoURL;
-            const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
-            
-            container.innerHTML += `
-                <div class="reactor-item">
-                    <img src="${pfp}" class="reactor-pfp">
-                    <div class="reactor-info">
-                        <div class="reactor-name">${name}</div>
-                    </div>
-                    <div class="reactor-emoji">${rData.emoji}</div>
-                </div>`;
-        });
-        document.getElementById('reaction-details-overlay').style.display = 'flex';
-    });
-
-    // 4. Open Menu (Long Press)
-    list.addEventListener('open-msg-menu', (e) => {
-        const { id, sender, text } = e.detail;
-        activeMenuId = id;
-        activeMenuText = text;
-        activeMenuSender = sender;
-        
-        const isMine = sender === myUid;
-        document.getElementById('edit-btn').style.display = (isMine && text && text !== "Attachment") ? 'block' : 'none';
-        document.getElementById('unsend-btn').style.display = isMine ? 'block' : 'none';
-        menuOverlay.style.display = 'flex';
-    });
-
-    // --- MENU ACTIONS ---
-    function closeMenu() { menuOverlay.style.display = 'none'; }
-
-    function applyReaction(emoji) {
-        if(activeMenuId) applyReactionToId(activeMenuId, emoji);
-        closeMenu();
-    }
-
-    async function applyReactionToId(id, emoji) {
-        // Optimistic
-        if(messagesMap.has(id)) {
-            const msg = messagesMap.get(id);
-            if(!msg.reactions) msg.reactions = {};
-            
-            if(msg.reactions[myUid]?.emoji === emoji) delete msg.reactions[myUid];
-            else if(emoji) msg.reactions[myUid] = { emoji, timestamp: Date.now() };
-            
-            messagesMap.set(id, msg);
-            renderAllMessages(); // Re-render to show updated reaction instantly
-        }
-
-        const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(id);
-        const doc = await msgRef.get();
-        if(!doc.exists) return;
-        
-        const current = doc.data().reactions?.[myUid]?.emoji;
-        if (current === emoji) {
-            await msgRef.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() });
+        const ref = db.collection("chats").doc(chatId).collection("messages").doc(id);
+        const doc = await ref.get();
+        if(doc.exists && doc.data().reactions?.[myUid]?.emoji === emoji) {
+            ref.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() });
         } else {
-            await msgRef.update({ [`reactions.${myUid}`]: { emoji, timestamp: Date.now() } });
+            ref.update({ [`reactions.${myUid}`]: { emoji, timestamp: Date.now() } });
+            document.getElementById('heart-overlay').style.animation = 'heartPop 0.8s ease-out';
         }
-    }
-
-    async function copyMessageText() {
-        if(activeMenuText) {
-            try { await navigator.clipboard.writeText(activeMenuText); } catch(e){}
-        }
-        closeMenu();
-    }
-
-    function initReplyFromMenu() {
-        if(activeMenuText) input.setReply(activeMenuText);
-        closeMenu();
-    }
-
-    function initEditFromMenu() {
-        if(activeMenuText) input.setEdit(activeMenuText);
-        closeMenu();
-    }
-
-    async function unsendMsg() {
-        if(activeMenuId) {
-            await db.collection("chats").doc(chatId).collection("messages").doc(activeMenuId).delete();
-            // Optimistic removal happens in listener
-        }
-        closeMenu();
-    }
-
-    async function updateLastMsg(text) {
-        await db.collection("chats").doc(chatId).set({
-            lastMessage: text, lastSender: myUid, lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            participants: [myUid, targetUid], seen: false,
-            [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
-        }, { merge: true });
-    }
-
-    // Global Click Handler for Menu
-    menuOverlay.addEventListener('click', closeMenu);
+    });
+    
+    // Menu
+    list.addEventListener('open-msg-menu', (e) => {
+        activeMenuId = e.detail.id; activeMenuText = e.detail.text;
+        const isMine = e.detail.sender === myUid;
+        document.getElementById('edit-btn').style.display = isMine ? 'block' : 'none';
+        document.getElementById('unsend-btn').style.display = isMine ? 'block' : 'none';
+        document.getElementById('menu-overlay').style.display = 'flex';
+    });
+    
+    document.getElementById('copy-btn').onclick = () => { navigator.clipboard.writeText(activeMenuText); document.getElementById('menu-overlay').style.display='none'; };
+    document.getElementById('reply-btn').onclick = () => { input.setReply(activeMenuText); document.getElementById('menu-overlay').style.display='none'; };
+    document.getElementById('edit-btn').onclick = () => { input.setEdit(activeMenuText); document.getElementById('menu-overlay').style.display='none'; };
+    document.getElementById('unsend-btn').onclick = async () => { 
+        await db.collection("chats").doc(chatId).collection("messages").doc(activeMenuId).delete();
+        document.getElementById('menu-overlay').style.display='none';
+    };
+    document.getElementById('reaction-details-overlay').onclick = function() { this.style.display='none'; };
+    
+    // Attachments
+    const imgPicker = document.getElementById('img-picker');
+    input.addEventListener('trigger-camera', () => imgPicker.openPicker());
+    imgPicker.addEventListener('image-uploaded', (e) => db.collection("chats").doc(chatId).collection("messages").add({ imageUrl: e.detail.url, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp() }));
+    
+    const filePicker = document.getElementById('file-picker');
+    input.addEventListener('trigger-file', () => filePicker.openPicker());
+    filePicker.addEventListener('file-uploaded', (e) => db.collection("chats").doc(chatId).collection("messages").add({ fileUrl: e.detail.url, fileMeta: e.detail.metadata, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp() }));
 
 </script>
 </body>
