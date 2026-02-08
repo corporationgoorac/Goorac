@@ -6,51 +6,168 @@ export class ChatHeader extends HTMLElement {
     }
 
     render() {
-        // I am using Light DOM (this.innerHTML) so it inherits your 
-        // global CSS variables like --header-bg and --accent
         this.innerHTML = `
         <style>
-            /* Component Specific Styles */
-            header { 
+            /* --- FIX: Apply positioning to the Component Host --- */
+            :host {
+                display: block;
                 position: absolute;
                 top: 0; left: 0; right: 0;
+                /* Higher z-index ensures it sits ABOVE the scrollable message list */
+                z-index: 2000; 
+                height: calc(60px + env(safe-area-inset-top));
+                pointer-events: none; /* Allows clicks to pass through transparent areas if any */
+            }
+
+            /* Main Header Bar */
+            header { 
+                pointer-events: auto; /* Re-enable clicks on the header content */
                 padding: 0 16px;
                 padding-top: calc(env(safe-area-inset-top) + 10px);
-                height: calc(60px + env(safe-area-inset-top));
+                height: 100%;
                 background: var(--header-bg, rgba(0,0,0,0.96)); 
                 border-bottom: 1px solid var(--border, #262626); 
                 display: flex; align-items: center; gap: 12px; 
-                z-index: 2000; 
                 backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
             }
 
-            .back-btn { font-size: 1.8rem; color: var(--accent, #0095f6); cursor: pointer; display: flex; align-items: center; justify-content: center; height: 40px; width: 30px; }
+            .back-btn { 
+                font-size: 1.8rem; 
+                color: var(--accent, #0095f6); 
+                cursor: pointer; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                height: 40px; 
+                width: 30px; 
+            }
 
-            .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
+            .h-profile-group { 
+                display: flex; 
+                align-items: center; 
+                gap: 12px; 
+                cursor: pointer; 
+                flex: 1; 
+                overflow: hidden; 
+            }
             
-            .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
-            .h-pfp { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #121212; border: 1px solid #333; transition: opacity 0.3s ease; }
+            .pfp-container { 
+                position: relative; 
+                width: 38px; 
+                height: 38px; 
+                flex-shrink: 0; 
+            }
+            
+            .h-pfp { 
+                width: 100%; 
+                height: 100%; 
+                border-radius: 50%; 
+                object-fit: cover; 
+                background: #121212; 
+                border: 1px solid #333; 
+                transition: opacity 0.3s ease; 
+            }
             
             /* Online Dot Animation */
-            .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); animation: pulseGreen 2s infinite; }
-            @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 70% { box-shadow: 0 0 0 4px rgba(0, 230, 118, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } }
+            .online-dot { 
+                position: absolute; 
+                bottom: 0; 
+                right: 0; 
+                width: 10px; 
+                height: 10px; 
+                background: #00e676; 
+                border-radius: 50%; 
+                border: 2px solid #000; 
+                display: none; 
+                box-shadow: 0 0 4px rgba(0,230,118,0.5); 
+                animation: pulseGreen 2s infinite; 
+            }
+            
+            @keyframes pulseGreen { 
+                0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 
+                70% { box-shadow: 0 0 0 4px rgba(0, 230, 118, 0); } 
+                100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } 
+            }
 
-            .h-info { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
-            .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.1; }
-            .h-name { font-weight: 700; font-size: 1rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .h-info { 
+                display: flex; 
+                flex-direction: column; 
+                justify-content: center; 
+                gap: 1px; 
+                min-width: 0; 
+            }
+            
+            .h-name-wrapper { 
+                display: flex; 
+                align-items: center; 
+                gap: 4px; 
+                line-height: 1.1; 
+            }
+            
+            .h-name { 
+                font-weight: 700; 
+                font-size: 1rem; 
+                color: #fff; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+            }
             
             /* Loading Shimmer */
-            .loading-shimmer { background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite; }
-            @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+            .loading-shimmer { 
+                background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); 
+                background-size: 400px 100%; 
+                animation: shimmer 1.2s ease-in-out infinite; 
+            }
             
-            .h-name:empty { height: 16px; width: 120px; border-radius: 4px; background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); background-size: 400px 100%; animation: shimmer 1.2s infinite; }
+            @keyframes shimmer { 
+                0% { background-position: -200px 0; } 
+                100% { background-position: 200px 0; } 
+            }
             
-            .h-username-sub { font-size: 0.75rem; color: var(--text-secondary, #a8a8a8); font-weight: 400; transition: opacity 0.3s ease; }
-            .v-badge { width: 14px; height: 14px; display: none; }
+            .h-name:empty { 
+                height: 16px; 
+                width: 120px; 
+                border-radius: 4px; 
+                background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); 
+                background-size: 400px 100%; 
+                animation: shimmer 1.2s infinite; 
+            }
+            
+            .h-username-sub { 
+                font-size: 0.75rem; 
+                color: var(--text-secondary, #a8a8a8); 
+                font-weight: 400; 
+                transition: opacity 0.3s ease; 
+            }
+            
+            .v-badge { 
+                width: 14px; 
+                height: 14px; 
+                display: none; 
+            }
 
-            .header-actions { display: flex; align-items: center; gap: 20px; margin-left: auto; padding-right: 5px; }
-            .header-icon { width: 26px; height: 26px; cursor: pointer; fill: #ffffff; opacity: 0.9; transition: transform 0.2s, opacity 0.2s; }
-            .header-icon:active { opacity: 0.6; transform: scale(0.9); }
+            .header-actions { 
+                display: flex; 
+                align-items: center; 
+                gap: 20px; 
+                margin-left: auto; 
+                padding-right: 5px; 
+            }
+            
+            .header-icon { 
+                width: 26px; 
+                height: 26px; 
+                cursor: pointer; 
+                fill: #ffffff; 
+                opacity: 0.9; 
+                transition: transform 0.2s, opacity 0.2s; 
+            }
+            
+            .header-icon:active { 
+                opacity: 0.6; 
+                transform: scale(0.9); 
+            }
         </style>
 
         <header id="chat-header-el">
@@ -159,7 +276,7 @@ export class ChatHeader extends HTMLElement {
         }
     }
 
-    // --- HELPER FUNCTIONS (Copied from your original script) ---
+    // --- HELPER FUNCTIONS ---
 
     _formatActiveTime(timestamp) {
         if (!timestamp) return "";
