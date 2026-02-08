@@ -1,207 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#000000">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Quantum Home</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#000000">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Goorac | Quantum Home</title>
+
+<script src="config.js" type="module"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script src="components/navbar.js" defer></script>
+<script src="components/call-notifier.js" defer></script>
+<script src="components/viewNotes.js" defer></script>
+
+<style>
+    :root {
+        --bg: #000;
+        --accent: #00d2ff;
+        --accent-glow: rgba(0, 210, 255, 0.3);
+        --card-bg: rgba(255, 255, 255, 0.05);
+        --border: rgba(255, 255, 255, 0.1);
+        --text-main: #ffffff;
+        --text-dim: #a0a0a0;
+        --danger: #ff4444;
+        --danger-glow: rgba(255, 68, 68, 0.3);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--text-main);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding-bottom: 100px;
+        overflow-x: hidden;
+        background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
+        min-height: 100vh;
+    }
+
+    /* --- HEADER --- */
+    header {
+        padding: 15px 20px;
+        display: flex; justify-content: space-between; align-items: center;
+        backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+        background: rgba(0,0,0,0.7);
+        position: sticky; top: 0;
+        border-bottom: 1px solid var(--border);
+        z-index: 1000;
+        padding-top: max(15px, env(safe-area-inset-top));
+    }
+
+    .logo { 
+        font-size: 1.2rem; font-weight: 900; color: var(--accent); 
+        letter-spacing: 3px; text-shadow: 0 0 15px var(--accent-glow);
+        flex: 1;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 20px; }
+
+    /* NOTIFICATION BELL */
+    .notif-btn {
+        position: relative; cursor: pointer;
+        width: 28px; height: 28px;
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s;
+    }
+    .notif-btn:active { transform: scale(0.9); }
+
+    .notif-icon {
+        width: 24px; height: 24px; fill: none; stroke: var(--text-main); stroke-width: 1.8;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     
-    <script src="config.js" type="module"></script>
+    .notif-btn.has-unread .notif-icon {
+        fill: var(--text-main); stroke: none;
+        filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+    }
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    .notif-badge {
+        position: absolute; top: -2px; right: -2px;
+        background: var(--danger); color: white;
+        font-size: 0.6rem; font-weight: 800;
+        min-width: 16px; height: 16px;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        border: 2.5px solid #000; opacity: 0; transform: scale(0);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 0 10px var(--danger-glow);
+        pointer-events: none;
+    }
+    .notif-badge.visible { 
+        opacity: 1; transform: scale(1); 
+        animation: badgePulse 3s infinite;
+    }
 
-    <script src="components/navbar.js" defer></script>
-    <script src="components/call-notifier.js" defer></script>
-    <script src="components/viewNotes.js" defer></script>
+    @keyframes badgePulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
+        50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+    }
 
-    <style>
-        :root {
-            --bg: #000;
-            --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.3);
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
-            --text-main: #ffffff;
-            --text-dim: #a0a0a0;
-            --danger: #ff4444;
-            --danger-glow: rgba(255, 68, 68, 0.3);
-        }
+    .header-pfp { 
+        width: 38px; height: 38px; border-radius: 12px; 
+        object-fit: cover; border: 1px solid var(--border);
+        cursor: pointer; background: #111;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    #progress-bar {
+        position: fixed; top: 0; left: 0; height: 2px;
+        background: var(--accent); width: 0%; z-index: 1001;
+        transition: width 0.4s ease, opacity 0.3s;
+        box-shadow: 0 0 10px var(--accent);
+    }
 
-        body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding-bottom: 100px;
-            overflow-x: hidden;
-            background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
-            min-height: 100vh;
-        }
+    /* NOTES CONTAINER */
+    #notes-container {
+        display: flex; gap: 20px; padding: 20px;
+        overflow-x: auto; scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        min-height: 110px;
+    }
+    #notes-container::-webkit-scrollbar { display: none; }
+    
+    .note-item { display: flex; flex-direction: column; align-items: center; min-width: 75px; cursor: pointer; }
+    
+    /* CONTENT */
+    .content { padding: 10px 20px; max-width: 500px; margin: 0 auto; }
+    .section-label { 
+        font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); 
+        font-weight: 800; letter-spacing: 2.5px; margin-bottom: 15px; 
+        display: flex; align-items: center; gap: 8px; opacity: 0.8;
+    }
+    .section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-        /* --- HEADER --- */
-        header {
-            padding: 15px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-            background: rgba(0,0,0,0.7);
-            position: sticky; top: 0;
-            border-bottom: 1px solid var(--border);
-            z-index: 1000;
-            padding-top: max(15px, env(safe-area-inset-top));
-        }
+    .welcome-card { 
+        background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); 
+        border: 1px solid var(--border); padding: 25px; border-radius: 30px; 
+        margin-bottom: 25px; backdrop-filter: blur(10px); position: relative; 
+        overflow: hidden; animation: fadeIn 0.8s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .logo { 
-            font-size: 1.2rem; font-weight: 900; color: var(--accent); 
-            letter-spacing: 3px; text-shadow: 0 0 15px var(--accent-glow);
-            flex: 1;
-        }
+    .welcome-card h1 { 
+        margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; 
+        background: linear-gradient(to bottom, #fff 0%, #aaa 100%); 
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+    }
+    .welcome-card p { 
+        color: var(--text-dim); margin-top: 10px; font-size: 0.9rem; 
+        line-height: 1.5; font-weight: 400; opacity: 0.9;
+    }
 
-        .header-right { display: flex; align-items: center; gap: 20px; }
+    .quantum-info {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+    }
+    .status-tag {
+        display: inline-flex; align-items: center; gap: 6px; 
+        background: rgba(0, 210, 255, 0.1); color: var(--accent); 
+        padding: 5px 12px; border-radius: 100px; font-size: 0.65rem; 
+        font-weight: 800; border: 1px solid rgba(0, 210, 255, 0.2);
+    }
+    .live-clock { color: var(--accent); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
 
-        /* NOTIFICATION BELL */
-        .notif-btn {
-            position: relative; cursor: pointer;
-            width: 28px; height: 28px;
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s;
-        }
-        .notif-btn:active { transform: scale(0.9); }
+    /* ACTIVITY CARDS */
+    .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+    .activity-card { 
+        background: var(--card-bg); border: 1px solid var(--border); padding: 18px; 
+        border-radius: 24px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        text-align: left; position: relative; min-height: 120px; 
+        display: flex; flex-direction: column; justify-content: flex-end; 
+    }
+    .activity-card:active { transform: scale(0.95); background: rgba(255,255,255,0.08); }
+    
+    .card-icon-area { 
+        position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; 
+        border-radius: 12px; background: rgba(255,255,255,0.05); 
+        display: flex; align-items: center; justify-content: center; 
+        overflow: hidden; border: 1px solid var(--border); 
+    }
+    .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .count-num { font-size: 1.1rem; font-weight: 800; display: block; margin-bottom: 2px; color: #fff; }
+    .count-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+    .time-badge { font-size: 0.6rem; color: var(--accent); margin-bottom: 8px; display: block; opacity: 0.8; font-weight: 600; }
+    
+    .activity-card.has-count { border-color: var(--accent); background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%); }
+    .activity-card.missed-alert { border-color: var(--danger); background: linear-gradient(145deg, rgba(255, 68, 68, 0.08) 0%, transparent 100%); }
+    .missed-alert .count-num { color: var(--danger); }
 
-        .notif-icon {
-            width: 24px; height: 24px; fill: none; stroke: var(--text-main); stroke-width: 1.8;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .notif-btn.has-unread .notif-icon {
-            fill: var(--text-main); stroke: none;
-            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
-        }
+    .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        .notif-badge {
-            position: absolute; top: -2px; right: -2px;
-            background: var(--danger); color: white;
-            font-size: 0.6rem; font-weight: 800;
-            min-width: 16px; height: 16px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            border: 2.5px solid #000; opacity: 0; transform: scale(0);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 0 10px var(--danger-glow);
-            pointer-events: none;
-        }
-        .notif-badge.visible { 
-            opacity: 1; transform: scale(1); 
-            animation: badgePulse 3s infinite;
-        }
-
-        @keyframes badgePulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
-            50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
-        }
-
-        .header-pfp { 
-            width: 38px; height: 38px; border-radius: 12px; 
-            object-fit: cover; border: 1px solid var(--border);
-            cursor: pointer; background: #111;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-
-        #progress-bar {
-            position: fixed; top: 0; left: 0; height: 2px;
-            background: var(--accent); width: 0%; z-index: 1001;
-            transition: width 0.4s ease, opacity 0.3s;
-            box-shadow: 0 0 10px var(--accent);
-        }
-
-        /* NOTES CONTAINER (Populated by viewNotes.js) */
-        #notes-container {
-            display: flex; gap: 20px; padding: 20px;
-            overflow-x: auto; scrollbar-width: none;
-            -webkit-overflow-scrolling: touch;
-            min-height: 110px;
-        }
-        #notes-container::-webkit-scrollbar { display: none; }
-        
-        .note-item { display: flex; flex-direction: column; align-items: center; min-width: 75px; cursor: pointer; }
-        
-        /* CONTENT */
-        .content { padding: 10px 20px; max-width: 500px; margin: 0 auto; }
-        .section-label { 
-            font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); 
-            font-weight: 800; letter-spacing: 2.5px; margin-bottom: 15px; 
-            display: flex; align-items: center; gap: 8px; opacity: 0.8;
-        }
-        .section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-
-        .welcome-card { 
-            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); 
-            border: 1px solid var(--border); padding: 25px; border-radius: 30px; 
-            margin-bottom: 25px; backdrop-filter: blur(10px); position: relative; 
-            overflow: hidden; animation: fadeIn 0.8s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .welcome-card h1 { 
-            margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; 
-            background: linear-gradient(to bottom, #fff 0%, #aaa 100%); 
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
-        }
-        .welcome-card p { 
-            color: var(--text-dim); margin-top: 10px; font-size: 0.9rem; 
-            line-height: 1.5; font-weight: 400; opacity: 0.9;
-        }
-
-        .quantum-info {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
-        }
-        .status-tag {
-            display: inline-flex; align-items: center; gap: 6px; 
-            background: rgba(0, 210, 255, 0.1); color: var(--accent); 
-            padding: 5px 12px; border-radius: 100px; font-size: 0.65rem; 
-            font-weight: 800; border: 1px solid rgba(0, 210, 255, 0.2);
-        }
-        .live-clock { color: var(--accent); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
-
-        /* ACTIVITY CARDS */
-        .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
-        .activity-card { 
-            background: var(--card-bg); border: 1px solid var(--border); padding: 18px; 
-            border-radius: 24px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            text-align: left; position: relative; min-height: 120px; 
-            display: flex; flex-direction: column; justify-content: flex-end; 
-        }
-        .activity-card:active { transform: scale(0.95); background: rgba(255,255,255,0.08); }
-        
-        .card-icon-area { 
-            position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; 
-            border-radius: 12px; background: rgba(255,255,255,0.05); 
-            display: flex; align-items: center; justify-content: center; 
-            overflow: hidden; border: 1px solid var(--border); 
-        }
-        .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .count-num { font-size: 1.1rem; font-weight: 800; display: block; margin-bottom: 2px; color: #fff; }
-        .count-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
-        .time-badge { font-size: 0.6rem; color: var(--accent); margin-bottom: 8px; display: block; opacity: 0.8; font-weight: 600; }
-        
-        .activity-card.has-count { border-color: var(--accent); background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%); }
-        .activity-card.missed-alert { border-color: var(--danger); background: linear-gradient(145deg, rgba(255, 68, 68, 0.08) 0%, transparent 100%); }
-        .missed-alert .count-num { color: var(--danger); }
-
-        .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-        .skeleton { background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%); background-size: 200% 100%; animation: loading 1.5s infinite linear; border-radius: 12px; }
-        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        
-        main-navbar.hidden { display: none !important; }
-    </style>
+    .skeleton { background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%); background-size: 200% 100%; animation: loading 1.5s infinite linear; border-radius: 12px; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    
+    main-navbar.hidden { display: none !important; }
+</style>
 </head>
 <body oncontextmenu="return false;"> 
 
@@ -262,23 +263,26 @@
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    // Initialize with config from config.js
-    let fbConfig;
+    // --- FIREBASE INIT ---
+    let fbConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
+
+    // Use shared config from config.js if available
     if (typeof window.firebaseConfig !== 'undefined') {
         fbConfig = window.firebaseConfig;
     } else if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
         fbConfig = window.CONFIG.firebase;
-    } else {
-        console.error("Firebase Config missing! Ensure config.js is loaded.");
     }
 
-    if (fbConfig && !firebase.apps.length) {
-        firebase.initializeApp(fbConfig);
-    }
-
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const prog = document.getElementById('progress-bar');
+    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    const auth = firebase.auth(), db = firebase.firestore(), prog = document.getElementById('progress-bar');
     
     let READ_KEY = "goorac_read_notifs"; 
 
@@ -332,6 +336,7 @@
 
     // --- UNIFIED NOTIFICATION LISTENER ---
     function listenNotifications(uid) {
+        // Sets to track unique IDs
         let likeIds = new Set();
         let followIds = new Set();
 
@@ -339,6 +344,7 @@
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
             
+            // Count unique unseen items
             likeIds.forEach(id => { if(!readList.includes(id)) count++; });
             followIds.forEach(id => { if(!readList.includes(id)) count++; });
 
@@ -353,7 +359,7 @@
             }
         };
 
-        // 1. LISTEN TO LIKES (From 'notes' collection)
+        // 1. LISTEN TO LIKES
         db.collection("notes")
             .where("uid", "==", uid)
             .orderBy("createdAt", "desc")
@@ -375,7 +381,7 @@
                 updateBadgeUI();
             });
 
-        // 2. LISTEN TO FOLLOWERS (From 'users' document)
+        // 2. LISTEN TO FOLLOWERS
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -433,7 +439,6 @@
         });
     }
 
-    // Double-tap zoom prevention
     document.addEventListener('touchend', (e) => {
         const now = (new Date()).getTime();
         if (now - (window.lastTouch || 0) <= 300) e.preventDefault();
@@ -445,7 +450,7 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 
-    // --- 1. PWA Service Worker Registration ---
+    // 1. PWA Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
@@ -454,15 +459,13 @@
         });
     }
 
-    // --- 2. Notification Permissions ---
-    // Ask immediately when the user visits the home page
+    // 2. Notification Permissions
     if (Notification.permission !== "granted") {
         Notification.requestPermission();
     }
 
-    // --- 3. Start Background Worker (When Logged In) ---
+    // 3. Start Background Worker (Wait for config.js)
     function initNotificationSystem() {
-        // Wait for config.js to load into window
         if (!window.firebaseConfig) {
             setTimeout(initNotificationSystem, 500);
             return;
@@ -479,25 +482,21 @@
     }
 
     function startNotificationWorker(uid) {
-        // Prevent starting multiple workers
         if (window.Worker && !window.notifWorker) {
             console.log("🚀 Starting Background Notification Worker...");
             
-            // Create the worker thread
             window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
             
-            // Send the keys and User ID to the worker
             window.notifWorker.postMessage({
                 type: 'START',
                 uid: uid,
                 config: window.firebaseConfig
             });
 
-            // Listen for logs from worker
             window.notifWorker.onmessage = (e) => {
                 if (e.data.type === 'LOG') console.log('[Worker]', e.data.msg);
                 
-                // CRITICAL: Connect Worker -> Main Page -> Service Worker
+                // --- CONNECT WORKER TO SERVICE WORKER ---
                 if (e.data.type === 'FOUND_MESSAGE') {
                     showPersistentNotification(e.data);
                 }
@@ -505,7 +504,6 @@
         }
     }
 
-    // Helper to show notification via Service Worker (Required for Mobile)
     function showPersistentNotification(data) {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(registration => {
