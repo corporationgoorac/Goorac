@@ -1,238 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
-
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#050505">
-    <title>My Profile | Goorac</title>
+    <meta name="theme-color" content="#000000">
+    <title>Profile | Goorac</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-
-    <script src="components/navbar.js" defer></script>
-    <script src="components/call-notifier.js" defer></script>
-
     <style>
         :root {
-            --bg: #050505;
-            --card-bg: rgba(20, 20, 20, 0.6);
-            --accent: #0095f6;
-            --accent-glow: rgba(0, 149, 246, 0.4);
-            --text: #ffffff;
-            --text-sec: #a8a8a8;
-            --border: rgba(255, 255, 255, 0.1);
-            --danger: #ff3b30;
+            --bg: #000000;
+            --surface: #121212;
+            --surface-light: #1E1E1E;
+            --border: #2A2A2A;
+            --primary: #3b82f6;
+            --text-main: #FFFFFF;
+            --text-muted: #888888;
+            --danger: #ef4444;
+            --safe-area-top: env(safe-area-inset-top);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        body { background: var(--bg); color: var(--text); overflow-x: hidden; padding-bottom: 80px; }
-
-        /* --- SKELETON LOADING --- */
-        .skeleton {
-            background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 6px;
-            color: transparent !important;
+        body { 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            padding-bottom: 40px;
         }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
         /* --- HEADER --- */
         header {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            padding: 15px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
+            padding: calc(12px + var(--safe-area-top)) 16px 12px;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        .header-title { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.5px; text-transform: uppercase; }
-        .settings-btn { background: none; border: none; color: var(--text); opacity: 0.8; cursor: pointer; }
+        .nav-btn { background: none; border: none; color: var(--text-main); padding: 8px; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .nav-btn:active { background: var(--surface-light); }
+        .header-title { font-weight: 700; font-size: 16px; letter-spacing: -0.5px; text-transform: uppercase; }
 
-        /* --- HERO SECTION --- */
-        .hero { position: relative; margin-top: 60px; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
+        /* --- MAIN LAYOUT --- */
+        main { max-width: 600px; margin: 0 auto; padding: 24px 16px; }
+
+        /* --- PROFILE TOP --- */
+        .profile-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 24px; }
         
-        /* Dynamic Banner */
-        .banner {
-            width: 100%; height: 120px; border-radius: 20px;
-            background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
-            position: relative; overflow: hidden;
-            border: 1px solid var(--border);
+        .avatar-container {
+            width: 100px; height: 100px; margin-bottom: 16px;
+            position: relative;
         }
-        .banner::after {
-            content:''; position: absolute; inset:0;
-            background: radial-gradient(circle at 50% 120%, var(--accent-glow), transparent 70%);
-            opacity: 0.6;
-        }
-
-        /* Avatar */
-        .pfp-container {
-            margin-top: -50px; position: relative;
-            width: 100px; height: 100px;
-        }
-        .pfp {
+        .avatar {
             width: 100%; height: 100%; border-radius: 50%;
-            object-fit: cover; border: 4px solid var(--bg);
-            background: #111; position: relative; z-index: 2;
+            object-fit: cover; background: var(--surface-light);
+            border: 2px solid var(--border);
         }
 
-        /* Info */
-        .info-section { text-align: center; margin-top: 10px; width: 100%; }
-        .name-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 1.4rem; font-weight: 800; }
-        .badge { width: 16px; height: 16px; display: inline-block; }
-        .username { color: var(--text-sec); font-size: 0.9rem; margin-top: 2px; font-weight: 500; }
+        .user-info { width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .display-name { font-size: 22px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .verified-badge { color: var(--primary); font-size: 18px; }
         
-        /* ID Badge */
-        .id-badge {
-            display: inline-flex; align-items: center; gap: 6px;
-            background: rgba(255,255,255,0.05); padding: 4px 12px;
-            border-radius: 12px; font-size: 0.7rem; color: var(--text-sec);
-            margin-top: 10px; border: 1px solid var(--border); cursor: pointer;
-        }
-        .id-badge:active { background: rgba(255,255,255,0.1); }
+        .username-tag { color: var(--text-muted); font-size: 14px; font-weight: 500; }
 
-        .bio {
-            margin: 15px 0 20px; font-size: 0.95rem; line-height: 1.5; color: #ddd;
-            max-width: 90%; text-align: center;
+        /* --- ID PILL --- */
+        .id-pill {
+            margin-top: 12px;
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--surface); border: 1px solid var(--border);
+            padding: 6px 14px; border-radius: 100px;
+            cursor: pointer; transition: 0.1s;
         }
+        .id-pill:active { background: var(--surface-light); transform: scale(0.98); }
+        .id-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .id-value { font-family: monospace; font-size: 13px; font-weight: 600; color: var(--text-main); letter-spacing: 1px; }
 
-        /* --- STATS GRID --- */
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;
-            margin-bottom: 20px;
-        }
-        .stat-item {
-            background: var(--card-bg); padding: 15px; border-radius: 16px;
-            text-align: center; border: 1px solid var(--border);
-            cursor: pointer; transition: 0.2s;
-            text-decoration: none; display: block;
-        }
-        .stat-item:active { transform: scale(0.98); background: rgba(255,255,255,0.05); }
-        .stat-num { font-size: 1.2rem; font-weight: 800; display: block; color: var(--text); }
-        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-sec); letter-spacing: 0.5px; margin-top: 4px; display: block; }
+        .bio-text { margin: 16px 0; font-size: 14px; line-height: 1.5; color: #d4d4d4; max-width: 90%; }
 
-        /* --- ACTIONS --- */
-        .action-row { display: flex; gap: 10px; width: 100%; margin-bottom: 25px; }
+        /* --- STATS --- */
+        .stats-row {
+            display: flex; justify-content: space-around; width: 100%;
+            padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        .stat-box { display: flex; flex-direction: column; align-items: center; cursor: pointer; flex: 1; }
+        .stat-box:active { opacity: 0.5; }
+        .stat-num { font-size: 18px; font-weight: 700; color: var(--text-main); }
+        .stat-lbl { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 4px; }
+
+        /* --- BUTTONS --- */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 30px; }
         .btn {
-            flex: 1; padding: 12px; border-radius: 12px; border: none;
-            font-weight: 600; font-size: 0.9rem; cursor: pointer;
-            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
-            text-decoration: none;
+            padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: background 0.2s;
         }
         
-        .btn-edit { background: #fff; color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
-        .btn-logout { background: rgba(255, 59, 48, 0.1); color: var(--danger); border: 1px solid rgba(255, 59, 48, 0.2); }
-        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:active { opacity: 0.8; }
+        
+        .btn-secondary { background: var(--surface); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:active { background: var(--surface-light); }
+        
+        /* Following State Style */
+        .btn-following { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
 
         /* --- TABS --- */
-        .tabs {
-            display: flex; width: 100%; border-bottom: 1px solid var(--border);
-            margin-bottom: 1px;
+        .tabs-header { display: flex; border-bottom: 1px solid var(--border); }
+        .tab { 
+            flex: 1; text-align: center; padding: 14px; font-size: 13px; font-weight: 600; 
+            color: var(--text-muted); cursor: pointer; position: relative; 
         }
-        .tab {
-            flex: 1; padding: 15px; text-align: center;
-            font-size: 0.9rem; color: var(--text-sec); font-weight: 600;
-            position: relative; cursor: pointer;
-        }
-        .tab.active { color: var(--text); }
+        .tab.active { color: var(--text-main); }
         .tab.active::after {
-            content:''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 2px;
-            background: var(--accent); border-radius: 2px;
+            content:''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--text-main);
         }
 
-        .content-area {
-            padding: 40px 20px; text-align: center; color: var(--text-sec);
-            font-size: 0.9rem;
+        .content-placeholder {
+            padding: 60px 20px; text-align: center; color: var(--text-muted);
+            font-size: 13px;
         }
+
+        /* --- UTILS --- */
+        .skeleton { background: #1E1E1E; color: transparent !important; border-radius: 4px; }
+        .hide { display: none !important; }
 
         /* --- TOAST --- */
         #toast {
-            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: #fff; color: #000; padding: 10px 24px; border-radius: 50px;
-            font-weight: 600; font-size: 0.85rem; opacity: 0; pointer-events: none;
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 20px);
+            background: #fff; color: #000; padding: 10px 20px; border-radius: 50px;
+            font-size: 12px; font-weight: 700; opacity: 0; pointer-events: none;
+            transition: 0.3s; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
     <header>
-        <span class="header-title" id="nav-username">MY PROFILE</span>
-        <button class="settings-btn">
-            <span class="material-icons-round">settings</span>
+        <button class="nav-btn" onclick="history.back()">
+            <span class="material-icons-round">arrow_back</span>
+        </button>
+        <div class="header-title" id="nav-name">Profile</div>
+        <button class="nav-btn">
+            <span class="material-icons-round">more_vert</span>
         </button>
     </header>
 
-    <div class="hero">
-        <div class="banner"></div>
-        
-        <div class="pfp-container skeleton" id="sk-pfp">
-            <img id="pfp" class="pfp" src="" style="opacity: 0;">
-        </div>
-
-        <div class="info-section">
-            <div class="name-row skeleton" id="sk-name" style="width: 150px; margin: 0 auto;">
-                <span id="display-name">Loading</span>
-                <img id="verified-badge" class="badge" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" style="display:none;">
-            </div>
-            
-            <div class="username skeleton" id="sk-user" style="width: 100px; margin: 4px auto 0;">@username</div>
-
-            <div class="id-badge skeleton" id="sk-id" onclick="copyID()" style="width: 120px; margin: 10px auto 0;">
-                <span class="material-icons-round" style="font-size:14px;">fingerprint</span>
-                ID: <span id="goorac-id">------</span>
+    <main>
+        <div class="profile-header">
+            <div class="avatar-container">
+                <img id="pfp" class="avatar skeleton" src="" alt="">
             </div>
 
-            <p class="bio skeleton" id="sk-bio" style="width: 80%; margin: 15px auto;">Fetching your details...</p>
+            <div class="user-info">
+                <div class="display-name">
+                    <span id="display-name" class="skeleton">Loading</span>
+                    <span class="material-icons-round verified-badge hide" id="badge">verified</span>
+                </div>
+                <div class="username-tag skeleton" id="username" style="width:80px; height:16px; margin-top:4px;">@...</div>
+            </div>
+
+            <div class="id-pill" onclick="copyGooracID()">
+                <span class="id-label">ID</span>
+                <span class="id-value" id="goorac-id">------</span>
+                <span class="material-icons-round" style="font-size:14px; color:#666;">content_copy</span>
+            </div>
+
+            <p class="bio-text skeleton" id="bio" style="width:90%; height:40px;">Fetching details...</p>
         </div>
 
-        <div class="stats-grid">
-            <a href="followers.html" class="stat-item skeleton" id="sk-fol">
+        <div class="stats-row">
+            <div class="stat-box">
+                <span class="stat-num" id="count-posts">0</span>
+                <span class="stat-lbl">Posts</span>
+            </div>
+            <div class="stat-box" onclick="viewFollowers()">
                 <span class="stat-num" id="count-followers">0</span>
-                <span class="stat-label">Followers</span>
-            </a>
-            <a href="following.html" class="stat-item skeleton" id="sk-fing">
+                <span class="stat-lbl">Followers</span>
+            </div>
+            <div class="stat-box" onclick="viewFollowing()">
                 <span class="stat-num" id="count-following">0</span>
-                <span class="stat-label">Following</span>
-            </a>
+                <span class="stat-lbl">Following</span>
+            </div>
         </div>
 
-        <div class="action-row">
-            <a href="setup.html" class="btn btn-edit skeleton" id="sk-btn1">Edit Profile</a>
-            <button onclick="logout()" class="btn btn-logout skeleton" id="sk-btn2">
-                <span class="material-icons-round" style="font-size:18px;">logout</span> Logout
-            </button>
+        <div class="action-grid" id="action-container">
+            <button class="btn btn-primary skeleton" id="btn-follow" onclick="handleFollow()">Follow</button>
+            <button class="btn btn-secondary skeleton" id="btn-msg" onclick="openChat()">Message</button>
         </div>
-    </div>
 
-    <div class="tabs">
-        <div class="tab active">Notes</div>
-        <div class="tab">Media</div>
-        <div class="tab">About</div>
-    </div>
-    
-    <div class="content-area">
-        <span class="material-icons-round" style="font-size: 30px; opacity: 0.5; margin-bottom: 10px;">grid_view</span>
-        <br>Your posts will appear here
-    </div>
+        <div class="tabs-header">
+            <div class="tab active">POSTS</div>
+            <div class="tab">MEDIA</div>
+            <div class="tab">TAGGED</div>
+        </div>
 
-    <div id="toast">ID Copied to clipboard</div>
-    
-    <main-navbar></main-navbar>
-    <call-notifier></call-notifier>
+        <div class="content-placeholder">
+            <span class="material-icons-round" style="font-size:32px; margin-bottom:10px; opacity:0.3;">grid_view</span>
+            <br>No posts yet
+        </div>
+    </main>
+
+    <div id="toast">Copied to Clipboard</div>
 
 <script>
-    // --- CONFIG ---
+    // --- 1. CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -246,88 +227,240 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- INIT ---
-    auth.onAuthStateChanged(async (user) => {
+    // --- 2. GLOBAL STATE ---
+    const params = new URLSearchParams(window.location.search);
+    const targetUsername = params.get('user');
+    
+    let myUid = null;
+    let targetUid = null;
+    let targetUserData = null;
+    let isFollowActionLocked = false; // Prevents spam clicking
+
+    // --- 3. CACHING SYSTEM (LocalStorage) ---
+    // Why? To load the profile instantly if visited before.
+    function loadFromCache() {
+        if(!targetUsername) return;
+        const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
+        if(cached) {
+            console.log("Loaded from cache");
+            const data = JSON.parse(cached);
+            targetUserData = data;
+            targetUid = data.uid; // Ensure UID is saved in data
+            renderProfile(data);
+        }
+    }
+
+    function saveToCache(data, uid) {
+        if(!targetUsername) return;
+        const dataToSave = { ...data, uid: uid }; 
+        localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(dataToSave));
+    }
+
+    // --- 4. INITIALIZATION ---
+    auth.onAuthStateChanged(user => {
         if (user) {
-            loadMyProfile(user.uid);
+            myUid = user.uid;
+            
+            // 1. Load Cache Immediately (Fast)
+            loadFromCache();
+
+            // 2. Fetch Fresh Data (Reliable)
+            if(targetUsername) fetchProfileFresh();
         } else {
             window.location.href = 'login.html';
         }
     });
 
-    async function loadMyProfile(uid) {
-        // Use Snapshot for real-time updates without page reload
-        db.collection("users").doc(uid).onSnapshot((doc) => {
-            if (doc.exists) {
-                renderProfile(doc.data());
-            } else {
-                // User document doesn't exist, redirect to setup
-                window.location.href = "setup.html";
-            }
+    // --- 5. DATA FETCHING ---
+    function fetchProfileFresh() {
+        // Find user by username
+        db.collection("users").where("username", "==", targetUsername).limit(1)
+        .onSnapshot((snapshot) => {
+            if(snapshot.empty) return; // Handle user not found later
+            
+            const doc = snapshot.docs[0];
+            const freshData = doc.data();
+            targetUid = doc.id;
+            targetUserData = freshData;
+
+            // Save & Render
+            saveToCache(freshData, targetUid);
+            renderProfile(freshData);
+            
+            // Check Relationship (Are we following?)
+            checkRelation();
         });
     }
 
+    // --- 6. RENDER UI ---
     function renderProfile(data) {
-        // Stop Skeletons
+        // Remove skeleton classes
         document.querySelectorAll('.skeleton').forEach(el => {
             el.classList.remove('skeleton');
-            el.style.width = 'auto';
-            el.style.color = '';
-            el.style.margin = '';
+            el.style.width = ''; el.style.height = '';
         });
 
-        // 1. Images
-        const pfpEl = document.getElementById('pfp');
-        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
-        pfpEl.onload = () => pfpEl.style.opacity = '1';
-
-        // 2. Text
+        // Safe sets
         document.getElementById('display-name').innerText = data.name || "User";
-        document.getElementById('sk-user').innerText = `@${data.username}`;
-        document.getElementById('sk-bio').innerText = data.bio || "Welcome to my Goorac profile.";
-        document.getElementById('goorac-id').innerText = data.gooracNumber || "----------";
-
-        // 3. Badge
-        if(data.verified) document.getElementById('verified-badge').style.display = 'inline-block';
-
-        // 4. Counts (USING ARRAY LENGTH - ZERO READ COST)
-        // Check if arrays exist, if not use empty array to prevent error
-        const followersList = data.followers || [];
-        const followingList = data.following || [];
+        document.getElementById('nav-name').innerText = (data.name || "Profile").toUpperCase();
+        document.getElementById('username').innerText = `@${data.username}`;
+        document.getElementById('bio').innerText = data.bio || "No bio available.";
+        document.getElementById('goorac-id').innerText = data.gooracNumber || "N/A";
         
-        document.getElementById('count-followers').innerText = followersList.length;
-        document.getElementById('count-following').innerText = followingList.length;
+        // PFP
+        const img = document.getElementById('pfp');
+        img.src = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=?';
+
+        // Verified Badge
+        if(data.verified) document.getElementById('badge').classList.remove('hide');
+
+        // Stats (using array length)
+        const followers = data.followers || [];
+        const following = data.following || [];
+        document.getElementById('count-followers').innerText = followers.length;
+        document.getElementById('count-following').innerText = following.length;
+
+        // Hide buttons if viewing own profile
+        if(myUid === targetUid) {
+            document.getElementById('action-container').style.display = 'none';
+        }
     }
 
-    // --- ACTIONS ---
+    // --- 7. RELATION LOGIC ---
+    async function checkRelation() {
+        if(!myUid || !targetUid || myUid === targetUid) return;
 
-    function copyID() {
-        const txt = document.getElementById('goorac-id').innerText;
-        if(txt.includes('-')) return;
+        const myDoc = await db.collection("users").doc(myUid).get();
+        const myFollowing = myDoc.data().following || [];
 
+        // Check if targetUid is in my following list
+        // Supports both array of strings [uid, uid] and array of objects [{uid, time}, ...]
+        const isFollowing = myFollowing.some(item => {
+            const id = typeof item === 'string' ? item : item.uid;
+            return id === targetUid;
+        });
+
+        updateFollowButton(isFollowing);
+    }
+
+    function updateFollowButton(isFollowing) {
+        const btn = document.getElementById('btn-follow');
+        if(isFollowing) {
+            btn.innerText = "Following";
+            btn.className = "btn btn-following";
+        } else {
+            btn.innerText = "Follow";
+            btn.className = "btn btn-primary";
+        }
+    }
+
+    // --- 8. ACTIONS ---
+
+    // Follow / Unfollow
+    async function handleFollow() {
+        if(isFollowActionLocked || !targetUid) return;
+        
+        const btn = document.getElementById('btn-follow');
+        const isUnfollowing = btn.innerText === "Following"; // Current state
+        
+        // LOCK & VIBRATE
+        isFollowActionLocked = true;
         if(navigator.vibrate) navigator.vibrate(10);
 
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(txt).then(() => showToast("ID Copied"));
-        } else {
-            // Fallback
-            const textArea = document.createElement("textarea");
-            textArea.value = txt;
-            textArea.style.position = "fixed"; textArea.style.left = "-9999px";
-            document.body.appendChild(textArea);
-            textArea.focus(); textArea.select();
-            try { document.execCommand('copy'); showToast("ID Copied"); } catch (err) {}
-            document.body.removeChild(textArea);
+        // Optimistic Update (Change UI immediately)
+        updateFollowButton(!isUnfollowing);
+
+        // Adjust local counter visually
+        const countEl = document.getElementById('count-followers');
+        let currentCount = parseInt(countEl.innerText);
+        countEl.innerText = isUnfollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+        const ts = firebase.firestore.Timestamp.now();
+
+        try {
+            if(!isUnfollowing) {
+                // FOLLOW OPERATION
+                const batch = db.batch();
+                
+                // 1. Add to My Following
+                const myRef = db.collection("users").doc(myUid);
+                batch.update(myRef, {
+                    following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
+                });
+
+                // 2. Add to Their Followers
+                const theirRef = db.collection("users").doc(targetUid);
+                batch.update(theirRef, {
+                    followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
+                });
+
+                // 3. Send Notification
+                const notifRef = db.collection("notifications").doc();
+                batch.set(notifRef, {
+                    recipientId: targetUid,
+                    senderId: myUid,
+                    type: "follow",
+                    timestamp: ts,
+                    seen: false
+                });
+
+                await batch.commit();
+
+            } else {
+                // UNFOLLOW OPERATION
+                // Note: ArrayRemove requires exact match. 
+                // For simplified arrays of objects, read-modify-write is safer than arrayRemove if objects vary.
+                // Here we use a transaction to safely remove the specific object based on UID.
+                
+                await db.runTransaction(async (t) => {
+                    const myRef = db.collection("users").doc(myUid);
+                    const theirRef = db.collection("users").doc(targetUid);
+                    
+                    const myDoc = await t.get(myRef);
+                    const theirDoc = await t.get(theirRef);
+
+                    // Filter out target from my following
+                    const newFollowing = (myDoc.data().following || []).filter(i => (typeof i==='string'?i:i.uid) !== targetUid);
+                    
+                    // Filter me out of their followers
+                    const newFollowers = (theirDoc.data().followers || []).filter(i => (typeof i==='string'?i:i.uid) !== myUid);
+
+                    t.update(myRef, { following: newFollowing });
+                    t.update(theirRef, { followers: newFollowers });
+                });
+            }
+        } catch(e) {
+            console.error("Follow Error:", e);
+            // Revert UI on failure
+            updateFollowButton(isUnfollowing);
+            countEl.innerText = currentCount;
+            showToast("Action failed");
         }
+
+        // UNLOCK
+        setTimeout(() => { isFollowActionLocked = false; }, 500);
     }
 
-    function logout() {
-        if(confirm("Are you sure you want to log out?")) {
-            if(navigator.vibrate) navigator.vibrate(10);
-            auth.signOut().then(() => {
-                window.location.href = "login.html";
-            });
-        }
+    function copyGooracID() {
+        const txt = document.getElementById('goorac-id').innerText;
+        if(txt === "N/A" || txt.includes("-")) return;
+        
+        navigator.clipboard.writeText(txt).then(() => {
+            if(navigator.vibrate) navigator.vibrate(50);
+            showToast("ID Copied");
+        });
+    }
+
+    function openChat() {
+        if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`;
+    }
+    
+    function viewFollowers() {
+        if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`;
+    }
+
+    function viewFollowing() {
+        if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`;
     }
 
     function showToast(msg) {
@@ -340,4 +473,3 @@
 </script>
 </body>
 </html>
-
