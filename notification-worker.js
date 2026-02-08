@@ -5,14 +5,14 @@ self.onmessage = async (e) => {
     if (e.data.type === 'START') {
         startListening(e.data.uid, e.data.config);
     }
+    // Test Ping
     if (e.data.type === 'PING') {
-        self.postMessage({ type: 'LOG', msg: "✅ PONG! Worker is running." });
-        // Send a test notification to prove connection
+        self.postMessage({ type: 'LOG', msg: "✅ Worker is Running" });
         self.postMessage({
             type: 'SHOW_NOTIFICATION',
             payload: {
-                title: "Worker Connected",
-                body: "Background system is active.",
+                title: "Worker Active",
+                body: "System is monitoring messages.",
                 icon: "https://cdn-icons-png.flaticon.com/512/3067/3067451.png"
             }
         });
@@ -39,6 +39,7 @@ function startListening(myUid, firebaseConfig) {
                 const msgTime = data.lastTimestamp?.toMillis() || 0;
 
                 if (myUnread > 0 && (now - msgTime) < 600000) {
+                    // Send Command to Main Thread
                     self.postMessage({
                         type: 'SHOW_NOTIFICATION',
                         payload: {
