@@ -7,6 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
+    <script src="config.js" type="module"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -17,49 +19,187 @@
     <script src="components/viewNotes.js" defer></script>
 
     <style>
-        :root { --bg: #000; --accent: #00d2ff; --accent-glow: rgba(0, 210, 255, 0.3); --card-bg: rgba(255, 255, 255, 0.05); --border: rgba(255, 255, 255, 0.1); --text-main: #ffffff; --text-dim: #a0a0a0; --danger: #ff4444; --danger-glow: rgba(255, 68, 68, 0.3); }
+        :root {
+            --bg: #000;
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.3);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-dim: #a0a0a0;
+            --danger: #ff4444;
+            --danger-glow: rgba(255, 68, 68, 0.3);
+        }
+
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-        body { background-color: var(--bg); color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; margin: 0; padding-bottom: 100px; overflow-x: hidden; background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%); min-height: 100vh; }
-        header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: rgba(0,0,0,0.7); position: sticky; top: 0; border-bottom: 1px solid var(--border); z-index: 1000; padding-top: max(15px, env(safe-area-inset-top)); }
-        .logo { font-size: 1.2rem; font-weight: 900; color: var(--accent); letter-spacing: 3px; text-shadow: 0 0 15px var(--accent-glow); flex: 1; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding-bottom: 100px;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at top right, #001a2e 0%, #000 50%);
+            min-height: 100vh;
+        }
+
+        /* --- HEADER --- */
+        header {
+            padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            background: rgba(0,0,0,0.7);
+            position: sticky; top: 0;
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            padding-top: max(15px, env(safe-area-inset-top));
+        }
+
+        .logo { 
+            font-size: 1.2rem; font-weight: 900; color: var(--accent); 
+            letter-spacing: 3px; text-shadow: 0 0 15px var(--accent-glow);
+            flex: 1;
+        }
+
         .header-right { display: flex; align-items: center; gap: 20px; }
-        .notif-btn { position: relative; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+
+        /* NOTIFICATION BELL */
+        .notif-btn {
+            position: relative; cursor: pointer;
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s;
+        }
         .notif-btn:active { transform: scale(0.9); }
-        .notif-icon { width: 24px; height: 24px; fill: none; stroke: var(--text-main); stroke-width: 1.8; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .notif-btn.has-unread .notif-icon { fill: var(--text-main); stroke: none; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
-        .notif-badge { position: absolute; top: -2px; right: -2px; background: var(--danger); color: white; font-size: 0.6rem; font-weight: 800; min-width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2.5px solid #000; opacity: 0; transform: scale(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 0 10px var(--danger-glow); pointer-events: none; }
-        .notif-badge.visible { opacity: 1; transform: scale(1); animation: badgePulse 3s infinite; }
-        @keyframes badgePulse { 0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); } }
-        .header-pfp { width: 38px; height: 38px; border-radius: 12px; object-fit: cover; border: 1px solid var(--border); cursor: pointer; background: #111; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        #progress-bar { position: fixed; top: 0; left: 0; height: 2px; background: var(--accent); width: 0%; z-index: 1001; transition: width 0.4s ease, opacity 0.3s; box-shadow: 0 0 10px var(--accent); }
-        #notes-container { display: flex; gap: 20px; padding: 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; min-height: 110px; }
+
+        .notif-icon {
+            width: 24px; height: 24px; fill: none; stroke: var(--text-main); stroke-width: 1.8;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .notif-btn.has-unread .notif-icon {
+            fill: var(--text-main); stroke: none;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+        }
+
+        .notif-badge {
+            position: absolute; top: -2px; right: -2px;
+            background: var(--danger); color: white;
+            font-size: 0.6rem; font-weight: 800;
+            min-width: 16px; height: 16px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            border: 2.5px solid #000; opacity: 0; transform: scale(0);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 10px var(--danger-glow);
+            pointer-events: none;
+        }
+        .notif-badge.visible { 
+            opacity: 1; transform: scale(1); 
+            animation: badgePulse 3s infinite;
+        }
+
+        @keyframes badgePulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        .header-pfp { 
+            width: 38px; height: 38px; border-radius: 12px; 
+            object-fit: cover; border: 1px solid var(--border);
+            cursor: pointer; background: #111;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        #progress-bar {
+            position: fixed; top: 0; left: 0; height: 2px;
+            background: var(--accent); width: 0%; z-index: 1001;
+            transition: width 0.4s ease, opacity 0.3s;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        /* NOTES CONTAINER */
+        #notes-container {
+            display: flex; gap: 20px; padding: 20px;
+            overflow-x: auto; scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            min-height: 110px;
+        }
         #notes-container::-webkit-scrollbar { display: none; }
+        
         .note-item { display: flex; flex-direction: column; align-items: center; min-width: 75px; cursor: pointer; }
+        
+        /* CONTENT */
         .content { padding: 10px 20px; max-width: 500px; margin: 0 auto; }
-        .section-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); font-weight: 800; letter-spacing: 2.5px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; opacity: 0.8; }
+        .section-label { 
+            font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); 
+            font-weight: 800; letter-spacing: 2.5px; margin-bottom: 15px; 
+            display: flex; align-items: center; gap: 8px; opacity: 0.8;
+        }
         .section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-        .welcome-card { background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid var(--border); padding: 25px; border-radius: 30px; margin-bottom: 25px; backdrop-filter: blur(10px); position: relative; overflow: hidden; animation: fadeIn 0.8s ease; }
+
+        .welcome-card { 
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); 
+            border: 1px solid var(--border); padding: 25px; border-radius: 30px; 
+            margin-bottom: 25px; backdrop-filter: blur(10px); position: relative; 
+            overflow: hidden; animation: fadeIn 0.8s ease;
+        }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .welcome-card h1 { margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(to bottom, #fff 0%, #aaa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .welcome-card p { color: var(--text-dim); margin-top: 10px; font-size: 0.9rem; line-height: 1.5; font-weight: 400; opacity: 0.9; }
-        .quantum-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .status-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 210, 255, 0.1); color: var(--accent); padding: 5px 12px; border-radius: 100px; font-size: 0.65rem; font-weight: 800; border: 1px solid rgba(0, 210, 255, 0.2); }
+
+        .welcome-card h1 { 
+            margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; 
+            background: linear-gradient(to bottom, #fff 0%, #aaa 100%); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+        }
+        .welcome-card p { 
+            color: var(--text-dim); margin-top: 10px; font-size: 0.9rem; 
+            line-height: 1.5; font-weight: 400; opacity: 0.9;
+        }
+
+        .quantum-info {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+        }
+        .status-tag {
+            display: inline-flex; align-items: center; gap: 6px; 
+            background: rgba(0, 210, 255, 0.1); color: var(--accent); 
+            padding: 5px 12px; border-radius: 100px; font-size: 0.65rem; 
+            font-weight: 800; border: 1px solid rgba(0, 210, 255, 0.2);
+        }
         .live-clock { color: var(--accent); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
+
+        /* ACTIVITY CARDS */
         .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
-        .activity-card { background: var(--card-bg); border: 1px solid var(--border); padding: 18px; border-radius: 24px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; position: relative; min-height: 120px; display: flex; flex-direction: column; justify-content: flex-end; }
+        .activity-card { 
+            background: var(--card-bg); border: 1px solid var(--border); padding: 18px; 
+            border-radius: 24px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            text-align: left; position: relative; min-height: 120px; 
+            display: flex; flex-direction: column; justify-content: flex-end; 
+        }
         .activity-card:active { transform: scale(0.95); background: rgba(255,255,255,0.08); }
-        .card-icon-area { position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; border-radius: 12px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border); }
+        
+        .card-icon-area { 
+            position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; 
+            border-radius: 12px; background: rgba(255,255,255,0.05); 
+            display: flex; align-items: center; justify-content: center; 
+            overflow: hidden; border: 1px solid var(--border); 
+        }
         .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
+        
         .count-num { font-size: 1.1rem; font-weight: 800; display: block; margin-bottom: 2px; color: #fff; }
         .count-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
         .time-badge { font-size: 0.6rem; color: var(--accent); margin-bottom: 8px; display: block; opacity: 0.8; font-weight: 600; }
+        
         .activity-card.has-count { border-color: var(--accent); background: linear-gradient(145deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%); }
         .activity-card.missed-alert { border-color: var(--danger); background: linear-gradient(145deg, rgba(255, 68, 68, 0.08) 0%, transparent 100%); }
         .missed-alert .count-num { color: var(--danger); }
+
         .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
         .skeleton { background: linear-gradient(90deg, #111 25%, #1d1d1d 50%, #111 75%); background-size: 200% 100%; animation: loading 1.5s infinite linear; border-radius: 12px; }
         @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
         main-navbar.hidden { display: none !important; }
     </style>
 </head>
@@ -86,7 +226,7 @@
         <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
         <span class="note-username">Your Note</span>
     </div>
-</div>
+    </div>
 
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
@@ -121,77 +261,247 @@
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
 
-<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:200px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
+<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:250px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
     <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
+        <button onclick="pingWorker()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">TEST: Ping Worker</button>
         <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
     </div>
-    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">System Ready.</div>
+    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">Initializing System...</div>
 </div>
 
 <script>
     const logBox = document.getElementById('debug-logs');
-    function debug(msg) {
-        logBox.innerHTML += `<div>> ${msg}</div>`;
+    function debug(msg, type='INFO') {
+        const color = type === 'ERR' ? '#ff5555' : (type === 'OK' ? '#55ff55' : '#ccc');
+        logBox.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+        logBox.scrollTop = logBox.scrollHeight;
         console.log(msg);
     }
+    
+    function pingWorker() {
+        if(!window.notifWorker) return debug("❌ Worker Missing!", "ERR");
+        debug("📡 Pinging worker...");
+        window.notifWorker.postMessage({ type: 'PING' });
+    }
+</script>
+
+<script>
+    // Safe Init for UI - Waits for config.js to run
+    function initUI() {
+        // Wait for config if needed, otherwise rely on window.firebaseConfig
+        if (typeof window.firebaseConfig === 'undefined') {
+            setTimeout(initUI, 100);
+            return;
+        }
+        
+        if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
+        const auth = firebase.auth(), db = firebase.firestore();
+
+        // Clock
+        function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
+        setInterval(updateClock, 1000); updateClock();
+
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                document.getElementById('progress-bar').style.width = '60%';
+                const doc = await db.collection("users").doc(user.uid).get();
+                if (doc.exists) updateUI(doc.data());
+                // Start UI listeners
+                startLiveCounters(user.uid, db);
+                listenNotifications(user.uid, db);
+            } else window.location.href = "login.html";
+        });
+    }
+
+    function updateUI(data) {
+        document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
+        document.getElementById('header-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
+        document.getElementById('my-note-pfp').src = data.photoURL;
+        document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
+        document.getElementById('progress-bar').style.width = '100%';
+        setTimeout(()=>document.getElementById('progress-bar').style.opacity='0', 500);
+    }
+
+    // --- LEGACY LISTENERS RESTORED ---
+    let READ_KEY = "goorac_read_notifs"; 
+
+    function listenNotifications(uid, db) {
+        READ_KEY = `goorac_read_${uid}`;
+        let likeIds = new Set();
+        let followIds = new Set();
+
+        const updateBadgeUI = () => {
+            const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+            let count = 0;
+            
+            likeIds.forEach(id => { if(!readList.includes(id)) count++; });
+            followIds.forEach(id => { if(!readList.includes(id)) count++; });
+
+            const badge = document.getElementById('notif-count'), btn = document.getElementById('notif-btn');
+            if (count > 0) {
+                badge.innerText = count > 9 ? '9+' : count;
+                badge.classList.add('visible');
+                btn.classList.add('has-unread');
+            } else {
+                badge.classList.remove('visible');
+                btn.classList.remove('has-unread');
+            }
+        };
+
+        db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20)
+            .onSnapshot(snapshot => {
+                likeIds.clear(); 
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.likes && Array.isArray(data.likes)) {
+                        data.likes.forEach(liker => {
+                            if (liker.uid !== uid && liker.timestamp) {
+                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                                likeIds.add(`like_${liker.uid}_${timeMillis}`);
+                            }
+                        });
+                    }
+                });
+                updateBadgeUI();
+            });
+
+        db.collection("users").doc(uid).onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                followIds.clear();
+                if (data.followers) {
+                    data.followers.forEach(f => {
+                        if (typeof f === 'object' && f.timestamp) {
+                            const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                            followIds.add(`follow_${f.uid}_${timeMillis}`);
+                        }
+                    });
+                }
+                updateBadgeUI();
+            }
+        });
+        window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
+    }
+
+    function formatTime(ts) {
+        if (!ts) return "";
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        const sec = Math.floor((new Date() - date) / 1000);
+        if (sec < 60) return "Just now";
+        if (sec < 3600) return Math.floor(sec/60) + "m ago";
+        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
+        return Math.floor(sec/86400) + "d ago";
+    }
+
+    function startLiveCounters(uid, db) {
+        db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
+            let latest = null;
+            for (const doc of snap.docs) {
+                const d = doc.data();
+                if ((d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0)) { latest = d; break; }
+            }
+            const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
+            if (latest) {
+                header.innerText = "New Data"; sub.innerText = "From " + (latest.lastSenderName || "User");
+                time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
+                if (latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
+            } else {
+                header.innerText = "Inbox"; sub.innerText = "No new msgs";
+                time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
+                card.classList.remove('has-count'); pfp.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">MSG</div>`;
+            }
+        });
+
+        db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
+            const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
+            if (!snap.empty) {
+                const call = snap.docs[0].data();
+                time.innerText = formatTime(call.timestamp);
+                if (call.receiverId === uid && (call.status === "missed" || call.status === "cancelled")) {
+                    el.innerText = "Missed"; lbl.innerText = call.callerName || "Recent Call";
+                    card.classList.add('missed-alert'); if (call.callerPfp) pfp.innerHTML = `<img src="${call.callerPfp}">`;
+                } else {
+                    el.innerText = "Calls"; lbl.innerText = "Logs stable";
+                    card.classList.remove('missed-alert'); pfp.innerHTML = `<div style="color:var(--text-dim); font-size:10px;">LOG</div>`;
+                }
+            }
+        });
+    }
+
+    initUI();
 </script>
 
 <script type="module">
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
     
-    // --- 1. IMPORT CONFIG (Safe Import) ---
+    // --- 1. IMPORT CONFIG (As Requested) ---
     import { firebaseConfig } from './config.js';
 
-    // --- 2. START UI ---
-    if(firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    // --- 2. PWA INSTALL (SW) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => {
+                    debug("✅ SW Registered", "OK");
+                    if(reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                })
+                .catch(e => debug("❌ SW Fail: " + e, "ERR"));
+        });
+    }
 
-    function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
-    setInterval(updateClock, 1000); updateClock();
+    // --- 3. NOTIFICATION PERMISSION ---
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
 
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            document.getElementById('progress-bar').style.width = '60%';
-            const doc = await db.collection("users").doc(user.uid).get();
-            if (doc.exists) {
-                const data = doc.data();
-                document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
-                document.getElementById('header-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
-                document.getElementById('my-note-pfp').src = data.photoURL;
-                document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
-                document.getElementById('progress-bar').style.width = '100%';
-                setTimeout(()=>document.getElementById('progress-bar').style.opacity='0', 500);
-            }
-            startNotificationWorker(user.uid, firebaseConfig);
-        } else window.location.href = "login.html";
-    });
-
-    // --- 3. WORKER LOGIC (Separated) ---
-    function startNotificationWorker(uid, config) {
-        // Register SW for install only
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(reg => debug("SW Registered")).catch(e => debug("SW Error"));
+    // --- 4. START NOTIFICATION WORKER ---
+    async function initWorkerSystem() {
+        debug("⏳ Waiting for Config...");
+        
+        if (!firebaseConfig) {
+            debug("❌ Config Import Failed", "ERR");
+            return;
         }
+        
+        debug("✅ Config Loaded!", "OK");
 
-        // Start Worker for Logic
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                debug("👤 User Logged In. Starting Worker...", "OK");
+                startNotificationWorker(user.uid, firebaseConfig);
+            } else {
+                debug("👤 No User", "ERR");
+            }
+        });
+    }
+
+    function startNotificationWorker(uid, config) {
         if (window.Worker && !window.notifWorker) {
-            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
-            
-            window.notifWorker.postMessage({
-                type: 'START',
-                uid: uid,
-                config: config
-            });
+            try {
+                window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
+                
+                // Start Worker
+                window.notifWorker.postMessage({
+                    type: 'START',
+                    uid: uid,
+                    config: config
+                });
 
-            // HANDLE MESSAGES HERE (Not in SW)
-            window.notifWorker.onmessage = (e) => {
-                if (e.data.type === 'SHOW_NOTIF') {
-                    debug("🔔 Showing Notification");
-                    showNotification(e.data);
-                }
-            };
+                // LISTEN for command to show notification
+                window.notifWorker.onmessage = (e) => {
+                    if (e.data.type === 'SHOW_NOTIFICATION') {
+                        debug("🔔 Showing Notification");
+                        showNotification(e.data.payload);
+                    }
+                };
+                debug("✅ Worker Started", "OK");
+            } catch (e) {
+                debug("❌ Worker Error: " + e, "ERR");
+            }
         }
     }
 
@@ -201,7 +511,7 @@
             navigator.serviceWorker.ready.then(reg => {
                 reg.showNotification(data.title, {
                     body: data.body,
-                    icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png',
+                    icon: data.icon,
                     vibrate: [200, 100, 200],
                     tag: 'chat-msg',
                     data: { url: data.url }
@@ -209,6 +519,8 @@
             });
         }
     }
+
+    initWorkerSystem();
 </script>
 
 </body>
