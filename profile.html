@@ -66,15 +66,17 @@
             width: 110px; height: 110px; margin-bottom: 16px;
             position: relative;
         }
+        /* Avatar Styling */
         .avatar {
             width: 100%; height: 100%; border-radius: 50%;
             object-fit: cover; background: var(--surface);
             border: 2px solid var(--border);
+            transition: opacity 0.3s ease;
         }
 
-        .user-name { font-size: 24px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .user-name { font-size: 24px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; min-height: 29px; }
         .verified { color: var(--accent); font-size: 20px; }
-        .user-handle { color: var(--secondary); font-size: 15px; font-weight: 500; }
+        .user-handle { color: var(--secondary); font-size: 15px; font-weight: 500; min-height: 18px; }
 
         /* --- ID PILL --- */
         .id-pill {
@@ -92,7 +94,7 @@
 
         .bio {
             margin: 20px 0; color: #d4d4d4; font-size: 14px;
-            line-height: 1.5; max-width: 90%;
+            line-height: 1.5; max-width: 90%; min-height: 20px;
         }
 
         /* --- STATS CARDS --- */
@@ -147,11 +149,13 @@
             font-size: 14px;
         }
 
-        /* --- UTILS --- */
+        /* --- SKELETON ANIMATIONS --- */
         .skeleton {
             background: linear-gradient(90deg, #121212 25%, #1e1e1e 50%, #121212 75%);
             background-size: 200% 100%; animation: shimmer 1.5s infinite;
             color: transparent !important; border-radius: 6px;
+            /* Fix for broken image borders */
+            border-color: transparent !important;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
@@ -178,7 +182,7 @@
 
     <div class="profile-hero">
         <div class="avatar-wrapper">
-            <img id="pfp" class="avatar skeleton" src="" alt="">
+            <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
         </div>
 
         <div class="user-name">
@@ -188,7 +192,7 @@
         
         <div class="user-handle skeleton" id="username" style="width: 100px; margin-top: 4px;">@...</div>
 
-        <div class="id-pill" onclick="copyID()">
+        <div class="id-pill skeleton" id="id-pill-container" onclick="copyID()">
             <span class="id-label">Goorac ID</span>
             <span class="id-value" id="goorac-id">------</span>
             <span class="material-icons-round copy-icon">content_copy</span>
@@ -198,11 +202,11 @@
     </div>
 
     <div class="stats-grid">
-        <a href="followers.html" class="stat-card">
+        <a href="followers.html" class="stat-card skeleton" id="stat-fol">
             <span class="stat-num" id="count-followers">0</span>
             <span class="stat-label">Followers</span>
         </a>
-        <a href="following.html" class="stat-card">
+        <a href="following.html" class="stat-card skeleton" id="stat-fing">
             <span class="stat-num" id="count-following">0</span>
             <span class="stat-label">Following</span>
         </a>
@@ -249,29 +253,39 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap Loading) ---
-    // Reads from localStorage immediately to paint the UI before Firebase loads
+    // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap) ---
     function loadCache() {
         const cached = localStorage.getItem('my_goorac_profile');
+        
         if (cached) {
+            // CASE A: User has visited before -> Load instantly & remove skeletons
             try {
-                console.log("⚡ Loaded from Cache");
+                console.log("⚡ Found cache, loading instantly...");
                 const data = JSON.parse(cached);
-                renderUI(data);
+                renderUI(data); 
             } catch (e) {
                 console.error("Cache parse error", e);
             }
+        } else {
+            // CASE B: First visit -> Do nothing. 
+            // The HTML elements already have the .skeleton class, 
+            // so they will shimmer until Firebase finishes loading.
+            console.log("⏳ First visit, waiting for network...");
         }
     }
-    loadCache(); // Executed instantly
+    
+    // Execute immediately on page load
+    loadCache(); 
 
     // --- 2. AUTH & NETWORK ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             initRealtimeListener(user.uid);
         } else {
-            // Give a small buffer if needed, or redirect immediately
-            window.location.href = 'login.html';
+            // Delay slightly to avoid flash if checking auth state
+            setTimeout(() => {
+               if(!localStorage.getItem('my_goorac_profile')) window.location.href = 'login.html';
+            }, 500);
         }
     });
 
@@ -284,10 +298,9 @@
                 // 1. Update Cache
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                 
-                // 2. Update UI
+                // 2. Update UI (This will remove skeletons if they are still there)
                 renderUI(data);
             } else {
-                // If doc missing, force setup
                 window.location.href = "setup.html";
             }
         });
@@ -295,10 +308,11 @@
 
     // --- 3. RENDER ENGINE ---
     function renderUI(data) {
-        // Remove skeleton loading classes
-        document.querySelectorAll('.skeleton').forEach(el => {
-            el.classList.remove('skeleton');
-            el.style.width = ''; el.style.height = '';
+        // Remove skeleton loading classes from all elements
+        const ids = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.classList.remove('skeleton');
         });
 
         // Safe Text Setters
@@ -310,7 +324,11 @@
         // Image Handling (Prevent flicker)
         const pfp = document.getElementById('pfp');
         const newSrc = data.photoURL || 'https://via.placeholder.com/150/121212/FFFFFF?text=User';
-        if(pfp.src !== newSrc) pfp.src = newSrc;
+        
+        // Only update src if it's different (or if it's the initial placeholder)
+        if(pfp.src !== newSrc && !pfp.src.includes(newSrc)) {
+            pfp.src = newSrc;
+        }
 
         // Badge
         const badge = document.getElementById('verified-badge');
