@@ -3,22 +3,8 @@ import { getFirestore, collection, query, where, onSnapshot } from "https://www.
 
 self.onmessage = async (e) => {
     if (e.data.type === 'START') {
-        self.postMessage({ type: 'LOG', msg: "Worker Listening for " + e.data.uid });
+        // console.log("Worker Started");
         startListening(e.data.uid, e.data.config);
-    }
-    // PING TEST
-    if (e.data.type === 'PING') {
-        self.postMessage({ type: 'LOG', msg: "✅ PONG! Worker is Alive." });
-        // Force a test notification to prove it works
-        self.postMessage({
-            type: 'FOUND_MESSAGE',
-            payload: {
-                title: "Worker Test",
-                body: "This confirms the Worker -> Home -> SW chain is fixed.",
-                icon: "https://cdn-icons-png.flaticon.com/512/3067/3067451.png",
-                url: "chat.html"
-            }
-        });
     }
 };
 
@@ -34,39 +20,26 @@ function startListening(myUid, firebaseConfig) {
     let isFirstRun = true;
 
     onSnapshot(q, (snapshot) => {
-        // Skip existing messages on first load
-        if (isFirstRun) {
-            isFirstRun = false;
-            return;
-        }
+        if (isFirstRun) { isFirstRun = false; return; }
 
         snapshot.docChanges().forEach((change) => {
             if (change.type === "modified") {
                 const data = change.doc.data();
-                
-                // 1. Check Sender (Ignore own)
-                if (data.lastSender === myUid) return;
+                if (data.lastSender === myUid) return; // Ignore own
 
-                // 2. Check Unread
-                const myUnread = data.unreadCount && data.unreadCount[myUid] ? data.unreadCount[myUid] : 0;
+                const myUnread = data.unreadCount?.[myUid] || 0;
                 
-                // 3. Time Window (10 minutes)
+                // Flexible time window (10 mins) to catch everything
                 const now = Date.now();
-                const msgTime = data.lastTimestamp ? data.lastTimestamp.toMillis() : 0;
+                const msgTime = data.lastTimestamp?.toMillis() || 0;
 
                 if (myUnread > 0 && (now - msgTime) < 600000) {
-                    
-                    // console.log("🔔 Real Message Found!");
-
-                    // --- CRITICAL FIX: WRAP IN 'payload' ---
+                    // Send Clean Data to Main Thread
                     self.postMessage({
-                        type: 'FOUND_MESSAGE',
-                        payload: {
-                            title: data.lastSenderName || "New Message",
-                            body: data.lastMessage || "You have a new message",
-                            icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png',
-                            url: `chat.html?user=${data.lastSenderName || 'unknown'}`
-                        }
+                        type: 'SHOW_NOTIF', // Simple Command
+                        title: data.lastSenderName || "New Message",
+                        body: data.lastMessage || "Check your messages",
+                        url: `chat.html?user=${data.lastSenderName || ''}`
                     });
                 }
             }
