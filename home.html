@@ -206,6 +206,8 @@
 </head>
 <body oncontextmenu="return false;"> 
 
+    
+
 <div id="progress-bar"></div>
 
 <header>
@@ -220,6 +222,62 @@
         <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
     </div>
 </header>
+<div id="debug-console" style="position:fixed; top:0; left:0; width:100%; height:200px; background:rgba(0,0,0,0.9); color:#0f0; z-index:9999; overflow:auto; font-family:monospace; font-size:12px; padding:10px; pointer-events:none; display:block;">
+    <strong>DEBUG LOG:</strong><br>
+</div>
+<div style="position:fixed; top:210px; left:0; width:100%; z-index:9999; display:flex; gap:5px;">
+    <button onclick="testSW()" style="flex:1; padding:15px; background:blue; color:white;">1. Test SW</button>
+    <button onclick="testWorkerBridge()" style="flex:1; padding:15px; background:orange; color:white;">2. Test Bridge</button>
+</div>
+
+<script>
+    function log(msg) {
+        const d = document.getElementById('debug-console');
+        d.innerHTML += `> ${msg}<br>`;
+        d.scrollTop = d.scrollHeight;
+        console.log(msg);
+    }
+
+    // 1. TEST DIRECT NOTIFICATION (Does your phone allow it?)
+    function testSW() {
+        log("Testing Service Worker Notification...");
+        if (!('serviceWorker' in navigator)) return log("❌ SW Not Supported");
+        
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (!reg) return log("❌ No SW Found. Reload page.");
+            
+            // Force a notification directly
+            reg.showNotification("System Check", {
+                body: "If you see this, permissions are OK!",
+                icon: "https://cdn-icons-png.flaticon.com/512/3067/3067451.png"
+            }).then(() => log("✅ Notification Request Sent"))
+              .catch(e => log("❌ Notification Failed: " + e));
+        });
+    }
+
+    // 2. TEST WORKER CONNECTION (Is the invisible script running?)
+    function testWorkerBridge() {
+        log("Testing Worker Connection...");
+        if (!window.notifWorker) return log("❌ Worker not loaded yet");
+        
+        // Force the worker to reply
+        window.notifWorker.postMessage({ type: 'PING' });
+    }
+
+    // LISTEN FOR WORKER REPLIES
+    window.addEventListener('load', () => {
+        log("Page Loaded. Checking Permissions...");
+        log("Permission: " + Notification.permission);
+        
+        if (Notification.permission !== 'granted') {
+            log("❌ PERMISSION DENIED. Click 'Enable'!");
+        }
+
+        navigator.serviceWorker.ready.then(reg => {
+            log("✅ Service Worker Ready: " + reg.scope);
+        });
+    });
+</script>
 
 <div id="notes-container">
     <div class="note-item" id="my-note-btn">
@@ -523,3 +581,4 @@
 
 </body>
 </html>
+
