@@ -4,7 +4,7 @@ import { getFirestore, collection, query, where, onSnapshot } from "https://www.
 let db;
 let unsubscribe = null;
 
-// 1. Listen for the "Start" command from the Home Page
+// 1. Listen for START command from config.js
 self.onmessage = async (e) => {
     if (e.data.type === 'START') {
         const { uid, config } = e.data;
@@ -13,43 +13,40 @@ self.onmessage = async (e) => {
 };
 
 function startBackgroundListener(myUid, firebaseConfig) {
-    if (unsubscribe) return; // Already running
+    if (unsubscribe) return; // Prevent double starting
 
-    // Initialize Firebase inside the Worker
+    // Initialize a separate Firebase instance for this thread
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
 
-    console.log("👷 Notification Worker: Started for user", myUid);
+    self.postMessage({ type: 'LOG', msg: `Listening for messages for user: ${myUid}` });
 
-    // 2. Query: Find all chats where I am a participant
+    // 2. Query: Find chats where I am a participant
     const q = query(
         collection(db, "chats"),
         where("participants", "array-contains", myUid)
     );
 
-    // 3. Real-time Listener
+    // 3. Real-time Listener (Runs in background)
     unsubscribe = onSnapshot(q, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
             const data = change.doc.data();
             
-            // We only care if a message was ADDED or MODIFIED (New message arrived)
+            // Only care about Modified/Added chats
             if (change.type === "added" || change.type === "modified") {
                 
-                // CHECK 1: Did someone else send the last message?
+                // Rule 1: Not sent by me
                 if (data.lastSender && data.lastSender !== myUid) {
                     
-                    // CHECK 2: Do I have unread messages?
-                    // Access the nested unread count: unreadCount['myUid']
+                    // Rule 2: I have unread messages
                     const myUnread = data.unreadCount ? data.unreadCount[myUid] : 0;
 
                     if (myUnread > 0) {
-                        // CHECK 3: Is this actually a NEW update? (Prevent spam on reload)
-                        // We compare the timestamp roughly to "now" to ensure we don't notify for old stuff
+                        // Rule 3: Must be RECENT (sent in last 10 seconds)
+                        // This prevents 50 notifications popping up when you refresh the page
                         const msgTime = data.lastTimestamp ? data.lastTimestamp.toMillis() : 0;
                         const now = Date.now();
                         
-                        // Only notify if message is recent (less than 10 seconds old)
-                        // OR if it's the first time we are loading and we see unread items
                         if (now - msgTime < 10000) { 
                             sendNotification(data);
                         }
@@ -61,16 +58,15 @@ function startBackgroundListener(myUid, firebaseConfig) {
 }
 
 function sendNotification(chatData) {
-    const title = `New Message`;
+    const title = "New Message";
     const body = chatData.lastMessage || "You have a new message";
     
-    // We assume the worker cannot open windows, so we use the Notification API
-    // The click action is handled by the browser focusing the tab
+    // Check Permission inside Worker
     if (Notification.permission === "granted") {
         new Notification(title, {
             body: body,
-            icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png', // App Icon
-            tag: 'chat-msg', // Prevents duplicate stacks
+            icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png', // Goorac Icon
+            tag: 'chat-msg', // Prevents stack of identical notifications
             vibrate: [200, 100, 200]
         });
     }
