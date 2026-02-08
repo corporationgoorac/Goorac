@@ -55,7 +55,7 @@
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
             transition: background 0.2s;
-            touch-action: pan-y; /* Fixes scroll/touch conflict */
+            touch-action: pan-y;
             position: relative;
         }
         .chat-item:active { background: var(--glass); }
@@ -79,7 +79,7 @@
         .follow-btn { 
             background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
             padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-            pointer-events: auto; /* Buttons must be clickable */
+            pointer-events: auto; /* MUST BE AUTO TO CLICK */
         }
 
         .unread-badge { 
@@ -202,6 +202,7 @@
     
     // Interaction Variables
     let longPressTimer;
+    let isLongPress = false;
     let activeChatId = null;
     let searchTimeout = null;
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
@@ -258,7 +259,6 @@
                 return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
             });
 
-            // Rebuild DOM with fresh Event Listeners
             if(results.length > 0) list.innerHTML = "";
 
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
@@ -278,12 +278,24 @@
 
                 const finalName = u.name || u.displayName || u.username || "Unknown";
                 const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+                
+                // Safe JSON for handlers
+                const safeUserStr = encodeURIComponent(JSON.stringify({
+                    name: finalName,
+                    username: u.username,
+                    photoURL: u.photoURL,
+                    verified: u.verified
+                }));
 
-                // --- BUILD ITEM (DOM API for Reliability) ---
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
-                // HTML Content
+                // --- FIXED TOUCH LOGIC (INLINE ATTRIBUTES FOR CACHE PERSISTENCE) ---
+                item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
+                item.setAttribute("ontouchend", "endLongPress(this)");
+                item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
+                item.setAttribute("onclick", `enterChat(event, '${u.username}')`); // One tap logic
+
                 item.innerHTML = `
                     <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
                     <div class="chat-info">
@@ -300,50 +312,14 @@
                                 ${lastMsg}
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                                ${!amIFollowing ? `<button class="follow-btn" data-user="${u.username}">Profile</button>` : ''}
+                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
                                 ${isUnread ? `<div class="unread-badge">${displayCount}</div>` : ''}
                             </div>
                         </div>
                     </div>
                 `;
-
-                // --- ROBUST EVENT HANDLERS ---
-                let isLongPress = false;
-
-                // 1. CLICK (Navigation)
-                item.addEventListener('click', (e) => {
-                    // Ignore if long press happened or clicking a button inside
-                    if (isLongPress || e.target.closest('button')) return;
-                    
-                    // Simple, direct navigation
-                    window.location.href = `chat.html?user=${u.username}`;
-                });
-
-                // 2. LONG PRESS (Menu)
-                item.addEventListener('touchstart', () => {
-                    isLongPress = false;
-                    longPressTimer = setTimeout(() => {
-                        isLongPress = true; // Flag to block click
-                        if(navigator.vibrate) navigator.vibrate(30);
-                        openDeleteMenu(id, isPinned, u);
-                    }, 600);
-                }, { passive: true });
-
-                item.addEventListener('touchend', () => clearTimeout(longPressTimer));
-                item.addEventListener('touchmove', () => clearTimeout(longPressTimer)); // Scroll cancels press
-
-                // 3. PROFILE BUTTON (If exists)
-                const profileBtn = item.querySelector('.follow-btn');
-                if(profileBtn) {
-                    profileBtn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Stop bubble to item
-                        window.location.href = `profile.html?user=${u.username}`;
-                    });
-                }
-
                 list.appendChild(item);
-
-                // Typing Status
+                
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
@@ -351,13 +327,45 @@
                     else { msgEl.innerHTML = lastMsg; }
                 });
             });
-
+            
             if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#333; font-weight:700;'>No data in this frequency.</p>";
 
             // Save Cache
             localStorage.setItem('goorac_inbox_html', list.innerHTML);
         });
     }
+
+    // --- GLOBAL HANDLERS (MUST BE ON WINDOW) ---
+    
+    window.startLongPress = function(el, chatId, isPinned, userStr) {
+        isLongPress = false;
+        const u = JSON.parse(decodeURIComponent(userStr));
+        
+        longPressTimer = setTimeout(() => {
+            isLongPress = true; // Long Press Detected
+            if(navigator.vibrate) navigator.vibrate(30);
+            openDeleteMenu(chatId, isPinned, u);
+        }, 600);
+    };
+
+    window.cancelLongPress = function(el) {
+        clearTimeout(longPressTimer);
+    };
+
+    window.endLongPress = function(el) {
+        clearTimeout(longPressTimer);
+    };
+
+    window.enterChat = function(e, username) {
+        // Prevent if long press happened or clicking a button
+        if(isLongPress || e.target.closest('button')) return;
+        window.location.href = `chat.html?user=${username}`;
+    };
+
+    window.visitProfile = function(e, username) {
+        e.stopPropagation();
+        window.location.href = `profile.html?user=${username}`;
+    };
 
     // --- MENU ACTIONS ---
 
@@ -396,7 +404,7 @@
         }
     }
 
-    function closeDeleteMenu(shouldGoBack) {
+    window.closeDeleteMenu = function(shouldGoBack) {
         activeChatId = null;
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
@@ -424,7 +432,7 @@
 
     // --- SEARCH ---
 
-    function handleSearch(val) {
+    window.handleSearch = function(val) {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => searchUsers(val), 400);
     }
