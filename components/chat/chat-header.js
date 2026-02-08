@@ -8,29 +8,41 @@ export class ChatHeader extends HTMLElement {
     render() {
         this.innerHTML = `
         <style>
-            /* --- FIX: Apply positioning to the Component Host --- */
+            /* --- HOST STYLES (Fixed Position at Top) --- */
             :host {
                 display: block;
                 position: absolute;
-                top: 0; left: 0; right: 0;
-                /* Higher z-index ensures it sits ABOVE the scrollable message list */
-                z-index: 2000; 
+                top: 0; 
+                left: 0; 
+                right: 0;
+                margin-top: 0;
+                z-index: 2000; /* High z-index to stay above message list */
                 height: calc(60px + env(safe-area-inset-top));
-                pointer-events: none; /* Allows clicks to pass through transparent areas if any */
+                pointer-events: none; /* Allows clicks to pass through if transparent */
             }
 
-            /* Main Header Bar */
+            /* --- MAIN HEADER BAR --- */
             header { 
                 pointer-events: auto; /* Re-enable clicks on the header content */
+                box-sizing: border-box;
                 padding: 0 16px;
                 padding-top: calc(env(safe-area-inset-top) + 10px);
                 height: 100%;
+                width: 100%;
+                
+                /* Visual Style */
                 background: var(--header-bg, rgba(0,0,0,0.96)); 
                 border-bottom: 1px solid var(--border, #262626); 
-                display: flex; align-items: center; gap: 12px; 
-                backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+                backdrop-filter: blur(25px); 
+                -webkit-backdrop-filter: blur(25px);
+                
+                /* Layout */
+                display: flex; 
+                align-items: center; 
+                gap: 12px; 
             }
 
+            /* --- BACK BUTTON --- */
             .back-btn { 
                 font-size: 1.8rem; 
                 color: var(--accent, #0095f6); 
@@ -40,8 +52,10 @@ export class ChatHeader extends HTMLElement {
                 justify-content: center; 
                 height: 40px; 
                 width: 30px; 
+                -webkit-tap-highlight-color: transparent;
             }
 
+            /* --- PROFILE SECTION --- */
             .h-profile-group { 
                 display: flex; 
                 align-items: center; 
@@ -49,6 +63,7 @@ export class ChatHeader extends HTMLElement {
                 cursor: pointer; 
                 flex: 1; 
                 overflow: hidden; 
+                -webkit-tap-highlight-color: transparent;
             }
             
             .pfp-container { 
@@ -113,7 +128,7 @@ export class ChatHeader extends HTMLElement {
                 text-overflow: ellipsis; 
             }
             
-            /* Loading Shimmer */
+            /* Loading Shimmer Effect */
             .loading-shimmer { 
                 background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%); 
                 background-size: 400px 100%; 
@@ -125,6 +140,7 @@ export class ChatHeader extends HTMLElement {
                 100% { background-position: 200px 0; } 
             }
             
+            /* Placeholder for name when loading */
             .h-name:empty { 
                 height: 16px; 
                 width: 120px; 
@@ -147,6 +163,7 @@ export class ChatHeader extends HTMLElement {
                 display: none; 
             }
 
+            /* --- ACTION BUTTONS (Calls) --- */
             .header-actions { 
                 display: flex; 
                 align-items: center; 
@@ -162,6 +179,7 @@ export class ChatHeader extends HTMLElement {
                 fill: #ffffff; 
                 opacity: 0.9; 
                 transition: transform 0.2s, opacity 0.2s; 
+                -webkit-tap-highlight-color: transparent;
             }
             
             .header-icon:active { 
@@ -213,63 +231,64 @@ export class ChatHeader extends HTMLElement {
     }
 
     attachEvents() {
-        // Back Button
-        this.dom.backBtn.addEventListener('click', () => history.back());
+        // Back Button Logic
+        this.dom.backBtn.addEventListener('click', () => {
+            if (window.history.length > 1) {
+                history.back();
+            } else {
+                window.location.href = 'index.html'; // Fallback
+            }
+        });
 
-        // Profile Click (Dispatches event so main script can handle navigation)
+        // Profile Click (Bubbles event to main script)
         this.dom.profileGroup.addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('profile-click', { bubbles: true, composed: true }));
         });
 
-        // Call Buttons (Defaulting to your href logic, or dispatching events)
+        // Call Buttons (Redirects)
         this.dom.audioBtn.addEventListener('click', () => window.location.href = 'calls.html');
         this.dom.videoBtn.addEventListener('click', () => window.location.href = 'calls.html');
     }
 
-    // --- MAIN METHODS TO CALL FROM chat.html ---
+    // --- PUBLIC METHODS (Called by chat.html) ---
 
     /**
-     * Sets the user profile data.
-     * @param {Object} user - The user object from Firebase
+     * Updates the user profile section (Name, PFP, Badge)
      */
     setUserData(user) {
         if (!user) return;
         
-        // Update PFP
         this.dom.pfp.classList.remove('loading-shimmer');
         this.dom.pfp.src = user.photoURL || 'https://via.placeholder.com/150';
-
-        // Update Text
         this.dom.displayName.innerText = user.name || user.username;
         this.dom.usernameLabel.innerText = `@${user.username}`;
         
-        // Verified Badge
         if (user.verified === true) {
             this.dom.badge.style.display = 'block';
+        } else {
+            this.dom.badge.style.display = 'none';
         }
     }
 
     /**
-     * Updates the status (Online, Offline, Typing)
-     * @param {boolean} isTyping - Is the user currently typing?
-     * @param {boolean} isOnline - Is the user connected?
-     * @param {number} lastChanged - Timestamp of last status change
+     * Updates the text below the name (Active Now, Last Seen, Typing...)
      */
     setStatus(isTyping, isOnline, lastChanged) {
-        // Priority 1: Typing
+        // 1. Typing takes priority
         if (isTyping) {
             this.dom.usernameLabel.innerText = "Typing...";
             this.dom.usernameLabel.style.color = "#00e676";
-            this.dom.onlineDot.style.display = 'block'; // Keep green dot while typing
+            this.dom.onlineDot.style.display = 'block'; 
             return;
         }
 
-        // Priority 2: Online/Offline
+        // 2. Online status
         if (isOnline) {
             this.dom.onlineDot.style.display = 'block';
             this.dom.usernameLabel.innerText = "Active now";
             this.dom.usernameLabel.style.color = "#00e676";
         } else {
+            // 3. Offline / Last Seen
             this.dom.onlineDot.style.display = 'none';
             this.dom.usernameLabel.innerText = this._formatActiveTime(lastChanged);
             this.dom.usernameLabel.style.color = "var(--text-secondary, #a8a8a8)";
@@ -280,9 +299,8 @@ export class ChatHeader extends HTMLElement {
 
     _formatActiveTime(timestamp) {
         if (!timestamp) return "";
-        const now = Date.now();
-        const diff = now - timestamp;
-        if (diff < 60000) return "Active now";
+        const diff = Date.now() - timestamp;
+        if (diff < 60000) return "Active now"; // Buffer for quick disconnects
         return "Active " + this._timeAgo(new Date(timestamp));
     }
 
