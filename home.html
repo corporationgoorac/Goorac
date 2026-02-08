@@ -1,16 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
-
-    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
-    <script src="config.js"></script>
+    <script src="config.js" type="module"></script>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -20,63 +17,7 @@
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
-<script type="module">
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 
-    // --- 1. PWA Service Worker Registration ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('✅ Service Worker Registered'))
-                .catch(err => console.log('❌ Service Worker Failed', err));
-        });
-    }
-
-    // --- 2. Notification Permissions ---
-    // Ask immediately when the user visits the home page
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
-
-    // --- 3. Start Background Worker (When Logged In) ---
-    // We rely on window.firebaseConfig which comes from config.js
-    if (window.firebaseConfig) {
-        const app = initializeApp(window.firebaseConfig);
-        const auth = getAuth(app);
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                startNotificationWorker(user.uid);
-            }
-        });
-    } else {
-        console.error("⚠️ Firebase Config not found. Make sure config.js is loaded first.");
-    }
-
-    function startNotificationWorker(uid) {
-        // Prevent starting multiple workers
-        if (window.Worker && !window.notifWorker) {
-            console.log("🚀 Starting Background Notification Worker...");
-            
-            // Create the worker thread
-            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
-            
-            // Send the keys and User ID to the worker
-            window.notifWorker.postMessage({
-                type: 'START',
-                uid: uid,
-                config: window.firebaseConfig
-            });
-
-            // Optional: Listen for logs from worker
-            window.notifWorker.onmessage = (e) => {
-                if (e.data.type === 'LOG') console.log('[Worker]', e.data.msg);
-            };
-        }
-    }
-</script>
-    
     <style>
         :root {
             --bg: #000;
@@ -285,7 +226,7 @@
         <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
         <span class="note-username">Your Note</span>
     </div>
-    </div>
+</div>
 
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
@@ -321,20 +262,23 @@
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    // --- FIREBASE INIT ---
-    let fbConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
+    // Initialize with config from config.js
+    let fbConfig;
+    if (typeof window.firebaseConfig !== 'undefined') {
+        fbConfig = window.firebaseConfig;
+    } else if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
+        fbConfig = window.CONFIG.firebase;
+    } else {
+        console.error("Firebase Config missing! Ensure config.js is loaded.");
+    }
 
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) fbConfig = window.CONFIG.firebase;
-    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
-    const auth = firebase.auth(), db = firebase.firestore(), prog = document.getElementById('progress-bar');
+    if (fbConfig && !firebase.apps.length) {
+        firebase.initializeApp(fbConfig);
+    }
+
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const prog = document.getElementById('progress-bar');
     
     let READ_KEY = "goorac_read_notifs"; 
 
@@ -388,7 +332,6 @@
 
     // --- UNIFIED NOTIFICATION LISTENER ---
     function listenNotifications(uid) {
-        // Sets to track unique IDs
         let likeIds = new Set();
         let followIds = new Set();
 
@@ -396,7 +339,6 @@
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
             
-            // Count unique unseen items
             likeIds.forEach(id => { if(!readList.includes(id)) count++; });
             followIds.forEach(id => { if(!readList.includes(id)) count++; });
 
@@ -412,20 +354,17 @@
         };
 
         // 1. LISTEN TO LIKES (From 'notes' collection)
-        // Check my last 20 notes for new likes
         db.collection("notes")
             .where("uid", "==", uid)
             .orderBy("createdAt", "desc")
             .limit(20)
             .onSnapshot(snapshot => {
-                likeIds.clear(); // Refresh to handle unlikes
+                likeIds.clear(); 
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     if (data.likes && Array.isArray(data.likes)) {
                         data.likes.forEach(liker => {
-                            // Don't notify for self-likes
                             if (liker.uid !== uid && liker.timestamp) {
-                                // Consistent ID generation
                                 const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                                 const notifId = `like_${liker.uid}_${timeMillis}`;
                                 likeIds.add(notifId);
@@ -443,7 +382,6 @@
                 followIds.clear();
                 if (data.followers && Array.isArray(data.followers)) {
                     data.followers.forEach(f => {
-                        // Check if follower object has timestamp
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}_${timeMillis}`;
@@ -455,7 +393,6 @@
             }
         });
 
-        // Sync if reading on another tab
         window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
     }
 
@@ -503,7 +440,88 @@
         window.lastTouch = now;
     }, false);
 </script>
+
+<script type="module">
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+
+    // --- 1. PWA Service Worker Registration ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('✅ Service Worker Registered'))
+                .catch(err => console.log('❌ Service Worker Failed', err));
+        });
+    }
+
+    // --- 2. Notification Permissions ---
+    // Ask immediately when the user visits the home page
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    // --- 3. Start Background Worker (When Logged In) ---
+    function initNotificationSystem() {
+        // Wait for config.js to load into window
+        if (!window.firebaseConfig) {
+            setTimeout(initNotificationSystem, 500);
+            return;
+        }
+
+        const app = initializeApp(window.firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                startNotificationWorker(user.uid);
+            }
+        });
+    }
+
+    function startNotificationWorker(uid) {
+        // Prevent starting multiple workers
+        if (window.Worker && !window.notifWorker) {
+            console.log("🚀 Starting Background Notification Worker...");
+            
+            // Create the worker thread
+            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
+            
+            // Send the keys and User ID to the worker
+            window.notifWorker.postMessage({
+                type: 'START',
+                uid: uid,
+                config: window.firebaseConfig
+            });
+
+            // Listen for logs from worker
+            window.notifWorker.onmessage = (e) => {
+                if (e.data.type === 'LOG') console.log('[Worker]', e.data.msg);
+                
+                // CRITICAL: Connect Worker -> Main Page -> Service Worker
+                if (e.data.type === 'FOUND_MESSAGE') {
+                    showPersistentNotification(e.data);
+                }
+            };
+        }
+    }
+
+    // Helper to show notification via Service Worker (Required for Mobile)
+    function showPersistentNotification(data) {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(data.title, {
+                    body: data.body,
+                    icon: data.icon,
+                    vibrate: [200, 100, 200],
+                    tag: 'chat-msg',
+                    data: { url: data.url }
+                });
+            });
+        }
+    }
+
+    initNotificationSystem();
+</script>
+
 </body>
 </html>
-
-
