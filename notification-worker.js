@@ -3,7 +3,6 @@ import { getFirestore, collection, query, where, onSnapshot } from "https://www.
 
 self.onmessage = async (e) => {
     if (e.data.type === 'START') {
-        console.log("🔧 TEST WORKER STARTED: Listening for UID", e.data.uid);
         startListening(e.data.uid, e.data.config);
     }
 };
@@ -12,30 +11,52 @@ function startListening(myUid, firebaseConfig) {
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Query: Chats where I am a participant
     const q = query(
         collection(db, "chats"),
         where("participants", "array-contains", myUid)
     );
 
+    let isFirstRun = true;
+
     onSnapshot(q, (snapshot) => {
+        // Skip the initial load to prevent spamming old notifications
+        if (isFirstRun) {
+            isFirstRun = false;
+            return;
+        }
+
         snapshot.docChanges().forEach((change) => {
-            // DEBUG: Log everything
-            console.log("🔥 DB CHANGE DETECTED:", change.type);
-            
-            // IGNORE "added" on first load (too noisy), only look for "modified"
             if (change.type === "modified") {
                 const data = change.doc.data();
+
+                // 1. Ignore my own messages
+                if (data.lastSender === myUid) return;
+
+                // 2. Check Unread Count
+                const myUnread = data.unreadCount && data.unreadCount[myUid] ? data.unreadCount[myUid] : 0;
                 
-                console.log("🔔 SENDING NOTIFICATION SIGNAL...");
+                // 3. Check Timestamp (Must be recent, e.g., last 60 seconds)
+                const now = Date.now();
+                const msgTime = data.lastTimestamp ? data.lastTimestamp.toMillis() : 0;
                 
-                // SEND SIGNAL TO MAIN PAGE (Even if it's my own message)
-                self.postMessage({
-                    type: 'FOUND_MESSAGE',
-                    title: "Test Notification",
-                    body: data.lastMessage || "Database updated!",
-                    icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png',
-                    url: `chat.html?user=${data.lastSender}` 
-                });
+                if (myUnread > 0 && (now - msgTime) < 60000) {
+                    // Determine Body Text
+                    let body = data.lastMessage || "New Message";
+                    if (data.imageUrl && !data.text) body = "📷 Sent a photo";
+                    if (data.fileUrl && !data.text) body = "📄 Sent a file";
+
+                    // Send to Main Thread
+                    self.postMessage({
+                        type: 'FOUND_MESSAGE',
+                        payload: {
+                            title: "New Message",
+                            body: body,
+                            icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png',
+                            url: `chat.html?user=${data.lastSenderName || 'unknown'}`
+                        }
+                    });
+                }
             }
         });
     });
