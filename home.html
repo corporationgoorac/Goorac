@@ -152,7 +152,7 @@
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({
                 type: 'SHOW_NOTIFICATION',
-                payload: { title: 'Test', body: 'This is a test', icon: 'https://cdn-icons-png.flaticon.com/512/3067/3067451.png' }
+                payload: { title: 'Test', body: 'This is a test', icon: 'https://via.placeholder.com/50' }
             });
             debug("✅ Request Sent to SW", "OK");
         } else {
@@ -316,22 +316,16 @@
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
                 .then(reg => {
-                    console.log('✅ Service Worker Registered');
-                    // Force update if one is waiting
-                    if (reg.waiting) {
-                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    }
+                    debug("✅ SW Registered", "OK");
+                    if(reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                 })
-                .catch(err => console.log('❌ Service Worker Failed', err));
+                .catch(e => debug("❌ SW Fail: " + e, "ERR"));
         });
     }
 
-    // 2. Notification Permissions
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
+    if (Notification.permission !== "granted") Notification.requestPermission();
 
-    // 3. WAIT FOR CONFIG (The Fix)
+    // 2. WAIT FOR CONFIG (The Fix)
     async function waitForConfig() {
         while (!window.firebaseConfig) {
             await new Promise(resolve => setTimeout(resolve, 100));
