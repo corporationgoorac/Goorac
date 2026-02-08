@@ -228,6 +228,75 @@
     </div>
 </div>
 
+
+
+
+<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:300px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
+    <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
+        <button onclick="testSW()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">1. Test Notification</button>
+        <button onclick="pingWorker()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">2. Ping Worker</button>
+        <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
+    </div>
+    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">Waiting for logs...</div>
+</div>
+
+<script>
+    // 1. OVERRIDE CONSOLE.LOG to print to screen
+    const realLog = console.log;
+    const logBox = document.getElementById('debug-logs');
+    
+    function logToScreen(msg, type='INFO') {
+        const line = document.createElement('div');
+        line.style.color = type === 'ERR' ? '#ff5555' : (type === 'OK' ? '#55ff55' : '#ccffcc');
+        line.textContent = `> ${msg}`;
+        logBox.appendChild(line);
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    console.log = (...args) => {
+        realLog(...args);
+        logToScreen(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' '));
+    };
+
+    console.error = (...args) => {
+        realLog(...args);
+        logToScreen(args.join(' '), 'ERR');
+    };
+
+    // 2. TEST FUNCTIONS
+    function testSW() {
+        console.log("--- TESTING NOTIFICATION ---");
+        if (Notification.permission !== "granted") {
+            return console.error("❌ Permission is " + Notification.permission);
+        }
+        
+        if (!navigator.serviceWorker.controller) {
+            return console.error("❌ Service Worker is NOT controlling this page. Reload!");
+        }
+
+        navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification("System Test", {
+                body: "Service Worker is active!",
+                icon: "https://cdn-icons-png.flaticon.com/512/3067/3067451.png"
+            }).then(() => console.log("✅ Notification Sent to System"))
+              .catch(e => console.error("❌ Notification Failed", e));
+        });
+    }
+
+    function pingWorker() {
+        console.log("--- PINGING WORKER ---");
+        if (!window.notifWorker) {
+            return console.error("❌ Worker Object is Missing!");
+        }
+        window.notifWorker.postMessage({ type: 'PING' });
+        console.log("📡 Ping sent... waiting for reply...");
+    }
+</script>
+    
+
+
+
+    
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
     <div class="welcome-card">
@@ -520,3 +589,4 @@
 
 </body>
 </html>
+
