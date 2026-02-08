@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goorac-quantum-v6';
+const CACHE_NAME = 'goorac-quantum-v8';
 const ASSETS = [
     '/',
     '/home.html',
@@ -34,5 +34,16 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('notificationclick', (e) => {
     e.notification.close();
     const url = e.notification.data?.url || '/home.html';
-    e.waitUntil(clients.openWindow(url));
+    
+    e.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+            for (const client of clientList) {
+                if (client.url.includes(url.split('?')[0]) && 'focus' in client) {
+                    if (url.includes('?')) client.navigate(url);
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) return clients.openWindow(url);
+        })
+    );
 });
