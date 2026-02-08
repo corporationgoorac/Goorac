@@ -113,7 +113,7 @@
             min-width: 70px; cursor: pointer; position: relative;
         }
         
-        /* STRICT SIZING TO PREVENT FULL SCREEN BUG */
+        /* STRICT SIZING TO PREVENT BUGS */
         .note-pfp {
             width: 65px; height: 65px; 
             min-width: 65px; min-height: 65px;
@@ -206,25 +206,21 @@
         }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* --- NAVBAR & MODAL CONTROL --- */
-        
-        /* Force Modal above everything */
-        view-notes {
-            z-index: 9999 !important;
-            position: relative;
-        }
-
-        /* Navbar Transition */
+        /* --- NAVBAR HIDING UTILS (Crucial for Fix) --- */
         main-navbar {
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: fixed; bottom: 0; left: 0; right: 0;
             z-index: 1000;
         }
-        
-        /* Hidden State for Navbar */
+        /* Uses important to override any inline styles or default display */
         main-navbar.hidden-nav {
-            transform: translateY(150%);
-            opacity: 0;
-            pointer-events: none;
+            transform: translateY(150%) !important;
+            pointer-events: none !important;
+        }
+        
+        view-notes {
+            z-index: 9999 !important; /* Above navbar */
+            position: relative;
         }
 
         /* --- INSTALL POPUP --- */
@@ -351,6 +347,37 @@
         }
     })();
 
+    // --- NAVBAR HIDER (Logic to hide nav when modal opens) ---
+    // Watches the view-notes component for active state
+    document.addEventListener('DOMContentLoaded', () => {
+        const noteViewer = document.getElementById('note-viewer');
+        const mainNav = document.getElementById('main-nav');
+        
+        if (noteViewer && mainNav) {
+            // Force reset on load
+            mainNav.classList.remove('hidden-nav');
+
+            const observer = new MutationObserver((mutations) => {
+                const style = window.getComputedStyle(noteViewer);
+                // Check multiple conditions to determine if it's visible
+                const isVisible = 
+                    (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
+                    noteViewer.classList.contains('open') || 
+                    noteViewer.classList.contains('active') ||
+                    noteViewer.hasAttribute('open');
+
+                if (isVisible) {
+                    mainNav.classList.add('hidden-nav');
+                } else {
+                    mainNav.classList.remove('hidden-nav');
+                }
+            });
+            
+            // Watch everything relevant
+            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+        }
+    });
+
     // Helper: Save State
     function saveHomeState() {
         const state = {
@@ -374,32 +401,6 @@
         };
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
-
-    // --- NAVBAR HIDER (Logic to hide nav when modal opens) ---
-    // We observe the note-viewer component for attribute changes
-    document.addEventListener('DOMContentLoaded', () => {
-        const noteViewer = document.getElementById('note-viewer');
-        const mainNav = document.getElementById('main-nav');
-        
-        if (noteViewer && mainNav) {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    // Check if the element is visible
-                    const style = window.getComputedStyle(noteViewer);
-                    const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-                    const hasClass = noteViewer.classList.contains('open') || noteViewer.classList.contains('active');
-
-                    if (isVisible || hasClass) {
-                        mainNav.classList.add('hidden-nav');
-                    } else {
-                        mainNav.classList.remove('hidden-nav');
-                    }
-                });
-            });
-            // Observe style and class changes
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class'] });
-        }
-    });
 
     // --- PWA INSTALL ---
     let deferredPrompt;
@@ -542,7 +543,7 @@
     }
 
     function startLiveCounters(uid) {
-        // Messages
+        // Msg
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
             let latest = null;
             for (const doc of snap.docs) {
