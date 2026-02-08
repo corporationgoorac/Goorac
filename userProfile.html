@@ -147,14 +147,16 @@
             font-size: 14px;
         }
 
-        /* --- UTILS --- */
+        /* --- SKELETON ANIMATIONS --- */
         .skeleton {
             background: linear-gradient(90deg, #121212 25%, #1e1e1e 50%, #121212 75%);
             background-size: 200% 100%; animation: shimmer 1.5s infinite;
-            color: transparent !important; border-radius: 6px;
+            color: transparent !important; border-radius: 6px; user-select: none;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .hide { display: none !important; }
+        
+        /* Ensure skeleton buttons don't have borders/shadows while loading */
+        button.skeleton { border: none !important; box-shadow: none !important; pointer-events: none; }
 
         /* --- TOAST --- */
         #toast {
@@ -214,7 +216,7 @@
 
     <div class="action-row" id="action-container">
         <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">Follow</button>
-        <button class="btn btn-msg skeleton" onclick="openChat()">Message</button>
+        <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">Message</button>
     </div>
 
     <div class="tabs">
@@ -260,21 +262,28 @@
     // --- 1. CACHE LOADING (Immediate) ---
     function loadFromCache() {
         if(!targetUsername) return;
-        // Unique cache key for each user
         const key = `goorac_user_${targetUsername}`;
         const cached = localStorage.getItem(key);
         
         if (cached) {
             try {
-                console.log("⚡ Loaded from Cache");
                 const data = JSON.parse(cached);
                 targetUserData = data;
-                targetUid = data.uid;
-                renderUI(data);
-            } catch (e) {
-                console.error("Cache error", e);
-            }
+                targetUid = data.uid; // Retrieve cached UID
+                
+                console.log("⚡ Loaded from Cache");
+                renderUI(data); // Render Text/Images
+                
+                // Render Button State if cached
+                if (data.hasOwnProperty('amIFollowing')) {
+                    updateFollowBtnUI(data.amIFollowing);
+                    // Remove skeleton from button immediately
+                    document.getElementById('btn-follow').classList.remove('skeleton');
+                    document.getElementById('btn-msg').classList.remove('skeleton');
+                }
+            } catch (e) { console.error("Cache error", e); }
         }
+        // If NO cache, skeleton CSS classes remain active automatically
     }
     loadFromCache(); // Execute immediately
 
@@ -282,15 +291,18 @@
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            if(targetUsername) fetchProfileFresh();
+            if(targetUsername) {
+                // Fetch User Details AND Relationship Status in parallel
+                initProfileListeners();
+            }
         } else {
             // Optional: Redirect if login required
             // window.location.href = 'login.html';
         }
     });
 
-    function fetchProfileFresh() {
-        // Real-time listener
+    function initProfileListeners() {
+        // A. Listen to Target User (Updates Bio, Name, etc.)
         db.collection("users").where("username", "==", targetUsername).limit(1)
         .onSnapshot((snapshot) => {
             if(snapshot.empty) return;
@@ -299,25 +311,20 @@
             const freshData = doc.data();
             targetUid = doc.id;
             targetUserData = freshData;
-
-            // Save to Cache (Full Object with UID)
-            const dataToSave = { ...freshData, uid: targetUid };
-            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(dataToSave));
-
-            // Render
+            
+            // Render basic info immediately
             renderUI(freshData);
             
-            // Check Relationship (Only if logged in and not viewing self)
-            if(myUid && myUid !== targetUid) checkFollowStatus();
+            // Trigger relationship check now that we have targetUid
+            if(myUid && myUid !== targetUid) checkFollowStatus(freshData);
         });
     }
 
     // --- 3. RENDER ENGINE ---
     function renderUI(data) {
-        // Remove skeletons
-        document.querySelectorAll('.skeleton').forEach(el => {
-            el.classList.remove('skeleton');
-            el.style.width = ''; el.style.height = '';
+        // Remove text/image skeletons
+        ['pfp', 'display-name', 'username', 'bio'].forEach(id => {
+            document.getElementById(id).classList.remove('skeleton');
         });
 
         // Text
@@ -354,19 +361,32 @@
         if(el) el.innerText = val;
     }
 
-    // --- 4. FOLLOW LOGIC (Strict & Safe) ---
-    async function checkFollowStatus() {
-        // We check "My Following List" to see if Target is in it
+    // --- 4. FOLLOW LOGIC (With Caching) ---
+    async function checkFollowStatus(freshUserData) {
+        // Fetch "My" following list to be 100% sure
         const myDoc = await db.collection("users").doc(myUid).get();
         const myFollowing = myDoc.data().following || [];
 
-        // Support string IDs or object {uid: '...', time: ...}
+        // Check relationship
         const isFollowing = myFollowing.some(item => {
             const id = typeof item === 'string' ? item : item.uid;
             return id === targetUid;
         });
 
+        // UPDATE UI
         updateFollowBtnUI(isFollowing);
+        
+        // Remove Button Skeletons
+        document.getElementById('btn-follow').classList.remove('skeleton');
+        document.getElementById('btn-msg').classList.remove('skeleton');
+
+        // SAVE EVERYTHING TO CACHE (User Data + Relationship Status)
+        const cacheObj = {
+            ...freshUserData,
+            uid: targetUid,
+            amIFollowing: isFollowing // Store this for next time!
+        };
+        localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
 
     function updateFollowBtnUI(isFollowing) {
@@ -384,7 +404,7 @@
         if(isFollowLocked || !myUid || !targetUid) return;
         
         const btn = document.getElementById('btn-follow');
-        const isUnfollowing = btn.innerText === "Following"; // Current state in UI
+        const isUnfollowing = btn.innerText === "Following"; // Current state
         
         // LOCK to prevent spam
         isFollowLocked = true;
@@ -403,10 +423,9 @@
 
             if(!isUnfollowing) {
                 // --- FOLLOW ---
-                // 1. Double Check: Are we ALREADY following? (Server side check to prevent dupes)
+                // Server-side Double Check
                 const myRef = db.collection("users").doc(myUid);
                 const doc = await myRef.get();
-                // Safe check handling legacy string arrays or object arrays
                 const existing = (doc.data().following || []).some(i => (typeof i==='string'?i:i.uid) === targetUid);
 
                 if(!existing) {
@@ -434,12 +453,9 @@
                     });
 
                     await batch.commit();
-                } else {
-                    console.log("Already following.");
                 }
             } else {
                 // --- UNFOLLOW ---
-                // Safe removal using Transaction to handle objects vs strings cleanly
                 await db.runTransaction(async (t) => {
                     const myRef = db.collection("users").doc(myUid);
                     const theirRef = db.collection("users").doc(targetUid);
@@ -455,6 +471,12 @@
                     t.update(theirRef, { followers: newFollowers });
                 });
             }
+            
+            // Update cache after successful action
+            const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
+            cached.amIFollowing = !isUnfollowing;
+            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
+
         } catch(e) {
             console.error("Action failed", e);
             // Revert UI if failed
