@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
-    <script src="config.js" type="module"></script>
+    <script src="config.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -205,6 +205,40 @@
 </head>
 <body oncontextmenu="return false;"> 
 
+<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:250px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
+    <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
+        <button onclick="pingWorker()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">TEST: Ping Worker</button>
+        <button onclick="testSW()" style="background:#000044; color:#fff; border:1px solid #5555ff; padding:5px 10px; border-radius:4px;">TEST: Notification</button>
+        <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
+    </div>
+    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">System Ready.</div>
+</div>
+
+<script>
+    const logBox = document.getElementById('debug-logs');
+    function debug(msg) {
+        logBox.innerHTML += `<div>> ${msg}</div>`;
+        console.log(msg);
+    }
+    
+    function pingWorker() {
+        if(!window.notifWorker) return debug("❌ Worker Missing!");
+        debug("📡 Pinging worker...");
+        window.notifWorker.postMessage({ type: 'PING' });
+    }
+
+    function testSW() {
+        debug("Testing SW Notification...");
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification("Test", { body: "SW Working" });
+                debug("✅ SW Request Sent");
+            });
+        } else {
+            debug("❌ SW Not Ready/Controlling");
+        }
+    }
+</script>
 <div id="progress-bar"></div>
 
 <header>
@@ -226,7 +260,7 @@
         <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
         <span class="note-username">Your Note</span>
     </div>
-    </div>
+</div>
 
 <div class="content">
     <span class="section-label">Quantum Terminal</span>
@@ -261,72 +295,79 @@
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
 
-<div id="debug-overlay" style="position:fixed; top:0; left:0; width:100%; height:250px; background:rgba(0,0,0,0.95); color:#00ff00; z-index:99999; font-family:monospace; font-size:12px; display:flex; flex-direction:column; border-bottom:2px solid #00ff00;">
-    <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:10px;">
-        <button onclick="pingWorker()" style="background:#004400; color:#fff; border:1px solid #00ff00; padding:5px 10px; border-radius:4px;">TEST: Ping Worker</button>
-        <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-left:auto; background:red; color:white; border:none; padding:5px 10px;">X</button>
-    </div>
-    <div id="debug-logs" style="flex:1; overflow-y:auto; padding:10px; white-space:pre-wrap;">Initializing System...</div>
-</div>
-
 <script>
-    const logBox = document.getElementById('debug-logs');
-    function debug(msg, type='INFO') {
-        const color = type === 'ERR' ? '#ff5555' : (type === 'OK' ? '#55ff55' : '#ccc');
-        logBox.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
-        logBox.scrollTop = logBox.scrollHeight;
-        console.log(msg);
-    }
+    // --- FIREBASE INIT ---
+    let fbConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
+
+    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) fbConfig = window.CONFIG.firebase;
+    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    const auth = firebase.auth(), db = firebase.firestore(), prog = document.getElementById('progress-bar');
     
-    function pingWorker() {
-        if(!window.notifWorker) return debug("❌ Worker Missing!", "ERR");
-        debug("📡 Pinging worker...");
-        window.notifWorker.postMessage({ type: 'PING' });
-    }
-</script>
-
-<script>
-    // Safe Init for UI - Waits for config.js to run
-    function initUI() {
-        // Wait for config if needed, otherwise rely on window.firebaseConfig
-        if (typeof window.firebaseConfig === 'undefined') {
-            setTimeout(initUI, 100);
-            return;
-        }
-        
-        if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
-        const auth = firebase.auth(), db = firebase.firestore();
-
-        // Clock
-        function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false }); }
-        setInterval(updateClock, 1000); updateClock();
-
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                document.getElementById('progress-bar').style.width = '60%';
-                const doc = await db.collection("users").doc(user.uid).get();
-                if (doc.exists) updateUI(doc.data());
-                // Start UI listeners
-                startLiveCounters(user.uid, db);
-                listenNotifications(user.uid, db);
-            } else window.location.href = "login.html";
-        });
-    }
-
-    function updateUI(data) {
-        document.getElementById('welcome-name').innerText = `Welcome, ${data.name.split(' ')[0]}`;
-        document.getElementById('header-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('my-note-pfp').src = data.photoURL;
-        document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
-        document.getElementById('progress-bar').style.width = '100%';
-        setTimeout(()=>document.getElementById('progress-bar').style.opacity='0', 500);
-    }
-
-    // --- LEGACY LISTENERS RESTORED ---
     let READ_KEY = "goorac_read_notifs"; 
 
-    function listenNotifications(uid, db) {
-        READ_KEY = `goorac_read_${uid}`;
+    // --- CLOCK FEATURE ---
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString([], { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function formatTime(ts) {
+        if (!ts) return "";
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        const sec = Math.floor((new Date() - date) / 1000);
+        if (sec < 60) return "Just now";
+        if (sec < 3600) return Math.floor(sec/60) + "m ago";
+        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
+        return Math.floor(sec/86400) + "d ago";
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            READ_KEY = `goorac_read_${user.uid}`;
+            prog.style.width = '60%';
+            const doc = await db.collection("users").doc(user.uid).get();
+            if (doc.exists) {
+                updateUI(doc.data());
+                startLiveCounters(user.uid);
+                listenNotifications(user.uid);
+            } else window.location.href = "setup.html";
+            
+            // === 2. BRIDGE ADDED HERE (Safe Insert) ===
+            startWorkerBridge(user.uid, fbConfig); 
+            // ==========================================
+
+        } else window.location.href = "login.html";
+    });
+
+    function updateUI(data) {
+        const nameEl = document.getElementById('welcome-name'), textEl = document.getElementById('welcome-text'), pfpEl = document.getElementById('header-pfp');
+        nameEl.classList.remove('skeleton');
+        const hour = new Date().getHours();
+        let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+        pfpEl.classList.remove('skeleton');
+        pfpEl.src = data.photoURL || 'https://via.placeholder.com/150';
+        document.getElementById('my-note-pfp').src = data.photoURL || 'https://via.placeholder.com/150';
+        
+        textEl.classList.remove('skeleton');
+        textEl.innerText = "All neural-links are operational. Your communication is currently isolated and secure.";
+        
+        prog.style.width = '100%';
+        setTimeout(() => prog.style.opacity = '0', 400);
+    }
+
+    // --- UNIFIED NOTIFICATION LISTENER ---
+    function listenNotifications(uid) {
         let likeIds = new Set();
         let followIds = new Set();
 
@@ -348,7 +389,11 @@
             }
         };
 
-        db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20)
+        // 1. LISTEN TO LIKES
+        db.collection("notes")
+            .where("uid", "==", uid)
+            .orderBy("createdAt", "desc")
+            .limit(20)
             .onSnapshot(snapshot => {
                 likeIds.clear(); 
                 snapshot.forEach(doc => {
@@ -357,7 +402,8 @@
                         data.likes.forEach(liker => {
                             if (liker.uid !== uid && liker.timestamp) {
                                 const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                                likeIds.add(`like_${liker.uid}_${timeMillis}`);
+                                const notifId = `like_${liker.uid}_${timeMillis}`;
+                                likeIds.add(notifId);
                             }
                         });
                     }
@@ -365,35 +411,29 @@
                 updateBadgeUI();
             });
 
+        // 2. LISTEN TO FOLLOWERS
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
                 followIds.clear();
-                if (data.followers) {
+                if (data.followers && Array.isArray(data.followers)) {
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            followIds.add(`follow_${f.uid}_${timeMillis}`);
+                            const notifId = `follow_${f.uid}_${timeMillis}`;
+                            followIds.add(notifId);
                         }
                     });
                 }
                 updateBadgeUI();
             }
         });
+
         window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
     }
 
-    function formatTime(ts) {
-        if (!ts) return "";
-        const date = ts.toDate ? ts.toDate() : new Date(ts);
-        const sec = Math.floor((new Date() - date) / 1000);
-        if (sec < 60) return "Just now";
-        if (sec < 3600) return Math.floor(sec/60) + "m ago";
-        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
-        return Math.floor(sec/86400) + "d ago";
-    }
-
-    function startLiveCounters(uid, db) {
+    function startLiveCounters(uid) {
+        // Message Counter
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
             let latest = null;
             for (const doc of snap.docs) {
@@ -412,6 +452,7 @@
             }
         });
 
+        // Call Counter
         db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
             const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
             if (!snap.empty) {
@@ -428,85 +469,38 @@
         });
     }
 
-    initUI();
-</script>
+    document.addEventListener('touchend', (e) => {
+        const now = (new Date()).getTime();
+        if (now - (window.lastTouch || 0) <= 300) e.preventDefault();
+        window.lastTouch = now;
+    }, false);
 
-<script type="module">
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-    
-    // --- 1. IMPORT CONFIG (As Requested) ---
-    import { firebaseConfig } from './config.js';
-
-    // --- 2. PWA INSTALL (SW) ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => {
-                    debug("✅ SW Registered", "OK");
-                    if(reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                })
-                .catch(e => debug("❌ SW Fail: " + e, "ERR"));
-        });
-    }
-
-    // --- 3. NOTIFICATION PERMISSION ---
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
-
-    // --- 4. START NOTIFICATION WORKER ---
-    async function initWorkerSystem() {
-        debug("⏳ Waiting for Config...");
-        
-        if (!firebaseConfig) {
-            debug("❌ Config Import Failed", "ERR");
-            return;
+    // === 3. BRIDGE FUNCTIONS (Added at the end) ===
+    function startWorkerBridge(uid, config) {
+        // Register PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(() => debug("SW Registered"));
         }
         
-        debug("✅ Config Loaded!", "OK");
+        // Permissions
+        if (Notification.permission !== "granted") Notification.requestPermission();
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                debug("👤 User Logged In. Starting Worker...", "OK");
-                startNotificationWorker(user.uid, firebaseConfig);
-            } else {
-                debug("👤 No User", "ERR");
-            }
-        });
-    }
-
-    function startNotificationWorker(uid, config) {
+        // Start Worker
         if (window.Worker && !window.notifWorker) {
-            try {
-                window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
-                
-                // Start Worker
-                window.notifWorker.postMessage({
-                    type: 'START',
-                    uid: uid,
-                    config: config
-                });
-
-                // LISTEN for command to show notification
-                window.notifWorker.onmessage = (e) => {
-                    if (e.data.type === 'SHOW_NOTIFICATION') {
-                        debug("🔔 Showing Notification");
-                        showNotification(e.data.payload);
-                    }
-                };
-                debug("✅ Worker Started", "OK");
-            } catch (e) {
-                debug("❌ Worker Error: " + e, "ERR");
-            }
+            window.notifWorker = new Worker('/notification-worker.js', { type: "module" });
+            window.notifWorker.postMessage({ type: 'START', uid: uid, config: config });
+            
+            // Listen for Worker Commands
+            window.notifWorker.onmessage = (e) => {
+                if (e.data.type === 'SHOW_NOTIFICATION') {
+                    showNativeNotification(e.data.payload);
+                }
+            };
+            debug("Worker Bridge Active");
         }
     }
 
-    function showNotification(data) {
-        // Use SW Registration to show notification (Native Android behavior)
+    function showNativeNotification(data) {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(reg => {
                 reg.showNotification(data.title, {
@@ -519,9 +513,6 @@
             });
         }
     }
-
-    initWorkerSystem();
 </script>
-
 </body>
 </html>
