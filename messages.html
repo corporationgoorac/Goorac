@@ -1,15 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
-
-    
+    <link rel="manifest" href="/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
     <title>Goorac | Quantum Inbox</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -30,11 +27,7 @@
             background: var(--bg); color: white; margin: 0;
             font-family: -apple-system, system-ui, sans-serif;
             padding-bottom: 90px; overflow-x: hidden;
-            -webkit-user-select: none; 
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
+            -webkit-user-select: none; user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -54,25 +47,15 @@
             width: 100%; background: #111; border: 1px solid var(--border);
             padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
             font-size: 16px !important; transition: all 0.3s ease;
-            -webkit-user-select: text; user-select: text;
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
-
-        /* SKELETON LOADER */
-        .skeleton-item {
-            display: flex; align-items: center; padding: 15px 20px; opacity: 0.5;
-            animation: quantumPulse 1.5s infinite ease-in-out;
-        }
-        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
-        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
-        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
 
         /* CHAT LIST ITEM */
         .chat-item { 
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
             transition: background 0.2s;
-            touch-action: pan-y; /* Crucial for smooth scrolling */
+            touch-action: pan-y; /* Fixes scroll/touch conflict */
             position: relative;
         }
         .chat-item:active { background: var(--glass); }
@@ -90,15 +73,13 @@
             width: 14px; height: 14px; 
             background: var(--accent);
             clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
-            display: inline-block;
-            filter: drop-shadow(0 0 5px var(--accent));
-            margin-left: 4px;
+            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px;
         }
 
         .follow-btn { 
             background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
             padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-            pointer-events: auto;
+            pointer-events: auto; /* Buttons must be clickable */
         }
 
         .unread-badge { 
@@ -110,7 +91,13 @@
             flex-shrink: 0;
         }
 
-        /* MODAL / ACTION SHEET */
+        /* SKELETON */
+        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
+        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
+        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
+        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
+
+        /* MODAL */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: var(--sheet-bg); border-top: 1px solid var(--border);
@@ -120,51 +107,20 @@
             box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
         }
         #delete-menu.active { bottom: 0; }
-        
-        /* PC RESPONSIVENESS */
+        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); }
+
         @media (min-width: 768px) {
-            #delete-menu {
-                width: 400px;
-                left: 50%;
-                transform: translateX(-50%);
-                bottom: -100%; /* Hidden state */
-                border-radius: 24px;
-                border: 1px solid var(--border);
-                padding-bottom: 20px;
-            }
-            #delete-menu.active {
-                bottom: 50%;
-                transform: translate(-50%, 50%);
-            }
-        }
-        
-        .menu-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            z-index: 99999; display: none; backdrop-filter: blur(8px);
+            #delete-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; }
+            #delete-menu.active { bottom: 50%; transform: translate(-50%, 50%); }
         }
 
-        /* Context UI */
-        .sheet-context {
-            display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 25px; margin-bottom: 10px;
-        }
-        .context-pfp {
-            width: 70px; height: 70px; border-radius: 25px; 
-            border: 2px solid var(--accent); margin-bottom: 12px;
-            object-fit: cover; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2);
-        }
+        /* CONTEXT UI */
+        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; }
+        .context-pfp { width: 70px; height: 70px; border-radius: 25px; border: 2px solid var(--accent); margin-bottom: 12px; object-fit: cover; }
         .context-name { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
         .context-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
-
         .action-list { display: flex; flex-direction: column; gap: 12px; }
-        
-        .btn-action {
-            width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem;
-            cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 10px;
-            transition: transform 0.1s;
-        }
-        .btn-action:active { transform: scale(0.98); opacity: 0.9; }
-        
+        .btn-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; }
         .del-btn-big { background: rgba(255, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(255, 68, 68, 0.2); }
         .pin-btn-big { background: #1a1a1a; color: var(--accent); border: 1px solid var(--border); }
         .cancel-btn { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; }
@@ -219,7 +175,7 @@
         const cachedHTML = localStorage.getItem('goorac_inbox_html');
         if (cachedHTML && cachedHTML.trim() !== "") {
             document.getElementById('chats-list').innerHTML = cachedHTML;
-            console.log("⚡ Inbox loaded from cache");
+            console.log("⚡ Loaded inbox from cache");
         }
     })();
 
@@ -248,8 +204,6 @@
     let longPressTimer;
     let activeChatId = null;
     let searchTimeout = null;
-    let isLongPressTriggered = false;
-
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
     let inboxListener = null;
 
@@ -304,10 +258,12 @@
                 return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
             });
 
+            // Rebuild DOM with fresh Event Listeners
             if(results.length > 0) list.innerHTML = "";
 
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
                 if(!u) return;
+                
                 const isUnread = (chat.lastSender !== myUid && chat.seen === false);
                 let displayCount = "";
                 if (chat.unreadCount && chat.unreadCount[myUid]) {
@@ -322,34 +278,12 @@
 
                 const finalName = u.name || u.displayName || u.username || "Unknown";
                 const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
-                
-                // Safe JSON for handlers
-                const safeUserStr = encodeURIComponent(JSON.stringify({
-                    name: finalName,
-                    username: u.username,
-                    photoURL: u.photoURL,
-                    verified: u.verified
-                }));
 
+                // --- BUILD ITEM (DOM API for Reliability) ---
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
-                // --- FIXED TOUCH LOGIC ---
-                // We use standard onclick for entry (it handles fast taps correctly)
-                // We use touchstart/touchend ONLY for Long Press detection
-                
-                item.setAttribute("ontouchstart", `startLongPress('${id}', ${isPinned}, '${safeUserStr}')`);
-                item.setAttribute("ontouchend", "endLongPress()");
-                item.setAttribute("ontouchmove", "cancelLongPress()"); // Scrolling kills long press
-                item.onclick = (e) => { 
-                    // Only enter if not scrolling and no menu opened
-                    if(!activeChatId && !isLongPressTriggered) {
-                        location.href = `chat.html?user=${u.username}`;
-                    }
-                    // Reset trigger flag after click processed
-                    setTimeout(() => isLongPressTriggered = false, 200);
-                };
-
+                // HTML Content
                 item.innerHTML = `
                     <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
                     <div class="chat-info">
@@ -366,14 +300,50 @@
                                 ${lastMsg}
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
+                                ${!amIFollowing ? `<button class="follow-btn" data-user="${u.username}">Profile</button>` : ''}
                                 ${isUnread ? `<div class="unread-badge">${displayCount}</div>` : ''}
                             </div>
                         </div>
                     </div>
                 `;
+
+                // --- ROBUST EVENT HANDLERS ---
+                let isLongPress = false;
+
+                // 1. CLICK (Navigation)
+                item.addEventListener('click', (e) => {
+                    // Ignore if long press happened or clicking a button inside
+                    if (isLongPress || e.target.closest('button')) return;
+                    
+                    // Simple, direct navigation
+                    window.location.href = `chat.html?user=${u.username}`;
+                });
+
+                // 2. LONG PRESS (Menu)
+                item.addEventListener('touchstart', () => {
+                    isLongPress = false;
+                    longPressTimer = setTimeout(() => {
+                        isLongPress = true; // Flag to block click
+                        if(navigator.vibrate) navigator.vibrate(30);
+                        openDeleteMenu(id, isPinned, u);
+                    }, 600);
+                }, { passive: true });
+
+                item.addEventListener('touchend', () => clearTimeout(longPressTimer));
+                item.addEventListener('touchmove', () => clearTimeout(longPressTimer)); // Scroll cancels press
+
+                // 3. PROFILE BUTTON (If exists)
+                const profileBtn = item.querySelector('.follow-btn');
+                if(profileBtn) {
+                    profileBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Stop bubble to item
+                        window.location.href = `profile.html?user=${u.username}`;
+                    });
+                }
+
                 list.appendChild(item);
-                
+
+                // Typing Status
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
@@ -381,32 +351,12 @@
                     else { msgEl.innerHTML = lastMsg; }
                 });
             });
-            
+
             if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#333; font-weight:700;'>No data in this frequency.</p>";
 
+            // Save Cache
             localStorage.setItem('goorac_inbox_html', list.innerHTML);
         });
-    }
-
-    // --- TOUCH HANDLERS ---
-    
-    function startLongPress(chatId, isPinned, userStr) {
-        isLongPressTriggered = false; // Reset flag
-        const u = JSON.parse(decodeURIComponent(userStr));
-        
-        longPressTimer = setTimeout(() => {
-            isLongPressTriggered = true; // Mark as long press occurred
-            if(navigator.vibrate) navigator.vibrate(30);
-            openDeleteMenu(chatId, isPinned, u);
-        }, 600); // 600ms hold
-    }
-
-    function cancelLongPress() {
-        clearTimeout(longPressTimer);
-    }
-
-    function endLongPress() {
-        clearTimeout(longPressTimer);
     }
 
     // --- MENU ACTIONS ---
@@ -472,10 +422,7 @@
         } catch(e) { console.error("Erase failed:", e); }
     };
 
-    function visitProfile(e, username) {
-        e.stopPropagation();
-        location.href = `userProfile.html?user=${username}`;
-    }
+    // --- SEARCH ---
 
     function handleSearch(val) {
         clearTimeout(searchTimeout);
@@ -506,7 +453,7 @@
             }).map(d => {
                 const u = d.data();
                 return `
-                    <div class="chat-item" onclick="location.href='chat.html?user=${u.username}'">
+                    <div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'">
                         <img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;">
                         <div class="chat-info">
                             <div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div>
