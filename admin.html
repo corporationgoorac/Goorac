@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Goorac | Admin Console</title>
+    
+    <script src="config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: #0a0a0a;
+            --surface-border: #1f1f1f;
+            --accent: #00ff9d;
+            --accent-dim: rgba(0, 255, 157, 0.1);
+            --danger: #ff3b30;
+            --text: #ffffff;
+            --text-sec: #666;
+        }
+
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: var(--bg); color: var(--text); margin: 0;
+            font-family: 'Inter', sans-serif; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- LOCK SCREEN --- */
+        #lock-screen {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: opacity 0.4s ease;
+        }
+        .lock-icon { font-size: 64px; color: var(--surface-border); margin-bottom: 20px; }
+        .pin-input {
+            background: transparent; border: 1px solid var(--surface-border);
+            color: var(--text); font-family: 'JetBrains Mono', monospace;
+            font-size: 24px; letter-spacing: 12px; text-align: center;
+            width: 240px; padding: 15px; border-radius: 12px;
+            transition: 0.3s;
+        }
+        .pin-input:focus { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-dim); }
+        .lock-err { color: var(--danger); font-size: 12px; margin-top: 15px; opacity: 0; transition: 0.3s; letter-spacing: 2px; }
+
+        /* --- DASHBOARD --- */
+        #dashboard { display: none; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
+        
+        header {
+            padding: 20px; border-bottom: 1px solid var(--surface-border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+        }
+        .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent); letter-spacing: -1px; }
+        .refresh-btn { cursor: pointer; color: var(--text-sec); transition: 0.2s; }
+        .refresh-btn:hover { color: var(--text); }
+
+        /* STATS GRID */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            padding: 20px;
+        }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--surface-border);
+            border-radius: 12px; padding: 15px; display: flex; flex-direction: column;
+        }
+        .stat-val { font-size: 20px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--text); }
+        .stat-label { font-size: 10px; text-transform: uppercase; color: var(--text-sec); margin-top: 5px; font-weight: 700; letter-spacing: 0.5px; }
+        .stat-new { color: var(--accent); }
+
+        /* SEARCH */
+        .search-bar {
+            margin: 0 20px 15px; background: var(--surface); 
+            border: 1px solid var(--surface-border); border-radius: 12px;
+            display: flex; align-items: center; padding: 0 15px;
+        }
+        .search-bar input {
+            flex: 1; background: transparent; border: none; color: white;
+            padding: 14px 10px; font-size: 14px; font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* USER LIST */
+        .list-header { 
+            padding: 0 25px 10px; font-size: 11px; color: var(--text-sec); 
+            text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+            display: flex; justify-content: space-between;
+        }
+        .user-list { flex: 1; overflow-y: auto; padding: 0 20px 40px; }
+        
+        .user-card {
+            background: var(--surface); border: 1px solid var(--surface-border);
+            border-radius: 14px; padding: 12px; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            transition: 0.2s; cursor: pointer; position: relative; overflow: hidden;
+        }
+        .user-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        
+        /* New User Indicator */
+        .new-tag {
+            position: absolute; top: 0; right: 0; background: var(--accent);
+            color: #000; font-size: 8px; font-weight: 800; padding: 2px 6px;
+            border-bottom-left-radius: 6px; display: none;
+        }
+        .user-card.is-new .new-tag { display: block; }
+
+        .uc-left { display: flex; align-items: center; gap: 12px; }
+        .uc-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #1a1a1a; border: 1px solid #333; }
+        
+        .uc-text h4 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .uc-text p { margin: 2px 0 0; font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono', monospace; }
+        
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #333; margin-left: auto; }
+        .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+        .v-badge { color: #00d2ff; font-size: 14px; }
+
+        /* EDITOR */
+        #editor {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100;
+            display: none; align-items: center; justify-content: center;
+            backdrop-filter: blur(8px);
+        }
+        .edit-box {
+            width: 90%; max-width: 380px; background: #000; 
+            border: 1px solid var(--surface-border); border-radius: 20px;
+            padding: 25px; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            max-height: 90vh; overflow-y: auto;
+        }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; color: var(--text-sec); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: 700; }
+        .form-input {
+            width: 100%; background: #0a0a0a; border: 1px solid #222;
+            color: white; padding: 12px; border-radius: 8px; font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .form-input:focus { border-color: var(--accent); }
+        
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 25px; }
+        .btn {
+            padding: 12px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; font-size: 13px;
+        }
+        .btn-save { background: var(--accent); color: black; }
+        .btn-close { background: #1a1a1a; color: white; border: 1px solid #333; }
+        
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 8px; }
+        .toggle-switch {
+            width: 36px; height: 20px; background: #333; border-radius: 20px;
+            position: relative; transition: 0.3s; cursor: pointer;
+        }
+        .toggle-switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 16px; height: 16px; background: white; border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch.active { background: var(--accent); }
+        .toggle-switch.active::after { transform: translateX(16px); }
+
+        .loader { border: 2px solid #222; border-top: 2px solid var(--accent); border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; margin: 20px auto; display: none; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="lock-screen">
+        <span class="material-icons-round lock-icon">security</span>
+        <input type="password" class="pin-input" id="pin-field" maxlength="4" placeholder="••••" oninput="checkPin()">
+        <div class="lock-err" id="pin-err">UNAUTHORIZED ACCESS</div>
+    </div>
+
+    <div id="dashboard">
+        <header>
+            <div class="logo">GOORAC://ADMIN</div>
+            <span class="material-icons-round refresh-btn" onclick="loadData()">refresh</span>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-val" id="stat-total">--</span>
+                <span class="stat-label">Total Users</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-val stat-new" id="stat-new">+0</span>
+                <span class="stat-label">New (24h)</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-val" id="stat-verified">--</span>
+                <span class="stat-label">Verified</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-val" id="stat-active" style="color:var(--text-sec)">--</span>
+                <span class="stat-label">System</span>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <span class="material-icons-round" style="color:#444; font-size:18px;">search</span>
+            <input type="text" id="user-search" placeholder="Query Database..." oninput="searchUsers()">
+        </div>
+
+        <div class="list-header">
+            <span>Identity</span>
+            <span>Status</span>
+        </div>
+
+        <div class="loader" id="list-loader"></div>
+        <div class="user-list" id="user-list"></div>
+    </div>
+
+    <div id="editor">
+        <div class="edit-box">
+            <div style="text-align:center; margin-bottom:20px;">
+                <img id="edit-pfp" style="width:70px; height:70px; border-radius:50%; object-fit:cover; border:2px solid var(--surface-border);">
+            </div>
+            
+            <div class="toggle-row" onclick="toggleVerify()">
+                <span style="font-weight:600; font-size:13px; text-transform:uppercase;">Verified Status</span>
+                <div class="toggle-switch" id="verify-toggle"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input type="text" class="form-input" id="edit-name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Username / Handle</label>
+                <input type="text" class="form-input" id="edit-username">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Goorac ID (Immutable Key)</label>
+                <input type="text" class="form-input" id="edit-gid" style="color:var(--accent);">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Bio Data</label>
+                <textarea class="form-input" id="edit-bio" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Avatar URL</label>
+                <input type="text" class="form-input" id="edit-url">
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-close" onclick="closeEditor()">Close</button>
+                <button class="btn btn-save" onclick="saveChanges()">Commit</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & INIT ---
+        const fbConfig = {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(fbConfig);
+        const db = firebase.firestore();
+
+        // --- SECURE PIN (SHA-256 for '2502') ---
+        const HASH = "e382c4aa13fb3134375b927df590f0502e6462719630656a297e260c6d5952e3";
+
+        async function checkPin() {
+            const val = document.getElementById('pin-field').value;
+            if (val.length === 4) {
+                const h = await sha256(val);
+                if (h === HASH) {
+                    const ls = document.getElementById('lock-screen');
+                    ls.style.opacity = '0';
+                    setTimeout(() => {
+                        ls.style.display = 'none';
+                        const db = document.getElementById('dashboard');
+                        db.style.display = 'flex';
+                        setTimeout(() => db.style.opacity = '1', 50);
+                        loadData();
+                    }, 400);
+                } else {
+                    const err = document.getElementById('pin-err');
+                    err.style.opacity = '1';
+                    document.getElementById('pin-field').value = '';
+                    setTimeout(() => err.style.opacity = '0', 1500);
+                }
+            }
+        }
+
+        async function sha256(m) {
+            const b = new TextEncoder().encode(m);
+            const h = await crypto.subtle.digest('SHA-256', b);
+            return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // --- CORE DATA LOGIC ---
+        let allUsers = [];
+        let editingUser = null;
+
+        async function loadData() {
+            const loader = document.getElementById('list-loader');
+            loader.style.display = 'block';
+            document.getElementById('user-list').innerHTML = '';
+
+            try {
+                // Fetch recent users (Last 50 for efficiency)
+                // Assuming 'createdAt' field exists. If not, default sort by verified/name.
+                // Note: For free tier, we fetch a batch. 
+                const snap = await db.collection("users").limit(100).get();
+                
+                allUsers = [];
+                let verifiedCount = 0;
+                let newCount = 0;
+                const oneDayAgo = new Date(Date.now() - 86400000);
+
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    d.uid = doc.id;
+                    
+                    // Stats Calculation
+                    if(d.verified) verifiedCount++;
+                    
+                    // Timestamp Logic (Handle Firestore Timestamp or Date string)
+                    let created = d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate() : new Date(d.createdAt)) : new Date(0);
+                    if(created > oneDayAgo) {
+                        d.isNew = true;
+                        newCount++;
+                    }
+
+                    allUsers.push(d);
+                });
+
+                // Sort: Newest First
+                allUsers.sort((a, b) => {
+                    const tA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : 0;
+                    const tB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : 0;
+                    return tB - tA;
+                });
+
+                // Update Stats UI
+                document.getElementById('stat-total').innerText = allUsers.length;
+                document.getElementById('stat-new').innerText = `+${newCount}`;
+                document.getElementById('stat-verified').innerText = verifiedCount;
+                document.getElementById('stat-active').innerText = "OK";
+
+                renderList(allUsers);
+
+            } catch(e) {
+                console.error(e);
+                alert("Data Fetch Error: Check Console");
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // --- RENDERING ---
+        function renderList(users) {
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+
+            if(users.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#333; padding:30px; font-size:12px;">NO RECORDS FOUND</div>';
+                return;
+            }
+
+            users.forEach(u => {
+                const div = document.createElement('div');
+                div.className = `user-card ${u.isNew ? 'is-new' : ''}`;
+                div.onclick = () => openEditor(u);
+                
+                div.innerHTML = `
+                    <div class="new-tag">NEW</div>
+                    <div class="uc-left">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/50'}" class="uc-img">
+                        <div class="uc-text">
+                            <h4>${u.name || 'Unknown'} ${u.verified ? '<span class="material-icons-round v-badge">verified</span>' : ''}</h4>
+                            <p>@${u.username || 'user'} • ${u.gooracNumber || 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div class="status-dot ${u.isNew ? 'active' : ''}"></div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function searchUsers() {
+            const term = document.getElementById('user-search').value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                (u.name && u.name.toLowerCase().includes(term)) ||
+                (u.username && u.username.toLowerCase().includes(term)) ||
+                (u.gooracNumber && u.gooracNumber.includes(term))
+            );
+            renderList(filtered);
+        }
+
+        // --- EDITOR ACTIONS ---
+        function openEditor(u) {
+            editingUser = u;
+            
+            document.getElementById('edit-pfp').src = u.photoURL || '';
+            document.getElementById('edit-name').value = u.name || '';
+            document.getElementById('edit-username').value = u.username || '';
+            document.getElementById('edit-gid').value = u.gooracNumber || '';
+            document.getElementById('edit-bio').value = u.bio || '';
+            document.getElementById('edit-url').value = u.photoURL || '';
+
+            const toggle = document.getElementById('verify-toggle');
+            if(u.verified) toggle.classList.add('active');
+            else toggle.classList.remove('active');
+
+            document.getElementById('editor').style.display = 'flex';
+        }
+
+        function closeEditor() {
+            document.getElementById('editor').style.display = 'none';
+            editingUser = null;
+        }
+
+        function toggleVerify() {
+            document.getElementById('verify-toggle').classList.toggle('active');
+        }
+
+        async function saveChanges() {
+            if(!editingUser) return;
+            const btn = document.querySelector('.btn-save');
+            btn.innerText = "Processing...";
+
+            const updates = {
+                name: document.getElementById('edit-name').value,
+                username: document.getElementById('edit-username').value,
+                gooracNumber: document.getElementById('edit-gid').value,
+                bio: document.getElementById('edit-bio').value,
+                photoURL: document.getElementById('edit-url').value,
+                verified: document.getElementById('verify-toggle').classList.contains('active')
+            };
+
+            try {
+                await db.collection("users").doc(editingUser.uid).update(updates);
+                
+                // Update Local State for speed
+                const idx = allUsers.findIndex(x => x.uid === editingUser.uid);
+                if(idx !== -1) allUsers[idx] = { ...allUsers[idx], ...updates };
+                
+                renderList(allUsers);
+                closeEditor();
+            } catch(e) {
+                alert("Write Failed: " + e.message);
+            } finally {
+                btn.innerText = "Commit";
+            }
+        }
+    </script>
+</body>
+</html>
