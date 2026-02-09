@@ -15,123 +15,130 @@
     <style>
         :root { 
             --bg: #000000; 
-            --surface: #121212; 
+            --surface: #111111; 
             --accent: #ffffff; 
             --text-main: #ffffff;
-            --text-dim: #a1a1a6;
-            --border: #2c2c2e;
+            --text-dim: #888888;
+            --border: #222222;
             --error: #ff453a;
-            --success: #32d74b;
+            --success: #30d158;
+            --glass: rgba(18, 18, 18, 0.8);
         }
         
         body { 
-            background: var(--bg); color: var(--text-main); 
+            background: var(--bg);
+            background-image: radial-gradient(circle at top center, #111 0%, #000 100%);
+            color: var(--text-main); 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; 
-            display: flex; justify-content: center; align-items: center; 
-            min-height: 100vh; margin: 0;
+            display: flex; justify-content: center; 
+            min-height: 100vh; margin: 0; padding-top: 0;
+        }
+
+        /* Fixed Header with Blur */
+        .nav-header {
+            position: sticky; top: 0; z-index: 50;
+            width: 100%; max-width: 440px;
+            background: var(--glass);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 15px 24px; box-sizing: border-box;
+            border-bottom: 1px solid var(--border);
         }
 
         .container {
-            width: 100%; max-width: 440px; padding: 24px;
-            opacity: 0; transform: translateY(10px);
-            transition: opacity 0.4s ease, transform 0.4s ease;
+            width: 100%; max-width: 440px; 
+            padding: 0 24px 60px 24px; box-sizing: border-box;
+            opacity: 0; transform: translateY(15px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
         .container.loaded { opacity: 1; transform: translateY(0); }
 
-        /* Header Navigation */
-        .nav-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 40px;
-        }
         .back-link {
-            background: var(--surface); border: none; color: white;
-            width: 36px; height: 36px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.2s;
+            background: transparent; border: none; color: white;
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: flex-start;
+            cursor: pointer; transition: 0.2s; padding: 0;
         }
-        .back-link:active { transform: scale(0.9); }
-        .page-title { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; }
+        .back-link:hover { opacity: 0.6; }
+        .page-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
 
-        /* Profile Photo Section */
+        /* Profile Photo Section - Cleaned up spacing */
         .profile-hero {
-            display: flex; flex-direction: column; align-items: center; margin-bottom: 32px;
+            display: flex; flex-direction: column; align-items: center; 
+            margin: 40px 0 32px 0;
         }
         .pfp-wrapper {
-            position: relative; width: 110px; height: 110px; cursor: pointer;
+            position: relative; width: 120px; height: 120px; cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        .pfp-wrapper:active { transform: scale(0.95); }
         .pfp-image {
             width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
-            border: 2px solid var(--border); padding: 4px; background: var(--bg);
+            border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         .pfp-edit-btn {
-            position: absolute; bottom: 0; right: 0;
+            position: absolute; bottom: 2px; right: 2px;
             background: var(--accent); color: black; border-radius: 50%;
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-            border: 3px solid var(--bg); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+            border: 4px solid var(--bg);
         }
         .pfp-edit-btn svg { width: 16px; height: 16px; fill: currentColor; }
 
-        /* Identity Badge */
         .id-badge {
-            background: var(--surface); color: var(--text-dim);
-            padding: 6px 14px; border-radius: 20px; font-size: 0.75rem;
-            font-weight: 700; letter-spacing: 0.05em; margin-top: 16px;
-            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05); color: var(--text-dim);
+            padding: 5px 12px; border-radius: 8px; font-size: 0.7rem;
+            font-weight: 800; letter-spacing: 0.08em; margin-top: 20px;
+            border: 1px solid var(--border); text-transform: uppercase;
         }
         #display-id { color: var(--text-main); }
 
-        /* Form Styling */
-        .form-group { margin-bottom: 24px; position: relative; }
+        /* Form Styling - Premium Inputs */
+        .form-group { margin-bottom: 28px; }
         .field-label {
-            display: block; font-size: 0.75rem; font-weight: 600;
-            color: var(--text-dim); margin-bottom: 8px; margin-left: 4px;
-            text-transform: uppercase; letter-spacing: 0.03em;
+            display: block; font-size: 0.7rem; font-weight: 700;
+            color: var(--text-dim); margin-bottom: 10px; margin-left: 2px;
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
         .input-box {
             width: 100%; background: var(--surface); border: 1px solid var(--border);
-            padding: 16px; border-radius: 14px; color: white;
-            font-size: 1rem; outline: none; box-sizing: border-box;
-            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 18px; border-radius: 16px; color: white;
+            font-size: 0.95rem; outline: none; box-sizing: border-box;
+            transition: all 0.3s ease;
         }
-        .input-box:focus { border-color: #666; background: #1a1a1a; }
+        .input-box:focus { border-color: #444; background: #161616; box-shadow: 0 0 0 4px rgba(255,255,255,0.03); }
 
         #status {
-            font-size: 0.8rem; margin-top: 8px; margin-left: 4px;
-            display: flex; align-items: center; gap: 6px; font-weight: 500;
+            font-size: 0.75rem; margin-top: 10px; margin-left: 2px;
+            display: flex; align-items: center; gap: 6px; font-weight: 600;
             height: 1rem;
         }
 
-        /* Action Button */
+        /* Modern Save Button */
         .btn-save {
             background: var(--accent); color: #000; border: none;
-            width: 100%; padding: 18px; border-radius: 16px;
-            font-weight: 700; font-size: 1rem; cursor: pointer;
-            margin-top: 20px; transition: 0.3s;
+            width: 100%; padding: 20px; border-radius: 20px;
+            font-weight: 800; font-size: 1rem; cursor: pointer;
+            margin-top: 10px; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(255,255,255,0.1);
         }
-        .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-save:active { transform: scale(0.98); }
+        .btn-save:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(255,255,255,0.15); }
+        .btn-save:disabled { opacity: 0.5; transform: none; }
 
-        /* Skeleton Shimmer */
-        .shimmer {
-            background: #1c1c1e; position: relative; overflow: hidden; color: transparent !important; border: none !important;
-        }
-        .shimmer::after {
-            content: ""; position: absolute; inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-
-        /* Hidden initially */
+        /* Full Screen Overlay */
         #loader-overlay {
-            position: fixed; inset: 0; background: #000; z-index: 100;
+            position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; align-items: center; justify-content: center;
         }
         .spinner {
-            width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.1);
+            width: 28px; height: 28px; border: 2px solid rgba(255,255,255,0.1);
             border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Scannable Grid Line */
+        .section-divider {
+            height: 1px; background: var(--border); margin: 32px 0; width: 100%;
+        }
 
         svg { fill: currentColor; }
     </style>
@@ -144,41 +151,46 @@
 
 <image-picker id="setup-image-picker"></image-picker>
 
-<div class="container" id="mainContainer">
+<div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
     <div class="nav-header">
         <button class="back-link" onclick="history.back()">
-            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
         </button>
-        <span class="page-title">Edit Profile</span>
-        <div style="width: 36px;"></div> </div>
+        <span class="page-title">Profile Settings</span>
+        <div style="width: 32px;"></div> 
+    </div>
 
-    <div class="profile-hero">
-        <div class="pfp-wrapper" onclick="changePFP()">
-            <img id="user-pfp" src="" class="pfp-image">
-            <div class="pfp-edit-btn">
-                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    <div class="container" id="mainContainer">
+        <div class="profile-hero">
+            <div class="pfp-wrapper" onclick="changePFP()">
+                <img id="user-pfp" src="" class="pfp-image">
+                <div class="pfp-edit-btn">
+                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </div>
             </div>
+            <div class="id-badge">Network ID: <span id="display-id">--------</span></div>
         </div>
-        <div class="id-badge">ID: <span id="display-id">--------</span></div>
-    </div>
 
-    <div class="form-group">
-        <label class="field-label">Display Name</label>
-        <input type="text" id="full-name" class="input-box" placeholder="Your name">
-    </div>
+        <div class="form-group">
+            <label class="field-label">Display Name</label>
+            <input type="text" id="full-name" class="input-box" placeholder="Your name">
+        </div>
 
-    <div class="form-group">
-        <label class="field-label">Username</label>
-        <input type="text" id="username" class="input-box" placeholder="@username" autocomplete="off">
-        <div id="status"></div>
-    </div>
+        <div class="form-group">
+            <label class="field-label">Username</label>
+            <input type="text" id="username" class="input-box" placeholder="@username" autocomplete="off">
+            <div id="status"></div>
+        </div>
 
-    <div class="form-group">
-        <label class="field-label">Bio</label>
-        <textarea id="bio" class="input-box" placeholder="Tell the world about yourself..." rows="3" style="resize: none;"></textarea>
-    </div>
+        <div class="form-group">
+            <label class="field-label">Short Bio</label>
+            <textarea id="bio" class="input-box" placeholder="Tell your story..." rows="3" style="resize: none;"></textarea>
+        </div>
 
-    <button id="launchBtn" class="btn-save" style="display: none;">Save Changes</button>
+        <div class="section-divider"></div>
+
+        <button id="launchBtn" class="btn-save" style="display: none;">Save Changes</button>
+    </div>
 </div>
 
 <script>
@@ -206,7 +218,6 @@
     const launchBtn = document.getElementById('launchBtn');
     const container = document.getElementById('mainContainer');
 
-    // 1. Instant 0ms Local Load
     const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
     if (localProfile) {
         populateUI(localProfile);
@@ -248,9 +259,7 @@
             const doc = await db.collection("users").doc(user.uid).get();
             if (doc.exists) {
                 const cloudData = doc.data();
-                // Update Local Storage
                 localStorage.setItem('goorac_profile', JSON.stringify(cloudData));
-                // Live Update UI if data is different
                 populateUI(cloudData);
             } else {
                 if (!finalGooracID) finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
@@ -271,23 +280,23 @@
 
         if (val.length < 3) {
             statusMsg.innerHTML = "Username too short";
-            statusMsg.style.color = "#a1a1a6";
+            statusMsg.style.color = "#888";
             return;
         }
 
         if (currentSavedUsername && val === currentSavedUsername) {
-            statusMsg.innerHTML = "✓ This is you";
-            statusMsg.style.color = "#32d74b";
+            statusMsg.innerHTML = "✓ Current Identity";
+            statusMsg.style.color = "#30d158";
             return;
         }
 
         const query = await db.collection("users").where("username", "==", val).get();
         if (query.empty) {
             statusMsg.innerHTML = "✓ Available";
-            statusMsg.style.color = "#32d74b";
+            statusMsg.style.color = "#30d158";
             launchBtn.disabled = false;
         } else {
-            statusMsg.innerHTML = "✕ Already taken";
+            statusMsg.innerHTML = "✕ Unavailable";
             statusMsg.style.color = "#ff453a";
             launchBtn.disabled = true;
         }
@@ -295,7 +304,7 @@
 
     launchBtn.onclick = async () => {
         const originalText = launchBtn.innerText;
-        launchBtn.innerText = "Saving...";
+        launchBtn.innerText = "Synchronizing...";
         launchBtn.disabled = true;
 
         const profileData = {
@@ -313,15 +322,12 @@
         }
 
         try {
-            // Optimistic Local Save
             localStorage.setItem('goorac_profile', JSON.stringify(profileData));
-
             await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
             await activeUser.updateProfile({
                 displayName: document.getElementById('full-name').value,
                 photoURL: currentPhotoURL
             });
-
             window.location.href = "home.html";
         } catch (e) {
             alert("Save Error: " + e.message);
