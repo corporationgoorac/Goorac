@@ -86,7 +86,6 @@
         .user-item { 
             display: flex; align-items: center; justify-content: space-between; 
             padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
-            /* animation removed for stability */
         }
         
         .user-item.is-me { 
@@ -224,7 +223,7 @@
     let isOwnProfile = false;
     let currentUserFollowing = []; 
     let followerIds = []; 
-    let processingIds = new Set(); // Lock mechanism
+    let processingIds = new Set(); 
     
     // Pagination
     let lastFetchedIndex = 0;
@@ -318,9 +317,11 @@
         const nextBatchIds = followerIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
+            // Speed optimization: Fetch all docs in parallel
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
+            
             allUsersData = [...allUsersData, ...newUsers];
             lastFetchedIndex += limit;
             renderList(allUsersData);
@@ -457,6 +458,7 @@
                 btn.style.pointerEvents = 'auto';
             }
             processingIds.delete(targetUid);
+            // Realtime update via onSnapshot will handle button state reset
         }
     }
 
