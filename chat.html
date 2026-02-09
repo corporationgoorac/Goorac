@@ -21,7 +21,6 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
 
-      // Your web app's Firebase configuration
       export const firebaseConfig = {
           apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
           authDomain: "goorac-c3b59.firebaseapp.com",
@@ -32,7 +31,6 @@
           measurementId: "G-M46FEVRYSS"
       };
 
-      // Initialize Firebase
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
     </script>
@@ -114,6 +112,11 @@
             background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite;
         }
 
+        /* INSTANT LOAD OVERRIDE: Remove animations when data is cached */
+        .instant-load .loading-shimmer { animation: none; background: transparent; }
+        .instant-load .chat-media-img { animation: none; }
+        .instant-load #chat-flow { opacity: 1 !important; transition: none !important; }
+
         .app-container { 
             display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
         }
@@ -162,7 +165,7 @@
             /* Hide Scrollbar */
             -ms-overflow-style: none; scrollbar-width: none;
             
-            /* Initial State Hidden (will be overridden by cache logic immediately) */
+            /* Initial State Hidden (Unless Instant Load) */
             opacity: 0; transition: opacity 0.2s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
@@ -342,8 +345,7 @@
         .picker-modal-content {
             width: 100%; height: 55vh; /* Half screen */
             background: #1c1c1c;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
             display: flex; flex-direction: column;
             animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             overflow: hidden;
@@ -653,7 +655,54 @@
     const headerSubLabel = document.getElementById('h-username-label');
     const attachmentMenu = document.getElementById('attachment-menu');
 
-    // UNWANTED EMOJIS REMOVED HERE
+    // === 0MS INSTANT LOADING BLOCK ===
+    // This executes synchronously before any network requests
+    (function instantRender() {
+        const storedMyUid = localStorage.getItem('my_uid_cache');
+        const userCacheKey = `chat_user_${targetUsername}`;
+        const storedUser = localStorage.getItem(userCacheKey);
+
+        if (storedUser && storedMyUid && targetUsername) {
+            try {
+                // 1. Render Header Instantly
+                chatTargetData = JSON.parse(storedUser);
+                const pfp = document.getElementById('h-pfp');
+                pfp.classList.remove('loading-shimmer');
+                pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
+                document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
+                document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
+                if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+
+                // 2. Calculate ChatID
+                myUid = storedMyUid; // Temporarily set strictly for render
+                targetUid = chatTargetData.uid;
+                chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
+
+                // 3. Render Messages Instantly
+                const msgCacheKey = `chat_msgs_${chatId}`;
+                const storedMsgs = localStorage.getItem(msgCacheKey);
+                
+                if (storedMsgs) {
+                    const msgs = JSON.parse(storedMsgs);
+                    msgs.forEach(m => {
+                        m.timestamp = { toDate: () => new Date(m.timestampIso || m.timestamp) };
+                        if(m.seenAtIso) m.seenAt = { toDate: () => new Date(m.seenAtIso) };
+                        messagesMap.set(m.id || m.timestampIso, m);
+                    });
+                    
+                    // Add class to kill animations for instant feel
+                    document.body.classList.add('instant-load');
+                    renderAll();
+                    
+                    // Scroll to bottom immediately
+                    chatFlow.style.opacity = '1';
+                    chatFlow.scrollTop = chatFlow.scrollHeight;
+                    isFirstLoad = false;
+                }
+            } catch(e) { console.error("Instant Load Error", e); }
+        }
+    })();
+    // === END INSTANT LOAD ===
 
     // NEW: Double Tap on Background to Scroll Down
     document.addEventListener('dblclick', (e) => {
@@ -976,6 +1025,9 @@
     auth.onAuthStateChanged(user => {
         if (user) { 
             myUid = user.uid; 
+            // Save UID for next instant load
+            localStorage.setItem('my_uid_cache', myUid);
+            
             db.collection('users').doc(myUid).get().then(doc => {
                  if (doc.exists) myUserData = doc.data();
             });
@@ -990,51 +1042,9 @@
 
         // --- CACHE LAYER: INSTANT LOAD USER DATA ---
         const cacheKeyUser = `chat_user_${targetUsername}`;
-        const cachedUserData = localStorage.getItem(cacheKeyUser);
-        let cacheHit = false;
-
-        const pfp = document.getElementById('h-pfp');
+        // Note: Cache loading now handled in the immediate block above, 
+        // but we still do a fresh fetch here to update any changes.
         
-        if (cachedUserData) {
-            try {
-                chatTargetData = JSON.parse(cachedUserData);
-                targetUid = chatTargetData.uid; // Ensure UID was stored
-                
-                // Instant UI Population
-                pfp.classList.remove('loading-shimmer');
-                pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
-                document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
-                document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
-                if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
-                
-                // Calculate Chat ID immediately if we have both UIDs
-                if (myUid && targetUid) {
-                    chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
-                    
-                    // --- CACHE LAYER: INSTANT LOAD MESSAGES ---
-                    const cacheKeyMsgs = `chat_msgs_${chatId}`;
-                    const cachedMsgs = localStorage.getItem(cacheKeyMsgs);
-                    if (cachedMsgs) {
-                        const msgs = JSON.parse(cachedMsgs);
-                        msgs.forEach(m => {
-                            // Reconstruct fake Firestore Timestamp object so existing render logic works
-                            m.timestamp = { toDate: () => new Date(m.timestampIso || m.timestamp) };
-                            if(m.seenAtIso) m.seenAt = { toDate: () => new Date(m.seenAtIso) };
-                            messagesMap.set(m.id || m.timestampIso, m);
-                        });
-                        
-                        // RENDER INSTANTLY AND FORCE VISIBILITY (NO FADE)
-                        renderAll();
-                        chatFlow.style.transition = 'none'; // DISABLE ANIMATION
-                        chatFlow.style.opacity = '1';
-                        chatFlow.scrollTop = chatFlow.scrollHeight;
-                        isFirstLoad = false; // Prevent jump effect when network returns
-                        cacheHit = true;
-                    }
-                }
-            } catch(e) { console.error("Cache Parse Error", e); }
-        }
-
         const snap = await db.collection("users").where("username", "==", targetUsername).get();
         if (snap.empty) return;
         
@@ -1048,8 +1058,9 @@
 
         chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // If no cache hit, do standard loading animation removal
-        if (!cacheHit) {
+        // If no cache hit happened, update UI now
+        if (!messagesMap.size) {
+            const pfp = document.getElementById('h-pfp');
             pfp.classList.remove('loading-shimmer');
             pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
             document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
@@ -1192,9 +1203,10 @@
                 if (isFirstLoad) {
                     renderAll();
                     chatFlow.scrollTop = chatFlow.scrollHeight;
-                    // Force display block if not already (redundant but safe)
-                    chatFlow.style.opacity = '1';
-                    isFirstLoad = false;
+                    setTimeout(() => {
+                        chatFlow.style.opacity = '1';
+                        isFirstLoad = false;
+                    }, 50);
                 } else {
                     const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
                     renderAll();
