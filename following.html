@@ -158,7 +158,9 @@
         .pulse { animation: pulse-bg 1.8s infinite ease-in-out; }
         @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); }
+        .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); opacity: 0; animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        
         .empty-icon { font-size: 4rem; margin-bottom: 20px; display: block; filter: drop-shadow(0 0 10px rgba(0,210,255,0.2)); }
         
         .lock-msg { 
@@ -238,7 +240,11 @@
                 const data = doc.data();
                 if(data && data.following) {
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
-                    if (allUsersData.length > 0) updateButtons();
+                    // FIXED: This now clears processing IDs to ensure buttons update immediately
+                    if (allUsersData.length > 0) {
+                        processingIds.clear(); 
+                        updateButtons();
+                    }
                 }
             });
             initPage(user); 
@@ -319,11 +325,9 @@
         const nextBatchIds = followingIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
-            // Speed boost: batch fetch user data
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
-            
             allUsersData = [...allUsersData, ...newUsers];
             lastFetchedIndex += limit;
             renderList(allUsersData);
@@ -387,31 +391,34 @@
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
-            // Skip if currently processing this user to keep spinner visible
-            if (processingIds.has(uid)) return;
-
             const span = btn.querySelector('span');
+            
             if(currentUserFollowing.includes(uid)) {
                 if(span) span.innerText = "Following";
                 btn.className = "action-btn following";
+                btn.innerHTML = `<span>Following</span>`; // Force clear loader
             } else {
                 if(span) span.innerText = "Follow";
                 btn.className = "action-btn";
+                btn.innerHTML = `<span>Follow</span>`; // Force clear loader
             }
+            btn.style.pointerEvents = 'auto'; // Re-enable clicks
         });
     }
 
     async function handleAction(targetUid, username) {
-        // PREVENT MULTIPLE CLICKS
         if (processingIds.has(targetUid)) return;
         processingIds.add(targetUid);
 
         const btn = document.getElementById(`btn-${targetUid}`);
-        let originalContent = '';
         if (btn) {
-            originalContent = btn.innerHTML;
             btn.innerHTML = '<div class="btn-loader"></div>';
             btn.style.pointerEvents = 'none';
+        }
+
+        // FEATURE: Haptic feedback for interaction
+        if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(10);
         }
 
         const myUid = auth.currentUser.uid;
@@ -422,7 +429,6 @@
 
         try {
             if (isOwnProfile) {
-                // REMOVED Native Pop-up. Direct action with visual feedback.
                 if(btn) {
                     const parentItem = btn.closest('.user-item');
                     parentItem.style.opacity = '0.3';
@@ -455,18 +461,15 @@
         } catch (e) {
             console.error(e);
             if (btn) {
-                btn.innerHTML = originalContent;
-                btn.style.pointerEvents = 'auto';
+                updateButtons(); // Restore button state on error
                 const parentItem = btn.closest('.user-item');
                 if(parentItem) {
                     parentItem.style.opacity = '1';
                     parentItem.style.transform = 'none';
                 }
             }
-        } finally {
-            processingIds.delete(targetUid);
-            // updateButtons() will be called automatically by the onSnapshot listener
         }
+        // Note: processingIds is cleared by the Firestore listener in onAuthStateChanged
     }
 
     async function removeFromList(docUid, field, targetUid) {
