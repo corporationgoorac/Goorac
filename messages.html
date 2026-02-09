@@ -18,6 +18,7 @@
             --accent: #00d2ff;
             --border: rgba(255, 255, 255, 0.1);
             --text-dim: #888;
+            --text-time: #b0b0b0; /* Improved visibility */
             --danger: #ff4444;
             --glass: rgba(255, 255, 255, 0.03);
             --sheet-bg: #121212;
@@ -65,13 +66,13 @@
         .pfp-container { position: relative; margin-right: 15px; }
         .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
         
-        /* The Real-Time Green Dot */
+        /* Real-Time Green Dot */
         .online-indicator {
             position: absolute; bottom: 2px; right: 2px;
             width: 12px; height: 12px; background: var(--online);
             border-radius: 50%; border: 2px solid #000;
             box-shadow: 0 0 8px var(--online);
-            display: none; /* Hidden by default */
+            display: none; 
             z-index: 2;
         }
         .online-indicator.active { display: block; }
@@ -80,8 +81,19 @@
         .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         
         .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
+        .chat-time { font-size: 0.75rem; color: var(--text-time); font-weight: 500; letter-spacing: 0.5px; }
+        
         .v-badge { height: 14px; width: 14px; }
-        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; transition: color 0.3s; }
+        
+        /* Message Preview Styles */
+        .last-msg { 
+            color: var(--text-dim); font-size: 0.9rem; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            max-width: 75%; transition: color 0.3s;
+        }
+        .last-msg.unread { color: #fff; font-weight: 700; }
+        .last-msg.seen-status { color: var(--text-dim); font-size: 0.8rem; font-style: italic; display: flex; align-items: center; gap: 4px; }
+        
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
         @keyframes pulseType { 50% { opacity: 0.6; } }
 
@@ -95,7 +107,7 @@
         .follow-btn { 
             background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
             padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-            pointer-events: auto; /* MUST BE AUTO TO CLICK */
+            pointer-events: auto; 
         }
 
         .unread-badge { 
@@ -152,7 +164,7 @@
 
 <header>
     <div class="header-logo">GOORAC</div>
-    </header>
+</header>
 
 <div class="search-wrap">
     <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
@@ -161,9 +173,8 @@
 <div id="search-results"></div>
 
 <div id="inbox-content">
-    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; display:flex; justify-content:space-between;">
-        <span>Quantum Inbox</span>
-        <span id="last-sync-time" style="opacity:0.5; font-weight:400;">Syncing...</span>
+    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
+        Quantum Inbox
     </div>
     
     <div id="chats-list">
@@ -298,8 +309,7 @@
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
-            document.getElementById('last-sync-time').innerText = "Updated " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
+            
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
@@ -351,14 +361,29 @@
                 });
 
                 const finalName = u.name || u.displayName || u.username || "Unknown";
-                const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
                 
+                // --- SEEN LOGIC ---
+                let lastMsgDisplay = chat.lastMessage || `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+                let msgClass = isUnread ? "last-msg unread" : "last-msg";
+                
+                // If I sent the last message AND it's seen
+                if (chat.lastSender === myUid && chat.seen) {
+                    const timeAgo = chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : 'now';
+                    lastMsgDisplay = `<span style="opacity:0.8; font-size:0.75rem;">Seen ${timeAgo}</span>`;
+                    msgClass = "last-msg seen-status";
+                } 
+                else if (chat.lastSender === myUid && !chat.seen) {
+                    lastMsgDisplay = `You: ${chat.lastMessage}`;
+                }
+
                 const safeUserStr = encodeURIComponent(JSON.stringify({
                     name: finalName,
                     username: u.username,
                     photoURL: u.photoURL,
                     verified: u.verified
                 }));
+
+                const timeDisplay = chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : '';
 
                 const item = document.createElement('div');
                 item.className = 'chat-item';
@@ -368,7 +393,6 @@
                 item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
                 item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
 
-                // --- GREEN DOT PLACEHOLDER ---
                 item.innerHTML = `
                     <div class="pfp-container">
                         <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
@@ -381,11 +405,11 @@
                                 ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
                                 ${isPinned ? `<span class="pin-indicator"></span>` : ''}
                             </span>
-                            <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
+                            <span class="chat-time">${timeDisplay}</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                                ${lastMsg}
+                            <div class="${msgClass}" id="last-msg-${id}">
+                                ${lastMsgDisplay}
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
                                 ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
@@ -401,7 +425,7 @@
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
                     if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
-                    else { msgEl.innerHTML = lastMsg; }
+                    else { msgEl.innerHTML = lastMsgDisplay; }
                 });
 
                 // --- LISTEN FOR ONLINE STATUS ---
