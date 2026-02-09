@@ -20,6 +20,7 @@
             --border: rgba(255, 255, 255, 0.1);
             --text-main: #ffffff;
             --text-dim: #999999;
+            --text-unread: #ffffff;
             --danger: #ff4444;
             --glass: rgba(255, 255, 255, 0.05);
             --sheet-bg: #121212;
@@ -94,7 +95,7 @@
         }
         
         /* Incoming Unread */
-        .last-msg.unread { color: #fff; font-weight: 800; }
+        .last-msg.unread { color: var(--text-unread); font-weight: 800; }
         
         /* Outgoing Seen */
         .last-msg.seen { color: var(--seen-color); font-weight: 500; font-size: 0.85rem; }
@@ -240,6 +241,7 @@
     function startInboxListener() {
         if(inboxUnsub) inboxUnsub();
 
+        // STRICTLY LISTENS TO DATA. DOES NOT UPDATE 'SEEN'.
         inboxUnsub = db.collection("chats")
             .where("participants", "array-contains", myUid)
             .onSnapshot(handleInboxSnapshot);
@@ -292,24 +294,25 @@
         chats.forEach(c => {
             const { id, data, user, otherUid, isPinned } = c;
             
-            // --- CRITICAL FIX: SEEN / UNREAD LOGIC ---
+            // --- MESSAGE STATUS LOGIC (Visual Only) ---
             const amISender = data.lastSender === myUid;
             
-            // "Seen" logic: If I am sender, check if they saw it. If I am receiver, check if I saw it.
-            // Note: In Firestore, 'seen' is a boolean often updated by the receiver.
+            // Determine "Seen" based on DB state, do NOT write to DB here
+            const isSeenByMe = data.seen === true || amISender; 
+            // Note: 'seen' usually tracks if the RECEIVER saw it.
+            // If amISender is true, data.seen=true means THEY saw it.
+            // If amISender is false, data.seen=true means I saw it.
             
             let msgText = data.lastMessage || "Media";
             let msgClass = "last-msg";
             let timeStr = data.lastTimestamp ? formatTime(data.lastTimestamp.toDate()) : "";
 
+            // --- LOGIC: What to show in preview ---
             if (amISender) {
                 // I sent the last message
                 if (data.seen === true) {
-                    // They read it -> Blue "Seen"
-                    // If your chat logic saves a 'seenAt', we calculate relative time. 
-                    // Since 'seenAt' might not be in the Chat doc (often only in Message doc), we use "Seen".
-                    // You can add seenAt to chat doc for better precision.
-                    msgText = `Seen ${timeStr} ago`; // Approximate using last msg time
+                    // They read it -> Show "Seen X ago"
+                    msgText = `Seen ${timeStr} ago`; 
                     msgClass = "last-msg seen";
                 } else {
                     // They haven't read it -> "You: Message"
@@ -317,20 +320,25 @@
                 }
             } else {
                 // I received the message
-                if (data.seen === false || (data.unreadCount && data.unreadCount[myUid] > 0)) {
-                    // I haven't read it -> Bold White
+                // Check UNREAD COUNT for me
+                const myUnreadCount = (data.unreadCount && data.unreadCount[myUid]) ? data.unreadCount[myUid] : 0;
+                
+                if (myUnreadCount > 0 || data.seen === false) {
+                    // It is unread for me -> Bold White Text
                     msgClass = "last-msg unread";
                 } else {
-                    // I read it -> Grey normal text
-                    // msgText remains as is
+                    // I have read it -> Normal Grey Text
+                    msgClass = "last-msg";
                 }
             }
 
-            // Unread Count Badge (Only if I am NOT sender and haven't read)
+            // Unread Count Badge (Only if I am NOT sender and have count)
             let badge = "";
-            if (!amISender && (data.unreadCount && data.unreadCount[myUid] > 0)) {
-                const count = data.unreadCount[myUid];
-                badge = `<div class="unread-count">${count > 99 ? '99+' : count}</div>`;
+            if (!amISender) {
+                const count = (data.unreadCount && data.unreadCount[myUid]) || 0;
+                if(count > 0) {
+                    badge = `<div class="unread-count">${count > 99 ? '99+' : count}</div>`;
+                }
             }
 
             const isFollowing = following.some(f => (typeof f === 'string' ? f : f.uid) === otherUid);
@@ -381,7 +389,7 @@
             const el = document.getElementById(`preview-${chatId}`);
             if(!el) return;
             if(s.val()) el.innerHTML = `<span class="typing-text">typing...</span>`;
-            // Reverting logic handled by next snapshot update
+            // Note: Reverting handled by next snapshot or reload
         });
 
         // Online Status
