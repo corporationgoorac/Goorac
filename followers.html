@@ -152,6 +152,12 @@
 
         .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); }
         .empty-icon { font-size: 4rem; margin-bottom: 20px; display: block; filter: drop-shadow(0 0 10px rgba(0,210,255,0.2)); }
+        
+        /* Privacy Msg Styling */
+        .lock-msg { 
+            background: var(--surface-light); padding: 30px 20px; border-radius: 20px; 
+            margin-top: 40px; border: 1px solid var(--border);
+        }
 
     </style>
 </head>
@@ -251,16 +257,37 @@
                     return;
                 }
                 const targetDoc = userQuery.docs[0];
+                const targetData = targetDoc.data();
                 targetUID = targetDoc.id;
                 isOwnProfile = (targetUID === currentUser.uid);
-                document.getElementById('header-title').innerText = `@${targetDoc.data().username}`;
+                document.getElementById('header-title').innerText = `@${targetData.username}`;
+
+                // --- MUTUAL PRIVACY LOGIC ---
+                if (!isOwnProfile) {
+                    // Get my data to check if I follow them
+                    const myDoc = await db.collection("users").doc(currentUser.uid).get();
+                    const myFollowing = (myDoc.data()?.following || []).map(f => typeof f === 'string' ? f : f.uid);
+                    const theirFollowers = (targetData.followers || []).map(f => typeof f === 'string' ? f : f.uid);
+                    
+                    const iFollowThem = myFollowing.includes(targetUID);
+                    const theyFollowMe = theirFollowers.includes(currentUser.uid);
+
+                    // If NOT mutual, block view
+                    if (!iFollowThem || !theyFollowMe) {
+                        list.innerHTML = `
+                            <div class="empty-state lock-msg">
+                                <div class="empty-icon">🔒</div>
+                                <h3>Private Profile</h3>
+                                <p>You must follow each other to view follower lists.</p>
+                            </div>`;
+                        document.getElementById('header-count').innerText = "Private";
+                        return;
+                    }
+                }
             } else {
                 isOwnProfile = true;
                 document.getElementById('header-title').innerText = "My Followers";
             }
-
-            // 2. Privacy/Mutual Check (Optional Logic Placeholder)
-            // If implementing private profiles, check mutual status here.
 
             // 3. Listen to Followers Array
             db.collection("users").doc(targetUID).onSnapshot(async doc => {
@@ -270,7 +297,6 @@
                 document.getElementById('header-count').innerText = `${rawFollowers.length} followers`;
 
                 // Normalize: array might contain Strings (old) or Objects (new)
-                // We reverse it to show newest followers at top (if array pushed chronologically)
                 followerIds = rawFollowers.map(item => typeof item === 'string' ? item : item.uid).reverse();
                 
                 if (followerIds.length === 0) {
@@ -346,13 +372,11 @@
             // Logic for Buttons
             let actionHtml = '';
             if (isMe) {
-                // If it's me, show a "You" badge instead of a button
                 actionHtml = `<div class="you-badge">YOU</div>`;
             } else {
                 let btnText = isOwnProfile ? 'Remove' : (isFollowing ? 'Following' : 'Follow');
                 let btnClass = isOwnProfile ? 'action-btn remove' : (isFollowing ? 'action-btn following' : 'action-btn');
                 
-                // Assign ID to button for optimistic updates
                 actionHtml = `<button id="btn-${u.uid}" class="${btnClass}" onclick="handleAction('${u.uid}', '${u.username}')">${btnText}</button>`;
             }
 
@@ -375,7 +399,7 @@
 
     // Only updates classes/text, doesn't redraw list (smoothness)
     function updateButtons() {
-        if(isOwnProfile) return; // Own profile always uses 'Remove' logic
+        if(isOwnProfile) return; 
 
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
@@ -394,7 +418,6 @@
     async function handleAction(targetUid, username) {
         const myUid = auth.currentUser.uid;
         
-        // 1. Prepare Data Objects with Metadata (Date/Time)
         const timestamp = firebase.firestore.Timestamp.now();
         const dateStr = new Date().toISOString();
         
@@ -402,38 +425,31 @@
         const theirFollowerData = { uid: myUid, timestamp: timestamp, date: dateStr, type: 'follower' };
 
         if (isOwnProfile) {
-            // REMOVING A FOLLOWER
             if (!confirm(`Remove @${username} from your followers?`)) return;
             
-            // UI Optimistic Remove
             const btn = document.getElementById(`btn-${targetUid}`);
             if(btn) btn.closest('.user-item').style.opacity = '0.5';
 
-            await removeFromList(myUid, 'followers', targetUid); // Remove from my followers list
-            await removeFromList(targetUid, 'following', myUid); // Remove me from their following list
+            await removeFromList(myUid, 'followers', targetUid); 
+            await removeFromList(targetUid, 'following', myUid); 
             
-            // Real removal from DOM handled by snapshot or manual reload if needed
             if(btn) btn.closest('.user-item').remove();
 
         } else {
-            // FOLLOW / UNFOLLOW LOGIC
             const isFollowing = currentUserFollowing.includes(targetUid);
             const btn = document.getElementById(`btn-${targetUid}`);
 
             if (isFollowing) {
-                // UNFOLLOW
                 btn.innerText = "Follow";
-                btn.className = "action-btn"; // Revert style instantly
+                btn.className = "action-btn"; 
                 
                 await removeFromList(myUid, 'following', targetUid);
                 await removeFromList(targetUid, 'followers', myUid);
             } else {
-                // FOLLOW
                 btn.innerText = "Following";
-                btn.className = "action-btn following"; // Update style instantly
+                btn.className = "action-btn following"; 
                 
                 const batch = db.batch();
-                // Store FULL OBJECT for future features
                 batch.update(db.collection("users").doc(myUid), {
                     following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
                     followingCount: firebase.firestore.FieldValue.increment(1)
@@ -448,7 +464,6 @@
         }
     }
 
-    // Helper: Safely remove item from array whether it's stored as String or Object
     async function removeFromList(docUid, field, targetUid) {
         const docRef = db.collection("users").doc(docUid);
         try {
@@ -457,13 +472,11 @@
                 if (!doc.exists) return;
                 
                 const currentArray = doc.data()[field] || [];
-                // Filter out: Check if item is string (==uid) OR if item.uid matches
                 const newArray = currentArray.filter(item => {
                     const id = typeof item === 'string' ? item : item.uid;
                     return id !== targetUid;
                 });
                 
-                // Only write if changed to save cost
                 if (newArray.length !== currentArray.length) {
                     const countField = field === 'followers' ? 'followerCount' : 'followingCount';
                     t.update(docRef, { 
