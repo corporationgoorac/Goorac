@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#000000">
     <title>My Profile | Goorac</title>
     
+    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -16,6 +17,8 @@
     
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
+    <script src="viewNotes.js" defer></script>
+    <script src="components/profileNotes.js" defer></script>
 
     <style>
         :root {
@@ -38,9 +41,11 @@
             color: var(--primary);
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            padding-bottom: 120px;
+            padding-bottom: 80px; /* Space for navbar */
             user-select: none; -webkit-user-select: none;
             -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
         }
 
         /* --- HEADER --- */
@@ -60,18 +65,20 @@
         }
         .icon-btn:active { transform: scale(0.9); background: var(--surface-press); }
 
-        /* --- HERO SECTION --- */
-        .profile-hero {
+        /* --- TOP HALF: PROFILE CARD --- */
+        .profile-top-section {
+            background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
+            padding: 20px 24px 30px;
             display: flex; flex-direction: column; align-items: center;
-            padding: 40px 24px 20px; text-align: center;
+            border-bottom: 1px solid var(--border);
         }
 
+        /* COMPACT AVATAR */
         .avatar-wrapper {
-            width: 110px; height: 110px; margin-bottom: 20px;
-            position: relative; padding: 4px;
+            width: 90px; height: 90px; margin-bottom: 15px;
+            position: relative; padding: 3px;
             background: linear-gradient(135deg, var(--border), transparent);
             border-radius: 50%;
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .avatar {
             width: 100%; height: 100%; border-radius: 50%;
@@ -79,65 +86,73 @@
             display: block; border: 2px solid var(--bg);
         }
 
+        /* INFO */
         .user-name { 
-            font-size: 24px; font-weight: 800; margin-bottom: 4px; 
+            font-size: 22px; font-weight: 800; margin-bottom: 4px; 
             display: flex; align-items: center; gap: 6px; letter-spacing: -0.5px;
-            min-height: 32px; /* Prevent jump */
+            min-height: 32px;
         }
         .verified { color: var(--accent); font-size: 20px; }
-        .user-handle { color: var(--secondary); font-size: 15px; font-weight: 500; min-height: 20px; }
+        .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; }
 
-        /* --- ID PILL --- */
+        /* ID PILL */
         .id-pill {
-            margin: 20px 0 28px;
+            margin: 15px 0 20px;
             background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-            padding: 8px 16px; border-radius: 12px;
+            padding: 6px 14px; border-radius: 100px;
             display: inline-flex; align-items: center; gap: 8px;
             cursor: pointer; transition: 0.2s;
-            min-height: 38px;
+            min-height: 32px;
         }
         .id-pill:active { background: var(--surface-press); transform: scale(0.97); }
         .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
-        .id-value { font-family: 'Inter', monospace; font-size: 14px; font-weight: 600; color: var(--primary); }
-        .copy-icon { font-size: 16px; color: var(--secondary); }
+        .id-value { font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); }
+        .copy-icon { font-size: 14px; color: var(--secondary); }
 
         .bio {
-            font-size: 14px; line-height: 1.5; color: #a0a0a0; 
-            text-align: center; max-width: 90%; margin-bottom: 32px;
-            min-height: 42px;
+            font-size: 13px; line-height: 1.5; color: #a0a0a0; 
+            text-align: center; max-width: 90%; margin-bottom: 25px;
+            min-height: 38px;
         }
 
-        /* --- STATS GRID --- */
+        /* STATS GRID */
         .stats-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-            padding: 0 24px; margin-bottom: 32px; width: 100%; max-width: 450px; margin-left: auto; margin-right: auto;
+            width: 100%; max-width: 400px; margin-bottom: 25px;
         }
         .stat-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
-            padding: 18px 12px; border-radius: 20px; text-align: center;
-            text-decoration: none; color: inherit; transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            min-height: 85px;
+            padding: 12px; border-radius: 16px; text-align: center;
+            text-decoration: none; color: inherit; transition: 0.2s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        .stat-card:active { background: var(--surface-press); transform: translateY(2px); }
-        .stat-num { display: block; font-size: 20px; font-weight: 800; margin-bottom: 2px; color: var(--primary); }
+        .stat-card:active { background: var(--surface-press); transform: scale(0.98); }
+        .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
         .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-        /* --- ACTIONS --- */
+        /* ACTIONS */
         .action-row {
-            display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px;
-            padding: 0 24px; width: 100%; max-width: 450px; margin-left: auto; margin-right: auto;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            width: 100%; max-width: 400px;
         }
         .btn {
-            height: 54px; border-radius: 18px;
-            font-size: 15px; font-weight: 700; text-align: center;
+            height: 44px; border-radius: 14px;
+            font-size: 14px; font-weight: 700; text-align: center;
             text-decoration: none; cursor: pointer; border: none;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .btn-edit { background: var(--primary); color: #000; box-shadow: 0 8px 20px rgba(255,255,255,0.1); }
+        .btn-edit { background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
         .btn:active { transform: scale(0.96); opacity: 0.8; }
+
+        /* --- BOTTOM HALF: NOTES --- */
+        .notes-section {
+            flex: 1;
+            padding: 0 24px;
+            margin-top: 10px;
+        }
 
         /* --- SKELETON REFINED --- */
         .skeleton {
@@ -173,7 +188,7 @@
         </button>
     </header>
 
-    <div class="profile-hero">
+    <div class="profile-top-section">
         <div class="avatar-wrapper" id="pfp-container">
             <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
         </div>
@@ -192,33 +207,38 @@
         </div>
 
         <p class="bio skeleton" id="bio" style="width: 80%; height: 36px; border-radius: 8px;"></p>
+
+        <div class="stats-grid">
+            <a href="followers.html" class="stat-card skeleton" id="stat-fol">
+                <span class="stat-num" id="count-followers" style="visibility: hidden;">0</span>
+                <span class="stat-label" style="visibility: hidden;">Followers</span>
+            </a>
+            <a href="following.html" class="stat-card skeleton" id="stat-fing">
+                <span class="stat-num" id="count-following" style="visibility: hidden;">0</span>
+                <span class="stat-label" style="visibility: hidden;">Following</span>
+            </a>
+        </div>
+
+        <div class="action-row">
+            <a href="setup.html" class="btn btn-edit">Edit Profile</a>
+            <button onclick="logout()" class="btn btn-logout">
+                <span class="material-icons-round" style="font-size: 18px;">logout</span> Logout
+            </button>
+        </div>
     </div>
 
-    <div class="stats-grid">
-        <a href="followers.html" class="stat-card skeleton" id="stat-fol">
-            <span class="stat-num" id="count-followers" style="visibility: hidden;">0</span>
-            <span class="stat-label" style="visibility: hidden;">Followers</span>
-        </a>
-        <a href="following.html" class="stat-card skeleton" id="stat-fing">
-            <span class="stat-num" id="count-following" style="visibility: hidden;">0</span>
-            <span class="stat-label" style="visibility: hidden;">Following</span>
-        </a>
+    <div class="notes-section">
+        <profile-notes id="profile-notes"></profile-notes>
     </div>
 
-    <div class="action-row">
-        <a href="setup.html" class="btn btn-edit">Edit Profile</a>
-        <button onclick="logout()" class="btn btn-logout">
-            <span class="material-icons-round" style="font-size: 18px;">logout</span> Logout
-        </button>
-    </div>
+    <view-notes id="view-notes-modal"></view-notes>
+    <call-notifier></call-notifier>
+    <main-navbar></main-navbar>
 
     <div id="toast">
         <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
         ID Copied
     </div>
-    
-
-    <call-notifier></call-notifier>
 
 <script>
     // --- FIREBASE CONFIG ---
@@ -251,6 +271,10 @@
     // --- 2. AUTH & REALTIME SYNC ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
+            // Trigger Notes Component with UID
+            const notesComp = document.getElementById('profile-notes');
+            if(notesComp) notesComp.uid = user.uid;
+
             initRealtimeListener(user.uid);
         } else {
             setTimeout(() => {
@@ -279,7 +303,7 @@
             const el = document.getElementById(id);
             if(el) {
                 el.classList.remove('skeleton');
-                el.style.width = ""; // Reset fixed skeleton widths
+                el.style.width = ""; 
                 el.style.height = "";
             }
         });
