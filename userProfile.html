@@ -11,11 +11,27 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <script>
+        // Init Firebase immediately to prevent component race conditions
+        if (!firebase.apps.length) {
+            firebase.initializeApp({
+                apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+                authDomain: "goorac-c3b59.firebaseapp.com",
+                projectId: "goorac-c3b59",
+                storageBucket: "goorac-c3b59.firebasestorage.app",
+                messagingSenderId: "746746595332",
+                appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
+            });
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+    </script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <script src="components/viewNotes.js" defer></script>
+    <script src="viewNotes.js" defer></script>
     <script src="components/profileNotes.js" defer></script>
 
     <style>
@@ -46,7 +62,7 @@
         /* --- HEADER --- */
         header {
             position: sticky; top: 0; z-index: 100;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             padding: calc(10px + var(--safe-top)) 16px 10px;
             display: flex; align-items: center; justify-content: space-between;
@@ -68,7 +84,6 @@
             border-bottom: 1px solid var(--border);
         }
 
-        /* COMPACT AVATAR */
         .avatar-wrapper {
             width: 90px; height: 90px; margin-bottom: 15px;
             position: relative; padding: 3px;
@@ -81,7 +96,6 @@
             display: block; border: 2px solid var(--bg);
         }
 
-        /* INFO */
         .user-name { 
             font-size: 22px; font-weight: 800; margin-bottom: 4px; 
             display: flex; align-items: center; justify-content: center; gap: 6px; letter-spacing: -0.5px;
@@ -90,7 +104,6 @@
         .verified { color: var(--accent); font-size: 20px; }
         .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; text-align: center; }
 
-        /* ID PILL */
         .id-pill {
             margin: 15px 0 20px;
             background: rgba(255,255,255,0.03); border: 1px solid var(--border);
@@ -111,7 +124,6 @@
             white-space: pre-wrap;
         }
 
-        /* STATS GRID */
         .stats-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
             width: 100%; max-width: 400px; margin-bottom: 25px;
@@ -128,7 +140,6 @@
         .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
         .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-        /* ACTIONS */
         .action-row {
             display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
             width: 100%; max-width: 400px;
@@ -140,10 +151,8 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        /* Follow Button: Gradient Accent */
         .btn-follow { background: var(--accent); color: #000; box-shadow: 0 4px 20px var(--accent-glow); }
         .btn-following { background: transparent; border: 1px solid #333; color: var(--primary); box-shadow: none; }
-        
         .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
         .btn-msg:active { background: var(--surface-press); }
 
@@ -155,7 +164,6 @@
             padding-bottom: 50px;
         }
 
-        /* --- SKELETONS --- */
         .skeleton {
             background: #111 !important;
             position: relative; overflow: hidden;
@@ -168,7 +176,6 @@
         }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        /* --- UTILS --- */
         .loader-circle {
             width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
             border-top: 2px solid var(--primary); border-radius: 50%;
@@ -188,7 +195,6 @@
             display: flex; align-items: center; gap: 8px;
         }
         #toast.show { opacity: 1; transform: translate(-50%, 0); }
-
     </style>
 </head>
 <body>
@@ -258,21 +264,7 @@
     </div>
 
 <script>
-    // --- 1. FIREBASE INIT ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
-    };
-
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-
-    // --- 2. GLOBAL VARS ---
+    // --- GLOBAL VARS ---
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
     
@@ -281,7 +273,7 @@
     let targetUserData = null;
     let isProcessing = false; 
     
-    // --- 3. CACHE STRATEGY (Instant Load) ---
+    // --- 1. LOCAL STORAGE CACHE (Restored & Fixed) ---
     function loadFromCache() {
         if(!targetUsername) return;
         const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
@@ -290,24 +282,27 @@
                 const data = JSON.parse(cached);
                 targetUserData = data;
                 targetUid = data.uid;
-                renderProfile(data); // Paint UI immediately
                 
-                // *** CRITICAL: Set UID for Notes Component ***
-                if(targetUid) {
-                    const notesComp = document.getElementById('profile-notes');
-                    if(notesComp) notesComp.uid = targetUid;
-                }
-
+                // Render UI immediately
+                renderProfile(data);
+                
+                // Update Follow Button State from cache
                 if (data.hasOwnProperty('amIFollowing')) {
                     updateFollowButton(data.amIFollowing);
                     removeBtnSkeletons();
                 }
+
+                // *** THE FIX: Safely initialize notes from cache ***
+                if(targetUid) {
+                    initNotesComponent(targetUid);
+                }
+
             } catch (e) { console.error("Cache Error", e); }
         }
     }
     loadFromCache();
 
-    // --- 4. AUTH & FRESH FETCH ---
+    // --- 2. AUTH & FRESH FETCH ---
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
@@ -327,15 +322,31 @@
 
             renderProfile(freshData);
             
-            // *** CRITICAL: Set UID for Notes Component ***
-            const notesComp = document.getElementById('profile-notes');
-            if(notesComp) notesComp.uid = targetUid;
+            // Update Notes with Fresh ID
+            initNotesComponent(targetUid);
 
             checkRelation(freshData);
         });
     }
 
-    // --- 5. RENDER LOGIC ---
+    // --- 3. SAFE COMPONENT INITIALIZER (The Magic Fix) ---
+    // This function ensures the UID is passed even if the script loads late
+    function initNotesComponent(uid) {
+        const notesComp = document.getElementById('profile-notes');
+        if(!notesComp) return;
+
+        // If the Custom Element is already defined (script loaded), set it.
+        if (customElements.get('profile-notes')) {
+            notesComp.uid = uid;
+        } else {
+            // If not loaded yet (cached data arrived first), wait for it.
+            customElements.whenDefined('profile-notes').then(() => {
+                notesComp.uid = uid;
+            });
+        }
+    }
+
+    // --- RENDER LOGIC ---
     function renderProfile(data) {
         // Remove skeletons
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
@@ -381,11 +392,10 @@
         document.getElementById('btn-msg').classList.remove('skeleton');
     }
 
-    // --- 6. FOLLOW/UNFOLLOW ---
+    // --- FOLLOW/UNFOLLOW ---
     async function checkRelation(freshData) {
         if(!myUid || !targetUid || myUid === targetUid) return;
 
-        // Check MY following list to see if I follow THEM
         const myDoc = await db.collection("users").doc(myUid).get();
         const myFollowing = myDoc.data().following || [];
 
@@ -397,7 +407,7 @@
         updateFollowButton(isFollowing);
         removeBtnSkeletons();
 
-        // Update Local Cache
+        // Update Local Storage Cache
         const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing };
         localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
@@ -424,7 +434,6 @@
         btn.classList.add('loading');
         if(navigator.vibrate) navigator.vibrate(15);
 
-        // Optimistic UI updates
         const countEl = document.getElementById('count-followers');
         let currentCount = parseInt(countEl.innerText);
         const ts = firebase.firestore.Timestamp.now();
@@ -465,7 +474,6 @@
                     // UNFOLLOW
                     const newFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
-
                     transaction.update(myRef, { following: newFollowing });
                     transaction.update(theirRef, { followers: newFollowers });
                 }
@@ -491,7 +499,7 @@
         }
     }
 
-    // --- 7. UTILS ---
+    // --- UTILS ---
     function copyGooracID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(txt === "N/A" || txt.includes("-")) return;
