@@ -86,7 +86,7 @@
         .user-item { 
             display: flex; align-items: center; justify-content: space-between; 
             padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
-            animation: slideUp 0.4s ease forwards;
+            /* animation: slideUp 0.4s ease forwards;  REMOVED AS REQUESTED */
         }
         
         .user-item.is-me { 
@@ -125,6 +125,8 @@
             border-radius: 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
             min-width: 95px; transition: all 0.2s ease;
             flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
         }
         .action-btn:active { transform: scale(0.94); opacity: 0.8; }
         
@@ -136,6 +138,16 @@
             border: 1.5px solid rgba(255, 59, 48, 0.2);
         }
 
+        /* --- BUTTON LOADER --- */
+        .btn-loader {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: btn-spin 0.6s linear infinite;
+        }
+        @keyframes btn-spin { to { transform: rotate(360deg); } }
+
         .v-badge { width: 15px; height: 15px; }
 
         /* Skeletons */
@@ -145,10 +157,6 @@
         
         .pulse { animation: pulse-bg 1.8s infinite ease-in-out; }
         @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-        @keyframes slideUp { 
-            from { opacity: 0; transform: translateY(15px); } 
-            to { opacity: 1; transform: translateY(0); } 
-        }
 
         .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); }
         .empty-icon { font-size: 4rem; margin-bottom: 20px; display: block; filter: drop-shadow(0 0 10px rgba(0,210,255,0.2)); }
@@ -216,6 +224,7 @@
     let isOwnProfile = false;
     let currentUserFollowing = []; 
     let followingIds = []; 
+    let processingIds = new Set(); // To prevent multiple rapid clicks
     
     // Pagination
     let lastFetchedIndex = 0;
@@ -352,7 +361,7 @@
             } else {
                 let btnText = isOwnProfile ? 'Following' : (isFollowing ? 'Following' : 'Follow');
                 let btnClass = isFollowing ? 'action-btn following' : 'action-btn';
-                actionHtml = `<button id="btn-${u.uid}" class="${btnClass}" onclick="handleAction('${u.uid}', '${u.username}')">${btnText}</button>`;
+                actionHtml = `<button id="btn-${u.uid}" class="${btnClass}" onclick="handleAction('${u.uid}', '${u.username}')"><span>${btnText}</span></button>`;
             }
 
             item.innerHTML = `
@@ -377,53 +386,80 @@
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
+            // Skip if currently processing this user to keep spinner visible
+            if (processingIds.has(uid)) return;
+
+            const span = btn.querySelector('span');
             if(currentUserFollowing.includes(uid)) {
-                btn.innerText = "Following";
+                if(span) span.innerText = "Following";
                 btn.className = "action-btn following";
             } else {
-                btn.innerText = "Follow";
+                if(span) span.innerText = "Follow";
                 btn.className = "action-btn";
             }
         });
     }
 
     async function handleAction(targetUid, username) {
+        // PREVENT MULTIPLE CLICKS
+        if (processingIds.has(targetUid)) return;
+        processingIds.add(targetUid);
+
+        const btn = document.getElementById(`btn-${targetUid}`);
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            btn.innerHTML = '<div class="btn-loader"></div>';
+            btn.style.pointerEvents = 'none';
+        }
+
         const myUid = auth.currentUser.uid;
         const timestamp = firebase.firestore.Timestamp.now();
         const dateStr = new Date().toISOString();
         const myFollowData = { uid: targetUid, timestamp: timestamp, date: dateStr, type: 'following' };
         const theirFollowerData = { uid: myUid, timestamp: timestamp, date: dateStr, type: 'follower' };
 
-        if (isOwnProfile) {
-            if (!confirm(`Unfollow @${username}?`)) return;
-            const btn = document.getElementById(`btn-${targetUid}`);
-            if(btn) btn.closest('.user-item').style.opacity = '0.5';
-            await removeFromList(myUid, 'following', targetUid);
-            await removeFromList(targetUid, 'followers', myUid);
-            if(btn) btn.closest('.user-item').remove();
-        } else {
-            const isFollowing = currentUserFollowing.includes(targetUid);
-            const btn = document.getElementById(`btn-${targetUid}`);
-
-            if (isFollowing) {
-                btn.innerText = "Follow";
-                btn.className = "action-btn"; 
+        try {
+            if (isOwnProfile) {
+                if (!confirm(`Unfollow @${username}?`)) {
+                    throw new Error("Cancelled");
+                }
+                if(btn) btn.closest('.user-item').style.opacity = '0.5';
                 await removeFromList(myUid, 'following', targetUid);
                 await removeFromList(targetUid, 'followers', myUid);
+                if(btn) btn.closest('.user-item').remove();
             } else {
-                btn.innerText = "Following";
-                btn.className = "action-btn following"; 
-                const batch = db.batch();
-                batch.update(db.collection("users").doc(myUid), {
-                    following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
-                    followingCount: firebase.firestore.FieldValue.increment(1)
-                });
-                batch.update(db.collection("users").doc(targetUid), {
-                    followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
-                    followerCount: firebase.firestore.FieldValue.increment(1)
-                });
-                try { await batch.commit(); } catch (e) { console.error(e); }
+                const isFollowing = currentUserFollowing.includes(targetUid);
+
+                if (isFollowing) {
+                    await removeFromList(myUid, 'following', targetUid);
+                    await removeFromList(targetUid, 'followers', myUid);
+                } else {
+                    const batch = db.batch();
+                    batch.update(db.collection("users").doc(myUid), {
+                        following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
+                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    batch.update(db.collection("users").doc(targetUid), {
+                        followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
+                        followerCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    await batch.commit();
+                }
             }
+        } catch (e) {
+            console.error(e);
+            if (btn && e.message !== "Cancelled") {
+                btn.innerHTML = originalContent;
+                btn.style.pointerEvents = 'auto';
+            }
+        } finally {
+            if (e?.message === "Cancelled" && btn) {
+                btn.innerHTML = originalContent;
+                btn.style.pointerEvents = 'auto';
+            }
+            processingIds.delete(targetUid);
+            // updateButtons() will be called automatically by the onSnapshot listener
         }
     }
 
@@ -443,7 +479,7 @@
                     t.update(docRef, { [field]: newArray, [countField]: newArray.length });
                 }
             });
-        } catch (e) { console.error("Remove failed", e); }
+        } catch (e) { console.error("Remove failed", e); throw e; }
     }
 
     function filterList() {
