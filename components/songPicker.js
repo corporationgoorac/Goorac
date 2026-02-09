@@ -229,10 +229,12 @@ class SongPicker extends HTMLElement {
             globalCache: {}, 
             addToGlobal: (songs) => songs.forEach(s => this.DB.globalCache[s.trackId] = s),
 
-            // Real-time History tracking
+            // Real-time History tracking (Most Watched)
             getHistory: () => JSON.parse(localStorage.getItem('picker_history')) || [],
             addToHistory: (song) => {
                 let history = this.DB.getHistory();
+                // Filter out if already exists to move it to top
+                history = history.filter(s => s.trackId !== song.trackId);
                 history.unshift(song);
                 localStorage.setItem('picker_history', JSON.stringify(history.slice(0, 50)));
             },
@@ -259,18 +261,25 @@ class SongPicker extends HTMLElement {
 
             getRecommendationQuery: () => {
                 const profile = this.DB.getUserProfile();
+                const history = this.DB.getHistory();
+                
                 const getTop = (obj) => Object.entries(obj).sort(([,a], [,b]) => b - a).map(([k]) => k);
                 
                 const topArtists = getTop(profile.artists);
                 const topGenres = getTop(profile.genres);
 
                 const dice = Math.random();
+                
+                // ML Strategy: 40% chance genre match, 40% artist match, 20% recent history match
                 if (dice < 0.4 && topGenres.length > 0) {
-                    return topGenres[0] + " top hits";
-                } else if (topArtists.length > 0) {
-                    // Weighted random: 70% chance for #1 artist, 30% for others in top 5
-                    return Math.random() < 0.7 ? topArtists[0] : topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 5))];
+                    return topGenres[0] + " songs";
+                } else if (dice < 0.8 && topArtists.length > 0) {
+                    return topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 3))];
+                } else if (history.length > 0) {
+                    // Pull artist from a recently watched song
+                    return history[0].artistName;
                 }
+                
                 return null;
             }
         };
@@ -290,7 +299,10 @@ class SongPicker extends HTMLElement {
             const val = e.target.value.trim();
             if (val.length > 1) { 
                 this.renderSkeletonLoading();
-                searchTimer = setTimeout(() => this.loadData(val, false, 'search'), 500); 
+                searchTimer = setTimeout(() => {
+                    // ML: Searching for something gives it weight
+                    this.loadData(val, false, 'search');
+                }, 500); 
             } else if(val.length === 0) {
                 this.switchTab('For You', root.getElementById('tabForYou'));
             }
@@ -326,7 +338,7 @@ class SongPicker extends HTMLElement {
 
     confirmSelection() {
         if (this.currentSongData) {
-            this.DB.trackInteraction(this.currentSongData, 5); 
+            this.DB.trackInteraction(this.currentSongData, 5); // Selection is strong signal
             this.dispatchEvent(new CustomEvent('song-selected', { 
                 detail: this.currentSongData,
                 bubbles: true,
@@ -361,7 +373,7 @@ class SongPicker extends HTMLElement {
 
         const cachedData = this.DB.getCache(cacheKey);
         
-        // Refresh For You every time to stay live with history updates
+        // ML: Force refresh For You every time to keep it dynamic based on new watches
         if (cachedData && cachedData.length > 0 && name !== 'For You') { 
             this.renderList(cachedData); 
         } else {
@@ -403,6 +415,7 @@ class SongPicker extends HTMLElement {
                 
                 if (isRecommendation) {
                     const savedIds = this.DB.getSaved().map(s => s.trackId);
+                    // Filter out already saved from For You to keep it fresh
                     results = results.filter(s => !savedIds.includes(s.trackId));
                     results = results.sort(() => Math.random() - 0.5);
                 }
@@ -467,7 +480,8 @@ class SongPicker extends HTMLElement {
             const song = this.DB.globalCache[id] || this.currentView.find(s => s.trackId === id);
             if(song) {
                 saved.push(song);
-                this.DB.trackInteraction(song, 10);
+                // ML: Saving a song is the highest weight interaction
+                this.DB.trackInteraction(song, 15);
             }
         }
         
@@ -490,8 +504,9 @@ class SongPicker extends HTMLElement {
         root.getElementById('mTitle').innerText = song.trackName;
         root.getElementById('mArtist').innerText = song.artistName;
         
+        // ML: Track the play as an interaction and add to "Most Watched" history
         this.DB.trackInteraction(song, 3);
-        this.DB.addToHistory(song); // Log play in live history
+        this.DB.addToHistory(song); 
         
         this.player.src = song.previewUrl;
         this.player.play().catch(e => console.warn("Playback Error"));
