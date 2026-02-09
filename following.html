@@ -86,7 +86,7 @@
         .user-item { 
             display: flex; align-items: center; justify-content: space-between; 
             padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
-            /* animation: slideUp 0.4s ease forwards;  REMOVED AS REQUESTED */
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         
         .user-item.is-me { 
@@ -319,9 +319,11 @@
         const nextBatchIds = followingIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
+            // Speed boost: batch fetch user data
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
+            
             allUsersData = [...allUsersData, ...newUsers];
             lastFetchedIndex += limit;
             renderList(allUsersData);
@@ -382,7 +384,6 @@
     }
 
     function updateButtons() {
-        if(isOwnProfile) return; 
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
@@ -421,12 +422,16 @@
 
         try {
             if (isOwnProfile) {
-                if (!confirm(`Unfollow @${username}?`)) {
-                    throw new Error("Cancelled");
+                // REMOVED Native Pop-up. Direct action with visual feedback.
+                if(btn) {
+                    const parentItem = btn.closest('.user-item');
+                    parentItem.style.opacity = '0.3';
+                    parentItem.style.transform = 'translateX(-10px)';
                 }
-                if(btn) btn.closest('.user-item').style.opacity = '0.5';
+                
                 await removeFromList(myUid, 'following', targetUid);
                 await removeFromList(targetUid, 'followers', myUid);
+                
                 if(btn) btn.closest('.user-item').remove();
             } else {
                 const isFollowing = currentUserFollowing.includes(targetUid);
@@ -449,15 +454,16 @@
             }
         } catch (e) {
             console.error(e);
-            if (btn && e.message !== "Cancelled") {
+            if (btn) {
                 btn.innerHTML = originalContent;
                 btn.style.pointerEvents = 'auto';
+                const parentItem = btn.closest('.user-item');
+                if(parentItem) {
+                    parentItem.style.opacity = '1';
+                    parentItem.style.transform = 'none';
+                }
             }
         } finally {
-            if (e?.message === "Cancelled" && btn) {
-                btn.innerHTML = originalContent;
-                btn.style.pointerEvents = 'auto';
-            }
             processingIds.delete(targetUid);
             // updateButtons() will be called automatically by the onSnapshot listener
         }
