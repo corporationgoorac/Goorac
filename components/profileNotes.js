@@ -1,7 +1,6 @@
 /**
  * ProfileNotes Component
- * Integrated Viewer + Deep Linking + Sharing + Mutual Privacy
- * Encapsulates all logic from viewNotes.js into a single profile-specific component.
+ * Integrated Feed + Viewer + Deep Linking + Mutual Privacy
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
@@ -23,7 +22,6 @@ class ProfileNotes extends HTMLElement {
 
     /**
      * Initializes the component for a specific profile.
-     * @param {string} targetUid - The UID of the profile being viewed.
      */
     async init(targetUid) {
         this.targetUid = targetUid;
@@ -93,7 +91,7 @@ class ProfileNotes extends HTMLElement {
                 font-size: 14px; font-weight: 600;
             }
 
-            /* Viewer Overlay - Matches viewNotes UI */
+            /* Viewer Overlay */
             .pn-overlay { 
                 position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; 
                 display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(12px);
@@ -208,7 +206,7 @@ class ProfileNotes extends HTMLElement {
     async shareNote() {
         if (!this.selectedNote) return;
         
-        // Dynamic link generation pointing to the specific note hash
+        // Link generation pointing to the specific note hash
         const shareUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#note-${this.selectedNote.id}`;
         
         try {
@@ -228,6 +226,7 @@ class ProfileNotes extends HTMLElement {
     async deleteNote(id) {
         if (confirm("Delete this thought bubble?")) {
             try {
+                // Mark note as inactive in Firestore
                 await this.db.collection("notes").doc(id).update({ isActive: false });
                 this.closeViewer();
                 if (navigator.vibrate) navigator.vibrate(10);
