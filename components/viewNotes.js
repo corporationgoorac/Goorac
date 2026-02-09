@@ -11,7 +11,8 @@ class ViewNotes extends HTMLElement {
         this.isOwnNote = false;
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
-        this.db = firebase.firestore();
+        // FIX: Lazy load DB to prevent startup crash
+        this.db = null;
         this.unsubscribe = null;
 
         // Swipe Logic Variables
@@ -24,6 +25,10 @@ class ViewNotes extends HTMLElement {
     }
 
     connectedCallback() {
+        // FIX: Initialize DB here if available
+        if (window.firebase && !this.db) {
+            this.db = firebase.firestore();
+        }
         this.render();
         this.setupEventListeners();
         this.setupSwipeLogic();
@@ -270,6 +275,14 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(initialNoteData, isOwnNote = false) {
+        // FIX: Ensure DB is connected before trying to use it
+        if (!this.db && window.firebase) this.db = firebase.firestore();
+        if (!this.db) {
+            console.error("Firebase not initialized.");
+            alert("Loading system... please try again.");
+            return;
+        }
+
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -304,18 +317,20 @@ class ViewNotes extends HTMLElement {
             });
         }
 
-        // === FIXED: LISTEN TO SPECIFIC NOTE ID IN 'notes' COLLECTION ===
+        // Live Listen to Note
         if (initialNoteData.id) {
             this.unsubscribe = this.db.collection("notes").doc(initialNoteData.id)
                 .onSnapshot((doc) => {
                     if (doc.exists) {
                         const data = doc.data();
-                        // Close if note is no longer active (deleted or overwritten)
-                        if (data.isActive === false) { this.close(); return; }
+                        
+                        // FIX: REMOVED the line that forces close on inactive notes.
+                        // Now profile history notes (which are inactive) will stay open.
                         
                         this.currentNote = { ...data, id: doc.id };
                         this.renderContent();
-                    } else if (!this.isOwnNote) {
+                    } else {
+                        // Only close if the document is actually deleted
                         this.close();
                     }
                 });
@@ -353,7 +368,6 @@ class ViewNotes extends HTMLElement {
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         const fontStyle = note.font || 'system-ui';
         
-        // Gradient Support - Use 'background' property for compatibility
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -366,7 +380,7 @@ class ViewNotes extends HTMLElement {
                         ${displayName} (You)
                         ${isVerified ? icons.verified : ''}
                     </div>
-                    <div class="vn-friend-handle">Active Note</div>
+                    <div class="vn-friend-handle">${note.isActive ? 'Active Note' : 'Archived Note'}</div>
                 </div>
             </div>
 
@@ -398,8 +412,11 @@ class ViewNotes extends HTMLElement {
                     `).join('') : `<div style="text-align:center; color:#555;">No likes yet</div>`}
                 </div>
                 
-                <button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Leave a New Note 📝</button>
-                <button class="vn-btn vn-btn-danger" id="delete-note-btn">Delete Note</button>
+                ${note.isActive ? 
+                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note 📝</button>` : 
+                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post a New Note 📝</button>`
+                }
+                ${note.isActive ? `<button class="vn-btn vn-btn-danger" id="delete-note-btn">Archive Note</button>` : ''}
             </div>
         `;
     }
@@ -419,7 +436,6 @@ class ViewNotes extends HTMLElement {
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
         const fontStyle = note.font || 'system-ui';
         
-        // Gradient Support
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
         const textShadow = this.getTextShadow(txtColor);
@@ -543,9 +559,9 @@ class ViewNotes extends HTMLElement {
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                if(confirm("Delete this note?")) {
+                if(confirm("Archive this note?")) {
                     try {
-                        // Mark as inactive in 'notes' collection (this is the correct collection now)
+                        // Mark as inactive
                         await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
                         this.close();
                         window.location.reload(); 
@@ -581,7 +597,6 @@ class ViewNotes extends HTMLElement {
                             })
                         });
                         
-                        // ADD NOTIFICATION
                         if (this.currentNote.uid !== user.uid) {
                             await this.db.collection('notifications').add({
                                 recipientId: this.currentNote.uid,
@@ -665,7 +680,6 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // Full Metadata for Chat Bubble
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
@@ -678,7 +692,7 @@ class ViewNotes extends HTMLElement {
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
             uid: this.currentNote.uid,
-            font: this.currentNote.font || 'system-ui' // Include Font!
+            font: this.currentNote.font || 'system-ui'
         };
 
         try {
@@ -736,16 +750,24 @@ customElements.define('view-notes', ViewNotes);
 const NotesManager = {
     init: function() {
         this.injectBubbleStyles(); 
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                this.setupMyNote(user);
-                this.loadMutualNotes(user);
-            }
-        });
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    // FIX: Check if we are on a page that actually has these elements
+                    if(document.getElementById('notes-container')) {
+                        this.setupMyNote(user);
+                        this.loadMutualNotes(user);
+                    }
+                }
+            });
+        }
     },
 
     injectBubbleStyles: function() {
+        if(document.getElementById('notes-bubble-styles')) return;
+        
         const style = document.createElement('style');
+        style.id = 'notes-bubble-styles';
         style.innerHTML = `
             #notes-container {
                 display: flex;
@@ -872,30 +894,26 @@ const NotesManager = {
         document.head.appendChild(style);
     },
 
-    // === CRITICAL FIX: QUERY "notes" COLLECTION WITH ACTIVE FILTER ===
     setupMyNote: function(user) {
         const db = firebase.firestore();
-        // Query for MY active note in 'notes' collection (Sort by newest)
-        // Ensure "Active" logic is robust (ignores old docs)
+        const btn = document.getElementById('my-note-btn');
+        const preview = document.getElementById('my-note-preview');
+        
+        if (!btn || !preview) return; 
+
         db.collection("notes")
             .where("uid", "==", user.uid)
             .where("isActive", "==", true)
             .onSnapshot(snapshot => {
-                const btn = document.getElementById('my-note-btn');
-                const preview = document.getElementById('my-note-preview');
-                if (!btn || !preview) return; 
-
                 let data = null;
                 let noteId = null;
 
                 if (!snapshot.empty) {
-                    // Get latest doc from client-side array
                     const docs = snapshot.docs;
-                    const doc = docs[docs.length - 1]; // Fallback if multiple are active
+                    const doc = docs[docs.length - 1]; 
                     data = doc.data();
                     noteId = doc.id;
                     
-                    // Expiration Check (24H)
                     if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
                         db.collection("notes").doc(noteId).update({ isActive: false });
                         data = null;
@@ -905,7 +923,6 @@ const NotesManager = {
                 preview.classList.add('visible');
 
                 if(data && (data.text || data.songName)) {
-                    // Use 'background' to support gradients
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
@@ -922,18 +939,14 @@ const NotesManager = {
                     
                     btn.onclick = () => {
                         const viewer = document.querySelector('view-notes');
-                        // Pass note data + ID so viewer listens to correct doc
-                        if(data) viewer.open({ ...data, id: noteId }, true);
+                        if(data && viewer) viewer.open({ ...data, id: noteId }, true);
                     };
                 } else {
-                    // Empty State Logic
                     preview.style.background = 'rgba(255,255,255,0.1)';
                     preview.style.color = 'rgba(255,255,255,0.7)';
                     preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                     btn.classList.remove('has-note');
-                    btn.onclick = () => {
-                        window.location.href = 'notes.html';
-                    };
+                    btn.onclick = () => window.location.href = 'notes.html';
                 }
             });
     },
@@ -949,7 +962,6 @@ const NotesManager = {
             const myFollowing = myData.following || []; 
             const myFollowers = myData.followers || []; 
 
-            // Handle potential object/string mix in arrays
             const followingUIDs = myFollowing.map(i => typeof i === 'string' ? i : i.uid);
             const followersUIDs = myFollowers.map(i => typeof i === 'string' ? i : i.uid);
 
@@ -962,17 +974,16 @@ const NotesManager = {
 
             const chunks = [];
             let tempUIDs = [...mutualUIDs];
-            while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 10)); // Limit 10
+            while(tempUIDs.length > 0) chunks.push(tempUIDs.splice(0, 10));
 
             chunks.forEach(chunk => {
-                // Query "notes" collection, filtering by UID + Active Status
                 db.collection("notes")
                     .where("uid", "in", chunk) 
                     .where("isActive", "==", true)
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(change => {
                             const noteData = change.doc.data();
-                            const uid = change.doc.id; // Note Document ID
+                            const uid = change.doc.id; 
                             
                             const existingEl = document.getElementById(`note-${uid}`);
                             if(existingEl) existingEl.remove();
@@ -983,7 +994,6 @@ const NotesManager = {
                                 div.id = `note-${uid}`; 
                                 div.className = 'note-item friend-note has-note';
                                 
-                                // Robust Background support
                                 const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
 
                                 div.innerHTML = `
