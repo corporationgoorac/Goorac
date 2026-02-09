@@ -1,231 +1,237 @@
 /**
- * ProfileNotes Component
- * Displays the feed of notes and handles opening the viewer.
+ * components/profileNotes.js
+ * Handles fetching and displaying note history with Privacy Logic.
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
         super();
-        this.notes = [];
-        this.targetUid = null;
-        this.isMutual = false;
-        this.isOwnProfile = false;
-        this.selectedNote = null;
+        this._uid = null;
         this.db = firebase.firestore();
-        this.audioPlayer = new Audio();
-        this.audioPlayer.loop = true;
+        this.auth = firebase.auth();
     }
+
+    set uid(val) {
+        if (this._uid === val) return;
+        this._uid = val;
+        this.init();
+    }
+
+    get uid() { return this._uid; }
 
     connectedCallback() {
-        this.renderBase();
-        this.setupOverlayClose();
+        this.renderSkeleton();
     }
 
-    async init(targetUid) {
-        this.targetUid = targetUid;
-        const user = firebase.auth().currentUser;
-        if (!user) return;
+    // --- 1. INITIALIZATION & PRIVACY CHECK ---
+    async init() {
+        if (!this.uid) return;
+        this.renderSkeleton();
 
-        this.isOwnProfile = user.uid === targetUid;
-        
-        if (!this.isOwnProfile) {
-            try {
-                const myDoc = await this.db.collection('users').doc(user.uid).get();
-                const theirDoc = await this.db.collection('users').doc(targetUid).get();
-                
-                const myFollowing = (myDoc.data()?.following || []).map(i => typeof i === 'string' ? i : i.uid);
-                const theirFollowing = (theirDoc.data()?.following || []).map(i => typeof i === 'string' ? i : i.uid);
-                
-                this.isMutual = myFollowing.includes(targetUid) && theirFollowing.includes(user.uid);
-            } catch (e) {
-                console.error("Mutual check failed", e);
-                this.isMutual = false;
-            }
-        } else {
-            this.isMutual = true;
-        }
-
-        this.fetchNotes();
-    }
-
-    fetchNotes() {
-        if (!this.targetUid) return;
-
-        this.db.collection("notes")
-            .where("uid", "==", this.targetUid)
-            .where("isActive", "==", true)
-            .orderBy("createdAt", "desc")
-            .onSnapshot(snap => {
-                this.notes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                this.renderFeed();
-                
-                const hash = window.location.hash;
-                if (hash.startsWith('#note-')) {
-                    const noteId = hash.replace('#note-', '');
-                    if (!this.selectedNote) {
-                        this.openViewer(noteId);
-                    }
-                }
-            });
-    }
-
-    renderBase() {
-        this.innerHTML = `
-        <style>
-            .pn-feed { display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%; margin-top: 20px; }
-            .pn-card { 
-                padding: 18px; border-radius: 20px; border: 1px solid #1f1f1f; 
-                cursor: pointer; transition: 0.2s; position: relative;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            }
-            .pn-card:active { transform: scale(0.98); }
-            .pn-text { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
-            .pn-private { 
-                background: #0a0a0a; border: 1px dashed #333; padding: 40px; 
-                text-align: center; color: #666; border-radius: 20px;
-                font-size: 14px; font-weight: 600;
-            }
-
-            .pn-overlay { 
-                position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; 
-                display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(12px);
-                opacity: 0; transition: opacity 0.3s ease;
-            }
-            .pn-overlay.show { display: flex; opacity: 1; }
-            
-            .pn-sheet { 
-                background: #121212; width: 100%; max-width: 500px; padding: 24px;
-                border-radius: 32px 32px 0 0; border-top: 1px solid #333;
-                transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
-                padding-bottom: max(30px, env(safe-area-inset-bottom));
-                color: white; font-family: -apple-system, sans-serif;
-            }
-            .pn-overlay.show .pn-sheet { transform: translateY(0); }
-
-            .pn-btn { 
-                background: rgba(255,255,255,0.05); color: #fff; border: 1px solid #333;
-                width: 100%; padding: 16px; border-radius: 18px; margin-top: 12px;
-                display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700;
-                cursor: pointer;
-            }
-            .pn-btn-primary { background: #fff; color: #000; border: none; }
-            
-            .pn-song-pill {
-                display: inline-flex; align-items: center; gap: 6px; 
-                background: rgba(255,255,255,0.15); padding: 8px 16px; 
-                border-radius: 100px; margin-top: 20px; font-size: 12px; 
-                font-weight: 700; backdrop-filter: blur(10px);
-            }
-        </style>
-        <div id="pn-feed" class="pn-feed"></div>
-        
-        <div class="pn-overlay" id="pn-overlay">
-            <div class="pn-sheet" id="pn-sheet">
-                <div id="pn-viewer-content"></div>
-                <div class="pn-actions" style="margin-top:20px;">
-                    <button class="pn-btn pn-btn-primary" onclick="this.getRootNode().host.shareNote()">
-                        <span class="material-icons-round">share</span> Share Note
-                    </button>
-                    <button class="pn-btn" style="background:transparent; border:none; color:#888;" onclick="this.getRootNode().host.closeViewer()">Dismiss</button>
-                </div>
-            </div>
-        </div>
-        `;
-    }
-
-    renderFeed() {
-        const container = this.querySelector('#pn-feed');
-        if (!this.isMutual && !this.isOwnProfile) {
-            container.innerHTML = `<div class="pn-private">Thought Bubbles are Private</div>`;
+        const user = this.auth.currentUser;
+        if (!user) {
+            this.renderError("Please login to view notes.");
             return;
         }
 
-        if (this.notes.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#444; padding:20px; font-size:14px;">No active notes</div>`;
+        // Case A: It's Me
+        if (user.uid === this.uid) {
+            this.fetchAndRenderNotes(true); // true = isOwnProfile
             return;
         }
 
-        container.innerHTML = this.notes.map(n => `
-            <div class="pn-card" style="background:${n.bgColor || '#262626'}; color:${n.textColor || '#fff'};" onclick="this.getRootNode().host.openViewer('${n.id}')">
-                <div class="pn-text" style="text-align:${n.textAlign || 'center'}; font-family:${n.font || 'system-ui'}">${n.text}</div>
-            </div>
-        `).join('');
-    }
-
-    openViewer(noteId) {
-        this.selectedNote = this.notes.find(n => n.id === noteId);
-        if (!this.selectedNote) return;
-
-        const content = this.querySelector('#pn-viewer-content');
-        const n = this.selectedNote;
-
-        window.history.replaceState(null, null, `#note-${noteId}`);
-
-        if (n.songPreview) {
-            this.audioPlayer.src = n.songPreview;
-            this.audioPlayer.play().catch(() => console.log("Audio play deferred"));
-        }
-
-        content.innerHTML = `
-            <div style="background:${n.bgColor || '#262626'}; color:${n.textColor || '#fff'}; padding:50px 24px; border-radius:24px; text-align:${n.textAlign || 'center'}; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
-                <div style="font-size:1.6rem; font-weight:800; line-height:1.3; font-family:${n.font || 'system-ui'}">${n.text}</div>
-                ${n.songName ? `
-                    <div class="pn-song-pill">
-                        <span class="material-icons-round" style="font-size:14px;">music_note</span>
-                        ${n.songName}
-                    </div>
-                ` : ''}
-            </div>
-            ${this.isOwnProfile ? `
-                <button class="pn-btn" style="color:#ff4444; margin-top:20px; border-color:rgba(255,68,68,0.2);" onclick="this.getRootNode().host.deleteNote('${n.id}')">
-                    <span class="material-icons-round">delete_outline</span> Delete Note
-                </button>
-            ` : ''}
-        `;
-
-        this.querySelector('#pn-overlay').classList.add('show');
-        if (navigator.vibrate) navigator.vibrate(15);
-    }
-
-    closeViewer() {
-        this.audioPlayer.pause();
-        this.querySelector('#pn-overlay').classList.remove('show');
-        this.selectedNote = null;
-        window.history.replaceState(null, null, window.location.pathname + window.location.search);
-    }
-
-    async shareNote() {
-        if (!this.selectedNote) return;
-        
-        const shareUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#note-${this.selectedNote.id}`;
-        
+        // Case B: Other User (Check Mutuals)
         try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: `Goorac Note`,
-                    text: `"${this.selectedNote.text}" - View my thought bubble on Goorac!`,
-                    url: shareUrl
-                });
-            } else {
-                await navigator.clipboard.writeText(shareUrl);
-                alert("Note link copied to clipboard!");
-            }
-        } catch (err) { console.error("Share failed", err); }
-    }
+            // Check if I follow them AND they follow me
+            // We can check this efficiently by looking at MY relationships
+            const myDoc = await this.db.collection('users').doc(user.uid).get();
+            const myData = myDoc.data() || {};
+            
+            const myFollowing = this.normalizeList(myData.following);
+            const myFollowers = this.normalizeList(myData.followers);
 
-    async deleteNote(id) {
-        if (confirm("Delete this thought bubble?")) {
-            try {
-                await this.db.collection("notes").doc(id).update({ isActive: false });
-                this.closeViewer();
-                if (navigator.vibrate) navigator.vibrate(10);
-            } catch (e) { console.error("Delete failed", e); }
+            const iFollowThem = myFollowing.includes(this.uid);
+            const theyFollowMe = myFollowers.includes(this.uid);
+
+            if (iFollowThem && theyFollowMe) {
+                this.fetchAndRenderNotes(false);
+            } else {
+                this.renderPrivate();
+            }
+
+        } catch (e) {
+            console.error("Privacy check failed", e);
+            this.renderError("Could not load history.");
         }
     }
 
-    setupOverlayClose() {
-        this.querySelector('#pn-overlay').onclick = (e) => {
-            if(e.target.id === 'pn-overlay') this.closeViewer();
-        };
+    normalizeList(list) {
+        if (!list) return [];
+        return list.map(item => (typeof item === 'string' ? item : item.uid));
+    }
+
+    // --- 2. DATA FETCHING ---
+    async fetchAndRenderNotes(isMine) {
+        try {
+            // Fetch last 30 notes, ordered by newest
+            const snapshot = await this.db.collection('notes')
+                .where('uid', '==', this.uid)
+                .orderBy('createdAt', 'desc')
+                .limit(30)
+                .get();
+
+            if (snapshot.empty) {
+                this.renderEmpty(isMine);
+                return;
+            }
+
+            const notes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            this.renderList(notes, isMine);
+
+        } catch (e) {
+            console.error("Error fetching notes:", e);
+            this.renderError("Failed to load notes.");
+        }
+    }
+
+    // --- 3. RENDERING ---
+    renderList(notes, isMine) {
+        let html = `
+            <style>
+                .pn-container { padding: 10px 0; width: 100%; animation: fadeIn 0.4s ease; }
+                .pn-header { 
+                    font-size: 13px; font-weight: 700; color: #666; 
+                    text-transform: uppercase; letter-spacing: 1.2px;
+                    margin-bottom: 20px; padding-left: 5px; 
+                    display: flex; align-items: center; gap: 8px;
+                }
+                
+                .pn-list { display: flex; flex-direction: column; gap: 15px; }
+
+                .pn-item {
+                    background: #151515; border: 1px solid #222;
+                    border-radius: 16px; padding: 16px;
+                    display: flex; flex-direction: column; gap: 10px;
+                    cursor: pointer; position: relative; overflow: hidden;
+                    transition: transform 0.2s, background 0.2s;
+                }
+                .pn-item:active { transform: scale(0.98); background: #1a1a1a; }
+
+                .pn-top { display: flex; justify-content: space-between; align-items: flex-start; }
+                
+                .pn-text { 
+                    font-size: 15px; font-weight: 500; color: #fff; line-height: 1.5;
+                    white-space: pre-wrap; word-break: break-word;
+                }
+
+                .pn-meta { 
+                    font-size: 11px; color: #666; font-weight: 500; 
+                    display: flex; align-items: center; gap: 6px; margin-top: 5px;
+                }
+                
+                /* Music Badge */
+                .pn-music {
+                    display: inline-flex; align-items: center; gap: 6px;
+                    background: rgba(255,255,255,0.05); padding: 6px 10px;
+                    border-radius: 100px; width: fit-content;
+                    font-size: 12px; color: #ccc; border: 1px solid rgba(255,255,255,0.05);
+                }
+                .pn-music svg { width: 12px; fill: #00d2ff; }
+
+                /* Status Dot */
+                .pn-dot {
+                    width: 8px; height: 8px; border-radius: 50%;
+                    background: #333; display: inline-block;
+                }
+                .pn-dot.active { background: #00d2ff; box-shadow: 0 0 8px rgba(0,210,255,0.4); }
+
+                @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+            </style>
+
+            <div class="pn-container">
+                <div class="pn-header">
+                    <span class="material-icons-round" style="font-size:16px;">history</span>
+                    Note History
+                </div>
+                <div class="pn-list" id="pn-list-wrapper"></div>
+            </div>
+        `;
+
+        this.innerHTML = html;
+        const listWrapper = this.querySelector('#pn-list-wrapper');
+
+        notes.forEach(note => {
+            const dateObj = note.createdAt ? note.createdAt.toDate() : new Date();
+            const dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const timeStr = dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            
+            const el = document.createElement('div');
+            el.className = 'pn-item';
+            el.innerHTML = `
+                <div class="pn-top">
+                    <div class="pn-text">${note.text || '<i>🎵 Music Note</i>'}</div>
+                    <div class="pn-dot ${note.isActive ? 'active' : ''}" title="${note.isActive ? 'Currently Active' : 'Archived'}"></div>
+                </div>
+                
+                ${note.songName ? `
+                <div class="pn-music">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    <span>${note.songName}</span>
+                </div>` : ''}
+
+                <div class="pn-meta">
+                    <span>${dateStr}</span> • <span>${timeStr}</span>
+                    ${note.likes && note.likes.length > 0 ? `• ${note.likes.length} likes` : ''}
+                </div>
+            `;
+
+            // CLICK HANDLER: Open the ViewNotes Modal
+            el.onclick = () => {
+                const viewer = document.querySelector('view-notes');
+                if (viewer) {
+                    if(navigator.vibrate) navigator.vibrate(10);
+                    // Open modal. Logic inside viewNotes.js handles "My Note" vs "Friend Note" UI
+                    viewer.open(note, isMine);
+                }
+            };
+
+            listWrapper.appendChild(el);
+        });
+    }
+
+    // --- 4. STATE HELPERS ---
+
+    renderPrivate() {
+        this.innerHTML = `
+            <div style="padding: 40px 20px; text-align: center; color: #666; background: rgba(255,255,255,0.02); border-radius: 16px; margin-top:20px; border:1px dashed #333;">
+                <span class="material-icons-round" style="font-size: 32px; margin-bottom: 10px;">lock</span>
+                <div style="font-weight: 600; font-size: 15px; color: #fff;">Notes are Private</div>
+                <div style="font-size: 13px; margin-top: 5px;">You must be mutual friends to see history.</div>
+            </div>
+        `;
+    }
+
+    renderEmpty(isMine) {
+        this.innerHTML = `
+            <div style="padding: 30px; text-align: center; color: #666; margin-top:20px;">
+                <span class="material-icons-round" style="font-size: 28px; opacity:0.5;">sticky_note_2</span>
+                <div style="font-size: 14px; margin-top: 8px;">${isMine ? 'You haven\'t posted any notes yet.' : 'No notes history found.'}</div>
+            </div>
+        `;
+    }
+
+    renderSkeleton() {
+        this.innerHTML = `
+            <div style="margin-top:30px; display:flex; flex-direction:column; gap:15px;">
+                <div style="height:15px; width:100px; background:#1a1a1a; border-radius:4px;"></div>
+                <div style="height:80px; width:100%; background:linear-gradient(90deg, #111, #1a1a1a, #111); background-size:200% 100%; animation:pn-shimmer 1.5s infinite; border-radius:16px;"></div>
+                <div style="height:80px; width:100%; background:linear-gradient(90deg, #111, #1a1a1a, #111); background-size:200% 100%; animation:pn-shimmer 1.5s infinite; border-radius:16px;"></div>
+            </div>
+            <style>@keyframes pn-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }</style>
+        `;
+    }
+    
+    renderError(msg) {
+        this.innerHTML = `<div style="padding:20px; text-align:center; color:#ff4444; font-size:13px;">${msg}</div>`;
     }
 }
 
