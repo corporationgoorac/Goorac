@@ -21,14 +21,15 @@
     <style>
         :root {
             --bg: #000000;
-            --surface: #0a0a0a;
-            --surface-press: #151515;
+            --surface: #111111;
+            --surface-press: #222222;
             --border: #1f1f1f;
             --primary: #FFFFFF;
-            --secondary: #888888;
+            --secondary: #999999;
             --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.15);
+            --accent-glow: rgba(0, 210, 255, 0.2);
             --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -38,16 +39,16 @@
             color: var(--primary);
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            user-select: none; -webkit-user-select: none;
-            padding-bottom: 60px; /* Space for scrolling */
+            /* Allow body to scroll normally */
+            min-height: 100vh;
         }
 
         /* --- HEADER --- */
         header {
             position: sticky; top: 0; z-index: 100;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-            border-bottom: 1px solid var(--border);
-            padding: calc(10px + var(--safe-top)) 16px 10px;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: calc(8px + var(--safe-top)) 12px 8px;
             display: flex; align-items: center; justify-content: space-between;
         }
         .nav-btn {
@@ -57,32 +58,32 @@
             cursor: pointer; transition: background 0.2s;
         }
         .nav-btn:active { background: var(--surface-press); }
-        .header-title { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary); }
+        .header-title { font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--primary); }
 
-        /* --- LAYOUT --- */
+        /* --- LAYOUT STRUCTURE --- */
         main { 
-            max-width: 550px; margin: 0 auto; 
-            min-height: 90vh;
+            max-width: 600px; margin: 0 auto; 
             display: flex; flex-direction: column;
+            min-height: 90vh;
         }
 
-        /* --- TOP SECTION (Profile Details) --- */
-        .profile-details-area {
-            padding: 20px 24px;
+        /* --- TOP HALF: PROFILE CARD --- */
+        .profile-card {
+            background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
+            padding: 20px 24px 30px;
             display: flex; flex-direction: column; align-items: center;
-            /* Subtle border to separate profile from notes */
             border-bottom: 1px solid var(--border);
-            background: linear-gradient(to bottom, var(--bg), #050505);
         }
 
-        /* COMPACT AVATAR (Reduced size for half-screen feel) */
-        .avatar-section { position: relative; margin-bottom: 16px; }
+        /* Compact Avatar */
         .avatar-container {
-            width: 96px; height: 96px; 
+            width: 86px; height: 86px; 
             border-radius: 50%; padding: 2px;
-            background: linear-gradient(135deg, var(--surface-press), var(--border));
-            border: 1px solid var(--border);
-            box-shadow: 0 8px 30px -5px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, #333, #000);
+            border: 1px solid #333;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            margin-bottom: 12px;
+            position: relative;
         }
         .avatar {
             width: 100%; height: 100%; border-radius: 50%;
@@ -90,79 +91,84 @@
             display: block;
         }
 
-        /* USER INFO (Tighter spacing) */
-        .user-info { text-align: center; width: 100%; margin-bottom: 14px; }
+        /* Info Block */
+        .user-info { text-align: center; width: 100%; margin-bottom: 12px; }
         
         .display-name { 
-            font-size: 22px; font-weight: 800; color: var(--primary);
-            display: flex; align-items: center; justify-content: center; gap: 5px; 
-            letter-spacing: -0.3px; margin-bottom: 2px;
+            font-size: 20px; font-weight: 700; color: var(--primary);
+            display: flex; align-items: center; justify-content: center; gap: 4px; 
+            letter-spacing: -0.2px; margin-bottom: 2px;
         }
-        .verified-badge { color: var(--accent); font-size: 20px; display: none; }
+        .verified-badge { color: var(--accent); font-size: 18px; display: none; }
         .verified-badge.show { display: inline-block; }
         
         .username-tag { 
-            font-size: 14px; color: var(--secondary); font-weight: 500; 
+            font-size: 13px; color: var(--secondary); font-weight: 500; 
         }
 
-        /* ID PILL (Compact) */
+        /* ID Pill - Very Compact */
         .id-pill {
-            margin: 10px 0 16px;
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.03); 
-            border: 1px solid var(--border);
-            padding: 6px 16px; border-radius: 100px;
+            margin: 4px 0 16px;
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.04); 
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 4px 12px; border-radius: 20px;
             cursor: pointer; transition: 0.2s;
         }
-        .id-pill:active { background: rgba(255,255,255,0.08); transform: scale(0.96); }
-        .id-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; }
-        .id-value { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--primary); }
-        .copy-icon { font-size: 14px; color: var(--secondary); }
+        .id-pill:active { background: rgba(255,255,255,0.1); transform: scale(0.95); }
+        .id-label { font-size: 9px; font-weight: 700; color: var(--secondary); text-transform: uppercase; }
+        .id-value { font-family: 'Courier New', monospace; font-size: 12px; font-weight: 600; color: #ddd; }
+        .copy-icon { font-size: 12px; color: var(--secondary); }
 
-        /* BIO */
+        /* Bio */
         .bio-text { 
-            font-size: 13px; line-height: 1.5; color: #ccc; 
-            text-align: center; max-width: 100%; margin-bottom: 24px;
-            white-space: pre-wrap; padding: 0 10px;
+            font-size: 13px; line-height: 1.4; color: #ccc; 
+            text-align: center; max-width: 90%; margin-bottom: 20px;
+            white-space: pre-wrap;
         }
 
-        /* STATS (Compact Row) */
+        /* Stats - Compact Row */
         .stats-row {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; 
-            width: 100%; margin-bottom: 24px;
+            display: flex; justify-content: center; gap: 30px;
+            width: 100%; margin-bottom: 20px;
         }
         .stat-box { 
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: 14px; padding: 12px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.2s;
+            display: flex; flex-direction: column; align-items: center; 
+            cursor: pointer; padding: 0 10px;
         }
-        .stat-box:active { transform: scale(0.97); background: var(--surface-press); }
-        .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
-        .stat-lbl { font-size: 10px; color: var(--secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-box:active { opacity: 0.7; }
+        .stat-num { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
+        .stat-lbl { font-size: 10px; color: var(--secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* ACTIONS */
-        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+        /* Actions */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 320px; }
         
         .btn {
-            height: 44px; border-radius: 12px; font-weight: 700; font-size: 14px;
-            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            height: 40px; border-radius: 10px; font-weight: 600; font-size: 13px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
             transition: all 0.2s; position: relative;
         }
-        .btn:active { transform: scale(0.96); opacity: 0.9; }
-        .btn-follow { background: var(--accent); color: #000; box-shadow: 0 4px 20px var(--accent-glow); }
-        .btn-following { background: transparent; border: 1px solid #333; color: var(--primary); box-shadow: none; }
+        .btn:active { transform: scale(0.97); }
+
+        .btn-follow { background: var(--accent); color: #000; box-shadow: 0 4px 15px var(--accent-glow); }
+        .btn-following { background: transparent; border: 1px solid #444; color: var(--primary); box-shadow: none; }
         .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
         .btn-msg:active { background: var(--surface-press); }
 
-        /* --- BOTTOM SECTION (Notes) --- */
-        .notes-area {
-            flex: 1; /* Fills remaining space */
-            padding: 0 24px;
-            background: var(--bg);
+
+        /* --- BOTTOM HALF: NOTES AREA --- */
+        .notes-section {
+            flex: 1; /* Takes remaining space */
+            padding: 0 20px;
+            padding-bottom: calc(80px + var(--safe-bottom));
+        }
+        .notes-header {
+            padding: 20px 4px 10px;
+            font-size: 12px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1.2px;
+            display: flex; align-items: center; gap: 8px;
         }
 
-        /* SKELETONS */
+        /* --- UTILS & ANIMATIONS --- */
         .skeleton { 
             background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%); 
             background-size: 200% 100%; animation: shimmer 1.5s infinite;
@@ -170,28 +176,26 @@
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        /* LOADER */
         .loader-circle {
-            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
-            border-top: 2px solid var(--primary); border-radius: 50%;
-            animation: spin 0.8s linear infinite; display: none;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid var(--primary);
+            border-radius: 50%; animation: spin 0.8s linear infinite; display: none;
         }
         .btn-follow .loader-circle { border-top-color: #000; border-color: rgba(0,0,0,0.2); }
         .loading .loader-circle { display: block; }
         .loading span { display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* TOAST */
         #toast {
             position: fixed; bottom: 40px; left: 50%; transform: translate(-50%, 20px);
             background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-            color: #000; padding: 12px 24px; border-radius: 100px;
+            color: #000; padding: 12px 24px; border-radius: 50px;
             font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none;
-            transition: 0.4s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000;
+            transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000;
             display: flex; align-items: center; gap: 8px;
         }
         #toast.show { opacity: 1; transform: translate(-50%, 0); }
-
     </style>
 </head>
 <body>
@@ -208,19 +212,18 @@
 
     <main>
         
-        <div class="profile-details-area">
-            <div class="avatar-section">
-                <div class="avatar-container">
-                    <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
-                </div>
+        <div class="profile-card">
+            
+            <div class="avatar-container">
+                <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
             </div>
 
             <div class="user-info">
                 <div class="display-name">
-                    <span id="display-name" class="skeleton" style="min-width:120px; height:26px; border-radius:6px;"></span>
+                    <span id="display-name" class="skeleton" style="min-width:100px; height:24px; border-radius:6px;"></span>
                     <span class="material-icons-round verified-badge" id="badge">verified</span>
                 </div>
-                <div class="username-tag skeleton" id="username" style="display:inline-block; min-width:80px; height:16px; margin-top:6px; border-radius:4px;"></div>
+                <div class="username-tag skeleton" id="username" style="display:inline-block; min-width:60px; height:14px; margin-top:4px; border-radius:4px;"></div>
             </div>
 
             <div class="id-pill skeleton" id="id-container" onclick="copyGooracID()">
@@ -229,13 +232,14 @@
                 <span class="material-icons-round copy-icon">content_copy</span>
             </div>
 
-            <div class="bio-text skeleton" id="bio" style="width:100%; height:36px; border-radius:6px;"></div>
+            <div class="bio-text skeleton" id="bio" style="width:100%; height:32px; border-radius:6px;"></div>
 
             <div class="stats-row">
                 <div class="stat-box" onclick="viewFollowers()">
                     <span class="stat-num" id="count-followers">0</span>
                     <span class="stat-lbl">Followers</span>
                 </div>
+                <div style="width:1px; background:rgba(255,255,255,0.1);"></div>
                 <div class="stat-box" onclick="viewFollowing()">
                     <span class="stat-num" id="count-following">0</span>
                     <span class="stat-lbl">Following</span>
@@ -248,12 +252,13 @@
                     <span id="btn-follow-text">Follow</span>
                 </button>
                 <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
+                    <span class="material-icons-round" style="font-size:16px;">chat_bubble_outline</span>
                     <span>Message</span>
                 </button>
             </div>
         </div>
 
-        <div class="notes-area">
+        <div class="notes-section">
             <profile-notes id="profile-notes"></profile-notes>
         </div>
 
@@ -262,8 +267,8 @@
     <view-notes id="view-notes-modal"></view-notes>
 
     <div id="toast">
-        <span class="material-icons-round" style="color: #000;">check_circle</span>
-        <span id="toast-msg">Copied to clipboard</span>
+        <span class="material-icons-round" style="color: #000; font-size:18px;">check_circle</span>
+        <span id="toast-msg">Copied</span>
     </div>
 
 <script>
@@ -281,16 +286,16 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- 2. VARS ---
+    // --- 2. GLOBAL VARIABLES ---
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
     
     let myUid = null;
     let targetUid = null;
     let targetUserData = null;
-    let isProcessing = false; 
+    let isProcessing = false; // Prevents spam clicking
     
-    // --- 3. CACHE LOAD ---
+    // --- 3. CACHE STRATEGY (Instant Load) ---
     function loadFromCache() {
         if(!targetUsername) return;
         const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
@@ -299,9 +304,9 @@
                 const data = JSON.parse(cached);
                 targetUserData = data;
                 targetUid = data.uid;
-                renderProfile(data); 
+                renderProfile(data); // Paint UI immediately
                 
-                // Initialize Notes from Cache
+                // Initialize Notes if ID exists in cache
                 if(targetUid) {
                     const notesComp = document.getElementById('profile-notes');
                     if(notesComp) notesComp.uid = targetUid;
@@ -311,12 +316,12 @@
                     updateFollowButton(data.amIFollowing);
                     removeBtnSkeletons();
                 }
-            } catch (e) { console.error("Cache Error", e); }
+            } catch (e) { console.error("Cache Parse Error", e); }
         }
     }
     loadFromCache();
 
-    // --- 4. AUTH & FETCH ---
+    // --- 4. AUTH & LIVE FETCH ---
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
@@ -325,6 +330,7 @@
     });
 
     function fetchProfileFresh() {
+        // Query by username to get UID and Data
         db.collection("users").where("username", "==", targetUsername).limit(1)
         .onSnapshot((snapshot) => {
             if(snapshot.empty) return; 
@@ -334,35 +340,38 @@
             targetUid = doc.id;
             targetUserData = freshData;
 
+            // Render fresh data
             renderProfile(freshData);
 
-            // Initialize Notes from Fresh Data
+            // Trigger Notes Component
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) notesComp.uid = targetUid;
 
+            // Check Follow Status
             checkRelation(freshData);
         });
     }
 
-    // --- 5. RENDER ---
+    // --- 5. RENDER LOGIC ---
     function renderProfile(data) {
-        // Remove skeletons
+        // Hide Skeleton Loaders
         ['pfp', 'display-name', 'username', 'bio', 'id-container'].forEach(id => {
             document.getElementById(id).classList.remove('skeleton');
         });
 
+        // Inject Data
         document.getElementById('display-name').innerText = data.name || "Unknown";
         document.getElementById('nav-name').innerText = (data.username || "Profile").toUpperCase();
         document.getElementById('username').innerText = `@${data.username}`;
         document.getElementById('bio').innerText = data.bio || "";
         document.getElementById('goorac-id').innerText = data.gooracNumber || "N/A";
         
-        // Image
+        // Avatar
         const img = document.getElementById('pfp');
         const newSrc = data.photoURL || 'https://via.placeholder.com/150/111/333?text=?';
         if (img.src !== newSrc) img.src = newSrc;
 
-        // Badge
+        // Verification Badge
         const badge = document.getElementById('badge');
         if(data.verified) badge.classList.add('show');
         else badge.classList.remove('show');
@@ -373,7 +382,7 @@
         document.getElementById('count-followers').innerText = followers.length;
         document.getElementById('count-following').innerText = following.length;
 
-        // Hide Actions if Own Profile
+        // Hide Buttons if viewing own profile
         if(myUid && targetUid && myUid === targetUid) {
             document.getElementById('action-container').style.display = 'none';
         } else {
@@ -386,10 +395,11 @@
         document.getElementById('btn-msg').classList.remove('skeleton');
     }
 
-    // --- 6. FOLLOW LOGIC ---
+    // --- 6. FOLLOW/UNFOLLOW LOGIC ---
     async function checkRelation(freshData) {
         if(!myUid || !targetUid || myUid === targetUid) return;
 
+        // Check MY following list to see if I follow THEM
         const myDoc = await db.collection("users").doc(myUid).get();
         const myFollowing = myDoc.data().following || [];
 
@@ -401,6 +411,7 @@
         updateFollowButton(isFollowing);
         removeBtnSkeletons();
 
+        // Update Local Cache
         const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing };
         localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
@@ -419,13 +430,15 @@
 
     async function handleFollow() {
         if(!targetUid || !myUid || isProcessing) return;
-        isProcessing = true; 
+        
+        isProcessing = true; // Lock
         const btn = document.getElementById('btn-follow');
         const isCurrentlyFollowing = btn.classList.contains('btn-following');
         
         btn.classList.add('loading');
         if(navigator.vibrate) navigator.vibrate(15);
 
+        // Optimistic UI updates
         const countEl = document.getElementById('count-followers');
         let currentCount = parseInt(countEl.innerText);
         const ts = firebase.firestore.Timestamp.now();
@@ -441,9 +454,11 @@
                 const myFollowing = myDoc.data().following || [];
                 const theirFollowers = theirDoc.data().followers || [];
 
+                // Double check relation inside transaction
                 const actuallyFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
                 if (!isCurrentlyFollowing && !actuallyFollowing) {
+                    // FOLLOW
                     transaction.update(myRef, {
                         following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
                     });
@@ -451,6 +466,7 @@
                         followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
                     });
                     
+                    // Notification
                     const notifRef = db.collection("notifications").doc();
                     transaction.set(notifRef, {
                         recipientId: targetUid,
@@ -460,6 +476,7 @@
                         seen: false
                     });
                 } else if (isCurrentlyFollowing && actuallyFollowing) {
+                    // UNFOLLOW
                     const newFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
 
@@ -468,9 +485,11 @@
                 }
             });
 
+            // Success Update
             updateFollowButton(!isCurrentlyFollowing); 
             countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
 
+            // Cache Update
             const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
             cached.amIFollowing = !isCurrentlyFollowing;
             localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
@@ -479,7 +498,7 @@
             revertFollowState(e, currentCount, isCurrentlyFollowing);
         } finally {
             btn.classList.remove('loading');
-            isProcessing = false;
+            isProcessing = false; // Unlock
         }
     }
 
@@ -497,7 +516,7 @@
         
         navigator.clipboard.writeText(txt).then(() => {
             if(navigator.vibrate) navigator.vibrate(50);
-            showToast("ID Copied");
+            showToast("Copied ID");
         });
     }
 
