@@ -168,6 +168,18 @@
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+        /* --- NEW: BUTTON PULSE LOADING --- */
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+            animation: pulse 1.2s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
         /* --- TOAST --- */
         #toast {
             position: fixed; bottom: 40px; left: 50%; transform: translate(-50%, 20px);
@@ -385,19 +397,21 @@
         isProcessing = true; // Lock the function
         const btn = document.getElementById('btn-follow');
         const isCurrentlyFollowing = btn.innerText === "Following"; 
-        
-        // --- START LOADING STATE ---
-        btn.innerText = "Connecting...";
-        btn.style.opacity = "0.7";
-        btn.style.pointerEvents = "none";
+        const originalText = btn.innerText;
+        const originalClass = btn.className;
 
+        // Visual Loading State
+        btn.innerText = "Connecting...";
+        btn.classList.add('btn-loading');
+        
         if(navigator.vibrate) navigator.vibrate(15);
 
         const countEl = document.getElementById('count-followers');
         let currentCount = parseInt(countEl.innerText);
+
         const ts = firebase.firestore.Timestamp.now();
 
-        // Database Operation
+        // Database Operation using Transaction to prevent duplicates
         try {
             await db.runTransaction(async (transaction) => {
                 const myRef = db.collection("users").doc(myUid);
@@ -409,9 +423,11 @@
                 const myFollowing = myDoc.data().following || [];
                 const theirFollowers = theirDoc.data().followers || [];
 
+                // Re-verify relationship inside transaction to prevent data corruption
                 const actuallyFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
                 if (!isCurrentlyFollowing && !actuallyFollowing) {
+                    // FOLLOW ACTION
                     transaction.update(myRef, {
                         following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
                     });
@@ -419,6 +435,7 @@
                         followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
                     });
                     
+                    // Notification
                     const notifRef = db.collection("notifications").doc();
                     transaction.set(notifRef, {
                         recipientId: targetUid,
@@ -428,6 +445,7 @@
                         seen: false
                     });
                 } else if (isCurrentlyFollowing && actuallyFollowing) {
+                    // UNFOLLOW ACTION
                     const newFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
 
@@ -436,10 +454,11 @@
                 }
             });
 
-            // --- SUCCESS: UPDATE UI AND STATS ---
+            // Update UI ONLY after successful Firestore update
             updateFollowButton(!isCurrentlyFollowing); 
             countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
 
+            // Update Cache Locally after success
             const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
             cached.amIFollowing = !isCurrentlyFollowing;
             localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
@@ -447,9 +466,7 @@
         } catch (e) {
             revertFollowState(e, currentCount, isCurrentlyFollowing);
         } finally {
-            // --- CLEANUP ---
-            btn.style.opacity = "1";
-            btn.style.pointerEvents = "auto";
+            btn.classList.remove('btn-loading');
             isProcessing = false; // Release lock
         }
     }
