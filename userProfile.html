@@ -386,18 +386,18 @@
         const btn = document.getElementById('btn-follow');
         const isCurrentlyFollowing = btn.innerText === "Following"; 
         
-        // 1. Optimistic UI Update
-        updateFollowButton(!isCurrentlyFollowing); 
+        // --- START LOADING STATE ---
+        btn.innerText = "Connecting...";
+        btn.style.opacity = "0.7";
+        btn.style.pointerEvents = "none";
+
         if(navigator.vibrate) navigator.vibrate(15);
 
-        // 2. Optimistic Stats Update
         const countEl = document.getElementById('count-followers');
         let currentCount = parseInt(countEl.innerText);
-        countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
-
         const ts = firebase.firestore.Timestamp.now();
 
-        // 3. Database Operation using Transaction to prevent duplicates
+        // Database Operation
         try {
             await db.runTransaction(async (transaction) => {
                 const myRef = db.collection("users").doc(myUid);
@@ -409,11 +409,9 @@
                 const myFollowing = myDoc.data().following || [];
                 const theirFollowers = theirDoc.data().followers || [];
 
-                // Re-verify relationship inside transaction to prevent data corruption
                 const actuallyFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
                 if (!isCurrentlyFollowing && !actuallyFollowing) {
-                    // FOLLOW ACTION
                     transaction.update(myRef, {
                         following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
                     });
@@ -421,7 +419,6 @@
                         followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
                     });
                     
-                    // Notification
                     const notifRef = db.collection("notifications").doc();
                     transaction.set(notifRef, {
                         recipientId: targetUid,
@@ -431,7 +428,6 @@
                         seen: false
                     });
                 } else if (isCurrentlyFollowing && actuallyFollowing) {
-                    // UNFOLLOW ACTION
                     const newFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
 
@@ -440,7 +436,10 @@
                 }
             });
 
-            // 4. Update Cache Locally after success
+            // --- SUCCESS: UPDATE UI AND STATS ---
+            updateFollowButton(!isCurrentlyFollowing); 
+            countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
+
             const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
             cached.amIFollowing = !isCurrentlyFollowing;
             localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
@@ -448,6 +447,9 @@
         } catch (e) {
             revertFollowState(e, currentCount, isCurrentlyFollowing);
         } finally {
+            // --- CLEANUP ---
+            btn.style.opacity = "1";
+            btn.style.pointerEvents = "auto";
             isProcessing = false; // Release lock
         }
     }
