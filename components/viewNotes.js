@@ -11,8 +11,9 @@ class ViewNotes extends HTMLElement {
         this.isOwnNote = false;
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
-        // FIX: Lazy load DB to prevent startup crash
-        this.db = null;
+        
+        // FIX 1: Don't init DB here to prevent startup crash
+        this.db = null; 
         this.unsubscribe = null;
 
         // Swipe Logic Variables
@@ -25,7 +26,7 @@ class ViewNotes extends HTMLElement {
     }
 
     connectedCallback() {
-        // FIX: Initialize DB here if available
+        // FIX 2: Init DB here if available
         if (window.firebase && !this.db) {
             this.db = firebase.firestore();
         }
@@ -275,10 +276,10 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(initialNoteData, isOwnNote = false) {
-        // FIX: Ensure DB is connected before trying to use it
+        // FIX 3: Ensure DB is connected now if it wasn't before
         if (!this.db && window.firebase) this.db = firebase.firestore();
         if (!this.db) {
-            console.error("Firebase not initialized.");
+            console.error("Firebase not initialized yet.");
             alert("Loading system... please try again.");
             return;
         }
@@ -324,13 +325,13 @@ class ViewNotes extends HTMLElement {
                     if (doc.exists) {
                         const data = doc.data();
                         
-                        // FIX: REMOVED the line that forces close on inactive notes.
-                        // Now profile history notes (which are inactive) will stay open.
+                        // FIX 4: REMOVED the line "if (data.isActive === false) this.close()"
+                        // This ensures notes from history (which are inactive) stay OPEN.
                         
                         this.currentNote = { ...data, id: doc.id };
                         this.renderContent();
                     } else {
-                        // Only close if the document is actually deleted
+                        // Only close if note is actually deleted from DB
                         this.close();
                     }
                 });
@@ -753,7 +754,7 @@ const NotesManager = {
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(user => {
                 if (user) {
-                    // FIX: Check if we are on a page that actually has these elements
+                    // FIX 5: Ensure we are on the Home Page before running home logic
                     if(document.getElementById('notes-container')) {
                         this.setupMyNote(user);
                         this.loadMutualNotes(user);
