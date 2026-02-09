@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000">
     <title>My Profile | Goorac</title>
     
+    <link rel="manifest" href="manifest.json">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -20,14 +20,15 @@
     <style>
         :root {
             --bg: #000000;
-            --surface: #121212;
-            --surface-press: #1A1A1A;
-            --border: #222222;
+            --surface: #0a0a0a;
+            --surface-press: #151515;
+            --border: #1f1f1f;
             --primary: #FFFFFF;
             --secondary: #888888;
-            --accent: #3b82f6;
-            --danger: #ef4444;
-            --danger-bg: rgba(239, 68, 68, 0.1);
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.15);
+            --danger: #ff4444;
+            --safe-top: env(safe-area-inset-top);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -37,128 +38,115 @@
             color: var(--primary);
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            padding-bottom: 90px; /* Space for Navbar */
+            padding-bottom: 100px; /* Space for Navbar */
+            user-select: none; -webkit-user-select: none;
         }
 
+        /* --- HEADER --- */
         header {
             position: sticky; top: 0; z-index: 50;
-            background: rgba(0,0,0,0.9); backdrop-filter: blur(12px);
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
             border-bottom: 1px solid var(--border);
-            padding: 14px 16px;
-            display: flex; justify-content: space-between; align-items: center;
+            padding: calc(10px + var(--safe-top)) 16px 10px;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        .header-title { font-weight: 800; font-size: 16px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .icon-btn {
+        .header-title { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .nav-btn {
             background: none; border: none; color: var(--primary);
-            padding: 8px; border-radius: 50%; display: flex; align-items: center;
-            cursor: pointer; transition: background 0.2s;
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
         }
-        .icon-btn:active { background: var(--surface-press); }
 
-        .profile-hero {
+        /* --- MAIN LAYOUT --- */
+        main { 
+            max-width: 500px; margin: 0 auto; 
+            padding: 30px 24px;
             display: flex; flex-direction: column; align-items: center;
-            padding: 30px 20px 20px; text-align: center;
         }
 
-        .avatar-wrapper {
-            width: 110px; height: 110px; margin-bottom: 16px;
-            position: relative;
+        /* --- PROFILE AVATAR --- */
+        .avatar-container {
+            width: 120px; height: 120px; 
+            border-radius: 50%; padding: 3px;
+            background: linear-gradient(135deg, var(--surface-press), var(--bg));
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
         }
         .avatar {
             width: 100%; height: 100%; border-radius: 50%;
             object-fit: cover; background: var(--surface);
-            border: 2px solid var(--border);
-            transition: opacity 0.3s ease;
         }
 
-        .user-name { font-size: 24px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; min-height: 29px; }
-        .verified { color: var(--accent); font-size: 20px; }
-        .user-handle { color: var(--secondary); font-size: 15px; font-weight: 500; min-height: 18px; }
+        /* --- USER INFO --- */
+        .user-info { text-align: center; width: 100%; }
+        .display-name { 
+            font-size: 26px; font-weight: 800; color: var(--primary);
+            display: flex; align-items: center; justify-content: center; gap: 6px; 
+            letter-spacing: -0.5px;
+        }
+        .verified-badge { color: var(--accent); font-size: 22px; display: none; }
+        .verified-badge.show { display: inline-block; }
+        .username-tag { font-size: 15px; color: var(--secondary); font-weight: 500; margin-top: 4px; }
 
+        /* --- ID PILL --- */
         .id-pill {
-            margin-top: 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 8px 16px; border-radius: 100px;
-            display: inline-flex; align-items: center; gap: 8px;
-            cursor: pointer; transition: 0.1s;
+            margin: 18px 0 24px;
+            display: inline-flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            padding: 10px 20px; border-radius: 100px;
+            cursor: pointer; transition: 0.2s;
         }
-        .id-pill:active { background: var(--surface-press); transform: scale(0.96); }
-        .id-label { font-size: 11px; font-weight: 700; color: var(--secondary); text-transform: uppercase; }
-        .id-value { font-family: monospace; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
-        .copy-icon { font-size: 14px; color: var(--secondary); }
+        .id-pill:active { background: rgba(255,255,255,0.08); transform: scale(0.96); }
+        .id-label { font-size: 11px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .id-value { font-family: monospace; font-size: 15px; font-weight: 700; color: var(--primary); }
 
-        .bio {
-            margin: 20px 0; color: #d4d4d4; font-size: 14px;
-            line-height: 1.5; max-width: 90%; min-height: 20px;
+        .bio-text { 
+            font-size: 14px; line-height: 1.6; color: #cccccc; 
+            text-align: center; margin-bottom: 32px; min-height: 20px;
         }
 
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-            padding: 0 16px; margin-bottom: 24px;
+        /* --- STATS --- */
+        .stats-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px; 
+            width: 100%; margin-bottom: 32px;
         }
-        .stat-card {
+        .stat-box { 
             background: var(--surface); border: 1px solid var(--border);
-            padding: 16px; border-radius: 16px; text-align: center;
-            text-decoration: none; color: inherit; transition: 0.1s;
+            border-radius: 18px; padding: 16px; text-decoration: none;
+            display: flex; flex-direction: column; align-items: center;
         }
-        .stat-card:active { background: var(--surface-press); transform: scale(0.98); }
-        .stat-num { display: block; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-        .stat-label { font-size: 12px; font-weight: 600; color: var(--secondary); text-transform: uppercase; }
+        .stat-box:active { background: var(--surface-press); transform: scale(0.97); }
+        .stat-num { font-size: 22px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+        .stat-lbl { font-size: 11px; color: var(--secondary); font-weight: 700; text-transform: uppercase; }
 
-        .action-row {
-            display: flex; gap: 12px; padding: 0 16px; margin-bottom: 30px;
-        }
+        /* --- ACTION BUTTONS --- */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
         .btn {
-            flex: 1; padding: 14px; border-radius: 12px;
-            font-size: 14px; font-weight: 600; text-align: center;
-            text-decoration: none; cursor: pointer; border: none;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            height: 52px; border-radius: 16px; font-weight: 700; font-size: 15px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            text-decoration: none; transition: 0.2s;
         }
-        
         .btn-edit { background: var(--primary); color: #000; }
-        .btn-edit:active { opacity: 0.9; transform: scale(0.98); }
-
-        .btn-logout { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
-        .btn-logout:active { background: rgba(239, 68, 68, 0.2); transform: scale(0.98); }
-
-        .tabs {
-            display: flex; border-bottom: 1px solid var(--border);
-            position: sticky; top: 60px; background: rgba(0,0,0,0.95); z-index: 40;
-        }
-        .tab {
-            flex: 1; text-align: center; padding: 16px;
-            font-size: 14px; font-weight: 600; color: var(--secondary);
-            position: relative; cursor: pointer;
-        }
-        .tab.active { color: var(--primary); }
-        .tab.active::after {
-            content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-            height: 2px; background: var(--primary);
-        }
-
-        .content-area {
-            padding: 60px 20px; text-align: center; color: var(--secondary);
-            font-size: 14px;
-        }
+        .btn-logout { background: var(--surface); color: var(--danger); border: 1px solid var(--border); }
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
 
         /* --- SKELETON --- */
         .skeleton {
-            background: linear-gradient(90deg, #121212 25%, #1e1e1e 50%, #121212 75%);
+            background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
             background-size: 200% 100%; animation: shimmer 1.5s infinite;
-            color: transparent !important; border-radius: 6px;
-            border-color: transparent !important;
+            color: transparent !important; border-color: transparent !important;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+        /* --- TOAST --- */
         #toast {
-            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: #fff; color: #000; padding: 12px 24px; border-radius: 50px;
-            font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none;
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px;
+            position: fixed; bottom: 100px; left: 50%; transform: translate(-50%, 20px);
+            background: #fff; color: #000; padding: 12px 24px; border-radius: 100px;
+            font-size: 14px; font-weight: 700; opacity: 0; pointer-events: none;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 1000;
         }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
     </style>
 </head>
@@ -166,71 +154,57 @@
 
     <header>
         <div class="header-title">MY PROFILE</div>
-        <button class="icon-btn">
+        <button class="nav-btn" onclick="location.href='settings.html'">
             <span class="material-icons-round">settings</span>
         </button>
     </header>
 
-    <div class="profile-hero">
-        <div class="avatar-wrapper">
-            <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
+    <main>
+        <div class="avatar-container">
+            <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
         </div>
 
-        <div class="user-name">
-            <span id="display-name" class="skeleton">Loading...</span>
-            <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
+        <div class="user-info">
+            <div class="display-name">
+                <span id="display-name" class="skeleton" style="min-width:140px; height:30px; border-radius:8px;"></span>
+                <span class="material-icons-round verified-badge" id="badge">verified</span>
+            </div>
+            <div class="username-tag skeleton" id="username" style="display:inline-block; min-width:80px; height:18px; margin-top:8px; border-radius:4px;"></div>
         </div>
-        
-        <div class="user-handle skeleton" id="username" style="width: 100px; margin-top: 4px;">@...</div>
 
-        <div class="id-pill skeleton" id="id-pill-container" onclick="copyID()">
-            <span class="id-label">Goorac ID</span>
+        <div class="id-pill skeleton" id="id-container" onclick="copyID()">
+            <span class="id-label">ID</span>
             <span class="id-value" id="goorac-id">------</span>
-            <span class="material-icons-round copy-icon">content_copy</span>
+            <span class="material-icons-round" style="font-size:16px; opacity:0.5;">content_copy</span>
         </div>
 
-        <p class="bio skeleton" id="bio" style="width: 80%; margin-top: 20px; height: 40px;"></p>
-    </div>
+        <p class="bio-text skeleton" id="bio" style="width:100%; height:40px; border-radius:8px;"></p>
 
-    <div class="stats-grid">
-        <a href="followers.html" class="stat-card skeleton" id="stat-fol">
-            <span class="stat-num" id="count-followers">0</span>
-            <span class="stat-label">Followers</span>
-        </a>
-        <a href="following.html" class="stat-card skeleton" id="stat-fing">
-            <span class="stat-num" id="count-following">0</span>
-            <span class="stat-label">Following</span>
-        </a>
-    </div>
+        <div class="stats-row">
+            <a href="followers.html" class="stat-box">
+                <span class="stat-num" id="count-followers">0</span>
+                <span class="stat-lbl">Followers</span>
+            </a>
+            <a href="following.html" class="stat-box">
+                <span class="stat-num" id="count-following">0</span>
+                <span class="stat-lbl">Following</span>
+            </a>
+        </div>
 
-    <div class="action-row">
-        <a href="setup.html" class="btn btn-edit">Edit Profile</a>
-        <button onclick="logout()" class="btn btn-logout">
-            <span class="material-icons-round" style="font-size: 18px;">logout</span> Logout
-        </button>
-    </div>
+        <div class="action-grid">
+            <a href="setup.html" class="btn btn-edit">Edit Profile</a>
+            <button onclick="logout()" class="btn btn-logout">
+                <span class="material-icons-round" style="font-size:18px;">logout</span> Logout
+            </button>
+        </div>
+    </main>
 
-    <div class="tabs">
-        <div class="tab active">Notes</div>
-        <div class="tab">Media</div>
-        <div class="tab">About</div>
-    </div>
-    
-    <div class="content-area">
-        <span class="material-icons-round" style="font-size: 32px; opacity: 0.3; margin-bottom: 12px;">grid_view</span>
-        <p>Your posts will appear here</p>
-    </div>
-
-    <div id="toast">
-        <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
-        ID Copied
-    </div>
+    <div id="toast">ID Copied</div>
     
     <main-navbar></main-navbar>
     <call-notifier></call-notifier>
 
 <script>
-    // --- FIREBASE CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -244,115 +218,67 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- 1. IMMEDIATE CACHE LOAD ---
+    // 1. Cache First
     (function loadCache() {
         const cached = localStorage.getItem('my_goorac_profile');
         if (cached) {
-            try {
-                const data = JSON.parse(cached);
-                renderUI(data);
-                console.log("⚡ Profile loaded from cache");
-            } catch (e) {
-                console.error("Cache parse error", e);
-            }
+            renderUI(JSON.parse(cached));
         }
     })();
 
-    // --- 2. AUTH & REALTIME SYNC ---
-    auth.onAuthStateChanged(async (user) => {
+    // 2. Auth & Realtime
+    auth.onAuthStateChanged(user => {
         if (user) {
-            initRealtimeListener(user.uid);
+            db.collection("users").doc(user.uid).onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    localStorage.setItem('my_goorac_profile', JSON.stringify(data));
+                    renderUI(data);
+                }
+            });
         } else {
-            // Buffer to prevent flickering redirects during session checks
-            setTimeout(() => {
-                if(!auth.currentUser) window.location.href = 'login.html';
-            }, 1000);
+            window.location.href = 'login.html';
         }
     });
 
-    function initRealtimeListener(uid) {
-        db.collection("users").doc(uid).onSnapshot((doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-                // 1. Update Cache
-                localStorage.setItem('my_goorac_profile', JSON.stringify(data));
-                // 2. Update UI
-                renderUI(data);
-            } else {
-                window.location.href = "setup.html";
-            }
-        });
-    }
-
-    // --- 3. RENDER ENGINE ---
     function renderUI(data) {
-        // Remove skeleton classes
-        const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
-        skeletons.forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.classList.remove('skeleton');
+        ['pfp', 'display-name', 'username', 'bio', 'id-container'].forEach(id => {
+            document.getElementById(id).classList.remove('skeleton');
         });
 
-        // Safe Text
-        safeText('display-name', data.name || "User");
-        safeText('username', `@${data.username}`);
-        safeText('bio', data.bio || "Welcome to my Goorac profile.");
-        safeText('goorac-id', data.gooracNumber || "-------");
-
-        // Image (Anti-flicker logic)
+        document.getElementById('display-name').innerText = data.name || "User";
+        document.getElementById('username').innerText = `@${data.username}`;
+        document.getElementById('bio').innerText = data.bio || "No bio yet.";
+        document.getElementById('goorac-id').innerText = data.gooracNumber || "N/A";
+        
         const pfp = document.getElementById('pfp');
-        const newSrc = data.photoURL || 'https://via.placeholder.com/150/121212/FFFFFF?text=User';
-        if(pfp.src !== newSrc) pfp.src = newSrc;
+        const src = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
+        if(pfp.src !== src) pfp.src = src;
 
-        // Badge
-        document.getElementById('verified-badge').style.display = data.verified ? 'inline-block' : 'none';
-
-        // Stats
-        const followers = data.followers || [];
-        const following = data.following || [];
-        safeText('count-followers', followers.length);
-        safeText('count-following', following.length);
+        if(data.verified) document.getElementById('badge').classList.add('show');
+        
+        document.getElementById('count-followers').innerText = (data.followers || []).length;
+        document.getElementById('count-following').innerText = (data.following || []).length;
     }
 
-    function safeText(id, val) {
-        const el = document.getElementById(id);
-        if(el) el.innerText = val;
-    }
-
-    // --- 4. ACTIONS ---
     function copyID() {
-        const txt = document.getElementById('goorac-id').innerText;
-        if(txt.includes('-')) return;
-
-        if(navigator.vibrate) navigator.vibrate(50);
-
-        navigator.clipboard.writeText(txt).then(() => {
-            showToast("ID Copied");
-        }).catch(() => {
-            const textArea = document.createElement("textarea");
-            textArea.value = txt;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showToast("ID Copied");
+        const id = document.getElementById('goorac-id').innerText;
+        if(id === "------") return;
+        navigator.clipboard.writeText(id).then(() => {
+            if(navigator.vibrate) navigator.vibrate(50);
+            const t = document.getElementById('toast');
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
         });
     }
 
     function logout() {
-        if(confirm("Log out of Goorac?")) {
+        if(confirm("Logout from Goorac?")) {
             auth.signOut().then(() => {
-                localStorage.removeItem('my_goorac_profile'); 
+                localStorage.clear();
                 window.location.href = "login.html";
             });
         }
-    }
-
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerHTML = `<span class="material-icons-round" style="font-size:16px;">check_circle</span> ${msg}`;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2000);
     }
 </script>
 </body>
