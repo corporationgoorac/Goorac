@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,6 +87,7 @@
         .user-item { 
             display: flex; align-items: center; justify-content: space-between; 
             padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         
         .user-item.is-me { 
@@ -157,7 +159,9 @@
         .pulse { animation: pulse-bg 1.8s infinite ease-in-out; }
         @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); }
+        .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); opacity: 0; animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        
         .empty-icon { font-size: 4rem; margin-bottom: 20px; display: block; filter: drop-shadow(0 0 10px rgba(0,210,255,0.2)); }
         
         .lock-msg { 
@@ -237,7 +241,11 @@
                 const data = doc.data();
                 if(data && data.following) {
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
-                    if (allUsersData.length > 0) updateButtons();
+                    // REAL-TIME RESET: Clear loaders when server responds
+                    if (allUsersData.length > 0) {
+                        processingIds.clear(); 
+                        updateButtons();
+                    }
                 }
             });
             initPage(user); 
@@ -317,7 +325,7 @@
         const nextBatchIds = followerIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
-            // Speed optimization: Fetch all docs in parallel
+            // Speed optimization: Parallel fetching
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
@@ -385,21 +393,26 @@
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
+            // Skip if currently processing this user to keep spinner visible
             if (processingIds.has(uid)) return;
 
             const span = btn.querySelector('span');
             if (isOwnProfile) {
                 if(span) span.innerText = "Remove";
                 btn.className = "action-btn remove";
+                btn.innerHTML = `<span>Remove</span>`;
             } else {
                 if(currentUserFollowing.includes(uid)) {
                     if(span) span.innerText = "Following";
                     btn.className = "action-btn following";
+                    btn.innerHTML = `<span>Following</span>`;
                 } else {
                     if(span) span.innerText = "Follow";
                     btn.className = "action-btn";
+                    btn.innerHTML = `<span>Follow</span>`;
                 }
             }
+            btn.style.pointerEvents = 'auto';
         });
     }
 
@@ -408,11 +421,14 @@
         processingIds.add(targetUid);
 
         const btn = document.getElementById(`btn-${targetUid}`);
-        let originalContent = '';
         if (btn) {
-            originalContent = btn.innerHTML;
             btn.innerHTML = '<div class="btn-loader"></div>';
             btn.style.pointerEvents = 'none';
+        }
+
+        // FEATURE: Haptic feedback
+        if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(10);
         }
 
         const myUid = auth.currentUser.uid;
@@ -423,10 +439,16 @@
 
         try {
             if (isOwnProfile) {
-                if (!confirm(`Remove @${username} from your followers?`)) throw new Error("Cancelled");
-                if(btn) btn.closest('.user-item').style.opacity = '0.5';
+                // PREMIUM: Instant slide-out removal without browser pop-up
+                if(btn) {
+                    const parentItem = btn.closest('.user-item');
+                    parentItem.style.opacity = '0.3';
+                    parentItem.style.transform = 'translateX(-10px)';
+                }
+                
                 await removeFromList(myUid, 'followers', targetUid); 
                 await removeFromList(targetUid, 'following', myUid); 
+                
                 if(btn) btn.closest('.user-item').remove();
             } else {
                 const isFollowing = currentUserFollowing.includes(targetUid);
@@ -448,17 +470,14 @@
             }
         } catch (e) {
             console.error(e);
-            if (btn && e.message !== "Cancelled") {
-                btn.innerHTML = originalContent;
-                btn.style.pointerEvents = 'auto';
+            if (btn) {
+                updateButtons();
+                const parentItem = btn.closest('.user-item');
+                if(parentItem) {
+                    parentItem.style.opacity = '1';
+                    parentItem.style.transform = 'none';
+                }
             }
-        } finally {
-            if (e?.message === "Cancelled" && btn) {
-                btn.innerHTML = originalContent;
-                btn.style.pointerEvents = 'auto';
-            }
-            processingIds.delete(targetUid);
-            // Realtime update via onSnapshot will handle button state reset
         }
     }
 
