@@ -47,7 +47,7 @@
 
         .container {
             width: 100%; max-width: 440px; 
-            padding: 70px 24px 120px 24px; /* Bottom padding for the fixed button */
+            padding: 70px 24px 120px 24px; 
             box-sizing: border-box;
             opacity: 0; transform: translateY(10px);
             transition: opacity 0.5s ease, transform 0.5s ease;
@@ -60,7 +60,7 @@
         }
         .page-title { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; }
 
-        /* Profile Hero - Compact */
+        /* Profile Hero */
         .profile-hero {
             display: flex; flex-direction: column; align-items: center; 
             margin: 20px 0 25px 0;
@@ -70,7 +70,7 @@
         }
         .pfp-image {
             width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
-            border: 1px solid var(--border);
+            border: 1px solid var(--border); background: #111;
         }
         .pfp-edit-btn {
             position: absolute; bottom: 0; right: 0;
@@ -211,13 +211,6 @@
     const launchBtn = document.getElementById('launchBtn');
     const container = document.getElementById('mainContainer');
 
-    const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
-    if (localProfile) {
-        populateUI(localProfile);
-        container.classList.add('loaded');
-        document.getElementById('loader-overlay').style.display = 'none';
-    }
-
     function populateUI(data) {
         document.getElementById('full-name').value = data.name || "";
         document.getElementById('username').value = data.username || "";
@@ -241,11 +234,33 @@
     auth.onAuthStateChanged((user) => {
         if (user) {
             activeUser = user;
+            
+            // BUG FIX: Only load local storage if it belongs to the NEW user
+            const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
+            if (localProfile && localProfile.uid === user.uid) {
+                populateUI(localProfile);
+                container.classList.add('loaded');
+                document.getElementById('loader-overlay').style.display = 'none';
+            } else {
+                // If UID mismatch, clear local storage and wait for cloud
+                localStorage.removeItem('goorac_profile');
+                // Reset UI to empty while waiting for cloud sync
+                resetUI();
+            }
+            
             syncWithCloud(user);
         } else {
             window.location.href = "login.html";
         }
     });
+
+    function resetUI() {
+        document.getElementById('full-name').value = "";
+        document.getElementById('username').value = "";
+        document.getElementById('bio').value = "";
+        document.getElementById('display-id').innerText = "--------";
+        document.getElementById('user-pfp').src = "https://via.placeholder.com/150";
+    }
 
     async function syncWithCloud(user) {
         try {
@@ -255,9 +270,11 @@
                 localStorage.setItem('goorac_profile', JSON.stringify(cloudData));
                 populateUI(cloudData);
             } else {
+                // Handle new account setup
                 if (!finalGooracID) finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
                 document.getElementById('display-id').innerText = finalGooracID;
                 document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
+                currentPhotoURL = user.photoURL;
             }
             container.classList.add('loaded');
             document.getElementById('loader-overlay').style.display = 'none';
