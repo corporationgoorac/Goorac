@@ -21,6 +21,7 @@
             --danger: #ff4444;
             --glass: rgba(255, 255, 255, 0.03);
             --sheet-bg: #121212;
+            --online: #00ff41;
         }
 
         body {
@@ -40,7 +41,7 @@
             padding-top: max(15px, env(safe-area-inset-top));
         }
         .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
+        
         /* SEARCH */
         .search-wrap { padding: 12px 20px; }
         .search-input {
@@ -60,14 +61,29 @@
         }
         .chat-item:active { background: var(--glass); }
 
-        .chat-pfp { width: 58px; height: 58px; border-radius: 20px; margin-right: 15px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; }
+        /* PFP Container for Online Dot */
+        .pfp-container { position: relative; margin-right: 15px; }
+        .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
+        
+        /* The Real-Time Green Dot */
+        .online-indicator {
+            position: absolute; bottom: 2px; right: 2px;
+            width: 12px; height: 12px; background: var(--online);
+            border-radius: 50%; border: 2px solid #000;
+            box-shadow: 0 0 8px var(--online);
+            display: none; /* Hidden by default */
+            z-index: 2;
+        }
+        .online-indicator.active { display: block; }
+
         .chat-info { flex: 1; min-width: 0; pointer-events: none; }
         .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         
         .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
         .v-badge { height: 14px; width: 14px; }
-        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; }
-        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; }
+        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; transition: color 0.3s; }
+        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
+        @keyframes pulseType { 50% { opacity: 0.6; } }
 
         .pin-indicator { 
             width: 14px; height: 14px; 
@@ -89,7 +105,9 @@
             display: flex; align-items: center; justify-content: center;
             padding: 0 5px; box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
             flex-shrink: 0;
+            animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
 
         /* SKELETON */
         .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
@@ -132,7 +150,9 @@
 </head>
 <body oncontextmenu="return false;">
 
-<header><div class="header-logo">GOORAC</div></header>
+<header>
+    <div class="header-logo">GOORAC</div>
+    </header>
 
 <div class="search-wrap">
     <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
@@ -141,7 +161,10 @@
 <div id="search-results"></div>
 
 <div id="inbox-content">
-    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">Quantum Inbox</div>
+    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; display:flex; justify-content:space-between;">
+        <span>Quantum Inbox</span>
+        <span id="last-sync-time" style="opacity:0.5; font-weight:400;">Syncing...</span>
+    </div>
     
     <div id="chats-list">
         <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
@@ -211,6 +234,7 @@
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
+            setupPresence(); // START REALTIME PRESENCE
             fetchUserData();
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 const data = doc.data();
@@ -222,11 +246,49 @@
         } else { window.location.href = 'login.html'; }
     });
 
+    // --- REALTIME PRESENCE SYSTEM ---
+    function setupPresence() {
+        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
+        const isOfflineForDatabase = {
+            state: 'offline',
+            last_changed: firebase.database.ServerValue.TIMESTAMP,
+        };
+        const isOnlineForDatabase = {
+            state: 'online',
+            last_changed: firebase.database.ServerValue.TIMESTAMP,
+        };
+
+        rdb.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === false) return;
+            userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
+                userStatusDatabaseRef.set(isOnlineForDatabase);
+            });
+        });
+    }
+
     async function fetchUserData() {
         const userDoc = await db.collection("users").doc(myUid).get();
         const data = userDoc.data();
         myFollowingList = data?.following || [];
         myFollowersList = data?.followers || [];
+    }
+
+    async function syncUserProfile(uid) {
+        if(!uid) return null;
+        try {
+            const snap = await db.collection("users").doc(uid).get();
+            if(snap.exists) {
+                const freshData = snap.data();
+                const cachedData = userCache[uid];
+                if (!cachedData || JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
+                    console.log(`♻️ Updating cache for: ${freshData.username}`);
+                    userCache[uid] = freshData;
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                    return freshData;
+                }
+            }
+        } catch(e) { console.error("Sync error", e); }
+        return null; 
     }
 
     function listenToInbox() {
@@ -236,19 +298,31 @@
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
-            
+            document.getElementById('last-sync-time').innerText = "Updated " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
                 
-                if (!userCache[otherUid]) {
-                    const otherDoc = await db.collection("users").doc(otherUid).get();
-                    userCache[otherUid] = otherDoc.data();
+                let userData = userCache[otherUid];
+                syncUserProfile(otherUid).then(fresh => {
+                    if(fresh) {
+                        const nameEl = document.getElementById(`name-${d.id}`);
+                        if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
+                             nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
+                        }
+                    }
+                });
+
+                if (!userData) {
+                    const doc = await db.collection("users").doc(otherUid).get();
+                    userData = doc.data();
+                    userCache[otherUid] = userData;
                     localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
-                return { id: d.id, chat, u: userCache[otherUid], otherUid, isPinned };
+                return { id: d.id, chat, u: userData, otherUid, isPinned };
             });
 
             const results = await Promise.all(chatPromises);
@@ -279,7 +353,6 @@
                 const finalName = u.name || u.displayName || u.username || "Unknown";
                 const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
                 
-                // Safe JSON for handlers
                 const safeUserStr = encodeURIComponent(JSON.stringify({
                     name: finalName,
                     username: u.username,
@@ -290,17 +363,20 @@
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
-                // --- FIXED TOUCH LOGIC (INLINE ATTRIBUTES FOR CACHE PERSISTENCE) ---
                 item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
                 item.setAttribute("ontouchend", "endLongPress(this)");
                 item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
-                item.setAttribute("onclick", `enterChat(event, '${u.username}')`); // One tap logic
+                item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
 
+                // --- GREEN DOT PLACEHOLDER ---
                 item.innerHTML = `
-                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                    <div class="pfp-container">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                        <div class="online-indicator" id="online-${otherUid}"></div>
+                    </div>
                     <div class="chat-info">
                         <div class="chat-top-row">
-                            <span class="u-name">
+                            <span class="u-name" id="name-${id}">
                                 ${finalName} 
                                 ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
                                 ${isPinned ? `<span class="pin-indicator"></span>` : ''}
@@ -320,11 +396,21 @@
                 `;
                 list.appendChild(item);
                 
+                // Typing Indicator Listener
                 rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                     const msgEl = document.getElementById(`last-msg-${id}`);
                     if(!msgEl) return;
                     if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
                     else { msgEl.innerHTML = lastMsg; }
+                });
+
+                // --- LISTEN FOR ONLINE STATUS ---
+                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
+                    const dot = document.getElementById(`online-${otherUid}`);
+                    if (dot) {
+                        if (snap.val() === 'online') dot.classList.add('active');
+                        else dot.classList.remove('active');
+                    }
                 });
             });
             
@@ -344,20 +430,23 @@
         longPressTimer = setTimeout(() => {
             isLongPress = true; // Long Press Detected
             if(navigator.vibrate) navigator.vibrate(30);
+            el.style.transform = "scale(0.96)";
+            setTimeout(() => el.style.transform = "scale(1)", 200);
             openDeleteMenu(chatId, isPinned, u);
         }, 600);
     };
 
     window.cancelLongPress = function(el) {
         clearTimeout(longPressTimer);
+        el.style.transform = "scale(1)";
     };
 
     window.endLongPress = function(el) {
         clearTimeout(longPressTimer);
+        el.style.transform = "scale(1)";
     };
 
     window.enterChat = function(e, username) {
-        // Prevent if long press happened or clicking a button
         if(isLongPress || e.target.closest('button')) return;
         window.location.href = `chat.html?user=${username}`;
     };
@@ -419,15 +508,17 @@
         if(!activeChatId) return;
         const cid = activeChatId; 
         closeDeleteMenu(true);
-        try {
-            const batch = db.batch();
-            const msgs = await db.collection("chats").doc(cid).collection("messages").get();
-            msgs.docs.forEach(d => batch.delete(d.ref));
-            batch.delete(db.collection("chats").doc(cid));
-            await batch.commit();
-            await rdb.ref(`typing/${cid}`).remove();
-            db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) });
-        } catch(e) { console.error("Erase failed:", e); }
+        if(confirm("Are you sure? This action is irreversible.")) {
+            try {
+                const batch = db.batch();
+                const msgs = await db.collection("chats").doc(cid).collection("messages").get();
+                msgs.docs.forEach(d => batch.delete(d.ref));
+                batch.delete(db.collection("chats").doc(cid));
+                await batch.commit();
+                await rdb.ref(`typing/${cid}`).remove();
+                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) });
+            } catch(e) { console.error("Erase failed:", e); }
+        }
     };
 
     // --- SEARCH ---
@@ -473,11 +564,18 @@
     }
 
     function formatTime(date) {
-        const sec = Math.floor((new Date() - date) / 1000);
-        if(sec < 60) return "now";
-        if(sec < 3600) return Math.floor(sec/60) + "m";
-        if(sec < 86400) return Math.floor(sec/3600) + "h";
-        return Math.floor(sec/86400) + "d";
+        const now = new Date();
+        const diff = now - date;
+        const sec = Math.floor(diff / 1000);
+        const min = Math.floor(sec / 60);
+        const hour = Math.floor(min / 60);
+        const day = Math.floor(hour / 24);
+
+        if(sec < 60) return "Just now";
+        if(min < 60) return `${min}m ago`;
+        if(hour < 24) return `${hour}h ago`;
+        if(day < 7) return `${day}d ago`;
+        return date.toLocaleDateString();
     }
 </script>
 </body>
