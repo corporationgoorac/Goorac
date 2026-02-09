@@ -206,26 +206,20 @@
         }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* --- NAVBAR STYLING & HIDING --- */
+        /* --- NAVBAR HIDING UTILS (Crucial for Fix) --- */
         main-navbar {
             transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            right: 0;
-            z-index: 10001; /* Higher than other content */
-            display: block;
-            width: 100%;
-            pointer-events: auto; /* Explicitly enable touch */
+            position: fixed; bottom: 0; left: 0; right: 0;
+            z-index: 1000;
         }
-        
+        /* Uses important to override any inline styles or default display */
         main-navbar.hidden-nav {
-            transform: translateY(120%) !important;
+            transform: translateY(150%) !important;
             pointer-events: none !important;
         }
         
         view-notes {
-            z-index: 10000 !important; /* One step below navbar when closed, but component handles its own modal z-index */
+            z-index: 9999 !important; /* Above navbar */
             position: relative;
         }
 
@@ -275,7 +269,7 @@
         <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp" width="65" height="65">
         <span class="note-username">You</span>
     </div>
-</div>
+    </div>
 
 <div class="content">
     <span class="section-label">DASHBOARD</span>
@@ -306,9 +300,9 @@
     </div>
 </div>
 
+<main-navbar id="main-nav"></main-navbar>
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
-<main-navbar id="main-nav"></main-navbar>
 
 <script>
     // --- 1. ZERO-LATENCY CACHE LOAD ---
@@ -348,21 +342,24 @@
                     document.getElementById('call-pfp-area').innerHTML = data.callState.pfpHTML;
                     if (data.callState.isMissed) document.getElementById('call-card').classList.add('missed-alert');
                 }
+                console.log("⚡ Home loaded from cache");
             } catch (e) { console.error(e); }
         }
     })();
 
-    // --- NAVBAR HIDER (Fixed Touch/Functionality Issues) ---
+    // --- NAVBAR HIDER (Logic to hide nav when modal opens) ---
+    // Watches the view-notes component for active state
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
         
         if (noteViewer && mainNav) {
+            // Force reset on load
             mainNav.classList.remove('hidden-nav');
 
-            const toggleNav = () => {
+            const observer = new MutationObserver((mutations) => {
                 const style = window.getComputedStyle(noteViewer);
-                // Detect if the modal component is "active"
+                // Check multiple conditions to determine if it's visible
                 const isVisible = 
                     (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
                     noteViewer.classList.contains('open') || 
@@ -371,19 +368,13 @@
 
                 if (isVisible) {
                     mainNav.classList.add('hidden-nav');
-                    mainNav.style.pointerEvents = 'none'; // Ensure clicks pass through to modal
                 } else {
                     mainNav.classList.remove('hidden-nav');
-                    mainNav.style.pointerEvents = 'auto'; // Re-enable touch for navbar
                 }
-            };
-
-            const observer = new MutationObserver(toggleNav);
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+            });
             
-            // Comprehensive check for touch/click events
-            document.addEventListener('click', () => setTimeout(toggleNav, 100));
-            document.addEventListener('touchend', () => setTimeout(toggleNav, 100));
+            // Watch everything relevant
+            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
         }
     });
 
@@ -438,8 +429,7 @@
 
     // --- CLOCK ---
     setInterval(() => {
-        const clockEl = document.getElementById('clock');
-        if (clockEl) clockEl.innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
     }, 1000);
 
     function formatTime(ts) {
@@ -470,24 +460,21 @@
         const pfpEl = document.getElementById('header-pfp');
         const notePfp = document.getElementById('my-note-pfp');
 
-        if(nameEl) {
-            nameEl.classList.remove('skeleton');
-            const hour = new Date().getHours();
-            let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-            nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
-        }
+        nameEl.classList.remove('skeleton');
+        const hour = new Date().getHours();
+        let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
         
         const src = data.photoURL || 'https://via.placeholder.com/150';
-        if(pfpEl) { pfpEl.src = src; pfpEl.classList.remove('skeleton'); }
-        if(notePfp) { notePfp.src = src; notePfp.classList.remove('skeleton'); }
+        pfpEl.src = src; pfpEl.classList.remove('skeleton');
+        notePfp.src = src; notePfp.classList.remove('skeleton');
         
-        if(textEl) {
-            textEl.classList.remove('skeleton');
-            textEl.innerText = "System operational. Connection secure.";
-        }
+        textEl.classList.remove('skeleton');
+        textEl.innerText = "System operational. Connection secure.";
         saveHomeState();
     }
 
+    // --- NOTIFICATION LOGIC ---
     function listenNotifications(uid) {
         let likeIds = new Set();
         let followIds = new Set();
@@ -495,40 +482,46 @@
         const updateBadgeUI = () => {
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
+            
             likeIds.forEach(id => { if(!readList.includes(id)) count++; });
             followIds.forEach(id => { if(!readList.includes(id)) count++; });
 
             const badge = document.getElementById('notif-count');
             const btn = document.getElementById('notif-btn');
             
-            if (badge && btn) {
-                if (count > 0) {
-                    badge.innerText = count > 9 ? '9+' : count;
-                    badge.classList.add('visible');
-                    btn.classList.add('has-unread');
-                } else {
-                    badge.classList.remove('visible');
-                    btn.classList.remove('has-unread');
-                }
+            if (count > 0) {
+                badge.innerText = count > 9 ? '9+' : count;
+                badge.classList.add('visible');
+                btn.classList.add('has-unread');
+            } else {
+                badge.classList.remove('visible');
+                btn.classList.remove('has-unread');
             }
         };
 
-        db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
-            likeIds.clear(); 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.likes && Array.isArray(data.likes)) {
-                    data.likes.forEach(liker => {
-                        if (liker.uid !== uid && liker.timestamp) {
-                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                            likeIds.add(`like_${liker.uid}_${timeMillis}`);
-                        }
-                    });
-                }
+        // Likes Listener
+        db.collection("notes")
+            .where("uid", "==", uid)
+            .orderBy("createdAt", "desc")
+            .limit(20)
+            .onSnapshot(snapshot => {
+                likeIds.clear(); 
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.likes && Array.isArray(data.likes)) {
+                        data.likes.forEach(liker => {
+                            if (liker.uid !== uid && liker.timestamp) {
+                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                                const notifId = `like_${liker.uid}_${timeMillis}`;
+                                likeIds.add(notifId);
+                            }
+                        });
+                    }
+                });
+                updateBadgeUI();
             });
-            updateBadgeUI();
-        });
 
+        // Followers Listener
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -537,7 +530,8 @@
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            followIds.add(`follow_${f.uid}_${timeMillis}`);
+                            const notifId = `follow_${f.uid}_${timeMillis}`;
+                            followIds.add(notifId);
                         }
                     });
                 }
@@ -549,6 +543,7 @@
     }
 
     function startLiveCounters(uid) {
+        // Msg
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
             let latest = null;
             for (const doc of snap.docs) {
@@ -557,23 +552,22 @@
             }
             const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
             
-            if (header) {
-                if (latest) {
-                    header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
-                    time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
-                    if(latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
-                } else {
-                    header.innerText = "Inbox"; sub.innerText = "No new messages";
-                    time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                    card.classList.remove('has-count'); pfp.innerHTML = `<div>MSG</div>`;
-                }
+            if (latest) {
+                header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
+                time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
+                if(latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
+            } else {
+                header.innerText = "Inbox"; sub.innerText = "No new messages";
+                time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
+                card.classList.remove('has-count'); pfp.innerHTML = `<div>MSG</div>`;
             }
             saveHomeState();
         });
 
+        // Calls
         db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
             const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
-            if (el && !snap.empty) {
+            if (!snap.empty) {
                 const call = snap.docs[0].data();
                 time.innerText = formatTime(call.timestamp);
                 if (call.receiverId === uid && (call.status === "missed")) {
