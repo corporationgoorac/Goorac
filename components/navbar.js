@@ -1,6 +1,10 @@
 // components/navbar.js
 class MainNavbar extends HTMLElement {
     connectedCallback() {
+        // --- AUTO-STORAGE LOGIC ---
+        // Stores the class definition code to local storage automatically
+        localStorage.setItem('goorac_navbar_component', this.constructor.toString());
+
         // Import Lucide Icons
         if (!document.getElementById('lucide-icons-script')) {
             const script = document.createElement('script');
@@ -20,100 +24,111 @@ class MainNavbar extends HTMLElement {
         <style>
             :host {
                 display: block;
-                transition: opacity 0.3s ease, transform 0.3s ease;
+                transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                            transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             /* This class will be toggled to hide the navbar during active calls */
             .nav-hidden {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                transform: translate(-50%, 100px) !important;
+                transform: translate(-50%, 40px) scale(0.95) !important;
             }
 
             .bottom-nav {
                 position: fixed;
-                bottom: 25px;
+                bottom: 30px;
                 left: 50%;
                 transform: translateX(-50%);
-                width: calc(100% - 40px);
-                max-width: 400px;
-                background: rgba(10, 10, 10, 0.85);
-                backdrop-filter: blur(25px) saturate(180%);
-                -webkit-backdrop-filter: blur(25px) saturate(180%);
+                width: calc(100% - 48px);
+                max-width: 420px;
+                /* Enhanced Glassmorphism */
+                background: rgba(15, 15, 15, 0.7);
+                backdrop-filter: blur(30px) saturate(200%) brightness(1.2);
+                -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.2);
                 display: flex;
                 justify-content: space-around;
                 align-items: center;
-                padding: 12px 8px;
-                border-radius: 28px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+                padding: 10px 8px;
+                border-radius: 35px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4), 
+                            inset 0 1px 1px rgba(255,255,255,0.1);
                 z-index: 10000;
-                transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .nav-item {
                 position: relative;
                 text-decoration: none;
-                color: #666;
+                color: #8e8e93; /* Apple-style dim text */
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 5px;
+                gap: 4px;
                 flex: 1;
+                height: 48px;
+                justify-content: center;
                 transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .nav-item i {
                 width: 22px;
                 height: 22px;
-                stroke-width: 2.2px;
-                transition: all 0.3s ease;
+                stroke-width: 2px;
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             }
 
             .nav-item span {
-                font-size: 0.6rem;
-                font-weight: 800;
+                font-size: 0.55rem;
+                font-weight: 700;
                 text-transform: uppercase;
-                letter-spacing: 0.8px;
+                letter-spacing: 1.2px;
                 opacity: 0;
-                transform: translateY(5px);
-                transition: all 0.3s ease;
+                transform: translateY(8px);
+                transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .nav-item.active {
                 color: #00d2ff;
             }
 
+            /* Premium Glow & Lift Effect */
             .nav-item.active i {
-                transform: translateY(-4px);
-                filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.6));
+                transform: translateY(-6px);
+                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
+                stroke-width: 2.5px;
             }
 
             .nav-item.active span {
                 opacity: 1;
                 transform: translateY(0);
+                color: #00d2ff;
+                text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
             }
 
             .nav-item.active::after {
                 content: '';
                 position: absolute;
-                bottom: -6px;
-                width: 5px;
-                height: 5px;
+                bottom: 0px;
+                width: 4px;
+                height: 4px;
                 background: #00d2ff;
                 border-radius: 50%;
-                box-shadow: 0 0 12px #00d2ff, 0 0 20px rgba(0, 210, 255, 0.4);
-                animation: navPulse 2s infinite;
+                box-shadow: 0 0 15px #00d2ff, 0 0 5px rgba(0, 210, 255, 1);
+                animation: navPulse 2.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
             }
 
             @keyframes navPulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.2); opacity: 0.7; }
-                100% { transform: scale(1); opacity: 1; }
+                0% { transform: scale(1); opacity: 0.8; }
+                50% { transform: scale(1.5); opacity: 1; filter: brightness(1.2); }
+                100% { transform: scale(1); opacity: 0.8; }
             }
 
+            /* Haptic Press Effect */
             .nav-item:active {
                 transform: scale(0.85);
+                opacity: 0.7;
             }
         </style>
 
@@ -164,7 +179,7 @@ class MainNavbar extends HTMLElement {
         // 1. Check immediately for call screen
         const checkVisibility = () => {
             const callScreen = document.getElementById('call-screen');
-            if (callScreen && callScreen.style.display === 'flex') {
+            if (callScreen && (callScreen.style.display === 'flex' || callScreen.classList.contains('active'))) {
                 navContainer.classList.add('nav-hidden');
             } else {
                 navContainer.classList.remove('nav-hidden');
@@ -172,7 +187,6 @@ class MainNavbar extends HTMLElement {
         };
 
         // 2. Use a MutationObserver to watch for display changes on the call-screen
-        // This makes it "fix" itself instantly when a call starts
         const observer = new MutationObserver(() => {
             checkVisibility();
         });
@@ -181,7 +195,7 @@ class MainNavbar extends HTMLElement {
         setTimeout(() => {
             const target = document.getElementById('call-screen');
             if (target) {
-                observer.observe(target, { attributes: true, attributeFilter: ['style'] });
+                observer.observe(target, { attributes: true, attributeFilter: ['style', 'class'] });
             }
             checkVisibility();
         }, 1000);
