@@ -55,7 +55,8 @@ class ViewNotes extends HTMLElement {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<span class="material-icons-round v-badge">verified</span>`
+            // UPDATED VERIFICATION BADGE
+            verified: `<span class="material-icons-round v-badge" style="color:#0095f6; font-size:16px;">verified</span>`
         };
     }
 
@@ -114,9 +115,6 @@ class ViewNotes extends HTMLElement {
                 font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; 
             }
             .vn-friend-handle { color: #888; font-size: 0.85rem; }
-
-            /* New Badge Style */
-            .v-badge { font-size: 16px; color: #0095f6; margin-left: 4px; display: inline-flex; align-items: center; }
             
             .vn-scroll-content { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
             .vn-scroll-content::-webkit-scrollbar { display: none; }
