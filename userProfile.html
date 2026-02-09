@@ -133,6 +133,13 @@
         .stat-num { font-size: 22px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
         .stat-lbl { font-size: 11px; color: var(--secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 
+        /* --- CUSTOM UI FOR NOTES SECTION --- */
+        .notes-section {
+            width: 100%;
+            margin-bottom: 32px;
+            padding: 0 4px;
+        }
+
         /* --- ACTION BUTTONS --- */
         .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
         
@@ -230,9 +237,11 @@
             </div>
         </div>
 
-        <profile-notes id="profile-notes"></profile-notes>
+        <div class="notes-section">
+            <profile-notes id="profile-notes"></profile-notes>
+        </div>
 
-        <div class="action-grid" id="action-container" style="margin-top: 32px;">
+        <div class="action-grid" id="action-container">
             <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">Follow</button>
             <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">Message</button>
         </div>
@@ -306,9 +315,11 @@
             renderProfile(freshData);
             checkRelation(freshData);
 
-            // Initialize the profile notes component
+            // Initialize the profile notes component once targetUid is available
             const notesComp = document.getElementById('profile-notes');
-            if(notesComp) notesComp.init(targetUid);
+            if(notesComp) {
+                notesComp.init(targetUid);
+            }
         });
     }
 
@@ -316,7 +327,8 @@
     function renderProfile(data) {
         // Remove skeletons
         ['pfp', 'display-name', 'username', 'bio', 'id-container'].forEach(id => {
-            document.getElementById(id).classList.remove('skeleton');
+            const el = document.getElementById(id);
+            if(el) el.classList.remove('skeleton');
         });
 
         document.getElementById('display-name').innerText = data.name || "Unknown";
@@ -350,8 +362,10 @@
     }
 
     function removeBtnSkeletons() {
-        document.getElementById('btn-follow').classList.remove('skeleton');
-        document.getElementById('btn-msg').classList.remove('skeleton');
+        const followBtn = document.getElementById('btn-follow');
+        const msgBtn = document.getElementById('btn-msg');
+        if(followBtn) followBtn.classList.remove('skeleton');
+        if(msgBtn) msgBtn.classList.remove('skeleton');
     }
 
     // --- 6. FOLLOW LOGIC ---
@@ -377,6 +391,7 @@
 
     function updateFollowButton(isFollowing) {
         const btn = document.getElementById('btn-follow');
+        if(!btn) return;
         if(isFollowing) {
             btn.innerText = "Following";
             btn.className = "btn btn-following";
