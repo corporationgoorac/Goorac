@@ -49,10 +49,9 @@
             width: 100%; max-width: 440px; 
             padding: 70px 24px 120px 24px; 
             box-sizing: border-box;
-            opacity: 0; transform: translateY(10px);
-            transition: opacity 0.5s ease, transform 0.5s ease;
+            /* Visible immediately now */
+            opacity: 1; transform: translateY(0);
         }
-        .container.loaded { opacity: 1; transform: translateY(0); }
 
         .back-link {
             background: transparent; border: none; color: white;
@@ -121,28 +120,18 @@
             font-weight: 800; font-size: 1rem; cursor: pointer;
             box-shadow: 0 10px 20px rgba(255,255,255,0.05);
             transition: 0.3s;
+            display: none; /* Hidden until verified */
         }
         .btn-save:active { transform: scale(0.97); }
         .btn-save:disabled { opacity: 0.4; filter: grayscale(1); }
 
-        #loader-overlay {
-            position: fixed; inset: 0; background: #000; z-index: 1000;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .spinner {
-            width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.1);
-            border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Loader removed as per request */
+        #loader-overlay { display: none; }
 
         svg { fill: currentColor; }
     </style>
 </head>
 <body>
-
-<div id="loader-overlay">
-    <div class="spinner"></div>
-</div>
 
 <image-picker id="setup-image-picker"></image-picker>
 
@@ -157,7 +146,7 @@
 <div class="container" id="mainContainer">
     <div class="profile-hero">
         <div class="pfp-wrapper" onclick="changePFP()">
-            <img id="user-pfp" src="" class="pfp-image">
+            <img id="user-pfp" src="https://via.placeholder.com/150" class="pfp-image">
             <div class="pfp-edit-btn">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </div>
@@ -203,7 +192,6 @@
     let activeUser = null;
     let finalGooracID = null;
     let currentSavedUsername = "";
-    let isAlreadyVerified = false; 
     let currentPhotoURL = "";
 
     const userInp = document.getElementById('username');
@@ -220,7 +208,24 @@
         currentPhotoURL = data.photoURL;
         finalGooracID = data.gooracNumber;
         currentSavedUsername = data.username;
+        
+        // Show the save button only after we have confirmed data
         launchBtn.style.display = "block";
+    }
+
+    function resetToAuthDefaults(user) {
+        // Immediately show what we know from Firebase Auth while waiting for DB
+        document.getElementById('full-name').value = user.displayName || "";
+        document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
+        currentPhotoURL = user.photoURL;
+        
+        // Clear other fields to prevent showing previous user's ghost data
+        document.getElementById('username').value = "";
+        document.getElementById('bio').value = "";
+        document.getElementById('display-id').innerText = "--------";
+        
+        // Button remains hidden until cloud sync confirms user exists or is new
+        launchBtn.style.display = "none";
     }
 
     const picker = document.getElementById('setup-image-picker');
@@ -235,32 +240,24 @@
         if (user) {
             activeUser = user;
             
-            // BUG FIX: Only load local storage if it belongs to the NEW user
+            // INTERNAL CHECK: Validate cache immediately without showing loader
             const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
+            
             if (localProfile && localProfile.uid === user.uid) {
+                // Cache belongs to this user, show it instantly
                 populateUI(localProfile);
-                container.classList.add('loaded');
-                document.getElementById('loader-overlay').style.display = 'none';
             } else {
-                // If UID mismatch, clear local storage and wait for cloud
+                // UID mismatch or no cache: Clear and show current user's Auth details
                 localStorage.removeItem('goorac_profile');
-                // Reset UI to empty while waiting for cloud sync
-                resetUI();
+                resetToAuthDefaults(user);
             }
             
+            // Sync with Cloud in the background
             syncWithCloud(user);
         } else {
             window.location.href = "login.html";
         }
     });
-
-    function resetUI() {
-        document.getElementById('full-name').value = "";
-        document.getElementById('username').value = "";
-        document.getElementById('bio').value = "";
-        document.getElementById('display-id').innerText = "--------";
-        document.getElementById('user-pfp').src = "https://via.placeholder.com/150";
-    }
 
     async function syncWithCloud(user) {
         try {
@@ -270,17 +267,13 @@
                 localStorage.setItem('goorac_profile', JSON.stringify(cloudData));
                 populateUI(cloudData);
             } else {
-                // Handle new account setup
+                // Handle new account setup: User is authenticated but no Firestore doc yet
                 if (!finalGooracID) finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
                 document.getElementById('display-id').innerText = finalGooracID;
-                document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
-                currentPhotoURL = user.photoURL;
+                launchBtn.style.display = "block";
             }
-            container.classList.add('loaded');
-            document.getElementById('loader-overlay').style.display = 'none';
         } catch (error) {
             console.error("Sync Error:", error);
-            document.getElementById('loader-overlay').style.display = 'none';
         }
     }
 
