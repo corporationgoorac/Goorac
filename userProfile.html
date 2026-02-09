@@ -138,6 +138,7 @@
             height: 52px; border-radius: 16px; font-weight: 700; font-size: 15px;
             border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
         }
         .btn:active { transform: scale(0.96); opacity: 0.9; }
 
@@ -168,17 +169,20 @@
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        /* --- NEW: BUTTON PULSE LOADING --- */
-        .btn-loading {
-            opacity: 0.7;
-            pointer-events: none;
-            animation: pulse 1.2s infinite ease-in-out;
+        /* --- LOADER CIRCLE --- */
+        .loader-circle {
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
         }
-        @keyframes pulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; }
-            100% { opacity: 0.6; }
-        }
+        .btn-follow .loader-circle { border-top-color: #000; border-color: rgba(0,0,0,0.2); }
+        .loading .loader-circle { display: block; }
+        .loading span { display: none; }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* --- TOAST --- */
         #toast {
@@ -241,8 +245,13 @@
         </div>
 
         <div class="action-grid" id="action-container">
-            <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">Follow</button>
-            <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">Message</button>
+            <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">
+                <div class="loader-circle"></div>
+                <span id="btn-follow-text">Follow</span>
+            </button>
+            <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
+                <span>Message</span>
+            </button>
         </div>
     </main>
 
@@ -382,11 +391,12 @@
 
     function updateFollowButton(isFollowing) {
         const btn = document.getElementById('btn-follow');
+        const txt = document.getElementById('btn-follow-text');
         if(isFollowing) {
-            btn.innerText = "Following";
+            txt.innerText = "Following";
             btn.className = "btn btn-following";
         } else {
-            btn.innerText = "Follow";
+            txt.innerText = "Follow";
             btn.className = "btn btn-follow";
         }
     }
@@ -396,22 +406,18 @@
         
         isProcessing = true; // Lock the function
         const btn = document.getElementById('btn-follow');
-        const isCurrentlyFollowing = btn.innerText === "Following"; 
-        const originalText = btn.innerText;
-        const originalClass = btn.className;
-
-        // Visual Loading State
-        btn.innerText = "Connecting...";
-        btn.classList.add('btn-loading');
+        const isCurrentlyFollowing = btn.classList.contains('btn-following');
+        
+        // Show Loading State
+        btn.classList.add('loading');
         
         if(navigator.vibrate) navigator.vibrate(15);
 
         const countEl = document.getElementById('count-followers');
         let currentCount = parseInt(countEl.innerText);
-
         const ts = firebase.firestore.Timestamp.now();
 
-        // Database Operation using Transaction to prevent duplicates
+        // 3. Database Operation using Transaction to prevent duplicates
         try {
             await db.runTransaction(async (transaction) => {
                 const myRef = db.collection("users").doc(myUid);
@@ -454,11 +460,11 @@
                 }
             });
 
-            // Update UI ONLY after successful Firestore update
+            // Update UI after success
             updateFollowButton(!isCurrentlyFollowing); 
             countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
 
-            // Update Cache Locally after success
+            // 4. Update Cache Locally after success
             const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
             cached.amIFollowing = !isCurrentlyFollowing;
             localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
@@ -466,7 +472,7 @@
         } catch (e) {
             revertFollowState(e, currentCount, isCurrentlyFollowing);
         } finally {
-            btn.classList.remove('btn-loading');
+            btn.classList.remove('loading');
             isProcessing = false; // Release lock
         }
     }
