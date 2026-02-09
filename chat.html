@@ -5,8 +5,6 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
 
-
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000"> 
@@ -164,7 +162,7 @@
             /* Hide Scrollbar */
             -ms-overflow-style: none; scrollbar-width: none;
             
-            /* Initial State Hidden */
+            /* Initial State Hidden (will be overridden by cache logic immediately) */
             opacity: 0; transition: opacity 0.2s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
@@ -344,7 +342,8 @@
         .picker-modal-content {
             width: 100%; height: 55vh; /* Half screen */
             background: #1c1c1c;
-            border-top-left-radius: 20px; border-top-right-radius: 20px;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
             display: flex; flex-direction: column;
             animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             overflow: hidden;
@@ -1024,7 +1023,9 @@
                             messagesMap.set(m.id || m.timestampIso, m);
                         });
                         
+                        // RENDER INSTANTLY AND FORCE VISIBILITY (NO FADE)
                         renderAll();
+                        chatFlow.style.transition = 'none'; // DISABLE ANIMATION
                         chatFlow.style.opacity = '1';
                         chatFlow.scrollTop = chatFlow.scrollHeight;
                         isFirstLoad = false; // Prevent jump effect when network returns
@@ -1191,10 +1192,9 @@
                 if (isFirstLoad) {
                     renderAll();
                     chatFlow.scrollTop = chatFlow.scrollHeight;
-                    setTimeout(() => {
-                        chatFlow.style.opacity = '1';
-                        isFirstLoad = false;
-                    }, 50);
+                    // Force display block if not already (redundant but safe)
+                    chatFlow.style.opacity = '1';
+                    isFirstLoad = false;
                 } else {
                     const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
                     renderAll();
