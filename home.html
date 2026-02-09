@@ -215,7 +215,8 @@
             right: 0;
             z-index: 10000;
             display: block;
-            width: 100%; /* Ensure it spans full width for centering logic inside the component */
+            width: 100%;
+            pointer-events: auto; /* Force active by default */
         }
         /* Hidden state */
         main-navbar.hidden-nav {
@@ -274,7 +275,7 @@
         <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp" width="65" height="65">
         <span class="note-username">You</span>
     </div>
-    </div>
+</div>
 
 <div class="content">
     <span class="section-label">DASHBOARD</span>
@@ -305,9 +306,9 @@
     </div>
 </div>
 
-<main-navbar id="main-nav"></main-navbar>
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
+<main-navbar id="main-nav"></main-navbar>
 
 <script>
     // --- 1. ZERO-LATENCY CACHE LOAD ---
@@ -316,8 +317,6 @@
         if (cached) {
             try {
                 const data = JSON.parse(cached);
-                
-                // Welcome
                 const nameEl = document.getElementById('welcome-name');
                 const textEl = document.getElementById('welcome-text');
                 const pfpEl = document.getElementById('header-pfp');
@@ -330,7 +329,6 @@
                     notePfp.src = data.photoURL; notePfp.classList.remove('skeleton');
                 }
 
-                // Messages
                 if (data.msgState) {
                     document.getElementById('msg-header').innerText = data.msgState.header;
                     document.getElementById('msg-subtext').innerText = data.msgState.sub;
@@ -339,7 +337,6 @@
                     if (data.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
                 }
 
-                // Calls
                 if (data.callState) {
                     document.getElementById('call-count').innerText = data.callState.count;
                     document.getElementById('call-label').innerText = data.callState.label;
@@ -347,22 +344,18 @@
                     document.getElementById('call-pfp-area').innerHTML = data.callState.pfpHTML;
                     if (data.callState.isMissed) document.getElementById('call-card').classList.add('missed-alert');
                 }
-                console.log("⚡ Home loaded from cache");
             } catch (e) { console.error(e); }
         }
     })();
 
-    // --- NAVBAR HIDER (Enhanced logic to hide nav when modal opens) ---
+    // --- FIXED NAVBAR HIDER LOGIC ---
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
         
         if (noteViewer && mainNav) {
-            mainNav.classList.remove('hidden-nav');
-
             const toggleNav = () => {
                 const style = window.getComputedStyle(noteViewer);
-                // Check if viewer is visible via CSS or class/attribute
                 const isVisible = 
                     (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
                     noteViewer.classList.contains('open') || 
@@ -373,19 +366,22 @@
                     mainNav.classList.add('hidden-nav');
                 } else {
                     mainNav.classList.remove('hidden-nav');
+                    // Force pointer events back on
+                    mainNav.style.pointerEvents = "auto";
                 }
             };
 
-            // Observer to catch any UI changes in the view-notes element
             const observer = new MutationObserver(toggleNav);
             observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
             
-            // Safety: also check on click events within container
-            document.addEventListener('click', () => setTimeout(toggleNav, 50));
+            // Check frequently during the transition window
+            document.addEventListener('click', () => {
+                setTimeout(toggleNav, 50);
+                setTimeout(toggleNav, 300);
+            });
         }
     });
 
-    // Helper: Save State
     function saveHomeState() {
         const state = {
             name: document.getElementById('welcome-name').innerText,
@@ -409,7 +405,6 @@
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
 
-    // --- PWA INSTALL ---
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault(); deferredPrompt = e;
@@ -419,7 +414,6 @@
         if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
     }
 
-    // --- FIREBASE INIT ---
     let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -434,7 +428,6 @@
     const auth = firebase.auth(), db = firebase.firestore();
     let READ_KEY = "goorac_read_notifs"; 
 
-    // --- CLOCK ---
     setInterval(() => {
         document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
     }, 1000);
@@ -466,36 +459,28 @@
         const textEl = document.getElementById('welcome-text');
         const pfpEl = document.getElementById('header-pfp');
         const notePfp = document.getElementById('my-note-pfp');
-
         nameEl.classList.remove('skeleton');
         const hour = new Date().getHours();
         let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
         nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
-        
         const src = data.photoURL || 'https://via.placeholder.com/150';
         pfpEl.src = src; pfpEl.classList.remove('skeleton');
         notePfp.src = src; notePfp.classList.remove('skeleton');
-        
         textEl.classList.remove('skeleton');
         textEl.innerText = "System operational. Connection secure.";
         saveHomeState();
     }
 
-    // --- NOTIFICATION LOGIC ---
     function listenNotifications(uid) {
         let likeIds = new Set();
         let followIds = new Set();
-
         const updateBadgeUI = () => {
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
-            
             likeIds.forEach(id => { if(!readList.includes(id)) count++; });
             followIds.forEach(id => { if(!readList.includes(id)) count++; });
-
             const badge = document.getElementById('notif-count');
             const btn = document.getElementById('notif-btn');
-            
             if (count > 0) {
                 badge.innerText = count > 9 ? '9+' : count;
                 badge.classList.add('visible');
@@ -505,30 +490,21 @@
                 btn.classList.remove('has-unread');
             }
         };
-
-        // Likes Listener
-        db.collection("notes")
-            .where("uid", "==", uid)
-            .orderBy("createdAt", "desc")
-            .limit(20)
-            .onSnapshot(snapshot => {
-                likeIds.clear(); 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.likes && Array.isArray(data.likes)) {
-                        data.likes.forEach(liker => {
-                            if (liker.uid !== uid && liker.timestamp) {
-                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                                const notifId = `like_${liker.uid}_${timeMillis}`;
-                                likeIds.add(notifId);
-                            }
-                        });
-                    }
-                });
-                updateBadgeUI();
+        db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
+            likeIds.clear(); 
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.likes && Array.isArray(data.likes)) {
+                    data.likes.forEach(liker => {
+                        if (liker.uid !== uid && liker.timestamp) {
+                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                            likeIds.add(`like_${liker.uid}_${timeMillis}`);
+                        }
+                    });
+                }
             });
-
-        // Followers Listener
+            updateBadgeUI();
+        });
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -537,20 +513,17 @@
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            const notifId = `follow_${f.uid}_${timeMillis}`;
-                            followIds.add(notifId);
+                            followIds.add(`follow_${f.uid}_${timeMillis}`);
                         }
                     });
                 }
                 updateBadgeUI();
             }
         });
-
         window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
     }
 
     function startLiveCounters(uid) {
-        // Msg
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
             let latest = null;
             for (const doc of snap.docs) {
@@ -558,7 +531,6 @@
                 if ((d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0)) { latest = d; break; }
             }
             const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
-            
             if (latest) {
                 header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
                 time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
@@ -570,8 +542,6 @@
             }
             saveHomeState();
         });
-
-        // Calls
         db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
             const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
             if (!snap.empty) {
