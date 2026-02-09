@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -241,9 +240,8 @@
                 const data = doc.data();
                 if(data && data.following) {
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
-                    // REAL-TIME RESET: Clear loaders when server responds
+                    // FIXED: Allow snappy updates but ensure we update visual buttons immediately
                     if (allUsersData.length > 0) {
-                        processingIds.clear(); 
                         updateButtons();
                     }
                 }
@@ -325,7 +323,6 @@
         const nextBatchIds = followerIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
-            // Speed optimization: Parallel fetching
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
@@ -393,23 +390,23 @@
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
-            // Skip if currently processing this user to keep spinner visible
+            // Skip updating buttons that are still strictly "processing" to prevent flickering
             if (processingIds.has(uid)) return;
 
             const span = btn.querySelector('span');
             if (isOwnProfile) {
-                if(span) span.innerText = "Remove";
                 btn.className = "action-btn remove";
-                btn.innerHTML = `<span>Remove</span>`;
+                if(span) span.innerText = "Remove";
+                else btn.innerHTML = `<span>Remove</span>`;
             } else {
                 if(currentUserFollowing.includes(uid)) {
-                    if(span) span.innerText = "Following";
                     btn.className = "action-btn following";
-                    btn.innerHTML = `<span>Following</span>`;
+                    if(span) span.innerText = "Following";
+                    else btn.innerHTML = `<span>Following</span>`;
                 } else {
-                    if(span) span.innerText = "Follow";
                     btn.className = "action-btn";
-                    btn.innerHTML = `<span>Follow</span>`;
+                    if(span) span.innerText = "Follow";
+                    else btn.innerHTML = `<span>Follow</span>`;
                 }
             }
             btn.style.pointerEvents = 'auto';
@@ -426,7 +423,7 @@
             btn.style.pointerEvents = 'none';
         }
 
-        // FEATURE: Haptic feedback
+        // FEATURE: Haptic feedback for tactile feel
         if (window.navigator && window.navigator.vibrate) {
             window.navigator.vibrate(10);
         }
@@ -471,13 +468,18 @@
         } catch (e) {
             console.error(e);
             if (btn) {
-                updateButtons();
                 const parentItem = btn.closest('.user-item');
                 if(parentItem) {
                     parentItem.style.opacity = '1';
                     parentItem.style.transform = 'none';
                 }
             }
+        } finally {
+            // FIXED: Added a small delay to ensure Firestore sync happens before we unlock the button
+            setTimeout(() => {
+                processingIds.delete(targetUid);
+                updateButtons();
+            }, 500);
         }
     }
 
