@@ -1,6 +1,6 @@
 /**
  * ProfileNotes Component
- * Integrated Feed + Viewer + Deep Linking + Mutual Privacy
+ * Displays the feed of notes and handles opening the viewer.
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
@@ -20,9 +20,6 @@ class ProfileNotes extends HTMLElement {
         this.setupOverlayClose();
     }
 
-    /**
-     * Initializes the component for a specific profile.
-     */
     async init(targetUid) {
         this.targetUid = targetUid;
         const user = firebase.auth().currentUser;
@@ -30,7 +27,6 @@ class ProfileNotes extends HTMLElement {
 
         this.isOwnProfile = user.uid === targetUid;
         
-        // Privacy Check: Only mutual friends can see notes
         if (!this.isOwnProfile) {
             try {
                 const myDoc = await this.db.collection('users').doc(user.uid).get();
@@ -39,14 +35,13 @@ class ProfileNotes extends HTMLElement {
                 const myFollowing = (myDoc.data()?.following || []).map(i => typeof i === 'string' ? i : i.uid);
                 const theirFollowing = (theirDoc.data()?.following || []).map(i => typeof i === 'string' ? i : i.uid);
                 
-                // Mutual means I follow them AND they follow me
                 this.isMutual = myFollowing.includes(targetUid) && theirFollowing.includes(user.uid);
             } catch (e) {
                 console.error("Mutual check failed", e);
                 this.isMutual = false;
             }
         } else {
-            this.isMutual = true; // Owner always sees their notes
+            this.isMutual = true;
         }
 
         this.fetchNotes();
@@ -63,7 +58,6 @@ class ProfileNotes extends HTMLElement {
                 this.notes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 this.renderFeed();
                 
-                // Deep Link Logic: Auto-open if #note-[ID] is in URL
                 const hash = window.location.hash;
                 if (hash.startsWith('#note-')) {
                     const noteId = hash.replace('#note-', '');
@@ -91,7 +85,6 @@ class ProfileNotes extends HTMLElement {
                 font-size: 14px; font-weight: 600;
             }
 
-            /* Viewer Overlay */
             .pn-overlay { 
                 position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; 
                 display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(12px);
@@ -165,10 +158,8 @@ class ProfileNotes extends HTMLElement {
         const content = this.querySelector('#pn-viewer-content');
         const n = this.selectedNote;
 
-        // Update URL hash for deep linking support
         window.history.replaceState(null, null, `#note-${noteId}`);
 
-        // Music Playback Logic
         if (n.songPreview) {
             this.audioPlayer.src = n.songPreview;
             this.audioPlayer.play().catch(() => console.log("Audio play deferred"));
@@ -199,14 +190,12 @@ class ProfileNotes extends HTMLElement {
         this.audioPlayer.pause();
         this.querySelector('#pn-overlay').classList.remove('show');
         this.selectedNote = null;
-        // Clean up hash from URL
         window.history.replaceState(null, null, window.location.pathname + window.location.search);
     }
 
     async shareNote() {
         if (!this.selectedNote) return;
         
-        // Link generation pointing to the specific note hash
         const shareUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#note-${this.selectedNote.id}`;
         
         try {
@@ -226,7 +215,6 @@ class ProfileNotes extends HTMLElement {
     async deleteNote(id) {
         if (confirm("Delete this thought bubble?")) {
             try {
-                // Mark note as inactive in Firestore
                 await this.db.collection("notes").doc(id).update({ isActive: false });
                 this.closeViewer();
                 if (navigator.vibrate) navigator.vibrate(10);
