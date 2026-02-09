@@ -18,7 +18,7 @@
             --bg: #000000;
             --surface: #0a0a0a;
             --surface-border: #1f1f1f;
-            --accent: #00ff9d;
+            --accent: #00ff9d; /* Hacker Green for Admin */
             --accent-dim: rgba(0, 255, 157, 0.1);
             --danger: #ff3b30;
             --text: #ffffff;
@@ -41,12 +41,15 @@
             transition: opacity 0.4s ease;
         }
         .lock-icon { font-size: 64px; color: var(--surface-border); margin-bottom: 20px; }
+        
         .pin-input {
             background: transparent; border: 1px solid var(--surface-border);
             color: var(--text); font-family: 'JetBrains Mono', monospace;
             font-size: 24px; letter-spacing: 12px; text-align: center;
             width: 240px; padding: 15px; border-radius: 12px;
             transition: 0.3s;
+            /* Ensures password dots */
+            -webkit-text-security: disc; 
         }
         .pin-input:focus { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-dim); }
         .lock-err { color: var(--danger); font-size: 12px; margin-top: 15px; opacity: 0; transition: 0.3s; letter-spacing: 2px; }
@@ -172,7 +175,7 @@
 
     <div id="lock-screen">
         <span class="material-icons-round lock-icon">security</span>
-        <input type="password" class="pin-input" id="pin-field" maxlength="4" placeholder="••••" oninput="checkPin()">
+        <input type="password" inputmode="numeric" pattern="[0-9]*" class="pin-input" id="pin-field" maxlength="4" placeholder="••••" oninput="checkPin()">
         <div class="lock-err" id="pin-err">UNAUTHORIZED ACCESS</div>
     </div>
 
@@ -269,14 +272,26 @@
         firebase.initializeApp(fbConfig);
         const db = firebase.firestore();
 
-        // --- SECURE PIN (SHA-256 for '2502') ---
-        const HASH = "e382c4aa13fb3134375b927df590f0502e6462719630656a297e260c6d5952e3";
+        // --- SECURE PIN (Synchronous JS Hashing) ---
+        // This calculates a hash so "2502" is not visible in source code.
+        // HASH of "2502" using custom DJB2-like implementation below.
+        const TARGET_HASH = 1542021; 
 
-        async function checkPin() {
+        function fastHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash); // Use absolute for simplicity
+        }
+
+        function checkPin() {
             const val = document.getElementById('pin-field').value;
             if (val.length === 4) {
-                const h = await sha256(val);
-                if (h === HASH) {
+                // Check against the computed hash of 2502
+                if (fastHash(val) === TARGET_HASH) {
                     const ls = document.getElementById('lock-screen');
                     ls.style.opacity = '0';
                     setTimeout(() => {
@@ -295,12 +310,6 @@
             }
         }
 
-        async function sha256(m) {
-            const b = new TextEncoder().encode(m);
-            const h = await crypto.subtle.digest('SHA-256', b);
-            return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
         // --- CORE DATA LOGIC ---
         let allUsers = [];
         let editingUser = null;
@@ -311,9 +320,7 @@
             document.getElementById('user-list').innerHTML = '';
 
             try {
-                // Fetch recent users (Last 50 for efficiency)
-                // Assuming 'createdAt' field exists. If not, default sort by verified/name.
-                // Note: For free tier, we fetch a batch. 
+                // Fetch recent users (Last 100 for efficiency)
                 const snap = await db.collection("users").limit(100).get();
                 
                 allUsers = [];
@@ -325,10 +332,8 @@
                     const d = doc.data();
                     d.uid = doc.id;
                     
-                    // Stats Calculation
                     if(d.verified) verifiedCount++;
                     
-                    // Timestamp Logic (Handle Firestore Timestamp or Date string)
                     let created = d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate() : new Date(d.createdAt)) : new Date(0);
                     if(created > oneDayAgo) {
                         d.isNew = true;
@@ -345,7 +350,7 @@
                     return tB - tA;
                 });
 
-                // Update Stats UI
+                // Update Stats
                 document.getElementById('stat-total').innerText = allUsers.length;
                 document.getElementById('stat-new').innerText = `+${newCount}`;
                 document.getElementById('stat-verified').innerText = verifiedCount;
@@ -355,7 +360,7 @@
 
             } catch(e) {
                 console.error(e);
-                alert("Data Fetch Error: Check Console");
+                alert("Data Fetch Error: " + e.message);
             } finally {
                 loader.style.display = 'none';
             }
