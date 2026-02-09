@@ -49,8 +49,7 @@
             width: 100%; max-width: 440px; 
             padding: 70px 24px 120px 24px; 
             box-sizing: border-box;
-            /* Visible immediately now */
-            opacity: 1; transform: translateY(0);
+            opacity: 1; /* Always visible for instant feel */
         }
 
         .back-link {
@@ -119,14 +118,11 @@
             width: 100%; padding: 18px; border-radius: 14px;
             font-weight: 800; font-size: 1rem; cursor: pointer;
             box-shadow: 0 10px 20px rgba(255,255,255,0.05);
-            transition: 0.3s;
-            display: none; /* Hidden until verified */
+            transition: opacity 0.3s ease, transform 0.2s ease;
+            display: none; /* Hidden by default for security check */
         }
         .btn-save:active { transform: scale(0.97); }
         .btn-save:disabled { opacity: 0.4; filter: grayscale(1); }
-
-        /* Loader removed as per request */
-        #loader-overlay { display: none; }
 
         svg { fill: currentColor; }
     </style>
@@ -199,7 +195,14 @@
     const launchBtn = document.getElementById('launchBtn');
     const container = document.getElementById('mainContainer');
 
-    function populateUI(data) {
+    // --- 0ms PRE-LOAD LOGIC ---
+    // This executes before Firebase Auth resolves
+    const initialCache = JSON.parse(localStorage.getItem('goorac_profile'));
+    if (initialCache) {
+        populateUI(initialCache, false); // Populate but don't show button yet
+    }
+
+    function populateUI(data, showButton = true) {
         document.getElementById('full-name').value = data.name || "";
         document.getElementById('username').value = data.username || "";
         document.getElementById('bio').value = data.bio || "";
@@ -209,50 +212,46 @@
         finalGooracID = data.gooracNumber;
         currentSavedUsername = data.username;
         
-        // Show the save button only after we have confirmed data
-        launchBtn.style.display = "block";
+        if (showButton) {
+            launchBtn.style.display = "block";
+        }
     }
 
     function resetToAuthDefaults(user) {
-        // Immediately show what we know from Firebase Auth while waiting for DB
         document.getElementById('full-name').value = user.displayName || "";
         document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
         currentPhotoURL = user.photoURL;
-        
-        // Clear other fields to prevent showing previous user's ghost data
         document.getElementById('username').value = "";
         document.getElementById('bio').value = "";
         document.getElementById('display-id').innerText = "--------";
-        
-        // Button remains hidden until cloud sync confirms user exists or is new
         launchBtn.style.display = "none";
     }
 
     const picker = document.getElementById('setup-image-picker');
-    picker.addEventListener('image-uploaded', (e) => {
-        currentPhotoURL = e.detail.url;
-        document.getElementById('user-pfp').src = currentPhotoURL;
-    });
+    if(picker) {
+        picker.addEventListener('image-uploaded', (e) => {
+            currentPhotoURL = e.detail.url;
+            document.getElementById('user-pfp').src = currentPhotoURL;
+        });
+    }
 
     function changePFP() { if(picker) picker.openPicker(); }
 
     auth.onAuthStateChanged((user) => {
         if (user) {
             activeUser = user;
-            
-            // INTERNAL CHECK: Validate cache immediately without showing loader
             const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
             
             if (localProfile && localProfile.uid === user.uid) {
-                // Cache belongs to this user, show it instantly
-                populateUI(localProfile);
+                // UID Verified - Reveal the button
+                populateUI(localProfile, true);
             } else {
-                // UID mismatch or no cache: Clear and show current user's Auth details
+                // Security Mismatch: Wipe cache and show current Auth session details
                 localStorage.removeItem('goorac_profile');
                 resetToAuthDefaults(user);
             }
             
-            // Sync with Cloud in the background
+            // Background Refresh
             syncWithCloud(user);
         } else {
             window.location.href = "login.html";
@@ -265,15 +264,15 @@
             if (doc.exists) {
                 const cloudData = doc.data();
                 localStorage.setItem('goorac_profile', JSON.stringify(cloudData));
-                populateUI(cloudData);
+                populateUI(cloudData, true);
             } else {
-                // Handle new account setup: User is authenticated but no Firestore doc yet
+                // New Account Initialization
                 if (!finalGooracID) finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
                 document.getElementById('display-id').innerText = finalGooracID;
                 launchBtn.style.display = "block";
             }
         } catch (error) {
-            console.error("Sync Error:", error);
+            console.error("Cloud Sync failed:", error);
         }
     }
 
@@ -294,16 +293,19 @@
             return;
         }
 
-        const query = await db.collection("users").where("username", "==", val).get();
-        if (query.empty) {
-            statusMsg.innerHTML = "✓ Available";
-            statusMsg.style.color = "#30d158";
-            launchBtn.disabled = false;
-        } else {
-            statusMsg.innerHTML = "✕ Unavailable";
-            statusMsg.style.color = "#ff453a";
-            launchBtn.disabled = true;
-        }
+        // Debounce or simple check
+        try {
+            const query = await db.collection("users").where("username", "==", val).get();
+            if (query.empty) {
+                statusMsg.innerHTML = "✓ Available";
+                statusMsg.style.color = "#30d158";
+                launchBtn.disabled = false;
+            } else {
+                statusMsg.innerHTML = "✕ Unavailable";
+                statusMsg.style.color = "#ff453a";
+                launchBtn.disabled = true;
+            }
+        } catch(e) { console.warn("Validation error"); }
     });
 
     launchBtn.onclick = async () => {
@@ -326,12 +328,18 @@
         }
 
         try {
+            // Save to local for next 0ms boot
             localStorage.setItem('goorac_profile', JSON.stringify(profileData));
+            
+            // Save to cloud
             await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
+            
+            // Update Auth Object
             await activeUser.updateProfile({
                 displayName: document.getElementById('full-name').value,
                 photoURL: currentPhotoURL
             });
+            
             window.location.href = "home.html";
         } catch (e) {
             alert("Save Error: " + e.message);
