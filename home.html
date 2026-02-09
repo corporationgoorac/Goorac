@@ -206,26 +206,26 @@
         }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* --- NAVBAR HIDING UTILS --- */
+        /* --- NAVBAR STYLING & HIDING --- */
         main-navbar {
             transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
             position: fixed; 
             bottom: 0; 
             left: 0; 
             right: 0;
-            z-index: 10000;
+            z-index: 10001; /* Higher than other content */
             display: block;
             width: 100%;
-            pointer-events: auto; /* Force active by default */
+            pointer-events: auto; /* Explicitly enable touch */
         }
-        /* Hidden state */
+        
         main-navbar.hidden-nav {
             transform: translateY(120%) !important;
             pointer-events: none !important;
         }
         
         view-notes {
-            z-index: 99999 !important; /* Above navbar */
+            z-index: 10000 !important; /* One step below navbar when closed, but component handles its own modal z-index */
             position: relative;
         }
 
@@ -317,6 +317,8 @@
         if (cached) {
             try {
                 const data = JSON.parse(cached);
+                
+                // Welcome
                 const nameEl = document.getElementById('welcome-name');
                 const textEl = document.getElementById('welcome-text');
                 const pfpEl = document.getElementById('header-pfp');
@@ -329,6 +331,7 @@
                     notePfp.src = data.photoURL; notePfp.classList.remove('skeleton');
                 }
 
+                // Messages
                 if (data.msgState) {
                     document.getElementById('msg-header').innerText = data.msgState.header;
                     document.getElementById('msg-subtext').innerText = data.msgState.sub;
@@ -337,6 +340,7 @@
                     if (data.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
                 }
 
+                // Calls
                 if (data.callState) {
                     document.getElementById('call-count').innerText = data.callState.count;
                     document.getElementById('call-label').innerText = data.callState.label;
@@ -348,14 +352,17 @@
         }
     })();
 
-    // --- FIXED NAVBAR HIDER LOGIC ---
+    // --- NAVBAR HIDER (Fixed Touch/Functionality Issues) ---
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
         
         if (noteViewer && mainNav) {
+            mainNav.classList.remove('hidden-nav');
+
             const toggleNav = () => {
                 const style = window.getComputedStyle(noteViewer);
+                // Detect if the modal component is "active"
                 const isVisible = 
                     (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
                     noteViewer.classList.contains('open') || 
@@ -364,24 +371,23 @@
 
                 if (isVisible) {
                     mainNav.classList.add('hidden-nav');
+                    mainNav.style.pointerEvents = 'none'; // Ensure clicks pass through to modal
                 } else {
                     mainNav.classList.remove('hidden-nav');
-                    // Force pointer events back on
-                    mainNav.style.pointerEvents = "auto";
+                    mainNav.style.pointerEvents = 'auto'; // Re-enable touch for navbar
                 }
             };
 
             const observer = new MutationObserver(toggleNav);
             observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
             
-            // Check frequently during the transition window
-            document.addEventListener('click', () => {
-                setTimeout(toggleNav, 50);
-                setTimeout(toggleNav, 300);
-            });
+            // Comprehensive check for touch/click events
+            document.addEventListener('click', () => setTimeout(toggleNav, 100));
+            document.addEventListener('touchend', () => setTimeout(toggleNav, 100));
         }
     });
 
+    // Helper: Save State
     function saveHomeState() {
         const state = {
             name: document.getElementById('welcome-name').innerText,
@@ -405,6 +411,7 @@
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
 
+    // --- PWA INSTALL ---
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault(); deferredPrompt = e;
@@ -414,6 +421,7 @@
         if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
     }
 
+    // --- FIREBASE INIT ---
     let fbConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -428,8 +436,10 @@
     const auth = firebase.auth(), db = firebase.firestore();
     let READ_KEY = "goorac_read_notifs"; 
 
+    // --- CLOCK ---
     setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
+        const clockEl = document.getElementById('clock');
+        if (clockEl) clockEl.innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
     }, 1000);
 
     function formatTime(ts) {
@@ -459,37 +469,50 @@
         const textEl = document.getElementById('welcome-text');
         const pfpEl = document.getElementById('header-pfp');
         const notePfp = document.getElementById('my-note-pfp');
-        nameEl.classList.remove('skeleton');
-        const hour = new Date().getHours();
-        let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+
+        if(nameEl) {
+            nameEl.classList.remove('skeleton');
+            const hour = new Date().getHours();
+            let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+            nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+        }
+        
         const src = data.photoURL || 'https://via.placeholder.com/150';
-        pfpEl.src = src; pfpEl.classList.remove('skeleton');
-        notePfp.src = src; notePfp.classList.remove('skeleton');
-        textEl.classList.remove('skeleton');
-        textEl.innerText = "System operational. Connection secure.";
+        if(pfpEl) { pfpEl.src = src; pfpEl.classList.remove('skeleton'); }
+        if(notePfp) { notePfp.src = src; notePfp.classList.remove('skeleton'); }
+        
+        if(textEl) {
+            textEl.classList.remove('skeleton');
+            textEl.innerText = "System operational. Connection secure.";
+        }
         saveHomeState();
     }
 
     function listenNotifications(uid) {
         let likeIds = new Set();
         let followIds = new Set();
+
         const updateBadgeUI = () => {
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
             likeIds.forEach(id => { if(!readList.includes(id)) count++; });
             followIds.forEach(id => { if(!readList.includes(id)) count++; });
+
             const badge = document.getElementById('notif-count');
             const btn = document.getElementById('notif-btn');
-            if (count > 0) {
-                badge.innerText = count > 9 ? '9+' : count;
-                badge.classList.add('visible');
-                btn.classList.add('has-unread');
-            } else {
-                badge.classList.remove('visible');
-                btn.classList.remove('has-unread');
+            
+            if (badge && btn) {
+                if (count > 0) {
+                    badge.innerText = count > 9 ? '9+' : count;
+                    badge.classList.add('visible');
+                    btn.classList.add('has-unread');
+                } else {
+                    badge.classList.remove('visible');
+                    btn.classList.remove('has-unread');
+                }
             }
         };
+
         db.collection("notes").where("uid", "==", uid).orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
             likeIds.clear(); 
             snapshot.forEach(doc => {
@@ -505,6 +528,7 @@
             });
             updateBadgeUI();
         });
+
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -520,6 +544,7 @@
                 updateBadgeUI();
             }
         });
+
         window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
     }
 
@@ -531,20 +556,24 @@
                 if ((d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0)) { latest = d; break; }
             }
             const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
-            if (latest) {
-                header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
-                time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
-                if(latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
-            } else {
-                header.innerText = "Inbox"; sub.innerText = "No new messages";
-                time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                card.classList.remove('has-count'); pfp.innerHTML = `<div>MSG</div>`;
+            
+            if (header) {
+                if (latest) {
+                    header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
+                    time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
+                    if(latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
+                } else {
+                    header.innerText = "Inbox"; sub.innerText = "No new messages";
+                    time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
+                    card.classList.remove('has-count'); pfp.innerHTML = `<div>MSG</div>`;
+                }
             }
             saveHomeState();
         });
+
         db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
             const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
-            if (!snap.empty) {
+            if (el && !snap.empty) {
                 const call = snap.docs[0].data();
                 time.innerText = formatTime(call.timestamp);
                 if (call.receiverId === uid && (call.status === "missed")) {
