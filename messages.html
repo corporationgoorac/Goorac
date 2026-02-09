@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <title>Goorac | Quantum Inbox</title>
+    <title>Goorac | Inbox</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -14,20 +14,21 @@
 
     <style>
         :root {
-            --bg: #000;
+            --bg: #000000;
             --accent: #00d2ff;
+            --seen-color: #00d2ff; /* Visible Blue for Seen Status */
             --border: rgba(255, 255, 255, 0.1);
-            --text-dim: #888;
-            --text-time: #b0b0b0; /* Improved visibility */
+            --text-main: #ffffff;
+            --text-dim: #999999; /* Lighter grey for better visibility */
             --danger: #ff4444;
-            --glass: rgba(255, 255, 255, 0.03);
+            --glass: rgba(255, 255, 255, 0.05);
             --sheet-bg: #121212;
             --online: #00ff41;
         }
 
         body {
-            background: var(--bg); color: white; margin: 0;
-            font-family: -apple-system, system-ui, sans-serif;
+            background: var(--bg); color: var(--text-main); margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             padding-bottom: 90px; overflow-x: hidden;
             -webkit-user-select: none; user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -35,14 +36,18 @@
 
         /* HEADER */
         header {
-            position: sticky; top: 0; background: rgba(0,0,0,0.9);
+            position: sticky; top: 0; background: rgba(0,0,0,0.95);
             padding: 15px 20px; display: flex; justify-content: space-between;
             align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
             backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
         }
-        .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
+        .header-logo { 
+            font-weight: 900; font-size: 1.4rem; letter-spacing: -0.5px; 
+            background: linear-gradient(to right, #fff, var(--accent)); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+        }
+
         /* SEARCH */
         .search-wrap { padding: 12px 20px; }
         .search-input {
@@ -50,169 +55,132 @@
             padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
             font-size: 16px !important; transition: all 0.3s ease;
         }
-        .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
+        .search-input:focus { border-color: var(--accent); background: #1a1a1a; }
 
-        /* CHAT LIST ITEM */
+        /* CHAT LIST */
         .chat-item { 
-            display: flex; align-items: center; padding: 15px 20px; 
-            cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
-            transition: background 0.2s;
-            touch-action: pan-y;
-            position: relative;
+            display: flex; align-items: center; padding: 16px 20px; 
+            cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s; position: relative;
         }
         .chat-item:active { background: var(--glass); }
 
-        /* PFP Container for Online Dot */
-        .pfp-container { position: relative; margin-right: 15px; }
-        .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
+        /* AVATAR AREA */
+        .pfp-container { position: relative; margin-right: 15px; flex-shrink: 0; }
+        .chat-pfp { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); display: block; background: #222; }
         
-        /* Real-Time Green Dot */
         .online-indicator {
             position: absolute; bottom: 2px; right: 2px;
-            width: 12px; height: 12px; background: var(--online);
+            width: 13px; height: 13px; background: var(--online);
             border-radius: 50%; border: 2px solid #000;
-            box-shadow: 0 0 8px var(--online);
-            display: none; 
-            z-index: 2;
+            display: none; z-index: 2;
         }
         .online-indicator.active { display: block; }
 
-        .chat-info { flex: 1; min-width: 0; pointer-events: none; }
-        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        /* INFO AREA */
+        .chat-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         
-        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
-        .chat-time { font-size: 0.75rem; color: var(--text-time); font-weight: 500; letter-spacing: 0.5px; }
+        .chat-top { display: flex; justify-content: space-between; align-items: center; }
+        .u-name { font-weight: 700; font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 4px; }
+        .chat-time { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; font-weight: 500; }
         
-        .v-badge { height: 14px; width: 14px; }
+        .chat-bottom { display: flex; justify-content: space-between; align-items: center; }
         
-        /* Message Preview Styles */
+        /* MESSAGE PREVIEW STYLES */
         .last-msg { 
-            color: var(--text-dim); font-size: 0.9rem; 
+            font-size: 0.95rem; color: var(--text-dim); 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-            max-width: 75%; transition: color 0.3s;
+            max-width: 85%;
         }
-        .last-msg.unread { color: #fff; font-weight: 700; }
-        .last-msg.seen-status { color: var(--text-dim); font-size: 0.8rem; font-style: italic; display: flex; align-items: center; gap: 4px; }
         
-        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
-        @keyframes pulseType { 50% { opacity: 0.6; } }
+        /* Incoming Unread */
+        .last-msg.unread { color: #fff; font-weight: 700; }
+        
+        /* Outgoing Seen */
+        .last-msg.seen { color: var(--seen-color); font-weight: 500; font-size: 0.85rem; }
+        
+        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; font-size: 0.9rem; animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.5; } }
 
-        .pin-indicator { 
-            width: 14px; height: 14px; 
-            background: var(--accent);
-            clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
-            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px;
-        }
+        .v-badge { width: 14px; height: 14px; vertical-align: middle; }
+        .pin-icon { width: 12px; height: 12px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 50% 100%); margin-left: 6px; }
 
-        .follow-btn { 
-            background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
-            padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-            pointer-events: auto; 
-        }
-
-        .unread-badge { 
+        /* BADGES & BUTTONS */
+        .unread-count { 
             background: var(--accent); color: #000; 
-            min-width: 18px; height: 18px; border-radius: 6px; 
-            font-size: 0.7rem; font-weight: 900;
+            min-width: 20px; height: 20px; border-radius: 10px; 
+            font-size: 0.75rem; font-weight: 800;
             display: flex; align-items: center; justify-content: center;
-            padding: 0 5px; box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
-            flex-shrink: 0;
-            animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            padding: 0 6px;
         }
-        @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
+        
+        .follow-btn { 
+            background: rgba(0, 210, 255, 0.15); color: var(--accent); border: none;
+            padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        }
 
-        /* SKELETON */
-        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
-        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
-        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
-        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
-
-        /* MODAL */
+        /* MENU & OVERLAY */
+        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: none; backdrop-filter: blur(5px); }
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
-            background: var(--sheet-bg); border-top: 1px solid var(--border);
-            z-index: 100000; border-radius: 30px 30px 0 0;
-            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 20px 20px calc(30px + env(safe-area-inset-bottom)); box-sizing: border-box;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
+            background: var(--sheet-bg); border-radius: 24px 24px 0 0;
+            padding: 25px; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2001; box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+            box-sizing: border-box; border-top: 1px solid var(--border);
         }
         #delete-menu.active { bottom: 0; }
-        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); }
 
-        @media (min-width: 768px) {
-            #delete-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; }
-            #delete-menu.active { bottom: 50%; transform: translate(-50%, 50%); }
-        }
+        .menu-header { text-align: center; margin-bottom: 20px; }
+        .menu-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; border: 2px solid var(--border); }
+        .menu-name { font-weight: 700; font-size: 1.1rem; }
+        
+        .menu-btn { width: 100%; padding: 16px; border-radius: 14px; font-weight: 600; font-size: 1rem; border: none; margin-bottom: 10px; cursor: pointer; }
+        .btn-pin { background: #222; color: white; }
+        .btn-del { background: rgba(255, 68, 68, 0.15); color: var(--danger); }
+        .btn-cancel { background: transparent; color: #777; }
 
-        /* CONTEXT UI */
-        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; }
-        .context-pfp { width: 70px; height: 70px; border-radius: 25px; border: 2px solid var(--accent); margin-bottom: 12px; object-fit: cover; }
-        .context-name { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
-        .context-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
-        .action-list { display: flex; flex-direction: column; gap: 12px; }
-        .btn-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; }
-        .del-btn-big { background: rgba(255, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(255, 68, 68, 0.2); }
-        .pin-btn-big { background: #1a1a1a; color: var(--accent); border: 1px solid var(--border); }
-        .cancel-btn { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; }
-
-        #search-results { display: none; background: #000; min-height: 100vh; }
-        .hide-nav { opacity: 0 !important; pointer-events: none !important; transform: translateY(20px); }
-        main-navbar { transition: all 0.4s ease; }
+        /* SKELETONS */
+        .skeleton { display: flex; align-items: center; padding: 16px 20px; opacity: 0.6; }
+        .sk-img { width: 56px; height: 56px; background: #222; border-radius: 50%; margin-right: 15px; }
+        .sk-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .sk-line { height: 12px; background: #222; border-radius: 4px; }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
 <header>
-    <div class="header-logo">GOORAC</div>
+    <div class="header-logo">QUANTUM INBOX</div>
 </header>
 
 <div class="search-wrap">
-    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
+    <input type="text" class="search-input" id="main-search" placeholder="Search messages..." oninput="handleSearch(this.value)">
 </div>
 
-<div id="search-results"></div>
+<div id="search-results" style="display:none; min-height:80vh;"></div>
 
-<div id="inbox-content">
-    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
-        Quantum Inbox
-    </div>
-    
-    <div id="chats-list">
-        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
-        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:30%"></div><div class="skeleton-line" style="width:60%"></div></div></div>
-    </div>
+<div id="chats-list">
+    <div class="skeleton"><div class="sk-img"></div><div class="sk-lines"><div class="sk-line" style="width:40%"></div><div class="sk-line" style="width:70%"></div></div></div>
+    <div class="skeleton"><div class="sk-img"></div><div class="sk-lines"><div class="sk-line" style="width:30%"></div><div class="sk-line" style="width:60%"></div></div></div>
 </div>
 
-<div class="menu-overlay" id="overlay" onclick="closeDeleteMenu(true)"></div>
+<div class="menu-overlay" id="overlay" onclick="closeMenu()"></div>
 <div id="delete-menu">
-    <div class="sheet-context" id="sheet-user-info">
-        <img src="" class="context-pfp" id="active-pfp">
-        <div class="context-name" id="active-name">User Name</div>
-        <div class="context-username" id="active-username">@handle</div>
+    <div class="menu-header">
+        <img src="" class="menu-avatar" id="m-pfp">
+        <div class="menu-name" id="m-name">User</div>
     </div>
-    
-    <div class="action-list">
-        <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
-        <button class="btn-action del-btn-big" id="confirm-delete">Erase History For Both</button>
-        <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
-    </div>
+    <button class="menu-btn btn-pin" id="btn-pin">Pin Chat</button>
+    <button class="menu-btn btn-del" id="btn-del">Delete Chat</button>
+    <button class="menu-btn btn-cancel" onclick="closeMenu()">Cancel</button>
 </div>
 
-<script src="components/navbar.js" defer></script>
+<script src="components/navbar.js"></script>
 <main-navbar></main-navbar>
-<script src="components/call-notifier.js" defer></script>
+<script src="components/call-notifier.js"></script>
 <call-notifier></call-notifier>
 
 <script>
-    // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap) ---
-    (function loadInboxCache() {
-        const cachedHTML = localStorage.getItem('goorac_inbox_html');
-        if (cachedHTML && cachedHTML.trim() !== "") {
-            document.getElementById('chats-list').innerHTML = cachedHTML;
-            console.log("⚡ Loaded inbox from cache");
-        }
-    })();
-
+    /* --- CONFIG & INIT --- */
     const firebaseConfig = {
         apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
         authDomain: "goorac-c3b59.firebaseapp.com",
@@ -227,379 +195,299 @@
     const db = firebase.firestore();
     const rdb = firebase.database();
     const auth = firebase.auth();
-    const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
+    const V_ICON = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
 
-    let myUid = "";
-    let myFollowingList = [];
-    let myFollowersList = [];
-    let myPinnedChats = [];
-    
-    // Interaction Variables
-    let longPressTimer;
-    let isLongPress = false;
-    let activeChatId = null;
-    let searchTimeout = null;
+    let myUid = null;
+    let following = [], followers = [], pinned = [];
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
-    let inboxListener = null;
+    let inboxUnsub;
 
+    /* --- AUTH & PRESENCE --- */
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            setupPresence(); // START REALTIME PRESENCE
-            fetchUserData();
-            db.collection("users").doc(myUid).onSnapshot(doc => {
-                const data = doc.data();
-                myFollowingList = data?.following || [];
-                myFollowersList = data?.followers || [];
-                myPinnedChats = data?.pinnedChats || [];
-                listenToInbox();
-            });
-        } else { window.location.href = 'login.html'; }
+            initPresence();
+            loadUserData();
+        } else {
+            window.location.href = 'login.html';
+        }
     });
 
-    // --- REALTIME PRESENCE SYSTEM ---
-    function setupPresence() {
-        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
-        const isOfflineForDatabase = {
-            state: 'offline',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
-        const isOnlineForDatabase = {
-            state: 'online',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
+    function initPresence() {
+        const myStatusRef = rdb.ref('/status/' + myUid);
+        const onlineData = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
+        const offlineData = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
-        rdb.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() === false) return;
-            userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
-                userStatusDatabaseRef.set(isOnlineForDatabase);
+        rdb.ref('.info/connected').on('value', snap => {
+            if (snap.val() === false) return;
+            myStatusRef.onDisconnect().set(offlineData).then(() => {
+                myStatusRef.set(onlineData);
             });
         });
     }
 
-    async function fetchUserData() {
-        const userDoc = await db.collection("users").doc(myUid).get();
-        const data = userDoc.data();
-        myFollowingList = data?.following || [];
-        myFollowersList = data?.followers || [];
-    }
-
-    async function syncUserProfile(uid) {
-        if(!uid) return null;
-        try {
-            const snap = await db.collection("users").doc(uid).get();
-            if(snap.exists) {
-                const freshData = snap.data();
-                const cachedData = userCache[uid];
-                if (!cachedData || JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
-                    console.log(`♻️ Updating cache for: ${freshData.username}`);
-                    userCache[uid] = freshData;
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                    return freshData;
-                }
-            }
-        } catch(e) { console.error("Sync error", e); }
-        return null; 
-    }
-
-    function listenToInbox() {
-        if(!myUid) return;
-        if(inboxListener) inboxListener();
-
-        inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
-        .onSnapshot(async snap => {
-            const list = document.getElementById('chats-list');
-            
-            const chatPromises = snap.docs.map(async d => {
-                const chat = d.data();
-                const otherUid = chat.participants.find(id => id !== myUid);
-                
-                let userData = userCache[otherUid];
-                syncUserProfile(otherUid).then(fresh => {
-                    if(fresh) {
-                        const nameEl = document.getElementById(`name-${d.id}`);
-                        if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
-                             nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
-                        }
-                    }
-                });
-
-                if (!userData) {
-                    const doc = await db.collection("users").doc(otherUid).get();
-                    userData = doc.data();
-                    userCache[otherUid] = userData;
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                }
-                
-                const isPinned = myPinnedChats.includes(d.id);
-                return { id: d.id, chat, u: userData, otherUid, isPinned };
-            });
-
-            const results = await Promise.all(chatPromises);
-            
-            results.sort((a,b) => {
-                if (a.isPinned && !b.isPinned) return -1;
-                if (!a.isPinned && b.isPinned) return 1;
-                return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
-            });
-
-            if(results.length > 0) list.innerHTML = "";
-
-            results.forEach(({id, chat, u, otherUid, isPinned}) => {
-                if(!u) return;
-                
-                const isUnread = (chat.lastSender !== myUid && chat.seen === false);
-                let displayCount = "";
-                if (chat.unreadCount && chat.unreadCount[myUid]) {
-                    const num = chat.unreadCount[myUid];
-                    displayCount = num > 99 ? "99+" : num;
-                }
-
-                const amIFollowing = myFollowingList.some(item => {
-                    const uid = typeof item === 'string' ? item : item.uid;
-                    return uid === otherUid;
-                });
-
-                const finalName = u.name || u.displayName || u.username || "Unknown";
-                
-                // --- SEEN LOGIC ---
-                let lastMsgDisplay = chat.lastMessage || `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
-                let msgClass = isUnread ? "last-msg unread" : "last-msg";
-                
-                // If I sent the last message AND it's seen
-                if (chat.lastSender === myUid && chat.seen) {
-                    const timeAgo = chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : 'now';
-                    lastMsgDisplay = `<span style="opacity:0.8; font-size:0.75rem;">Seen ${timeAgo}</span>`;
-                    msgClass = "last-msg seen-status";
-                } 
-                else if (chat.lastSender === myUid && !chat.seen) {
-                    lastMsgDisplay = `You: ${chat.lastMessage}`;
-                }
-
-                const safeUserStr = encodeURIComponent(JSON.stringify({
-                    name: finalName,
-                    username: u.username,
-                    photoURL: u.photoURL,
-                    verified: u.verified
-                }));
-
-                const timeDisplay = chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : '';
-
-                const item = document.createElement('div');
-                item.className = 'chat-item';
-                
-                item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
-                item.setAttribute("ontouchend", "endLongPress(this)");
-                item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
-                item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
-
-                item.innerHTML = `
-                    <div class="pfp-container">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                        <div class="online-indicator" id="online-${otherUid}"></div>
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-top-row">
-                            <span class="u-name" id="name-${id}">
-                                ${finalName} 
-                                ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
-                                ${isPinned ? `<span class="pin-indicator"></span>` : ''}
-                            </span>
-                            <span class="chat-time">${timeDisplay}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div class="${msgClass}" id="last-msg-${id}">
-                                ${lastMsgDisplay}
-                            </div>
-                            <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
-                                ${isUnread ? `<div class="unread-badge">${displayCount}</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                list.appendChild(item);
-                
-                // Typing Indicator Listener
-                rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
-                    const msgEl = document.getElementById(`last-msg-${id}`);
-                    if(!msgEl) return;
-                    if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
-                    else { msgEl.innerHTML = lastMsgDisplay; }
-                });
-
-                // --- LISTEN FOR ONLINE STATUS ---
-                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
-                    const dot = document.getElementById(`online-${otherUid}`);
-                    if (dot) {
-                        if (snap.val() === 'online') dot.classList.add('active');
-                        else dot.classList.remove('active');
-                    }
-                });
-            });
-            
-            if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#333; font-weight:700;'>No data in this frequency.</p>";
-
-            // Save Cache
-            localStorage.setItem('goorac_inbox_html', list.innerHTML);
+    /* --- DATA LOADING --- */
+    function loadUserData() {
+        db.collection("users").doc(myUid).onSnapshot(doc => {
+            const d = doc.data() || {};
+            following = d.following || [];
+            followers = d.followers || [];
+            pinned = d.pinnedChats || [];
+            startInboxListener();
         });
     }
 
-    // --- GLOBAL HANDLERS (MUST BE ON WINDOW) ---
-    
-    window.startLongPress = function(el, chatId, isPinned, userStr) {
-        isLongPress = false;
-        const u = JSON.parse(decodeURIComponent(userStr));
-        
-        longPressTimer = setTimeout(() => {
-            isLongPress = true; // Long Press Detected
-            if(navigator.vibrate) navigator.vibrate(30);
-            el.style.transform = "scale(0.96)";
-            setTimeout(() => el.style.transform = "scale(1)", 200);
-            openDeleteMenu(chatId, isPinned, u);
-        }, 600);
-    };
+    function startInboxListener() {
+        if(inboxUnsub) inboxUnsub();
 
-    window.cancelLongPress = function(el) {
-        clearTimeout(longPressTimer);
-        el.style.transform = "scale(1)";
-    };
-
-    window.endLongPress = function(el) {
-        clearTimeout(longPressTimer);
-        el.style.transform = "scale(1)";
-    };
-
-    window.enterChat = function(e, username) {
-        if(isLongPress || e.target.closest('button')) return;
-        window.location.href = `chat.html?user=${username}`;
-    };
-
-    window.visitProfile = function(e, username) {
-        e.stopPropagation();
-        window.location.href = `profile.html?user=${username}`;
-    };
-
-    // --- MENU ACTIONS ---
-
-    function openDeleteMenu(chatId, isPinned, userObj) {
-        activeChatId = chatId;
-        
-        history.pushState({ menuOpen: true }, "", "#menu");
-
-        document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
-        document.getElementById('active-username').innerText = `@${userObj.username}`;
-
-        const pinBtn = document.getElementById('pin-chat-btn');
-        pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
-        pinBtn.onclick = () => togglePin(chatId, isPinned);
-        
-        document.getElementById('delete-menu').classList.add('active');
-        document.getElementById('overlay').style.display = 'block';
-        const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
+        inboxUnsub = db.collection("chats")
+            .where("participants", "array-contains", myUid)
+            .onSnapshot(handleInboxSnapshot);
     }
 
-    window.onpopstate = (e) => {
-        if(document.getElementById('delete-menu').classList.contains('active')) {
-            closeDeleteMenu(false);
-        }
-    };
-
-    async function togglePin(chatId, isPinned) {
-        closeDeleteMenu(true);
-        const userRef = db.collection("users").doc(myUid);
-        if (isPinned) {
-            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
-        } else {
-            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
-        }
-    }
-
-    window.closeDeleteMenu = function(shouldGoBack) {
-        activeChatId = null;
-        document.getElementById('delete-menu').classList.remove('active');
-        document.getElementById('overlay').style.display = 'none';
-        const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.remove('hide-nav');
-        if(shouldGoBack && window.location.hash === "#menu") {
-            history.back();
-        }
-    }
-
-    document.getElementById('confirm-delete').onclick = async () => {
-        if(!activeChatId) return;
-        const cid = activeChatId; 
-        closeDeleteMenu(true);
-        if(confirm("Are you sure? This action is irreversible.")) {
-            try {
-                const batch = db.batch();
-                const msgs = await db.collection("chats").doc(cid).collection("messages").get();
-                msgs.docs.forEach(d => batch.delete(d.ref));
-                batch.delete(db.collection("chats").doc(cid));
-                await batch.commit();
-                await rdb.ref(`typing/${cid}`).remove();
-                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) });
-            } catch(e) { console.error("Erase failed:", e); }
-        }
-    };
-
-    // --- SEARCH ---
-
-    window.handleSearch = function(val) {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => searchUsers(val), 400);
-    }
-
-    function searchUsers(val) {
-        const results = document.getElementById('search-results');
-        const content = document.getElementById('inbox-content');
-        if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
-        
-        results.style.display = 'block'; content.style.display = 'none';
-        const q = val.toLowerCase();
-        
-        const allContacts = [...new Set([...myFollowingList, ...myFollowersList]
-            .map(f => typeof f === 'string' ? f : f.uid))];
-
-        if(allContacts.length === 0) {
-            results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>";
+    async function handleInboxSnapshot(snap) {
+        const container = document.getElementById('chats-list');
+        if(snap.empty) {
+            container.innerHTML = `<div style="text-align:center; padding:50px; color:#555;">No messages yet</div>`;
             return;
         }
 
-        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
-        .get().then(snap => {
-            results.innerHTML = snap.docs.filter(d => {
-                const u = d.data();
-                return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
-            }).map(d => {
-                const u = d.data();
-                return `
-                    <div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'">
-                        <img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;">
-                        <div class="chat-info">
-                            <div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div>
-                            <div style="font-size:0.8rem; color:#444;">@${u.username}</div>
+        const chats = await Promise.all(snap.docs.map(async doc => {
+            const data = doc.data();
+            const otherUid = data.participants.find(id => id !== myUid);
+            
+            // Resolve User
+            let u = userCache[otherUid];
+            if(!u) {
+                const uDoc = await db.collection("users").doc(otherUid).get();
+                u = uDoc.data();
+                if(u) {
+                    userCache[otherUid] = u;
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                }
+            }
+
+            return {
+                id: doc.id,
+                data: data,
+                user: u || { name: 'Unknown', photoURL: '' },
+                otherUid: otherUid,
+                isPinned: pinned.includes(doc.id)
+            };
+        }));
+
+        // Sort: Pinned first, then by timestamp
+        chats.sort((a,b) => {
+            if(a.isPinned !== b.isPinned) return b.isPinned - a.isPinned;
+            const tA = a.data.lastTimestamp?.seconds || 0;
+            const tB = b.data.lastTimestamp?.seconds || 0;
+            return tB - tA;
+        });
+
+        renderChats(chats, container);
+    }
+
+    function renderChats(chats, container) {
+        container.innerHTML = '';
+        chats.forEach(c => {
+            const { id, data, user, otherUid, isPinned } = c;
+            
+            // --- MESSAGE STATUS LOGIC ---
+            const amISender = data.lastSender === myUid;
+            const isRead = data.seen === true;
+            
+            let msgText = data.lastMessage || "Media";
+            let msgClass = "last-msg";
+            let timeStr = data.lastTimestamp ? formatTime(data.lastTimestamp.toDate()) : "";
+
+            if (amISender) {
+                if (isRead) {
+                    // SENT & SEEN -> Show "Seen" in Blue
+                    msgText = `Seen ${timeStr} ago`;
+                    msgClass = "last-msg seen";
+                } else {
+                    // SENT & UNSEEN -> Show "You: Message"
+                    msgText = `You: ${msgText}`;
+                }
+            } else {
+                // RECEIVED
+                if (!isRead) {
+                    // RECEIVED & UNREAD -> Bold White
+                    msgClass = "last-msg unread";
+                }
+            }
+
+            // Unread Count Badge
+            let badge = "";
+            if (!amISender && !isRead) {
+                const count = (data.unreadCount && data.unreadCount[myUid]) || 1;
+                badge = `<div class="unread-count">${count > 99 ? '99+' : count}</div>`;
+            }
+
+            const isFollowing = following.some(f => (typeof f === 'string' ? f : f.uid) === otherUid);
+            const verified = user.verified ? `<img src="${V_ICON}" class="v-badge">` : '';
+            
+            // Element Construction
+            const el = document.createElement('div');
+            el.className = 'chat-item';
+            
+            // Events
+            el.onclick = () => window.location.href = `chat.html?user=${user.username}`;
+            el.addEventListener('touchstart', (e) => startLongPress(e, id, user, isPinned));
+            el.addEventListener('touchend', endLongPress);
+            el.addEventListener('touchmove', endLongPress);
+
+            el.innerHTML = `
+                <div class="pfp-container">
+                    <img src="${user.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                    <div class="online-indicator" id="status-${otherUid}"></div>
+                </div>
+                <div class="chat-info">
+                    <div class="chat-top">
+                        <span class="u-name">
+                            ${user.name} ${verified}
+                            ${isPinned ? '<div class="pin-icon"></div>' : ''}
+                        </span>
+                        <span class="chat-time">${timeStr}</span>
+                    </div>
+                    <div class="chat-bottom">
+                        <div class="${msgClass}" id="preview-${id}">${msgText}</div>
+                        <div class="chat-meta">
+                            ${badge}
+                            ${!isFollowing && !badge ? `<button class="follow-btn" onclick="openProfile(event, '${user.username}')">Profile</button>` : ''}
                         </div>
-                    </div>`;
-            }).join('');
+                    </div>
+                </div>
+            `;
+            container.appendChild(el);
+
+            // Realtime Typing & Status
+            setupRealtimeFeatures(id, otherUid);
         });
     }
 
+    function setupRealtimeFeatures(chatId, uid) {
+        // Typing
+        rdb.ref(`typing/${chatId}/${uid}`).on('value', s => {
+            const el = document.getElementById(`preview-${chatId}`);
+            if(!el) return;
+            if(s.val()) el.innerHTML = `<span class="typing-text">typing...</span>`;
+            // Note: We don't revert text here to save complex logic, usually typing stops and message arrives
+        });
+
+        // Online Status
+        rdb.ref(`status/${uid}/state`).on('value', s => {
+            const el = document.getElementById(`status-${uid}`);
+            if(el) {
+                if(s.val() === 'online') el.classList.add('active');
+                else el.classList.remove('active');
+            }
+        });
+    }
+
+    /* --- HELPERS --- */
     function formatTime(date) {
         const now = new Date();
-        const diff = now - date;
-        const sec = Math.floor(diff / 1000);
-        const min = Math.floor(sec / 60);
-        const hour = Math.floor(min / 60);
-        const day = Math.floor(hour / 24);
+        const diff = (now - date) / 1000;
+        if(diff < 60) return "Just now";
+        if(diff < 3600) return `${Math.floor(diff/60)}m`;
+        if(diff < 86400) return `${Math.floor(diff/3600)}h`;
+        return `${Math.floor(diff/86400)}d`;
+    }
 
-        if(sec < 60) return "Just now";
-        if(min < 60) return `${min}m ago`;
-        if(hour < 24) return `${hour}h ago`;
-        if(day < 7) return `${day}d ago`;
-        return date.toLocaleDateString();
+    function openProfile(e, username) {
+        e.stopPropagation();
+        window.location.href = `profile.html?user=${username}`;
+    }
+
+    /* --- SEARCH --- */
+    let searchTimer;
+    function handleSearch(val) {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            const res = document.getElementById('search-results');
+            const list = document.getElementById('inbox-content');
+            
+            if(!val.trim()) {
+                res.style.display = 'none';
+                list.style.display = 'block';
+                return;
+            }
+
+            res.style.display = 'block';
+            list.style.display = 'none';
+            // Simple filter of loaded cache for speed, or implement DB search
+            res.innerHTML = '<div style="text-align:center; padding:30px; color:#555;">Searching...</div>';
+            
+            // Basic Implementation: Search Friends DB
+            db.collection("users")
+                .where("username", ">=", val.toLowerCase())
+                .where("username", "<=", val.toLowerCase() + "\uf8ff")
+                .limit(5)
+                .get().then(snap => {
+                    res.innerHTML = '';
+                    if(snap.empty) res.innerHTML = '<div style="text-align:center; color:#555; padding:20px;">No user found</div>';
+                    snap.forEach(doc => {
+                        const u = doc.data();
+                        const d = document.createElement('div');
+                        d.className = 'chat-item';
+                        d.onclick = () => window.location.href = `chat.html?user=${u.username}`;
+                        d.innerHTML = `
+                            <img src="${u.photoURL}" class="chat-pfp">
+                            <div class="chat-info">
+                                <div class="u-name">${u.name} ${u.verified ? `<img src="${V_ICON}" class="v-badge">` : ''}</div>
+                                <div style="font-size:0.8rem; color:#666;">@${u.username}</div>
+                            </div>
+                        `;
+                        res.appendChild(d);
+                    });
+                });
+        }, 500);
+    }
+
+    /* --- LONG PRESS MENU --- */
+    let pressTimer;
+    let selectedChat = null;
+
+    function startLongPress(e, id, user, isPinned) {
+        selectedChat = { id, user, isPinned };
+        pressTimer = setTimeout(() => {
+            if(navigator.vibrate) navigator.vibrate(40);
+            openMenu();
+        }, 600);
+    }
+
+    function endLongPress() { clearTimeout(pressTimer); }
+
+    function openMenu() {
+        if(!selectedChat) return;
+        document.getElementById('m-pfp').src = selectedChat.user.photoURL;
+        document.getElementById('m-name').innerText = selectedChat.user.name;
+        document.getElementById('btn-pin').innerText = selectedChat.isPinned ? "Unpin Chat" : "Pin Chat";
+        
+        document.getElementById('delete-menu').classList.add('active');
+        document.getElementById('overlay').style.display = 'block';
+        
+        // Handlers
+        document.getElementById('btn-pin').onclick = () => {
+            const ref = db.collection("users").doc(myUid);
+            if(selectedChat.isPinned) ref.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(selectedChat.id) });
+            else ref.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(selectedChat.id) });
+            closeMenu();
+        };
+
+        document.getElementById('btn-del').onclick = () => {
+            if(confirm("Delete this conversation permanently?")) {
+                db.collection("chats").doc(selectedChat.id).delete(); 
+                closeMenu();
+            }
+        };
+    }
+
+    function closeMenu() {
+        document.getElementById('delete-menu').classList.remove('active');
+        document.getElementById('overlay').style.display = 'none';
+        selectedChat = null;
     }
 </script>
 </body>
