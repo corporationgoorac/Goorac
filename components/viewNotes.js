@@ -12,7 +12,7 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         
-        // FIX 1: Don't init DB here to prevent startup crash
+        // FIX: Don't init DB in constructor to prevent startup crash
         this.db = null; 
         this.unsubscribe = null;
 
@@ -26,7 +26,7 @@ class ViewNotes extends HTMLElement {
     }
 
     connectedCallback() {
-        // FIX 2: Init DB here if available
+        // FIX: Init DB here if available, otherwise it handles in open()
         if (window.firebase && !this.db) {
             this.db = firebase.firestore();
         }
@@ -207,6 +207,7 @@ class ViewNotes extends HTMLElement {
             .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
             .vn-btn-primary { background: #262626; color: #fff; border: 1px solid #333; }
             .vn-btn-danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+            .vn-btn-archive { background: rgba(255, 149, 0, 0.15); color: #ff9f0a; }
 
             @keyframes emojiPop { 
                 0% { transform: scale(1); opacity: 1; } 
@@ -276,7 +277,7 @@ class ViewNotes extends HTMLElement {
     }
 
     async open(initialNoteData, isOwnNote = false) {
-        // FIX 3: Ensure DB is connected now if it wasn't before
+        // FIX: Ensure DB is connected
         if (!this.db && window.firebase) this.db = firebase.firestore();
         if (!this.db) {
             console.error("Firebase not initialized yet.");
@@ -325,13 +326,13 @@ class ViewNotes extends HTMLElement {
                     if (doc.exists) {
                         const data = doc.data();
                         
-                        // FIX 4: REMOVED the line "if (data.isActive === false) this.close()"
-                        // This ensures notes from history (which are inactive) stay OPEN.
+                        // FIX: ALLOW VIEWING INACTIVE (HISTORY) NOTES
+                        // We do NOT check data.isActive === false here anymore.
                         
                         this.currentNote = { ...data, id: doc.id };
                         this.renderContent();
                     } else {
-                        // Only close if note is actually deleted from DB
+                        // Only close if note is completely deleted from DB
                         this.close();
                     }
                 });
@@ -381,7 +382,7 @@ class ViewNotes extends HTMLElement {
                         ${displayName} (You)
                         ${isVerified ? icons.verified : ''}
                     </div>
-                    <div class="vn-friend-handle">${note.isActive ? 'Active Note' : 'Archived Note'}</div>
+                    <div class="vn-friend-handle">${note.isActive ? 'Active Note' : 'Archived'}</div>
                 </div>
             </div>
 
@@ -415,9 +416,11 @@ class ViewNotes extends HTMLElement {
                 
                 ${note.isActive ? 
                     `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note 📝</button>` : 
-                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post a New Note 📝</button>`
+                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note 📝</button>`
                 }
-                ${note.isActive ? `<button class="vn-btn vn-btn-danger" id="delete-note-btn">Archive Note</button>` : ''}
+                ${note.isActive ? `<button class="vn-btn vn-btn-archive" id="archive-note-btn">Archive Note</button>` : ''}
+                
+                <button class="vn-btn vn-btn-danger" id="delete-forever-btn">Delete Permanently</button>
             </div>
         `;
     }
@@ -556,14 +559,31 @@ class ViewNotes extends HTMLElement {
             };
         }
 
-        const deleteBtn = this.querySelector('#delete-note-btn');
-        if (deleteBtn) {
-            deleteBtn.onclick = async () => {
+        // --- NEW DELETE/ARCHIVE LOGIC ---
+        
+        // 1. Archive Button (Only sets isActive: false)
+        const archiveBtn = this.querySelector('#archive-note-btn');
+        if (archiveBtn) {
+            archiveBtn.onclick = async () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                if(confirm("Archive this note?")) {
+                if(confirm("Archive this note? It will be removed from your profile but saved in history.")) {
                     try {
-                        // Mark as inactive
                         await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
+                        this.close();
+                        window.location.reload(); 
+                    } catch(e) { console.error(e); }
+                }
+            };
+        }
+
+        // 2. Delete Forever Button (Completely removes doc)
+        const deleteForeverBtn = this.querySelector('#delete-forever-btn');
+        if (deleteForeverBtn) {
+            deleteForeverBtn.onclick = async () => {
+                if(navigator.vibrate) navigator.vibrate(10);
+                if(confirm("Delete permanently? This cannot be undone.")) {
+                    try {
+                        await this.db.collection("notes").doc(this.currentNote.id).delete();
                         this.close();
                         window.location.reload(); 
                     } catch(e) { console.error(e); }
@@ -754,7 +774,7 @@ const NotesManager = {
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(user => {
                 if (user) {
-                    // FIX 5: Ensure we are on the Home Page before running home logic
+                    // FIX: Ensure we are on the Home Page before running home logic
                     if(document.getElementById('notes-container')) {
                         this.setupMyNote(user);
                         this.loadMutualNotes(user);
