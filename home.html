@@ -36,7 +36,7 @@
             color: var(--text-main);
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
-            padding-bottom: 110px; /* Increased to ensure content clears the floating nav */
+            padding-bottom: 100px;
             overflow-x: hidden;
             -webkit-touch-callout: none;
         }
@@ -113,6 +113,7 @@
             min-width: 70px; cursor: pointer; position: relative;
         }
         
+        /* STRICT SIZING TO PREVENT BUGS */
         .note-pfp {
             width: 65px; height: 65px; 
             min-width: 65px; min-height: 65px;
@@ -205,22 +206,25 @@
         }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* --- NAVBAR FIXES --- */
+        /* --- NAVBAR HIDING UTILS --- */
         main-navbar {
-            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
-            position: fixed; bottom: 0; left: 0; right: 0;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0;
             z-index: 10000;
+            display: block;
+            width: 100%; /* Ensure it spans full width for centering logic inside the component */
         }
-        
-        /* Navigation Hide Logic */
+        /* Hidden state */
         main-navbar.hidden-nav {
-            transform: translate(0, 120px) !important;
-            opacity: 0 !important;
+            transform: translateY(120%) !important;
             pointer-events: none !important;
         }
         
         view-notes {
-            z-index: 20000 !important; /* Above everything */
+            z-index: 99999 !important; /* Above navbar */
             position: relative;
         }
 
@@ -270,7 +274,7 @@
         <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp" width="65" height="65">
         <span class="note-username">You</span>
     </div>
-</div>
+    </div>
 
 <div class="content">
     <span class="section-label">DASHBOARD</span>
@@ -313,6 +317,7 @@
             try {
                 const data = JSON.parse(cached);
                 
+                // Welcome
                 const nameEl = document.getElementById('welcome-name');
                 const textEl = document.getElementById('welcome-text');
                 const pfpEl = document.getElementById('header-pfp');
@@ -325,6 +330,7 @@
                     notePfp.src = data.photoURL; notePfp.classList.remove('skeleton');
                 }
 
+                // Messages
                 if (data.msgState) {
                     document.getElementById('msg-header').innerText = data.msgState.header;
                     document.getElementById('msg-subtext').innerText = data.msgState.sub;
@@ -333,6 +339,7 @@
                     if (data.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
                 }
 
+                // Calls
                 if (data.callState) {
                     document.getElementById('call-count').innerText = data.callState.count;
                     document.getElementById('call-label').innerText = data.callState.label;
@@ -345,27 +352,36 @@
         }
     })();
 
-    // --- NAVBAR HIDER ---
+    // --- NAVBAR HIDER (Enhanced logic to hide nav when modal opens) ---
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
         
         if (noteViewer && mainNav) {
-            const observer = new MutationObserver(() => {
+            mainNav.classList.remove('hidden-nav');
+
+            const toggleNav = () => {
                 const style = window.getComputedStyle(noteViewer);
-                // Detection for if the note viewer modal is active
-                const isVisible = (style.display !== 'none' && style.opacity !== '0') || 
-                                  noteViewer.hasAttribute('open') || 
-                                  noteViewer.classList.contains('active');
+                // Check if viewer is visible via CSS or class/attribute
+                const isVisible = 
+                    (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
+                    noteViewer.classList.contains('open') || 
+                    noteViewer.classList.contains('active') ||
+                    noteViewer.hasAttribute('open');
 
                 if (isVisible) {
                     mainNav.classList.add('hidden-nav');
                 } else {
                     mainNav.classList.remove('hidden-nav');
                 }
-            });
-            
+            };
+
+            // Observer to catch any UI changes in the view-notes element
+            const observer = new MutationObserver(toggleNav);
             observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+            
+            // Safety: also check on click events within container
+            document.addEventListener('click', () => setTimeout(toggleNav, 50));
         }
     });
 
@@ -490,6 +506,7 @@
             }
         };
 
+        // Likes Listener
         db.collection("notes")
             .where("uid", "==", uid)
             .orderBy("createdAt", "desc")
@@ -511,6 +528,7 @@
                 updateBadgeUI();
             });
 
+        // Followers Listener
         db.collection("users").doc(uid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -532,6 +550,7 @@
     }
 
     function startLiveCounters(uid) {
+        // Msg
         db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
             let latest = null;
             for (const doc of snap.docs) {
@@ -552,6 +571,7 @@
             saveHomeState();
         });
 
+        // Calls
         db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
             const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
             if (!snap.empty) {
