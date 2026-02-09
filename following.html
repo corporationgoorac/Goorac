@@ -240,9 +240,8 @@
                 const data = doc.data();
                 if(data && data.following) {
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
-                    // FIXED: This now clears processing IDs to ensure buttons update immediately
+                    // REAL-TIME RESET: Ensures buttons refresh once DB confirmed
                     if (allUsersData.length > 0) {
-                        processingIds.clear(); 
                         updateButtons();
                     }
                 }
@@ -391,18 +390,18 @@
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
+            // Skip buttons still strictly in-process to allow the loader to finish its cycle
+            if (processingIds.has(uid)) return;
+
             const span = btn.querySelector('span');
-            
             if(currentUserFollowing.includes(uid)) {
-                if(span) span.innerText = "Following";
                 btn.className = "action-btn following";
-                btn.innerHTML = `<span>Following</span>`; // Force clear loader
+                btn.innerHTML = `<span>Following</span>`; 
             } else {
-                if(span) span.innerText = "Follow";
                 btn.className = "action-btn";
-                btn.innerHTML = `<span>Follow</span>`; // Force clear loader
+                btn.innerHTML = `<span>Follow</span>`; 
             }
-            btn.style.pointerEvents = 'auto'; // Re-enable clicks
+            btn.style.pointerEvents = 'auto'; 
         });
     }
 
@@ -416,7 +415,6 @@
             btn.style.pointerEvents = 'none';
         }
 
-        // FEATURE: Haptic feedback for interaction
         if (window.navigator && window.navigator.vibrate) {
             window.navigator.vibrate(10);
         }
@@ -460,16 +458,13 @@
             }
         } catch (e) {
             console.error(e);
-            if (btn) {
-                updateButtons(); // Restore button state on error
-                const parentItem = btn.closest('.user-item');
-                if(parentItem) {
-                    parentItem.style.opacity = '1';
-                    parentItem.style.transform = 'none';
-                }
-            }
+        } finally {
+            // FIXED: Ensuring lock is cleared even on error and spinner is cleared
+            setTimeout(() => {
+                processingIds.delete(targetUid);
+                updateButtons();
+            }, 300);
         }
-        // Note: processingIds is cleared by the Firestore listener in onAuthStateChanged
     }
 
     async function removeFromList(docUid, field, targetUid) {
