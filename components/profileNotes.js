@@ -1,6 +1,7 @@
+
 /**
  * components/profileNotes.js
- * Fixed: Handles Auth Race Conditions automatically.
+ * Fixed: Handles Auth, Missing Indexes, and Modal interactions.
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
@@ -15,7 +16,8 @@ class ProfileNotes extends HTMLElement {
         // Listen for Auth State Changes
         this.authUnsub = firebase.auth().onAuthStateChanged(user => {
             this._currentUser = user;
-            this.attemptLoad(); // Retry load whenever auth updates
+            if(this._uid) this.attemptLoad();
+            else if(!user) this.renderError("Please log in.");
         });
     }
 
@@ -26,34 +28,27 @@ class ProfileNotes extends HTMLElement {
     set uid(val) {
         if (this._uid === val) return;
         this._uid = val;
-        this.attemptLoad(); // Retry load whenever UID updates
+        // If auth is already ready, load immediately. Otherwise wait for listener.
+        if(this._currentUser) this.attemptLoad();
     }
 
     get uid() { return this._uid; }
 
     // --- MAIN LOGIC ---
     async attemptLoad() {
-        // 1. Must have a Target UID
-        if (!this._uid) return;
+        if (!this._uid || !this._currentUser) return;
 
-        // 2. Must be Logged In (Wait for Auth)
-        if (!this._currentUser) {
-            // Keep skeleton showing while we wait for auth...
-            return; 
-        }
-
-        // 3. Reset UI to Skeleton before starting new fetch
+        // Reset UI to Skeleton
         this.renderSkeleton();
 
         const isMe = (this._currentUser.uid === this._uid);
 
-        // Case A: It's My Profile -> Show Notes Immediately
         if (isMe) {
             this.fetchAndRenderNotes(true);
             return;
         }
 
-        // Case B: Other User -> Check Mutual Friends
+        // Check Mutual Friends
         try {
             const myDoc = await this.db.collection('users').doc(this._currentUser.uid).get();
             const myData = myDoc.data() || {};
@@ -73,7 +68,7 @@ class ProfileNotes extends HTMLElement {
 
         } catch (e) {
             console.error("Privacy Check Failed:", e);
-            this.renderError("Error checking privacy.");
+            this.renderError("Error checking friendship status.");
         }
     }
 
@@ -85,6 +80,7 @@ class ProfileNotes extends HTMLElement {
     // --- DATA FETCHING ---
     async fetchAndRenderNotes(isMine) {
         try {
+            // Note: This query requires a Firestore Index: Collection 'notes', Fields: uid (Asc/Desc), createdAt (Desc)
             const snapshot = await this.db.collection('notes')
                 .where('uid', '==', this._uid)
                 .orderBy('createdAt', 'desc')
@@ -101,9 +97,11 @@ class ProfileNotes extends HTMLElement {
 
         } catch (e) {
             console.error("Fetch Notes Error:", e);
-            // If index is missing, this usually throws. 
-            // Ensure you have composite index on 'uid' + 'createdAt'
-            this.renderError("Could not load notes.");
+            if (e.message.includes("index")) {
+                this.renderError("System Error: Missing Database Index. Check Console.");
+            } else {
+                this.renderError("Could not load notes.");
+            }
         }
     }
 
@@ -136,7 +134,6 @@ class ProfileNotes extends HTMLElement {
                     font-size: 11px; color: #777; font-weight: 500; 
                     display: flex; align-items: center; gap: 6px; margin-top: 4px;
                 }
-                /* Music Badge */
                 .pn-music {
                     display: inline-flex; align-items: center; gap: 5px;
                     background: rgba(0, 210, 255, 0.1); padding: 4px 10px;
@@ -144,7 +141,6 @@ class ProfileNotes extends HTMLElement {
                     font-size: 11px; color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.2);
                 }
                 .pn-music svg { width: 12px; fill: #00d2ff; }
-                /* Status Dot */
                 .pn-dot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
                 .pn-dot.active { background: #00d2ff; box-shadow: 0 0 6px rgba(0,210,255,0.6); }
 
@@ -191,12 +187,17 @@ class ProfileNotes extends HTMLElement {
                 </div>
             `;
 
-            el.onclick = () => {
-                const viewer = document.querySelector('view-notes');
-                if (viewer) {
+            // === ROBUST CLICK HANDLER ===
+            el.onclick = (e) => {
+                e.stopPropagation(); // Prevent bubbling
+                const viewer = document.getElementById('view-notes-modal');
+                if (viewer && viewer.open) {
                     if(navigator.vibrate) navigator.vibrate(10);
                     // Open with ID and "isMine" status
                     viewer.open({ ...note, id: note.id }, isMine);
+                } else {
+                    console.error("ViewNotes modal not found or not ready!", viewer);
+                    alert("Error opening note viewer.");
                 }
             };
             listWrapper.appendChild(el);
@@ -233,7 +234,7 @@ class ProfileNotes extends HTMLElement {
     }
 
     renderError(msg) {
-        this.innerHTML = `<div style="padding:20px; text-align:center; color:#ff4444; font-size:12px;">${msg}</div>`;
+        this.innerHTML = `<div style="padding:20px; text-align:center; color:#ff4444; font-size:12px; border:1px solid #333; border-radius:12px; margin-top:20px;">${msg}</div>`;
     }
 }
 
