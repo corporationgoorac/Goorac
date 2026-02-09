@@ -273,7 +273,7 @@
     let targetUserData = null;
     let isProcessing = false; 
     
-    // --- 1. LOCAL STORAGE CACHE (Restored & Fixed) ---
+    // --- 1. LOCAL STORAGE CACHE (Restored) ---
     function loadFromCache() {
         if(!targetUsername) return;
         const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
@@ -292,7 +292,7 @@
                     removeBtnSkeletons();
                 }
 
-                // *** THE FIX: Safely initialize notes from cache ***
+                // *** FIX: Safely initialize notes from cache ***
                 if(targetUid) {
                     initNotesComponent(targetUid);
                 }
@@ -322,24 +322,22 @@
 
             renderProfile(freshData);
             
-            // Update Notes with Fresh ID
+            // Pass UID to Notes Component
             initNotesComponent(targetUid);
 
             checkRelation(freshData);
         });
     }
 
-    // --- 3. SAFE COMPONENT INITIALIZER (The Magic Fix) ---
-    // This function ensures the UID is passed even if the script loads late
+    // --- 3. SAFE COMPONENT INITIALIZER (The Fix for Loading) ---
     function initNotesComponent(uid) {
         const notesComp = document.getElementById('profile-notes');
         if(!notesComp) return;
 
-        // If the Custom Element is already defined (script loaded), set it.
+        // Ensure the component script is loaded before setting properties
         if (customElements.get('profile-notes')) {
             notesComp.uid = uid;
         } else {
-            // If not loaded yet (cached data arrived first), wait for it.
             customElements.whenDefined('profile-notes').then(() => {
                 notesComp.uid = uid;
             });
@@ -449,7 +447,6 @@
                 const myFollowing = myDoc.data().following || [];
                 const theirFollowers = theirDoc.data().followers || [];
 
-                // Double check relation inside transaction
                 const actuallyFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
                 if (!isCurrentlyFollowing && !actuallyFollowing) {
@@ -479,7 +476,7 @@
                 }
             });
 
-            // Success Update
+            // Success Update UI
             updateFollowButton(!isCurrentlyFollowing); 
             countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
 
@@ -487,6 +484,14 @@
             const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
             cached.amIFollowing = !isCurrentlyFollowing;
             localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
+
+            // *** CRITICAL FIX: Reload Notes Component Logic ***
+            // This toggles the UID on the component, forcing it to re-check privacy (Public/Private)
+            const notesComp = document.getElementById('profile-notes');
+            if (notesComp) {
+                notesComp.uid = null; // Clear it
+                setTimeout(() => { notesComp.uid = targetUid; }, 50); // Set it back immediately
+            }
 
         } catch (e) {
             console.error(e);
