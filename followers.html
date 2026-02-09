@@ -86,7 +86,7 @@
         .user-item { 
             display: flex; align-items: center; justify-content: space-between; 
             padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
-            animation: slideUp 0.4s ease forwards;
+            /* animation removed for stability */
         }
         
         .user-item.is-me { 
@@ -125,6 +125,8 @@
             border-radius: 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
             min-width: 95px; transition: all 0.2s ease;
             flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
         }
         .action-btn:active { transform: scale(0.94); opacity: 0.8; }
         
@@ -136,6 +138,16 @@
             border: 1.5px solid rgba(255, 59, 48, 0.2);
         }
 
+        /* --- BUTTON LOADER --- */
+        .btn-loader {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: btn-spin 0.6s linear infinite;
+        }
+        @keyframes btn-spin { to { transform: rotate(360deg); } }
+
         .v-badge { width: 15px; height: 15px; }
 
         /* Skeletons */
@@ -145,15 +157,10 @@
         
         .pulse { animation: pulse-bg 1.8s infinite ease-in-out; }
         @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-        @keyframes slideUp { 
-            from { opacity: 0; transform: translateY(15px); } 
-            to { opacity: 1; transform: translateY(0); } 
-        }
 
         .empty-state { text-align: center; padding: 100px 30px; color: var(--dim); }
         .empty-icon { font-size: 4rem; margin-bottom: 20px; display: block; filter: drop-shadow(0 0 10px rgba(0,210,255,0.2)); }
         
-        /* Privacy Msg Styling */
         .lock-msg { 
             background: var(--surface-light); padding: 30px 20px; border-radius: 20px; 
             margin-top: 40px; border: 1px solid var(--border);
@@ -215,8 +222,9 @@
     // State Management
     let allUsersData = [];
     let isOwnProfile = false;
-    let currentUserFollowing = []; // Strings (UIDs)
-    let followerIds = []; // Strings (UIDs)
+    let currentUserFollowing = []; 
+    let followerIds = []; 
+    let processingIds = new Set(); // Lock mechanism
     
     // Pagination
     let lastFetchedIndex = 0;
@@ -226,13 +234,10 @@
     // --- AUTH & INIT ---
     auth.onAuthStateChanged(user => {
         if (user) { 
-            // Real-time listener for MY following list (to update button states)
             db.collection("users").doc(user.uid).onSnapshot(doc => {
                 const data = doc.data();
                 if(data && data.following) {
-                    // Extract IDs whether strings or objects
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
-                    // Update buttons if list already rendered
                     if (allUsersData.length > 0) updateButtons();
                 }
             });
@@ -247,13 +252,11 @@
         try {
             let targetUID = currentUser.uid;
             
-            // 1. Determine Target User
             if (targetUsername) {
                 const userQuery = await db.collection("users").where("username", "==", targetUsername).get();
                 if (userQuery.empty) {
                     list.innerHTML = "<div class='empty-state'><div class='empty-icon'>🔍</div><p>User not found</p></div>";
                     document.getElementById('header-title').innerText = "Error";
-                    document.getElementById('header-count').innerText = "";
                     return;
                 }
                 const targetDoc = userQuery.docs[0];
@@ -262,9 +265,7 @@
                 isOwnProfile = (targetUID === currentUser.uid);
                 document.getElementById('header-title').innerText = `@${targetData.username}`;
 
-                // --- MUTUAL PRIVACY LOGIC ---
                 if (!isOwnProfile) {
-                    // Get my data to check if I follow them
                     const myDoc = await db.collection("users").doc(currentUser.uid).get();
                     const myFollowing = (myDoc.data()?.following || []).map(f => typeof f === 'string' ? f : f.uid);
                     const theirFollowers = (targetData.followers || []).map(f => typeof f === 'string' ? f : f.uid);
@@ -272,7 +273,6 @@
                     const iFollowThem = myFollowing.includes(targetUID);
                     const theyFollowMe = theirFollowers.includes(currentUser.uid);
 
-                    // If NOT mutual, block view
                     if (!iFollowThem || !theyFollowMe) {
                         list.innerHTML = `
                             <div class="empty-state lock-msg">
@@ -289,14 +289,9 @@
                 document.getElementById('header-title').innerText = "My Followers";
             }
 
-            // 3. Listen to Followers Array
             db.collection("users").doc(targetUID).onSnapshot(async doc => {
                 const rawFollowers = doc.data()?.followers || [];
-                
-                // Update Count in Header
                 document.getElementById('header-count').innerText = `${rawFollowers.length} followers`;
-
-                // Normalize: array might contain Strings (old) or Objects (new)
                 followerIds = rawFollowers.map(item => typeof item === 'string' ? item : item.uid).reverse();
                 
                 if (followerIds.length === 0) {
@@ -304,10 +299,9 @@
                     return;
                 }
                 
-                // Reset for new data load
                 allUsersData = [];
                 lastFetchedIndex = 0;
-                list.innerHTML = ''; // Clear skeleton
+                list.innerHTML = '';
                 await loadMoreUsers();
             });
 
@@ -317,7 +311,6 @@
         }
     }
 
-    // --- BATCH LOADING ---
     async function loadMoreUsers() {
         if (isLoadingMore || lastFetchedIndex >= followerIds.length) return;
         isLoadingMore = true;
@@ -325,15 +318,11 @@
         const nextBatchIds = followerIds.slice(lastFetchedIndex, lastFetchedIndex + limit);
         
         try {
-            // Parallel fetch user docs
             const profilePromises = nextBatchIds.map(id => db.collection("users").doc(id).get());
             const snapshots = await Promise.all(profilePromises);
-            
             const newUsers = snapshots.filter(p => p.exists).map(p => ({...p.data(), uid: p.id}));
-            
             allUsersData = [...allUsersData, ...newUsers];
             lastFetchedIndex += limit;
-            
             renderList(allUsersData);
         } catch (e) {
             console.error("Batch load error:", e);
@@ -342,20 +331,17 @@
         }
     }
 
-    // Infinite Scroll
     window.onscroll = () => {
         if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 200) {
             loadMoreUsers();
         }
     };
 
-    // --- RENDER LIST ---
     function renderList(users) {
         const list = document.getElementById('followers-list');
         list.innerHTML = "";
         const myUid = auth.currentUser.uid;
 
-        // Sort: Put ME at the top if present
         const sortedUsers = [...users].sort((a, b) => {
             if (a.uid === myUid) return -1;
             if (b.uid === myUid) return 1;
@@ -365,19 +351,16 @@
         sortedUsers.forEach(u => {
             const isMe = u.uid === myUid;
             const isFollowing = currentUserFollowing.includes(u.uid);
-            
             const item = document.createElement('div');
             item.className = `user-item ${isMe ? 'is-me' : ''}`;
             
-            // Logic for Buttons
             let actionHtml = '';
             if (isMe) {
                 actionHtml = `<div class="you-badge">YOU</div>`;
             } else {
                 let btnText = isOwnProfile ? 'Remove' : (isFollowing ? 'Following' : 'Follow');
                 let btnClass = isOwnProfile ? 'action-btn remove' : (isFollowing ? 'action-btn following' : 'action-btn');
-                
-                actionHtml = `<button id="btn-${u.uid}" class="${btnClass}" onclick="handleAction('${u.uid}', '${u.username}')">${btnText}</button>`;
+                actionHtml = `<button id="btn-${u.uid}" class="${btnClass}" onclick="handleAction('${u.uid}', '${u.username}')"><span>${btnText}</span></button>`;
             }
 
             item.innerHTML = `
@@ -397,70 +380,83 @@
         });
     }
 
-    // Only updates classes/text, doesn't redraw list (smoothness)
     function updateButtons() {
-        if(isOwnProfile) return; 
-
         const buttons = document.querySelectorAll('.action-btn');
         buttons.forEach(btn => {
             const uid = btn.id.replace('btn-', '');
-            if(currentUserFollowing.includes(uid)) {
-                btn.innerText = "Following";
-                btn.className = "action-btn following";
+            if (processingIds.has(uid)) return;
+
+            const span = btn.querySelector('span');
+            if (isOwnProfile) {
+                if(span) span.innerText = "Remove";
+                btn.className = "action-btn remove";
             } else {
-                btn.innerText = "Follow";
-                btn.className = "action-btn";
+                if(currentUserFollowing.includes(uid)) {
+                    if(span) span.innerText = "Following";
+                    btn.className = "action-btn following";
+                } else {
+                    if(span) span.innerText = "Follow";
+                    btn.className = "action-btn";
+                }
             }
         });
     }
 
-    // --- ACTIONS (Follow/Unfollow/Remove) ---
     async function handleAction(targetUid, username) {
+        if (processingIds.has(targetUid)) return;
+        processingIds.add(targetUid);
+
+        const btn = document.getElementById(`btn-${targetUid}`);
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            btn.innerHTML = '<div class="btn-loader"></div>';
+            btn.style.pointerEvents = 'none';
+        }
+
         const myUid = auth.currentUser.uid;
-        
         const timestamp = firebase.firestore.Timestamp.now();
         const dateStr = new Date().toISOString();
-        
         const myFollowData = { uid: targetUid, timestamp: timestamp, date: dateStr, type: 'following' };
         const theirFollowerData = { uid: myUid, timestamp: timestamp, date: dateStr, type: 'follower' };
 
-        if (isOwnProfile) {
-            if (!confirm(`Remove @${username} from your followers?`)) return;
-            
-            const btn = document.getElementById(`btn-${targetUid}`);
-            if(btn) btn.closest('.user-item').style.opacity = '0.5';
-
-            await removeFromList(myUid, 'followers', targetUid); 
-            await removeFromList(targetUid, 'following', myUid); 
-            
-            if(btn) btn.closest('.user-item').remove();
-
-        } else {
-            const isFollowing = currentUserFollowing.includes(targetUid);
-            const btn = document.getElementById(`btn-${targetUid}`);
-
-            if (isFollowing) {
-                btn.innerText = "Follow";
-                btn.className = "action-btn"; 
-                
-                await removeFromList(myUid, 'following', targetUid);
-                await removeFromList(targetUid, 'followers', myUid);
+        try {
+            if (isOwnProfile) {
+                if (!confirm(`Remove @${username} from your followers?`)) throw new Error("Cancelled");
+                if(btn) btn.closest('.user-item').style.opacity = '0.5';
+                await removeFromList(myUid, 'followers', targetUid); 
+                await removeFromList(targetUid, 'following', myUid); 
+                if(btn) btn.closest('.user-item').remove();
             } else {
-                btn.innerText = "Following";
-                btn.className = "action-btn following"; 
-                
-                const batch = db.batch();
-                batch.update(db.collection("users").doc(myUid), {
-                    following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
-                    followingCount: firebase.firestore.FieldValue.increment(1)
-                });
-                batch.update(db.collection("users").doc(targetUid), {
-                    followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
-                    followerCount: firebase.firestore.FieldValue.increment(1)
-                });
-                
-                try { await batch.commit(); } catch (e) { console.error(e); }
+                const isFollowing = currentUserFollowing.includes(targetUid);
+                if (isFollowing) {
+                    await removeFromList(myUid, 'following', targetUid);
+                    await removeFromList(targetUid, 'followers', myUid);
+                } else {
+                    const batch = db.batch();
+                    batch.update(db.collection("users").doc(myUid), {
+                        following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
+                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    batch.update(db.collection("users").doc(targetUid), {
+                        followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
+                        followerCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    await batch.commit();
+                }
             }
+        } catch (e) {
+            console.error(e);
+            if (btn && e.message !== "Cancelled") {
+                btn.innerHTML = originalContent;
+                btn.style.pointerEvents = 'auto';
+            }
+        } finally {
+            if (e?.message === "Cancelled" && btn) {
+                btn.innerHTML = originalContent;
+                btn.style.pointerEvents = 'auto';
+            }
+            processingIds.delete(targetUid);
         }
     }
 
@@ -470,24 +466,17 @@
             await db.runTransaction(async (t) => {
                 const doc = await t.get(docRef);
                 if (!doc.exists) return;
-                
                 const currentArray = doc.data()[field] || [];
                 const newArray = currentArray.filter(item => {
                     const id = typeof item === 'string' ? item : item.uid;
                     return id !== targetUid;
                 });
-                
                 if (newArray.length !== currentArray.length) {
                     const countField = field === 'followers' ? 'followerCount' : 'followingCount';
-                    t.update(docRef, { 
-                        [field]: newArray,
-                        [countField]: newArray.length
-                    });
+                    t.update(docRef, { [field]: newArray, [countField]: newArray.length });
                 }
             });
-        } catch (e) {
-            console.error("Remove failed", e);
-        }
+        } catch (e) { console.error("Remove failed", e); throw e; }
     }
 
     function filterList() {
