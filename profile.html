@@ -16,10 +16,15 @@
     <script src="config.js"></script>
 
     <script>
-        // FIX: Ensuring global variables from config.js are utilized for sync
-        const db = window.db || firebase.firestore();
-        const auth = window.auth || firebase.auth();
-        const rdb = window.rdb || firebase.database();
+        // FIX: Trigger the initialization function defined in your config.js
+        if (window.initFirebaseCore) {
+            window.initFirebaseCore();
+        }
+        
+        // Assign local pointers to the window variables created by config.js
+        const db = window.db;
+        const auth = window.auth;
+        const rdb = window.rdb;
     </script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -92,7 +97,7 @@
             border-radius: 24px 24px 0 0; z-index: 1001;
             padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
             transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            min-height: 55vh; /* Half screen and more */
+            min-height: 55vh; 
         }
         .bottom-modal.active { bottom: 0; }
         .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
@@ -222,7 +227,7 @@
         </div>
     </div>
 
-    <div class="notes-section">
+    <div class="notes-section" id="notes-container-wrapper">
         <profile-notes id="profile-notes"></profile-notes>
     </div>
 
@@ -235,12 +240,12 @@
     </div>
 
 <script>
-    // --- MODAL & BACK BUTTON HANDLER ---
+    // --- UI CONTROLS ---
     function toggleMenu(show) {
         const overlay = document.getElementById('modal-overlay');
         const modal = document.getElementById('bottom-modal');
         if (show) {
-            history.pushState({modalOpen: true}, ""); // Mobile back-button integration
+            history.pushState({modalOpen: true}, ""); 
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
             if(navigator.vibrate) navigator.vibrate(20);
@@ -250,6 +255,7 @@
         }
     }
 
+    // Back button to close modal
     window.onpopstate = function(e) {
         if(document.getElementById('bottom-modal').classList.contains('active')) {
             toggleMenu(false);
@@ -289,16 +295,18 @@
     // --- 2. AUTH & REALTIME SYNC ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            // FIX: Wait for profile-notes component to be ready
+            // FIX: Reliable initialization of profile-notes component
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) {
                 customElements.whenDefined('profile-notes').then(() => {
-                    notesComp.uid = user.uid;
+                    notesComp.setAttribute('uid', user.uid);
+                    if(notesComp.init) notesComp.init(); 
                 });
             }
             initRealtimeListener(user.uid);
         } else {
-            setTimeout(() => { if(!auth.currentUser) window.location.href = 'login.html'; }, 1000);
+            // Redirect immediately if not logged in
+            window.location.replace('login.html');
         }
     });
 
@@ -309,7 +317,7 @@
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                 renderUI(data);
             } else {
-                window.location.href = "setup.html";
+                window.location.replace("setup.html");
             }
         }, (error) => {
             console.error("Firestore Error:", error);
@@ -367,7 +375,7 @@
         if(confirm("Log out of Goorac?")) {
             auth.signOut().then(() => {
                 localStorage.clear(); 
-                window.location.href = "login.html";
+                window.location.replace("login.html");
             });
         }
     }
