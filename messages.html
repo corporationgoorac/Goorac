@@ -51,7 +51,7 @@
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
 
-        /* FILTER CHIPS (NEW FEATURE) */
+        /* FILTER CHIPS */
         .filter-scroll {
             display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
             scrollbar-width: none; -ms-overflow-style: none;
@@ -115,7 +115,7 @@
             pointer-events: auto; /* MUST BE AUTO TO CLICK */
         }
 
-        /* UPDATED UNREAD BADGE - DOT ONLY, RANDOM COLORS */
+        /* UNREAD BADGE */
         .unread-badge { 
             width: 12px; height: 12px; 
             border-radius: 50%; 
@@ -169,7 +169,7 @@
 
 <header>
     <div class="header-logo">GOORAC</div>
-    </header>
+</header>
 
 <div class="search-wrap">
     <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
@@ -249,8 +249,8 @@
     let inboxListener = null;
     
     // Filter Variable
-    let currentFilter = 'all'; // 'all' or 'unread'
-    let currentChatData = []; // Store raw data for filtering
+    let currentFilter = 'all'; 
+    let currentChatData = []; 
 
     // Neon Palette for Badges
     const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
@@ -258,7 +258,7 @@
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            setupPresence(); // START REALTIME PRESENCE
+            setupPresence(); 
             fetchUserData();
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 const data = doc.data();
@@ -268,6 +268,14 @@
                 listenToInbox();
             });
         } else { window.location.href = 'login.html'; }
+    });
+
+    // --- FORCE REFRESH WHEN RETURNING FROM CHAT (Back Button Fix) ---
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted && myUid) {
+            console.log("♻️ Page restored from cache - refreshing inbox");
+            listenToInbox();
+        }
     });
 
     // --- REALTIME PRESENCE SYSTEM ---
@@ -317,6 +325,7 @@
 
     function listenToInbox() {
         if(!myUid) return;
+        // Don't kill the listener if it's already active, just let it run
         if(inboxListener) inboxListener();
 
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
@@ -360,7 +369,6 @@
         });
     }
 
-    // --- NEW: FILTER LOGIC ---
     window.setFilter = function(filterType, el) {
         currentFilter = filterType;
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -369,14 +377,15 @@
     }
 
     function renderInbox() {
+        if (!myUid) return; // Prevent render before auth matches
+
         const list = document.getElementById('chats-list');
         list.innerHTML = "";
 
-        // Filter Data based on selection
+        // Filter Data
         const filteredData = currentChatData.filter(({chat}) => {
             if (currentFilter === 'all') return true;
             if (currentFilter === 'unread') {
-                // Check robust unread logic
                 if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) return Number(chat.unreadCount[myUid]) > 0;
                 return (chat.lastSender !== myUid && chat.seen === false);
             }
@@ -391,17 +400,17 @@
         filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
             if(!u) return;
             
-            // --- LOGIC FOR UNREAD (NO NUMBERS, JUST BOOLEAN) ---
+            // --- FIXED UNREAD LOGIC ---
             let isUnread = false;
-            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined && chat.unreadCount[myUid] !== null) {
+            // 1. Check direct count (New System)
+            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) {
                 isUnread = Number(chat.unreadCount[myUid]) > 0;
-            } else if (chat.lastSender !== myUid && chat.seen === false) {
-                isUnread = true; 
+            } 
+            // 2. Fallback to boolean seen (Legacy System)
+            else if (chat.lastSender && chat.lastSender !== myUid) {
+                isUnread = chat.seen === false; 
             }
 
-            // --- RANDOM COLOR GENERATOR ---
-            // We use a random color each render, or seeded by ID for consistency? 
-            // Request said "each time in different colors", so random pick on render.
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
 
             const amIFollowing = myFollowingList.some(item => {
@@ -462,7 +471,7 @@
                 else { msgEl.innerHTML = lastMsg; }
             });
 
-            // --- LISTEN FOR ONLINE STATUS ---
+            // Online Status
             rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
                 const dot = document.getElementById(`online-${otherUid}`);
                 if (dot) {
@@ -472,20 +481,20 @@
             });
         });
 
-        // Save Cache
+        // CACHE HTML ONLY IF FILTER IS ALL
         if(currentFilter === 'all') {
             localStorage.setItem('goorac_inbox_html', list.innerHTML);
         }
     }
 
-    // --- GLOBAL HANDLERS (MUST BE ON WINDOW) ---
+    // --- GLOBAL HANDLERS ---
     
     window.startLongPress = function(el, chatId, isPinned, userStr) {
         isLongPress = false;
         const u = JSON.parse(decodeURIComponent(userStr));
         
         longPressTimer = setTimeout(() => {
-            isLongPress = true; // Long Press Detected
+            isLongPress = true; 
             if(navigator.vibrate) navigator.vibrate(30);
             el.style.transform = "scale(0.96)";
             setTimeout(() => el.style.transform = "scale(1)", 200);
@@ -505,6 +514,10 @@
 
     window.enterChat = function(e, username) {
         if(isLongPress || e.target.closest('button')) return;
+        
+        // Note: We do NOT manipulate LocalStorage here manually to avoid
+        // overwriting incoming message states if they happen simultaneously.
+        // We rely on Firestore 'pageshow' refresh.
         window.location.href = `chat.html?user=${username}`;
     };
 
