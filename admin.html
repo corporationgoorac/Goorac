@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Goorac | Nexus Command v3.0</title>
+    <title>Goorac | Nexus v3.0</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -11,30 +11,28 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg: #050505;
-            --sidebar: #0a0a0a;
-            --surface: #111111;
-            --surface-hover: #1a1a1a;
+            --bg: #000000;
+            --surface: #0a0a0a;
+            --surface-light: #141414;
             --border: #222;
-            --primary: #3b82f6; /* Professional Blue */
-            --primary-glow: rgba(59, 130, 246, 0.15);
-            --accent: #00f2ff;
-            --danger: #ef4444;
-            --success: #10b981;
-            --text: #e5e5e5;
-            --text-muted: #737373;
+            --accent: #00f2ff; 
+            --accent-dim: rgba(0, 242, 255, 0.1);
+            --danger: #ff2a6d;
+            --success: #00ff9d;
+            --text: #ffffff;
+            --text-sec: #888888;
         }
 
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-        
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+
         body {
             background: var(--bg); color: var(--text); margin: 0;
-            font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden;
-            display: flex;
+            font-family: 'Inter', sans-serif; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
         /* --- LOCK SCREEN --- */
@@ -42,585 +40,553 @@
             position: fixed; inset: 0; z-index: 9999;
             background: #000; display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.4s ease;
         }
-        .lock-logo { font-family: 'JetBrains Mono'; font-size: 24px; letter-spacing: 4px; color: var(--text); margin-bottom: 40px; }
-        .pin-dots { display: flex; gap: 15px; margin-bottom: 40px; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); transition: 0.2s; }
-        .dot.filled { background: var(--text); border-color: var(--text); box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        .pin-display {
+            font-family: 'JetBrains Mono', monospace; font-size: 32px; letter-spacing: 12px;
+            margin-bottom: 40px; color: var(--accent); min-height: 40px; text-shadow: 0 0 15px var(--accent-dim);
+        }
+        .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .pin-btn {
+            width: 72px; height: 72px; border-radius: 20px; border: 1px solid var(--border);
+            background: var(--surface); color: white; font-size: 24px; font-weight: 600;
+            cursor: pointer; transition: 0.1s; font-family: 'JetBrains Mono';
+        }
+        .pin-btn:active { background: var(--accent); color: black; box-shadow: 0 0 20px var(--accent-dim); border-color: var(--accent); }
+
+        /* --- DASHBOARD LAYOUT --- */
+        #dashboard { display: none; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
         
-        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .num-btn {
-            width: 70px; height: 70px; border-radius: 50%; background: #111;
-            border: 1px solid #222; color: white; font-size: 20px; font-family: 'JetBrains Mono';
+        /* Header */
+        header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(5,5,5,0.9); backdrop-filter: blur(10px); z-index: 10;
+        }
+        .brand { display: flex; align-items: center; gap: 10px; }
+        .brand-icon { color: var(--accent); font-size: 22px; text-shadow: 0 0 10px var(--accent-dim); }
+        .brand-text { font-family: 'JetBrains Mono', monospace; font-weight: 800; letter-spacing: -1px; font-size: 1.1rem; }
+        
+        .h-actions { display: flex; gap: 8px; }
+        .h-btn {
+            width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text-sec); display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.2s;
         }
-        .num-btn:active { background: var(--text); color: black; }
+        .h-btn:active { background: var(--accent); color: black; border-color: var(--accent); }
 
-        /* --- MAIN LAYOUT --- */
-        #app-container { display: flex; width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s; display: none; }
-        
-        /* SIDEBAR */
-        aside {
-            width: 260px; background: var(--sidebar); border-right: 1px solid var(--border);
-            display: flex; flex-direction: column; padding: 20px; flex-shrink: 0;
-        }
-        .brand { font-family: 'JetBrains Mono'; font-weight: 700; font-size: 18px; margin-bottom: 40px; display: flex; align-items: center; gap: 10px; color: white; }
-        .nav-item {
-            padding: 12px 15px; border-radius: 8px; color: var(--text-muted);
-            display: flex; align-items: center; gap: 12px; cursor: pointer;
-            font-size: 14px; font-weight: 500; transition: 0.2s; margin-bottom: 5px;
-        }
-        .nav-item:hover { background: var(--surface-hover); color: white; }
-        .nav-item.active { background: var(--primary-glow); color: var(--primary); }
-
-        /* MAIN CONTENT */
-        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        
-        /* TOP BAR */
-        .top-bar {
-            height: 70px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 30px; background: rgba(5,5,5,0.8); backdrop-filter: blur(10px);
-        }
-        
-        /* SEARCH ENGINE */
-        .search-engine { position: relative; width: 400px; }
-        .search-engine input {
-            width: 100%; background: var(--surface); border: 1px solid var(--border);
-            padding: 12px 15px 12px 45px; border-radius: 8px; color: white;
-            font-family: 'JetBrains Mono'; font-size: 13px; transition: 0.2s;
-        }
-        .search-engine input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
-        .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 18px; }
-
-        /* STATS BAR */
-        .stats-deck {
-            display: flex; gap: 20px; padding: 20px 30px; border-bottom: 1px solid var(--border);
-            background: #080808;
+        /* Stats Row */
+        .stats-row {
+            display: flex; gap: 12px; padding: 20px; overflow-x: auto; flex-shrink: 0;
+            scrollbar-width: none;
         }
         .stat-card {
             background: var(--surface); border: 1px solid var(--border);
-            padding: 15px 20px; border-radius: 10px; min-width: 150px;
-            display: flex; flex-direction: column;
+            min-width: 110px; padding: 16px; border-radius: 14px;
+            display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-        .stat-val { font-size: 20px; font-weight: 700; color: white; }
-        .stat-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-top: 5px; letter-spacing: 0.5px; }
+        .s-val { font-size: 22px; font-weight: 800; color: white; margin-bottom: 4px; }
+        .s-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
 
-        /* DATA GRID */
-        .data-view { flex: 1; overflow-y: auto; padding: 0; }
-        .table-header {
-            display: grid; grid-template-columns: 60px 2fr 1.5fr 1fr 1fr 100px;
-            padding: 15px 30px; border-bottom: 1px solid var(--border);
-            background: var(--bg); position: sticky; top: 0; z-index: 10;
-            color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase;
+        /* Search Bar */
+        .search-container { padding: 0 20px 15px; flex-shrink: 0; }
+        .search-wrap {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; display: flex; align-items: center; padding: 0 14px;
+            transition: 0.3s;
         }
-        
-        .user-row {
-            display: grid; grid-template-columns: 60px 2fr 1.5fr 1fr 1fr 100px;
-            padding: 15px 30px; border-bottom: 1px solid var(--border);
-            align-items: center; transition: 0.15s; cursor: pointer;
+        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-dim); }
+        .search-wrap input {
+            width: 100%; background: transparent; border: none; color: white;
+            padding: 14px 8px; font-size: 14px; font-weight: 500; font-family: 'Inter';
         }
-        .user-row:hover { background: var(--surface-hover); }
-        .user-row.suspended { opacity: 0.5; text-decoration: line-through; }
-        
-        .avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #222; }
-        .u-identity { display: flex; flex-direction: column; }
-        .u-name { font-weight: 600; font-size: 14px; color: white; display: flex; align-items: center; gap: 6px; }
-        .u-sub { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono'; }
-        
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; width: fit-content; }
-        .badge.user { background: #1a1a1a; color: #888; }
-        .badge.online { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .verified-icon { color: var(--accent); font-size: 14px; }
 
-        /* EDITOR DRAWER */
-        #editor-drawer {
-            position: absolute; top: 0; right: 0; width: 400px; height: 100%;
-            background: #0c0c0c; border-left: 1px solid var(--border);
-            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 50; padding: 30px; display: flex; flex-direction: column;
-            box-shadow: -20px 0 50px rgba(0,0,0,0.5);
+        /* User List (Scrollable Area) */
+        .list-wrapper { flex: 1; overflow-y: auto; padding: 0 20px 80px; position: relative; }
+        .list-header { 
+            font-size: 11px; font-weight: 700; color: var(--text-sec); 
+            margin-bottom: 12px; display: flex; justify-content: space-between; position: sticky; top: 0;
+            background: var(--bg); padding: 10px 0; z-index: 5;
         }
-        #editor-drawer.open { transform: translateX(0); }
-        
-        .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .form-group { margin-bottom: 20px; }
-        .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
-        .form-input {
-            width: 100%; background: #161616; border: 1px solid var(--border);
-            padding: 12px; border-radius: 6px; color: white; font-family: 'JetBrains Mono'; font-size: 13px;
+
+        .u-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; padding: 14px; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            transition: 0.2s; cursor: pointer;
         }
+        .u-card:active { transform: scale(0.98); background: var(--surface-light); border-color: #444; }
         
-        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
-        .btn {
-            border: none; padding: 14px; border-radius: 8px; cursor: pointer;
-            font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px;
+        .u-left { display: flex; align-items: center; gap: 14px; }
+        .u-pfp { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: #222; border: 1px solid #333; }
+        .u-info { display: flex; flex-direction: column; }
+        .u-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .u-meta { font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono'; margin-top: 3px; }
+        
+        /* Badges */
+        .badge { font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .b-ver { color: var(--accent); background: rgba(0, 242, 255, 0.1); border: 1px solid rgba(0, 242, 255, 0.2); }
+        .b-sus { color: var(--danger); background: rgba(255, 42, 109, 0.1); border: 1px solid rgba(255, 42, 109, 0.2); }
+        .b-adm { color: #ffd700; background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); }
+
+        /* EDITOR MODAL (Layout Fix) */
+        #editor {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
+            display: none; justify-content: flex-end; backdrop-filter: blur(8px);
+        }
+        .sheet {
+            width: 100%; max-width: 500px; background: #080808; height: 100%;
+            border-left: 1px solid var(--border); display: flex; flex-direction: column;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: -20px 0 60px rgba(0,0,0,0.9);
+        }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* Header Fixed */
+        .sheet-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #080808; }
+        .sh-title { font-size: 18px; font-weight: 800; }
+
+        /* Body Scrollable */
+        .sheet-body { flex: 1; overflow-y: auto; padding: 24px; }
+
+        /* Profile Top */
+        .ed-top { display: flex; gap: 20px; align-items: center; margin-bottom: 30px; }
+        .ed-pfp { width: 75px; height: 75px; border-radius: 20px; object-fit: cover; border: 2px solid var(--border); }
+        
+        /* Toggles */
+        .toggle-row { display: flex; gap: 12px; margin-bottom: 25px; }
+        .toggle-card {
+            flex: 1; background: var(--surface); border: 1px solid var(--border);
+            padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.2s;
+        }
+        .toggle-card.active { border-color: var(--accent); background: var(--accent-dim); }
+        .toggle-card.danger.active { border-color: var(--danger); background: rgba(255, 42, 109, 0.1); }
+        .tc-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; margin-bottom: 6px; }
+        .active .tc-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .danger.active .tc-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        .tc-txt { font-size: 11px; font-weight: 700; }
+
+        /* Inputs */
+        .input-wrap { margin-bottom: 20px; }
+        .lbl { display: block; font-size: 10px; font-weight: 700; color: var(--text-sec); margin-bottom: 8px; text-transform: uppercase; }
+        .inp {
+            width: 100%; background: var(--surface); border: 1px solid var(--border);
+            color: white; padding: 14px; border-radius: 10px; font-size: 14px; font-family: 'JetBrains Mono';
             transition: 0.2s;
         }
-        .btn-primary { background: white; color: black; }
-        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-        .btn-danger:hover { background: var(--danger); color: white; }
+        .inp:focus { border-color: var(--accent); background: #121212; }
+
+        /* Footer Fixed (Buttons) */
+        .sheet-foot {
+            padding: 20px 24px; border-top: 1px solid var(--border); background: #080808;
+            display: grid; grid-template-columns: 1fr 2fr; gap: 12px;
+            /* Safe area for mobile */
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+        }
+        .btn {
+            padding: 16px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
+            border: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-save { background: white; color: black; }
+        .btn-save:active { transform: scale(0.98); }
+        .btn-del { background: rgba(255, 42, 109, 0.1); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.3); }
         
         /* TOAST */
         .toast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: #222; color: white; padding: 12px 20px; border-radius: 30px;
-            font-size: 13px; font-weight: 500; opacity: 0; transition: 0.3s;
-            display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); pointer-events: none; z-index: 100;
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #111; color: white; padding: 12px 24px; border-radius: 30px;
+            border: 1px solid var(--border); font-weight: 600; font-size: 13px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7); z-index: 200;
+            display: flex; align-items: center; gap: 10px;
+            animation: floatUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @keyframes floatUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            aside { display: none; }
-            .table-header { display: none; }
-            .user-row { grid-template-columns: 50px 1fr; gap: 10px; }
-            .user-row > *:not(:first-child):not(:nth-child(2)) { display: none; } /* Hide details on mobile */
-            .top-bar { padding: 0 15px; }
-            .search-engine { width: 100%; }
-            #editor-drawer { width: 100%; }
-        }
     </style>
 </head>
 <body>
 
+    <div id="toast-container"></div>
+
     <div id="lock-screen">
-        <div class="lock-logo">GOORAC NEXUS</div>
-        <div class="pin-dots">
-            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
-        </div>
-        <div class="numpad">
-            <button class="num-btn" onclick="enterPin(1)">1</button>
-            <button class="num-btn" onclick="enterPin(2)">2</button>
-            <button class="num-btn" onclick="enterPin(3)">3</button>
-            <button class="num-btn" onclick="enterPin(4)">4</button>
-            <button class="num-btn" onclick="enterPin(5)">5</button>
-            <button class="num-btn" onclick="enterPin(6)">6</button>
-            <button class="num-btn" onclick="enterPin(7)">7</button>
-            <button class="num-btn" onclick="enterPin(8)">8</button>
-            <button class="num-btn" onclick="enterPin(9)">9</button>
-            <button class="num-btn" style="color:var(--danger)" onclick="clearPin()">C</button>
-            <button class="num-btn" onclick="enterPin(0)">0</button>
-            <button class="num-btn" style="background:var(--text); color:black;" onclick="submitPin()">→</button>
+        <div class="pin-display" id="pin-display">••••</div>
+        <div class="pin-pad">
+            <button class="pin-btn" onclick="typePin('1')">1</button>
+            <button class="pin-btn" onclick="typePin('2')">2</button>
+            <button class="pin-btn" onclick="typePin('3')">3</button>
+            <button class="pin-btn" onclick="typePin('4')">4</button>
+            <button class="pin-btn" onclick="typePin('5')">5</button>
+            <button class="pin-btn" onclick="typePin('6')">6</button>
+            <button class="pin-btn" onclick="typePin('7')">7</button>
+            <button class="pin-btn" onclick="typePin('8')">8</button>
+            <button class="pin-btn" onclick="typePin('9')">9</button>
+            <button class="pin-btn" onclick="typePin('C')" style="color:var(--danger)">C</button>
+            <button class="pin-btn" onclick="typePin('0')">0</button>
+            <button class="pin-btn" onclick="unlock()">→</button>
         </div>
     </div>
 
-    <div id="app-container">
-        <aside>
-            <div class="brand"><span class="material-icons-round" style="color:var(--primary)">admin_panel_settings</span> NEXUS</div>
-            <div class="nav-item active"><i class="material-icons-round">people</i> Users</div>
-            <div class="nav-item"><i class="material-icons-round">bar_chart</i> Analytics</div>
-            <div class="nav-item"><i class="material-icons-round">settings</i> Settings</div>
-            <div style="margin-top:auto; font-size:11px; color:var(--text-muted);">v3.0 Stable<br>Server: Online</div>
-        </aside>
-
-        <main>
-            <div class="top-bar">
-                <div class="search-engine">
-                    <i class="material-icons-round search-icon">search</i>
-                    <input type="text" id="search-input" placeholder="Search Name, Username, Goorac ID..." oninput="handleSearch()">
-                </div>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn" style="background:var(--surface); border:1px solid var(--border); padding:8px 12px;" onclick="refreshData()">
-                        <i class="material-icons-round">refresh</i>
-                    </button>
-                    <button class="btn" style="background:var(--surface); border:1px solid var(--border); padding:8px 12px;" onclick="exportJSON()">
-                        <i class="material-icons-round">download</i>
-                    </button>
-                </div>
+    <div id="dashboard">
+        <header>
+            <div class="brand">
+                <span class="material-icons-round brand-icon">admin_panel_settings</span>
+                <span class="brand-text">NEXUS</span>
             </div>
-
-            <div class="stats-deck">
-                <div class="stat-card">
-                    <span class="stat-val" id="count-total">-</span>
-                    <span class="stat-label">Total Users</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-val" id="count-online" style="color:var(--success)">-</span>
-                    <span class="stat-label">Active Now</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-val" id="count-sus" style="color:var(--danger)">-</span>
-                    <span class="stat-label">Suspended</span>
-                </div>
+            <div class="h-actions">
+                <button class="h-btn" onclick="exportData()" title="Download JSON"><span class="material-icons-round">download</span></button>
+                <button class="h-btn" onclick="refreshData()" title="Reload DB"><span class="material-icons-round">refresh</span></button>
             </div>
+        </header>
 
-            <div class="table-header">
-                <div></div>
-                <div>User Identity</div>
-                <div>Goorac ID</div>
-                <div>Status</div>
-                <div>Verification</div>
-                <div>Actions</div>
+        <div class="stats-row">
+            <div class="stat-card">
+                <span class="s-val" id="s-total">--</span>
+                <span class="s-lbl">Database Size</span>
             </div>
+            <div class="stat-card">
+                <span class="s-val" style="color:var(--success);" id="s-online">--</span>
+                <span class="s-lbl">Online Now</span>
+            </div>
+            <div class="stat-card">
+                <span class="s-val" style="color:var(--danger);" id="s-sus">--</span>
+                <span class="s-lbl">Suspended</span>
+            </div>
+        </div>
 
-            <div class="data-view" id="user-grid">
+        <div class="search-container">
+            <div class="search-wrap">
+                <span class="material-icons-round" style="color:var(--text-sec); margin-right:8px;">search</span>
+                <input type="text" id="search-input" placeholder="Search Names, Usernames, IDs..." oninput="handleSearch()">
+            </div>
+        </div>
+
+        <div class="list-wrapper">
+            <div class="list-header">
+                <span>ENTITY LIST</span>
+                <span id="list-counter">SYNCING...</span>
+            </div>
+            <div id="user-list">
                 </div>
-            <div id="loader" style="text-align:center; padding:20px; color:#555; display:none; font-size:12px;">LOADING DATA...</div>
-        </main>
+        </div>
+    </div>
 
-        <div id="editor-drawer">
-            <div class="drawer-head">
-                <h2 style="margin:0; font-size:18px;">Edit Profile</h2>
-                <button onclick="closeDrawer()" style="background:none; border:none; color:white; cursor:pointer;"><i class="material-icons-round">close</i></button>
+    <div id="editor">
+        <div class="sheet">
+            <div class="sheet-head">
+                <span class="sh-title">Edit Entity</span>
+                <button class="h-btn" style="border:none; background:transparent;" onclick="closeEditor()">
+                    <span class="material-icons-round">close</span>
+                </button>
             </div>
             
-            <div style="text-align:center; margin-bottom:20px;">
-                <img id="edit-pfp" src="" style="width:80px; height:80px; border-radius:20px; background:#222; object-fit:cover;">
-                <div id="edit-uid" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-muted); margin-top:10px;"></div>
+            <div class="sheet-body">
+                <div class="ed-top">
+                    <img id="ed-pfp" class="ed-pfp">
+                    <div>
+                        <div id="ed-id" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-sec); margin-bottom:4px;">ID: ---</div>
+                        <div id="ed-name-disp" style="font-weight:800; font-size:18px;">User</div>
+                    </div>
+                </div>
+
+                <div class="toggle-row">
+                    <div class="toggle-card" id="tog-ver" onclick="toggleCard(this)">
+                        <div class="tc-dot"></div>
+                        <div class="tc-txt">VERIFIED</div>
+                    </div>
+                    <div class="toggle-card" id="tog-adm" onclick="toggleCard(this)">
+                        <div class="tc-dot"></div>
+                        <div class="tc-txt">ADMIN</div>
+                    </div>
+                    <div class="toggle-card danger" id="tog-sus" onclick="toggleCard(this)">
+                        <div class="tc-dot"></div>
+                        <div class="tc-txt">SUSPENDED</div>
+                    </div>
+                </div>
+
+                <div class="input-wrap">
+                    <label class="lbl">Display Name</label>
+                    <input type="text" class="inp" id="inp-name">
+                </div>
+                <div class="input-wrap">
+                    <label class="lbl">Username Handle</label>
+                    <input type="text" class="inp" id="inp-user">
+                </div>
+                <div class="input-wrap">
+                    <label class="lbl">Goorac ID (Static)</label>
+                    <input type="text" class="inp" id="inp-gid" style="color:var(--text-sec);" readonly>
+                </div>
+                <div class="input-wrap">
+                    <label class="lbl">Avatar Source</label>
+                    <input type="text" class="inp" id="inp-url">
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Display Name</label>
-                <input type="text" id="edit-name" class="form-input">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Username (@)</label>
-                <input type="text" id="edit-user" class="form-input">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Goorac Number</label>
-                <input type="text" id="edit-gid" class="form-input" readonly style="color:#666">
-            </div>
-
-            <div class="form-group" style="display:flex; gap:10px; margin-top:10px;">
-                <div onclick="toggleBool('verified')" id="btn-verify" class="btn" style="flex:1; background:#111; border:1px solid #333;">Verified</div>
-                <div onclick="toggleBool('suspended')" id="btn-suspend" class="btn" style="flex:1; background:#111; border:1px solid #333;">Suspended</div>
-            </div>
-
-            <div class="action-grid">
-                <button class="btn btn-primary" onclick="saveChanges()">Save Changes</button>
-                <button class="btn btn-danger" onclick="deleteUser()">Delete User</button>
+            <div class="sheet-foot">
+                <button class="btn btn-del" onclick="deleteEntity()">
+                    <span class="material-icons-round">delete</span> ERASE
+                </button>
+                <button class="btn btn-save" onclick="saveEntity()">
+                    <span class="material-icons-round">save</span> SAVE DATA
+                </button>
             </div>
         </div>
-    </div>
-
-    <div id="toast" class="toast">
-        <i class="material-icons-round" id="toast-icon">info</i>
-        <span id="toast-msg">Notification</span>
     </div>
 
     <script>
-        // ==========================================
-        // 1. CONFIGURATION (PUT YOUR KEYS HERE)
-        // ==========================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE", // Your Key
+        // --- CONFIGURATION ---
+        const fbConfig = {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
             authDomain: "goorac-c3b59.firebaseapp.com",
             projectId: "goorac-c3b59",
             databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
         };
-
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(fbConfig);
         const db = firebase.firestore();
         const rdb = firebase.database();
 
-        // ==========================================
-        // 2. STATE & PIN
-        // ==========================================
-        let allUsers = [];     
-        let lastDoc = null;    
-        let isLoading = false; 
-        let currentEdit = null;
-        let searchMode = false;
-        
-        let pin = "";
-        const TARGET_PIN = "2026"; // Default Pin
+        // --- AUTH (PIN SYSTEM) ---
+        let currentPin = "";
+        const TARGET_HASH = 1542021; // Simple hash for security
 
-        function enterPin(n) {
-            if(pin.length < 4) {
-                pin += n;
-                const dots = document.querySelectorAll('.dot');
-                dots[pin.length-1].classList.add('filled');
+        function fastHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash; 
             }
+            return Math.abs(hash);
         }
-        function clearPin() { 
-            pin = ""; 
-            document.querySelectorAll('.dot').forEach(d => d.classList.remove('filled')); 
+
+        function typePin(key) {
+            if (key === 'C') { currentPin = ""; }
+            else if (currentPin.length < 4) { currentPin += key; }
+            document.getElementById('pin-display').innerText = "•".repeat(currentPin.length).padEnd(4, '•');
         }
-        function submitPin() {
-            if(pin === TARGET_PIN) {
-                document.getElementById('lock-screen').style.opacity = '0';
+
+        function unlock() {
+            if (fastHash(currentPin) === TARGET_HASH) {
+                const ls = document.getElementById('lock-screen');
+                ls.style.opacity = '0';
                 setTimeout(() => {
-                    document.getElementById('lock-screen').style.display = 'none';
-                    document.getElementById('app-container').style.display = 'flex';
-                    setTimeout(() => document.getElementById('app-container').style.opacity = '1', 100);
-                    initApp();
-                }, 500);
+                    ls.style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'flex';
+                    setTimeout(() => document.getElementById('dashboard').style.opacity = '1', 50);
+                    initData(); // START DATA LOAD
+                }, 400);
             } else {
+                currentPin = "";
+                document.getElementById('pin-display').innerText = "••••";
                 showToast("Access Denied", "error");
-                clearPin();
             }
         }
 
-        // ==========================================
-        // 3. CORE FUNCTIONS
-        // ==========================================
-        function initApp() {
-            fetchUsers();
-            updateStats();
-        }
+        // --- DATA & SEARCH ENGINE ---
+        let allUsers = []; // Master list for client-side search
+        let editingId = null;
 
-        async function fetchUsers(isRefresh = false) {
-            if (isLoading) return;
-            isLoading = true;
-            if(isRefresh) {
-                lastDoc = null;
-                allUsers = [];
-                document.getElementById('user-grid').innerHTML = '';
-            }
+        async function initData() {
+            document.getElementById('list-counter').innerText = "DOWNLOADING...";
+            document.getElementById('user-list').innerHTML = '<div style="text-align:center; padding:40px; color:#444;">SYNCING DATABASE...</div>';
             
-            document.getElementById('loader').style.display = 'block';
-
             try {
-                // Simplified query to avoid index errors initially
-                let query = db.collection('users').limit(25);
-                if(!isRefresh && lastDoc) query = query.startAfter(lastDoc);
-
-                const snap = await query.get();
-                if (snap.empty) {
-                    isLoading = false;
-                    document.getElementById('loader').style.display = 'none';
-                    return;
-                }
-
-                lastDoc = snap.docs[snap.docs.length - 1];
-
+                // Fetch ALL users (suitable for <10k users). 
+                // This makes search INSTANT and fixes "Search not working" issues.
+                const snap = await db.collection("users").orderBy("username").get();
+                
+                allUsers = [];
                 snap.forEach(doc => {
-                    const data = { uid: doc.id, ...doc.data() };
-                    // Avoid duplicates
-                    if(!allUsers.find(u => u.uid === data.uid)){
-                        allUsers.push(data);
-                        renderRow(data);
-                    }
+                    allUsers.push({ id: doc.id, ...doc.data() });
                 });
 
-            } catch (error) {
-                console.error(error);
-                showToast("Fetch Error", "error");
-            } finally {
-                isLoading = false;
-                document.getElementById('loader').style.display = 'none';
+                // Update UI
+                renderList(allUsers);
+                updateStats();
+                showToast("Database Synced", "success");
+
+            } catch(e) {
+                // Fallback for huge DBs or errors
+                console.error(e);
+                document.getElementById('user-list').innerHTML = '<div style="text-align:center; color:#ff2a6d;">SYNC ERROR</div>';
             }
         }
 
-        function renderRow(u) {
-            const grid = document.getElementById('user-grid');
-            const div = document.createElement('div');
-            div.className = `user-row ${u.suspended ? 'suspended' : ''}`;
-            div.onclick = (e) => {
-                if(e.target.closest('.btn-action')) return;
-                openDrawer(u);
-            };
+        function refreshData() { initData(); }
 
-            const verifBadge = u.verified ? `<i class="material-icons-round verified-icon">verified</i>` : '';
+        // --- RENDER LOGIC ---
+        function renderList(data) {
+            const list = document.getElementById('user-list');
+            document.getElementById('list-counter').innerText = `${data.length} ENTITIES`;
+            list.innerHTML = "";
 
-            div.innerHTML = `
-                <div><img src="${u.photoURL || 'https://via.placeholder.com/40'}" class="avatar"></div>
-                <div class="u-identity">
-                    <div class="u-name">${u.name || 'Unknown'} ${verifBadge}</div>
-                    <div class="u-sub">@${u.username || '...'}</div>
-                </div>
-                <div class="u-sub" style="font-family:'JetBrains Mono'">${u.gooracNumber || 'N/A'}</div>
-                <div><span id="status-${u.uid}" class="badge user">OFFLINE</span></div>
-                <div>${u.verified ? '<span style="color:var(--accent)">Verified</span>' : '<span style="color:#555">Unverified</span>'}</div>
-                <div>
-                    <button class="btn btn-action" style="padding:5px; background:transparent; color:#666; border:1px solid #333;" onclick="copyId('${u.uid}')" title="Copy UID">
-                        <i class="material-icons-round" style="font-size:16px;">content_copy</i>
-                    </button>
-                </div>
-            `;
-            grid.appendChild(div);
-
-            // Live Status Listener
-            rdb.ref(`status/${u.uid}/state`).on('value', (snap) => {
-                const el = document.getElementById(`status-${u.uid}`);
-                if(el) {
-                    if(snap.val() === 'online') {
-                        el.innerText = "ONLINE";
-                        el.className = "badge online";
-                    } else {
-                        el.innerText = "OFFLINE";
-                        el.className = "badge user";
-                    }
-                }
-            });
-        }
-
-        // ==========================================
-        // 4. OMNI-SEARCH (THE FIX)
-        // ==========================================
-        let searchDebounce;
-        
-        async function handleSearch() {
-            clearTimeout(searchDebounce);
-            const term = document.getElementById('search-input').value.trim();
-            const grid = document.getElementById('user-grid');
-            
-            if(term === "") {
-                searchMode = false;
-                grid.innerHTML = '';
-                allUsers.forEach(renderRow);
+            if(data.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:30px; color:#444;">NO MATCHES FOUND</div>';
                 return;
             }
 
-            searchDebounce = setTimeout(async () => {
-                searchMode = true;
-                grid.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">SEARCHING...</div>';
-                
-                // 1. Client Side Filter (Memory)
-                const lowerTerm = term.toLowerCase();
-                const localMatches = allUsers.filter(u => 
-                    (u.name && u.name.toLowerCase().includes(lowerTerm)) ||
-                    (u.username && u.username.toLowerCase().includes(lowerTerm)) ||
-                    (u.gooracNumber && String(u.gooracNumber).includes(term)) ||
-                    (u.uid === term)
-                );
+            // Limit render to 50 items for DOM performance if list is huge
+            const viewData = data.slice(0, 50);
 
-                grid.innerHTML = '';
-                localMatches.forEach(renderRow);
+            viewData.forEach(u => {
+                const el = document.createElement('div');
+                el.className = 'u-card';
+                el.onclick = () => openEditor(u);
 
-                // 2. Server Side Query (Deep Search)
-                // If the user isn't in memory, check Firestore specifically
-                if (localMatches.length === 0) {
-                    try {
-                        const qSnap = await db.collection('users').where('username', '==', term).get();
-                        const idSnap = await db.collection('users').where('gooracNumber', '==', term).get();
-                        
-                        let foundServer = false;
-                        const process = (snap) => {
-                            snap.forEach(doc => {
-                                foundServer = true;
-                                const data = { uid: doc.id, ...doc.data() };
-                                allUsers.push(data); // Add to cache
-                                renderRow(data);
-                            });
-                        }
-                        process(qSnap);
-                        process(idSnap);
-                        
-                        if(!foundServer) grid.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">NO RESULTS FOUND</div>';
+                let badges = "";
+                if(u.verified) badges += `<span class="badge b-ver">VERIFIED</span> `;
+                if(u.isAdmin) badges += `<span class="badge b-adm">ADMIN</span> `;
+                if(u.suspended) badges += `<span class="badge b-sus">SUSPENDED</span>`;
 
-                    } catch (e) { console.log(e); }
-                }
-            }, 500);
-        }
-
-        // ==========================================
-        // 5. EDITING LOGIC
-        // ==========================================
-        let editState = { verified: false, suspended: false };
-
-        function openDrawer(u) {
-            currentEdit = u;
-            editState.verified = u.verified || false;
-            editState.suspended = u.suspended || false;
-
-            document.getElementById('edit-pfp').src = u.photoURL || '';
-            document.getElementById('edit-uid').innerText = u.uid;
-            document.getElementById('edit-name').value = u.name || '';
-            document.getElementById('edit-user').value = u.username || '';
-            document.getElementById('edit-gid').value = u.gooracNumber || '';
-
-            updateToggleUI();
-            document.getElementById('editor-drawer').classList.add('open');
-        }
-
-        function closeDrawer() {
-            document.getElementById('editor-drawer').classList.remove('open');
-            currentEdit = null;
-        }
-
-        function toggleBool(key) {
-            editState[key] = !editState[key];
-            updateToggleUI();
-        }
-
-        function updateToggleUI() {
-            const btnV = document.getElementById('btn-verify');
-            const btnS = document.getElementById('btn-suspend');
-
-            btnV.style.color = editState.verified ? 'var(--accent)' : 'white';
-            btnV.style.borderColor = editState.verified ? 'var(--accent)' : '#333';
-            
-            btnS.style.color = editState.suspended ? 'var(--danger)' : 'white';
-            btnS.style.borderColor = editState.suspended ? 'var(--danger)' : '#333';
-        }
-
-        async function saveChanges() {
-            if(!currentEdit) return;
-            const updates = {
-                name: document.getElementById('edit-name').value,
-                username: document.getElementById('edit-user').value,
-                verified: editState.verified,
-                suspended: editState.suspended
-            };
-
-            try {
-                await db.collection('users').doc(currentEdit.uid).update(updates);
-                
-                // Update Local Cache
-                const idx = allUsers.findIndex(u => u.uid === currentEdit.uid);
-                if(idx !== -1) allUsers[idx] = { ...allUsers[idx], ...updates };
-                
-                showToast("Profile Updated", "success");
-                closeDrawer();
-                if(!searchMode) {
-                    document.getElementById('user-grid').innerHTML = '';
-                    allUsers.forEach(renderRow);
-                } else {
-                    handleSearch(); 
-                }
-            } catch(e) { showToast(e.message, "error"); }
-        }
-
-        async function deleteUser() {
-            if(!confirm("Are you sure? This cannot be undone.")) return;
-            try {
-                await db.collection('users').doc(currentEdit.uid).delete();
-                showToast("User Deleted", "success");
-                closeDrawer();
-                refreshData();
-            } catch(e) { showToast(e.message, "error"); }
-        }
-
-        // ==========================================
-        // 6. UTILS
-        // ==========================================
-        function refreshData() { fetchUsers(true); }
-        function copyId(id) { navigator.clipboard.writeText(id); showToast("UID Copied", "success"); }
-        function exportJSON() {
-            const s = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers));
-            const a = document.createElement('a'); a.href = s; a.download = "export.json"; a.click();
-        }
-        function showToast(msg, type) {
-            const t = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            document.getElementById('toast-icon').innerText = type === 'success' ? 'check_circle' : 'error';
-            document.getElementById('toast-icon').style.color = type === 'success' ? 'var(--success)' : 'var(--danger)';
-            t.classList.add('visible');
-            setTimeout(() => t.classList.remove('visible'), 3000);
+                el.innerHTML = `
+                    <div class="u-left">
+                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="u-pfp">
+                        <div class="u-info">
+                            <div class="u-name">${u.name || 'Unknown'}</div>
+                            <div class="u-meta">@${u.username || '...'} • ${u.gooracNumber || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">${badges}</div>
+                `;
+                list.appendChild(el);
+            });
         }
 
         function updateStats() {
-            // Estimate based on loaded data + real-time
-            rdb.ref('status').on('value', snap => {
-                let c = 0; snap.forEach(x => { if(x.val().state === 'online') c++; });
-                document.getElementById('count-online').innerText = c;
+            document.getElementById('s-total').innerText = allUsers.length;
+            document.getElementById('s-sus').innerText = allUsers.filter(u => u.suspended).length;
+            
+            // Get Online Count
+            rdb.ref('status').once('value', snap => {
+                let online = 0;
+                snap.forEach(c => { if(c.val().state === 'online') online++; });
+                document.getElementById('s-online').innerText = online;
             });
-            // Simple visual placeholder for total/sus, real app needs Cloud Function or Aggregation Query
-            setTimeout(() => {
-                document.getElementById('count-total').innerText = allUsers.length + "+";
-                document.getElementById('count-sus').innerText = allUsers.filter(u=>u.suspended).length;
-            }, 2000);
         }
 
-        // Infinite Scroll
-        document.getElementById('user-grid').addEventListener('scroll', (e) => {
-            if(searchMode) return;
-            if(e.target.scrollTop + e.target.clientHeight >= e.target.scrollHeight - 50) fetchUsers();
-        });
+        // --- UNIVERSAL SEARCH (The Fix) ---
+        let debounce;
+        function handleSearch() {
+            clearTimeout(debounce);
+            const term = document.getElementById('search-input').value.toLowerCase().trim();
+            
+            debounce = setTimeout(() => {
+                if (!term) {
+                    renderList(allUsers);
+                    return;
+                }
+                
+                // Fuzzy search logic
+                const filtered = allUsers.filter(u => {
+                    const n = (u.name || "").toLowerCase();
+                    const un = (u.username || "").toLowerCase();
+                    const gid = (u.gooracNumber || "").toString();
+                    const uid = u.id.toLowerCase();
+                    return n.includes(term) || un.includes(term) || gid.includes(term) || uid.includes(term);
+                });
+                
+                renderList(filtered);
+            }, 300);
+        }
+
+        // --- EDITOR LOGIC ---
+        function openEditor(u) {
+            editingId = u.id;
+            
+            // Set fields
+            document.getElementById('ed-id').innerText = `UID: ${u.id}`;
+            document.getElementById('ed-name-disp').innerText = u.name || 'Unknown';
+            document.getElementById('ed-pfp').src = u.photoURL || '';
+            
+            document.getElementById('inp-name').value = u.name || '';
+            document.getElementById('inp-user').value = u.username || '';
+            document.getElementById('inp-gid').value = u.gooracNumber || '';
+            document.getElementById('inp-url').value = u.photoURL || '';
+
+            // Set toggles
+            setToggle('tog-ver', u.verified);
+            setToggle('tog-adm', u.isAdmin);
+            setToggle('tog-sus', u.suspended);
+
+            document.getElementById('editor').style.display = 'flex';
+        }
+
+        function closeEditor() {
+            document.getElementById('editor').style.display = 'none';
+            editingId = null;
+        }
+
+        function toggleCard(el) { el.classList.toggle('active'); }
+        function setToggle(id, status) {
+            const el = document.getElementById(id);
+            if(status) el.classList.add('active'); else el.classList.remove('active');
+        }
+
+        async function saveEntity() {
+            if(!editingId) return;
+            
+            const updates = {
+                name: document.getElementById('inp-name').value,
+                username: document.getElementById('inp-user').value,
+                photoURL: document.getElementById('inp-url').value,
+                verified: document.getElementById('tog-ver').classList.contains('active'),
+                isAdmin: document.getElementById('tog-adm').classList.contains('active'),
+                suspended: document.getElementById('tog-sus').classList.contains('active')
+            };
+
+            try {
+                await db.collection("users").doc(editingId).update(updates);
+                
+                // Update local array immediately (Optimistic UI)
+                const idx = allUsers.findIndex(u => u.id === editingId);
+                if(idx !== -1) allUsers[idx] = { ...allUsers[idx], ...updates };
+                
+                renderList(allUsers); // Re-render list to show changes
+                closeEditor();
+                showToast("Entity Updated", "success");
+            } catch(e) {
+                showToast("Save Error: " + e.message, "error");
+            }
+        }
+
+        async function deleteEntity() {
+            if(!confirm("⚠️ PERMANENT DELETE\n\nAre you sure you want to erase this user? This cannot be undone.")) return;
+            
+            try {
+                await db.collection("users").doc(editingId).delete();
+                
+                // Remove from local array
+                allUsers = allUsers.filter(u => u.id !== editingId);
+                renderList(allUsers);
+                updateStats();
+                
+                closeEditor();
+                showToast("Entity Deleted", "success");
+            } catch(e) {
+                showToast("Delete Failed", "error");
+            }
+        }
+
+        // --- UTILS ---
+        function exportData() {
+            if(allUsers.length === 0) return showToast("No data to export", "error");
+            const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers, null, 2));
+            const a = document.createElement('a');
+            a.href = str; a.download = `nexus_export_${Date.now()}.json`;
+            a.click();
+        }
+
+        function showToast(msg, type) {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.style.border = type === 'error' ? '1px solid #ff2a6d' : '1px solid #00ff9d';
+            t.innerHTML = `<span class="material-icons-round">${type==='error'?'error':'check_circle'}</span> ${msg}`;
+            c.appendChild(t);
+            setTimeout(() => {
+                t.style.opacity = '0';
+                t.style.transform = 'translate(-50%, 20px)';
+                setTimeout(() => t.remove(), 300);
+            }, 3000);
+        }
     </script>
 </body>
 </html>
