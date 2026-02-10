@@ -14,11 +14,16 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script src="config.js"></script>
-
+    
     <script>
-        // Use the 'db' and 'auth' already initialized by config.js or define them here
-        const db = window.db || firebase.firestore();
-        const auth = firebase.auth();
+        // Check if init function exists from config.js and run it
+        if (window.initFirebaseCore) {
+            window.initFirebaseCore();
+        }
+        
+        // Define local pointers to the global Firebase objects
+        const db = window.db;
+        const auth = window.auth;
     </script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -150,17 +155,9 @@
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
         .btn:active { transform: scale(0.96); opacity: 0.8; }
 
-        .notes-section {
-            flex: 1;
-            padding: 0 24px;
-            margin-top: 10px;
-        }
+        .notes-section { flex: 1; padding: 0 24px; margin-top: 10px; }
 
-        .skeleton {
-            background: #111 !important;
-            position: relative; overflow: hidden;
-            border: none !important;
-        }
+        .skeleton { background: #111 !important; position: relative; overflow: hidden; border: none !important; }
         .skeleton::after {
             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
@@ -232,11 +229,7 @@
 
     <view-notes id="view-notes-modal"></view-notes>
     <call-notifier></call-notifier>
-    
-    <div id="toast">
-        <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
-        ID Copied
-    </div>
+    <div id="toast"></div>
 
 <script>
     // --- 1. IMMEDIATE CACHE LOAD ---
@@ -251,24 +244,28 @@
     })();
 
     // --- 2. AUTH & REALTIME SYNC ---
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            const notesComp = document.getElementById('profile-notes');
-            if(notesComp) {
-                customElements.whenDefined('profile-notes').then(() => {
-                    notesComp.uid = user.uid;
-                });
-            }
-            initRealtimeListener(user.uid);
-        } else {
-            setTimeout(() => {
-                if(!auth.currentUser) window.location.href = 'login.html';
-            }, 1000);
+    // Wait for Firebase objects to be ready from config initialization
+    const checkAuth = setInterval(() => {
+        if (window.auth && window.db) {
+            clearInterval(checkAuth);
+            window.auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    const notesComp = document.getElementById('profile-notes');
+                    if(notesComp) {
+                        customElements.whenDefined('profile-notes').then(() => {
+                            notesComp.uid = user.uid;
+                        });
+                    }
+                    initRealtimeListener(user.uid);
+                } else {
+                    window.location.href = 'login.html';
+                }
+            });
         }
-    });
+    }, 100);
 
     function initRealtimeListener(uid) {
-        db.collection("users").doc(uid).onSnapshot((doc) => {
+        window.db.collection("users").doc(uid).onSnapshot((doc) => {
             if (doc.exists) {
                 const data = doc.data();
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
@@ -276,14 +273,9 @@
             } else {
                 window.location.href = "setup.html";
             }
-        }, (error) => {
-            console.error("Firestore Error:", error);
-            // Fallback: Remove skeletons if listener fails
-            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
         });
     }
 
-    // --- 3. RENDER ENGINE ---
     function renderUI(data) {
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
@@ -316,7 +308,6 @@
         if(el) el.innerText = val;
     }
 
-    // --- 4. ACTIONS ---
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(!txt || txt.includes('-')) return;
@@ -327,9 +318,8 @@
     }
 
     function logout() {
-        if(confirm("Log out of Goorac?")) {
-            auth.signOut().then(() => {
-                // Clear ALL site local storage
+        if(confirm("Log out?")) {
+            window.auth.signOut().then(() => {
                 localStorage.clear(); 
                 window.location.href = "login.html";
             });
