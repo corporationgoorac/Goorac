@@ -10,6 +10,8 @@
     
     <script src="config.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -357,7 +359,21 @@
 
         function checkAuth() {
             const pin = document.getElementById('pin-entry').value;
-            if (pin === "2502") { 
+            
+        
+            const masterHash = "687981ef407a515c0e0b3543948e910543f47e335f60647413663675f9226f94";
+            
+            // Check if CryptoJS is available, otherwise use plain fallback for safety
+            let isMatch = false;
+            if (typeof CryptoJS !== 'undefined') {
+                const inputHash = CryptoJS.SHA256(pin).toString();
+                if (inputHash === masterHash) isMatch = true;
+            } else {
+                // Emergency Fallback if Library fails to load
+                if (pin === "2502") isMatch = true;
+            }
+
+            if (isMatch) { 
                 document.getElementById('auth-gate').style.opacity = '0';
                 document.getElementById('auth-gate').style.transform = 'scale(1.1)';
                 setTimeout(() => {
