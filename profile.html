@@ -14,16 +14,13 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script src="config.js"></script>
-    
+
     <script>
-        // Check if init function exists from config.js and run it
-        if (window.initFirebaseCore) {
-            window.initFirebaseCore();
-        }
-        
-        // Define local pointers to the global Firebase objects
-        const db = window.db;
-        const auth = window.auth;
+        /** * FIX: Ensure we use global variables assigned in config.js
+         * If they are not ready, we fall back to manual assignment.
+         */
+        const db = window.db || firebase.firestore();
+        const auth = window.auth || firebase.auth();
     </script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -70,14 +67,38 @@
             padding: calc(10px + var(--safe-top)) 16px 10px;
             display: flex; align-items: center; justify-content: space-between;
         }
+        .header-left { display: flex; align-items: center; gap: 8px; }
+        .back-arrow { font-size: 24px; color: var(--primary); cursor: pointer; }
         .header-title { font-weight: 800; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--secondary); }
         .icon-btn {
-            background: var(--surface); border: 1px solid var(--border); color: var(--primary);
+            background: transparent; border: none; color: var(--primary);
             width: 38px; height: 38px; border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .icon-btn:active { transform: scale(0.9); background: var(--surface-press); }
+
+        /* SLEEK 3-BAR MENU ICON */
+        .menu-bars { display: flex; flex-direction: column; gap: 4px; width: 20px; }
+        .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; }
+        .menu-bars span:nth-child(2) { width: 70%; align-self: flex-end; }
+
+        /* BOTTOM MODAL STYLES */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 1000; display: none; backdrop-filter: blur(10px);
+        }
+        .bottom-modal {
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: var(--surface); border-top: 1px solid var(--border);
+            border-radius: 24px 24px 0 0; z-index: 1001;
+            padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
+            transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bottom-modal.active { bottom: 0; }
+        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; }
+        .modal-content { text-align: center; padding: 40px 0; color: var(--secondary); font-weight: 600; font-size: 14px; letter-spacing: 0.5px; }
 
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
@@ -155,9 +176,17 @@
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
         .btn:active { transform: scale(0.96); opacity: 0.8; }
 
-        .notes-section { flex: 1; padding: 0 24px; margin-top: 10px; }
+        .notes-section {
+            flex: 1;
+            padding: 0 24px;
+            margin-top: 10px;
+        }
 
-        .skeleton { background: #111 !important; position: relative; overflow: hidden; border: none !important; }
+        .skeleton {
+            background: #111 !important;
+            position: relative; overflow: hidden;
+            border: none !important;
+        }
         .skeleton::after {
             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
@@ -178,11 +207,30 @@
 <body>
 
     <header>
-        <div class="header-title">My Profile</div>
-        <button class="icon-btn" onclick="location.href='settings.html'">
-            <span class="material-icons-round" style="font-size: 20px;">settings</span>
+        <div class="header-left">
+            <span class="material-icons-round back-arrow" onclick="history.back()">west</span>
+            <div class="header-title">My Profile</div>
+        </div>
+        <button class="icon-btn" onclick="toggleMenu(true)">
+            <div class="menu-bars">
+                <span></span>
+                <span></span>
+            </div>
         </button>
     </header>
+
+    <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
+    <div class="bottom-modal" id="bottom-modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+            <span class="material-icons-round" onclick="toggleMenu(false)" style="cursor:pointer; color:var(--primary);">west</span>
+            <div class="header-title">Menu Options</div>
+            <div style="width:24px;"></div>
+        </div>
+        <div class="modal-content">
+            <p>ADVANCED COMMANDS COMING SOON...</p>
+        </div>
+    </div>
 
     <div class="profile-top-section">
         <div class="avatar-wrapper" id="pfp-container">
@@ -229,9 +277,27 @@
 
     <view-notes id="view-notes-modal"></view-notes>
     <call-notifier></call-notifier>
-    <div id="toast"></div>
+    
+    <div id="toast">
+        <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
+        ID Copied
+    </div>
 
 <script>
+    // --- UI CONTROLS ---
+    function toggleMenu(show) {
+        const overlay = document.getElementById('modal-overlay');
+        const modal = document.getElementById('bottom-modal');
+        if (show) {
+            overlay.style.display = 'block';
+            setTimeout(() => modal.classList.add('active'), 10);
+            if(navigator.vibrate) navigator.vibrate(20);
+        } else {
+            modal.classList.remove('active');
+            setTimeout(() => overlay.style.display = 'none', 400);
+        }
+    }
+
     // --- 1. IMMEDIATE CACHE LOAD ---
     (function loadCache() {
         const cached = localStorage.getItem('my_goorac_profile');
@@ -244,28 +310,25 @@
     })();
 
     // --- 2. AUTH & REALTIME SYNC ---
-    // Wait for Firebase objects to be ready from config initialization
-    const checkAuth = setInterval(() => {
-        if (window.auth && window.db) {
-            clearInterval(checkAuth);
-            window.auth.onAuthStateChanged(async (user) => {
-                if (user) {
-                    const notesComp = document.getElementById('profile-notes');
-                    if(notesComp) {
-                        customElements.whenDefined('profile-notes').then(() => {
-                            notesComp.uid = user.uid;
-                        });
-                    }
-                    initRealtimeListener(user.uid);
-                } else {
-                    window.location.href = 'login.html';
-                }
-            });
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            const notesComp = document.getElementById('profile-notes');
+            if(notesComp) {
+                customElements.whenDefined('profile-notes').then(() => {
+                    notesComp.uid = user.uid;
+                });
+            }
+            initRealtimeListener(user.uid);
+        } else {
+            setTimeout(() => {
+                if(!auth.currentUser) window.location.href = 'login.html';
+            }, 1000);
         }
-    }, 100);
+    });
 
     function initRealtimeListener(uid) {
-        window.db.collection("users").doc(uid).onSnapshot((doc) => {
+        // Uses the assigned db from script initialization
+        db.collection("users").doc(uid).onSnapshot((doc) => {
             if (doc.exists) {
                 const data = doc.data();
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
@@ -273,9 +336,13 @@
             } else {
                 window.location.href = "setup.html";
             }
+        }, (error) => {
+            console.error("Firestore Error:", error);
+            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
         });
     }
 
+    // --- 3. RENDER ENGINE ---
     function renderUI(data) {
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
@@ -308,6 +375,7 @@
         if(el) el.innerText = val;
     }
 
+    // --- 4. ACTIONS ---
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(!txt || txt.includes('-')) return;
@@ -318,8 +386,8 @@
     }
 
     function logout() {
-        if(confirm("Log out?")) {
-            window.auth.signOut().then(() => {
+        if(confirm("Log out of Goorac?")) {
+            auth.signOut().then(() => {
                 localStorage.clear(); 
                 window.location.href = "login.html";
             });
