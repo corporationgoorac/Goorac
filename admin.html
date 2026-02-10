@@ -3,25 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Goorac | Admin Nexus</title>
+    <title>Goorac | Admin Nexus v2.0</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg: #050505;
-            --surface: #111;
+            --bg: #030303;
+            --surface: #0e0e0e;
+            --surface-2: #161616;
             --border: #222;
-            --accent: #00e5ff; 
-            --accent-dim: rgba(0, 229, 255, 0.1);
+            --accent: #00f2ff; 
+            --accent-dim: rgba(0, 242, 255, 0.05);
             --danger: #ff2a6d;
-            --text: #fff;
-            --text-sec: #888;
+            --success: #00ff9d;
+            --text: #e0e0e0;
+            --text-sec: #777;
         }
 
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -32,6 +35,10 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
 
+        /* --- UTILS --- */
+        .cyber-glitch { animation: glitch 1s linear infinite; }
+        @keyframes glitch { 2%, 64% { transform: translate(2px,0) skew(0deg); } 4%, 60% { transform: translate(-2px,0) skew(0deg); } 62% { transform: translate(0,0) skew(5deg); } }
+
         /* --- LOCK SCREEN --- */
         #lock-screen {
             position: fixed; inset: 0; z-index: 9999;
@@ -41,34 +48,16 @@
         }
         .pin-display {
             font-family: 'JetBrains Mono', monospace; font-size: 32px; letter-spacing: 12px;
-            margin-bottom: 40px; color: var(--accent); min-height: 40px;
+            margin-bottom: 40px; color: var(--accent); min-height: 40px; text-shadow: 0 0 10px var(--accent-dim);
         }
-        .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
         .pin-btn {
-            width: 70px; height: 70px; border-radius: 50%; border: 1px solid var(--border);
+            width: 75px; height: 75px; border-radius: 20px; border: 1px solid var(--border);
             background: var(--surface); color: white; font-size: 24px; font-weight: 600;
-            cursor: pointer; transition: 0.1s;
+            cursor: pointer; transition: 0.15s; font-family: 'JetBrains Mono';
         }
-        .pin-btn:active { background: var(--accent); color: black; }
+        .pin-btn:active { background: var(--accent); color: black; box-shadow: 0 0 15px var(--accent); }
         .lock-err { color: var(--danger); font-size: 12px; margin-top: 20px; opacity: 0; letter-spacing: 2px; }
-
-        /* --- ERROR MODAL (INDEX FIXER) --- */
-        #error-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000;
-            display: none; align-items: center; justify-content: center; padding: 20px;
-        }
-        .err-box {
-            background: #1a1111; border: 1px solid var(--danger);
-            padding: 25px; border-radius: 16px; max-width: 400px; width: 100%;
-            text-align: center;
-        }
-        .err-title { color: var(--danger); font-weight: 800; font-size: 18px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .err-desc { font-size: 13px; color: #ccc; line-height: 1.5; margin-bottom: 20px; word-break: break-word; }
-        .err-btn {
-            background: var(--danger); color: white; border: none; padding: 12px 20px;
-            border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%;
-            text-decoration: none; display: inline-block;
-        }
 
         /* --- DASHBOARD --- */
         #dashboard { display: none; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
@@ -76,128 +65,141 @@
         header {
             padding: 15px 20px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: rgba(5,5,5,0.9); backdrop-filter: blur(10px); z-index: 10;
+            background: rgba(3,3,3,0.95); backdrop-filter: blur(10px); z-index: 10;
         }
         .brand { display: flex; align-items: center; gap: 10px; }
-        .brand-icon { color: var(--accent); font-size: 24px; }
-        .brand-text { font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: -0.5px; }
+        .brand-icon { color: var(--accent); font-size: 20px; text-shadow: 0 0 10px var(--accent); }
+        .brand-text { font-family: 'JetBrains Mono', monospace; font-weight: 800; letter-spacing: -1px; font-size: 1.1rem; }
         
-        /* STATS BAR */
-        .stats-scroll {
-            display: flex; gap: 12px; padding: 20px; overflow-x: auto;
-            scrollbar-width: none; flex-shrink: 0;
+        /* SYSTEM LOG BAR */
+        .sys-log {
+            font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-sec);
+            padding: 8px 20px; border-bottom: 1px solid var(--border); background: #080808;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px;
         }
-        .stat-card {
-            background: var(--surface); border: 1px solid var(--border);
-            min-width: 110px; padding: 15px; border-radius: 16px;
-            display: flex; flex-direction: column; justify-content: center;
-        }
-        .s-num { font-size: 22px; font-weight: 800; color: white; }
-        .s-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; font-weight: 700; margin-top: 4px; }
-        .s-accent { color: var(--accent); }
+        .sys-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; box-shadow: 0 0 5px var(--success); }
 
         /* TOOLBAR */
-        .toolbar { padding: 0 20px 10px; display: flex; gap: 10px; }
+        .toolbar { padding: 15px 20px 0; display: flex; gap: 10px; }
         .search-wrap {
             flex: 1; background: var(--surface); border: 1px solid var(--border);
-            border-radius: 12px; display: flex; align-items: center; padding: 0 12px;
+            border-radius: 10px; display: flex; align-items: center; padding: 0 12px;
+            transition: 0.3s;
         }
+        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-dim); }
         .search-wrap input {
             width: 100%; background: transparent; border: none; color: white;
-            padding: 12px 5px; font-size: 14px; font-family: 'Inter', sans-serif;
+            padding: 14px 5px; font-size: 13px; font-family: 'JetBrains Mono', sans-serif;
         }
+        .icon-btn {
+            background: var(--surface); border: 1px solid var(--border);
+            width: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-sec); transition: 0.2s;
+        }
+        .icon-btn:active { transform: scale(0.95); }
 
         /* USER LIST */
-        .user-list { flex: 1; overflow-y: auto; padding: 10px 20px 80px; }
+        .user-list { flex: 1; overflow-y: auto; padding: 15px 20px 80px; }
+        .user-list::-webkit-scrollbar { width: 4px; }
+        .user-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
         
         .u-card {
             background: var(--surface); border: 1px solid var(--border);
-            border-radius: 16px; padding: 12px; margin-bottom: 10px;
+            border-radius: 12px; padding: 15px; margin-bottom: 12px;
             display: flex; align-items: center; justify-content: space-between;
-            transition: all 0.2s; cursor: pointer; position: relative;
+            transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden;
         }
-        .u-card:active { transform: scale(0.98); border-color: var(--accent); }
+        .u-card::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+            background: var(--border); transition: 0.2s;
+        }
+        .u-card:hover { border-color: #333; background: var(--surface-2); }
+        .u-card:hover::before { background: var(--accent); }
+        .u-card:active { transform: scale(0.98); }
         
-        .u-main { display: flex; align-items: center; gap: 12px; }
-        .u-pfp { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #222; border: 1px solid #333; }
-        .u-info h4 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-        .u-info p { margin: 2px 0 0; font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono', monospace; }
+        .u-main { display: flex; align-items: center; gap: 15px; }
+        .u-pfp { width: 45px; height: 45px; border-radius: 12px; object-fit: cover; background: #1a1a1a; }
+        .u-info h4 { margin: 0; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; letter-spacing: -0.3px; }
+        .u-info p { margin: 3px 0 0; font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono', monospace; }
         
         .v-badge { color: var(--accent); font-size: 14px; }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #333; }
-        .status-dot.new { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .u-state { font-size: 10px; padding: 4px 8px; border-radius: 4px; background: #222; color: #666; font-weight: 700; }
+        .u-state.online { background: rgba(0, 255, 157, 0.1); color: var(--success); border: 1px solid rgba(0, 255, 157, 0.2); }
+        .u-state.sus { background: rgba(255, 42, 109, 0.1); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.2); }
 
         /* EDITOR OVERLAY */
         #editor {
             position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
-            display: none; justify-content: flex-end; backdrop-filter: blur(5px);
+            display: none; justify-content: flex-end; backdrop-filter: blur(8px);
         }
         .sheet {
-            width: 100%; max-width: 450px; background: #080808; height: 100%;
-            border-left: 1px solid var(--border); padding: 25px;
+            width: 100%; max-width: 480px; background: #050505; height: 100%;
+            border-left: 1px solid var(--border); padding: 30px;
             display: flex; flex-direction: column; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: -10px 0 50px rgba(0,0,0,0.8);
         }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .sh-title { font-size: 18px; font-weight: 800; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .sh-title { font-size: 20px; font-weight: 800; letter-spacing: -1px; }
         
-        .input-group { margin-bottom: 20px; }
-        .lbl { display: block; font-size: 10px; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; }
+        .input-group { margin-bottom: 25px; position: relative; }
+        .lbl { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
         .inp {
             width: 100%; background: var(--surface); border: 1px solid var(--border);
-            color: white; padding: 14px; border-radius: 10px; font-size: 14px;
+            color: white; padding: 16px; border-radius: 12px; font-size: 14px;
             font-family: 'JetBrains Mono', monospace; transition: 0.2s;
         }
-        .inp:focus { border-color: var(--accent); }
+        .inp:focus { border-color: var(--accent); background: #111; }
 
+        .action-row { display: flex; gap: 15px; margin-bottom: 30px; }
         .toggle-box {
-            display: flex; justify-content: space-between; align-items: center;
+            flex: 1; display: flex; flex-direction: column; justify-content: space-between;
             background: var(--surface); padding: 15px; border-radius: 12px;
-            border: 1px solid var(--border); margin-bottom: 20px; cursor: pointer;
+            border: 1px solid var(--border); cursor: pointer; transition: 0.2s;
         }
-        .t-switch {
-            width: 40px; height: 22px; background: #333; border-radius: 20px;
-            position: relative; transition: 0.3s;
-        }
-        .t-switch::after {
-            content: ''; position: absolute; top: 2px; left: 2px;
-            width: 18px; height: 18px; background: white; border-radius: 50%;
-            transition: 0.3s;
-        }
-        .toggle-box.active .t-switch { background: var(--accent); }
-        .toggle-box.active .t-switch::after { transform: translateX(18px); }
+        .toggle-box:hover { border-color: #444; }
+        .toggle-box.active { border-color: var(--accent); background: var(--accent-dim); }
+        .toggle-box.danger.active { border-color: var(--danger); background: rgba(255, 42, 109, 0.1); }
 
-        .fab-save {
-            margin-top: auto; background: var(--accent); color: #000;
-            border: none; padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px;
-            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
+        .t-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .t-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; }
+        .toggle-box.active .t-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .toggle-box.danger.active .t-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
         
-        /* INFINITE SCROLL LOADER */
-        .loading-spinner {
-            text-align: center; padding: 20px; color: var(--text-sec); font-size: 12px; display: none;
+        .t-lbl { font-size: 12px; font-weight: 700; }
+        .t-sub { font-size: 10px; color: var(--text-sec); }
+
+        .btn-stack { margin-top: auto; display: grid; gap: 10px; }
+        .btn {
+            width: 100%; padding: 18px; border-radius: 12px; font-weight: 700; 
+            font-size: 15px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: 0.2s;
         }
+        .btn-primary { background: var(--text); color: black; }
+        .btn-primary:active { transform: scale(0.98); }
         
-        .icon-btn {
-            background: var(--surface); border: 1px solid var(--border);
-            width: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: var(--text-sec);
+        .btn-danger { background: rgba(255, 42, 109, 0.1); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.2); }
+        .btn-danger:active { background: var(--danger); color: white; }
+
+        /* TOAST */
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast {
+            background: #111; border: 1px solid var(--border); color: white;
+            padding: 12px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
+            display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto;
         }
+        .toast i { font-size: 16px; }
+        .toast.success i { color: var(--success); }
+        .toast.error i { color: var(--danger); }
+        @keyframes popUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
     </style>
 </head>
 <body>
 
-    <div id="error-modal">
-        <div class="err-box">
-            <div class="err-title">
-                <span class="material-icons-round">warning</span> SYSTEM ALERT
-            </div>
-            <div class="err-desc" id="err-text">An unknown error occurred.</div>
-            <a href="#" target="_blank" class="err-btn" id="err-link">RESOLVE ISSUE</a>
-            <div style="margin-top:10px; font-size:11px; text-decoration:underline; cursor:pointer; color:#666;" onclick="document.getElementById('error-modal').style.display='none'">Dismiss</div>
-        </div>
-    </div>
+    <div id="toast-container"></div>
 
     <div id="lock-screen">
         <div class="pin-display" id="pin-display">••••</div>
@@ -215,63 +217,70 @@
             <button class="pin-btn" onclick="typePin('0')">0</button>
             <button class="pin-btn" onclick="unlock()">→</button>
         </div>
-        <div class="lock-err" id="lock-msg">ACCESS DENIED</div>
+        <div class="lock-err" id="lock-msg">INVALID AUTHENTICATION</div>
     </div>
 
     <div id="dashboard">
         <header>
             <div class="brand">
                 <span class="material-icons-round brand-icon">admin_panel_settings</span>
-                <span class="brand-text">NEXUS</span>
+                <span class="brand-text">NEXUS <span style="font-size:0.6em; color:var(--text-sec); border:1px solid #333; padding:2px 4px; border-radius:4px; margin-left:5px;">v2.0</span></span>
             </div>
-            <span class="material-icons-round" style="cursor:pointer;" onclick="resetList()">refresh</span>
+            <div style="display:flex; gap:10px;">
+                <button class="icon-btn" style="width:36px; height:36px;" onclick="exportData()" title="Export JSON">
+                    <span class="material-icons-round" style="font-size:18px;">download</span>
+                </button>
+                <button class="icon-btn" style="width:36px; height:36px;" onclick="resetList()">
+                    <span class="material-icons-round" style="font-size:18px;">refresh</span>
+                </button>
+            </div>
         </header>
 
-        <div class="stats-scroll">
-            <div class="stat-card">
-                <span class="s-num" id="s-total">--</span>
-                <span class="s-lbl">Total Users</span>
-            </div>
-            <div class="stat-card">
-                <span class="s-num s-accent" id="s-new">+0</span>
-                <span class="s-lbl">New (24h)</span>
-            </div>
-            <div class="stat-card">
-                <span class="s-num" id="s-verified">--</span>
-                <span class="s-lbl">Verified</span>
-            </div>
+        <div class="sys-log">
+            <div class="sys-dot"></div>
+            <span id="sys-msg">SYSTEM READY. WAITING FOR COMMAND.</span>
         </div>
 
         <div class="toolbar">
             <div class="search-wrap">
                 <span class="material-icons-round" style="color:#666; font-size:18px; margin-right:8px;">search</span>
-                <input type="text" id="search-input" placeholder="Search Database..." oninput="handleSearch()">
+                <input type="text" id="search-input" placeholder="Query Database by Username..." oninput="handleSearch()">
             </div>
         </div>
 
-        <div class="user-list" id="user-list"></div>
-        <div class="loading-spinner" id="bottom-loader">Loading more...</div>
+        <div class="user-list" id="user-list">
+            </div>
+        <div style="text-align:center; padding:20px; color:#444; font-size:12px; display:none;" id="bottom-loader">
+            <span class="material-icons-round cyber-glitch" style="font-size:16px;">sync</span>
+        </div>
     </div>
 
     <div id="editor">
         <div class="sheet">
             <div class="sheet-header">
-                <span class="sh-title">Edit Entity</span>
-                <button class="icon-btn" onclick="closeEditor()">
+                <span class="sh-title">Entity Editor</span>
+                <button class="icon-btn" onclick="closeEditor()" style="border:none; background:transparent;">
                     <span class="material-icons-round">close</span>
                 </button>
             </div>
 
-            <div style="text-align:center; margin-bottom:25px;">
-                <img id="ed-pfp" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid #333;">
+            <div style="display:flex; gap:20px; align-items:center; margin-bottom:30px;">
+                <img id="ed-pfp" style="width:70px; height:70px; border-radius:20px; object-fit:cover; border:1px solid #333;">
+                <div>
+                    <div id="ed-id-disp" style="font-family:'JetBrains Mono'; color:var(--text-sec); font-size:11px;">ID: ---</div>
+                    <div style="font-weight:700; font-size:16px; margin-top:4px;" id="ed-head-name">User</div>
+                </div>
             </div>
 
-            <div class="toggle-box" id="ed-verify-box" onclick="toggleVerify()">
-                <div>
-                    <div style="font-weight:700; font-size:14px;">Verification Badge</div>
-                    <div style="font-size:11px; color:#666;">Grants system privileges</div>
+            <div class="action-row">
+                <div class="toggle-box" id="ed-verify-box" onclick="toggleBox(this)">
+                    <div class="t-head"><div class="t-lbl">VERIFIED</div><div class="t-dot"></div></div>
+                    <div class="t-sub">Trusted Status</div>
                 </div>
-                <div class="t-switch"></div>
+                <div class="toggle-box danger" id="ed-sus-box" onclick="toggleBox(this)">
+                    <div class="t-head"><div class="t-lbl">SUSPENDED</div><div class="t-dot"></div></div>
+                    <div class="t-sub">Revoke Access</div>
+                </div>
             </div>
 
             <div class="input-group">
@@ -279,26 +288,31 @@
                 <input type="text" class="inp" id="ed-name">
             </div>
             <div class="input-group">
-                <label class="lbl">Username Handle</label>
+                <label class="lbl">Username</label>
                 <input type="text" class="inp" id="ed-user">
             </div>
             <div class="input-group">
-                <label class="lbl">Goorac ID (Unique)</label>
-                <input type="text" class="inp" id="ed-gid" style="color:var(--accent);">
+                <label class="lbl">Goorac ID (Static)</label>
+                <input type="text" class="inp" id="ed-gid" style="color:var(--text-sec);" readonly>
             </div>
             <div class="input-group">
-                <label class="lbl">Avatar Source</label>
+                <label class="lbl">Avatar URL <span style="cursor:pointer; color:var(--accent);" onclick="copyField('ed-url')">[COPY]</span></label>
                 <input type="text" class="inp" id="ed-url">
             </div>
 
-            <button class="fab-save" onclick="saveData()">
-                <span class="material-icons-round">save</span> COMMIT CHANGES
-            </button>
+            <div class="btn-stack">
+                <button class="btn btn-primary" onclick="saveData()">
+                    <span class="material-icons-round">save</span> COMMIT CHANGES
+                </button>
+                <button class="btn btn-danger" onclick="deleteUser()">
+                    <span class="material-icons-round">delete_forever</span> ERASE ENTITY
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- CONFIG ---
+        // --- 1. CONFIGURATION ---
         const fbConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
             authDomain: "goorac-c3b59.firebaseapp.com",
@@ -307,10 +321,11 @@
         };
         firebase.initializeApp(fbConfig);
         const db = firebase.firestore();
+        const rdb = firebase.database();
 
-        // --- PIN LOGIC ---
+        // --- 2. SECURITY (PIN) ---
         let currentPin = "";
-        const TARGET_HASH = 1542021; // Hash for 2502
+        const TARGET_HASH = 1542021; 
 
         function fastHash(str) {
             let hash = 0;
@@ -324,10 +339,7 @@
         function typePin(key) {
             if (key === 'C') { currentPin = ""; }
             else if (currentPin.length < 4) { currentPin += key; }
-            
-            let dots = "••••".split('');
-            for(let i=0; i<currentPin.length; i++) dots[i] = "●";
-            document.getElementById('pin-display').innerText = dots.join('');
+            document.getElementById('pin-display').innerText = "•".repeat(currentPin.length).padEnd(4, '•');
         }
 
         function unlock() {
@@ -337,7 +349,7 @@
                     document.getElementById('lock-screen').style.display = 'none';
                     document.getElementById('dashboard').style.display = 'flex';
                     setTimeout(() => document.getElementById('dashboard').style.opacity = '1', 50);
-                    initDashboard();
+                    initNexus();
                 }, 400);
             } else {
                 const err = document.getElementById('lock-msg');
@@ -348,14 +360,20 @@
             }
         }
 
-        // --- INFINITE SCROLL & DATA LOGIC ---
+        // --- 3. DATA CORE ---
         let lastDoc = null;
         let isFetching = false;
         let hasMore = true;
         let editingUid = null;
         let searchMode = false;
+        let allFetchedUsers = []; // Store for export
 
-        function initDashboard() {
+        function log(msg) {
+            document.getElementById('sys-msg').innerText = msg.toUpperCase();
+        }
+
+        function initNexus() {
+            log("Initializing Data Streams...");
             resetList();
             setupInfiniteScroll();
         }
@@ -365,6 +383,7 @@
             lastDoc = null;
             hasMore = true;
             searchMode = false;
+            allFetchedUsers = [];
             fetchNextBatch();
         }
 
@@ -372,43 +391,26 @@
             if (isFetching || !hasMore || searchMode) return;
             isFetching = true;
             document.getElementById('bottom-loader').style.display = 'block';
+            log("Fetching Data Node...");
 
             try {
-                // ATTEMPT 1: Try sorting by date (Preferred)
-                // Note: Only users WITH the 'createdAt' field will appear here.
-                let query = db.collection("users").orderBy("createdAt", "desc").limit(10);
+                // FIXED QUERY: Removed .orderBy("createdAt") to prevent crash
+                // Using .limit(20) fetches documents in ID order. Safe fallback.
+                let query = db.collection("users").limit(20);
 
                 if (lastDoc) {
                     query = query.startAfter(lastDoc);
                 }
 
-                let snapshot = await query.get();
+                const snapshot = await query.get();
                 
-                // FALLBACK MECHANISM:
-                // If we found 0 records, it likely means users are missing 'createdAt'
-                // so we try again without sorting to ensure the admin panel isn't empty.
-                if (snapshot.empty && !lastDoc) {
-                    console.warn("Sort failed (missing 'createdAt'). Attempting fallback...");
-                    query = db.collection("users").limit(10); // Raw fetch
-                    snapshot = await query.get();
-                    
-                    if (!snapshot.empty) {
-                        // We found users in fallback!
-                        const list = document.getElementById('user-list');
-                        list.innerHTML += `<div style="padding:10px; background:#1a1100; color:#ffaa00; font-size:11px; text-align:center; border-radius:8px; margin-bottom:10px;">
-                            ⚠️ Showing unsorted results. Your users are missing the 'createdAt' field.
-                        </div>`;
-                    }
-                }
-
                 if (snapshot.empty) {
-                    if(!lastDoc) {
-                        document.getElementById('user-list').innerHTML = 
-                            '<div style="text-align:center; padding:40px; color:#555;">Database Empty.</div>';
-                    }
                     hasMore = false;
-                    document.getElementById('bottom-loader').style.display = 'none';
                     isFetching = false;
+                    document.getElementById('bottom-loader').style.display = 'none';
+                    if(document.getElementById('user-list').children.length === 0) {
+                        document.getElementById('user-list').innerHTML = '<div style="text-align:center; padding:50px; color:#333;">NO DATA FOUND</div>';
+                    }
                     return;
                 }
 
@@ -418,13 +420,11 @@
                     renderUserCard(doc.data(), doc.id);
                 });
 
-                // Stats Estimation
-                const count = document.querySelectorAll('.u-card').length;
-                document.getElementById('s-total').innerText = count + "+";
+                log("Data Node Synced.");
 
             } catch (e) {
-                // This catches ACTUAL index errors and shows the popup
-                handleFirebaseError(e);
+                console.error(e);
+                showToast("Fetch Error: " + e.message, "error");
             } finally {
                 isFetching = false;
                 document.getElementById('bottom-loader').style.display = 'none';
@@ -440,97 +440,20 @@
             });
         }
 
-        // --- SEARCH LOGIC ---
-        let debounce;
-        function handleSearch() {
-            clearTimeout(debounce);
-            const term = document.getElementById('search-input').value.trim();
-            
-            if (!term) {
-                resetList(); 
-                return;
-            }
-
-            searchMode = true;
-            debounce = setTimeout(() => {
-                performSearch(term);
-            }, 600);
-        }
-
-        async function performSearch(term) {
-            const list = document.getElementById('user-list');
-            list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Searching...</div>';
-            
-            try {
-                // Search query
-                const snap = await db.collection("users")
-                    .where("username", ">=", term)
-                    .where("username", "<=", term + '\uf8ff')
-                    .limit(10)
-                    .get();
-
-                list.innerHTML = '';
-                if (snap.empty) {
-                    const idSnap = await db.collection("users").where("gooracNumber", "==", term).limit(1).get();
-                    if (idSnap.empty) {
-                        list.innerHTML = '<div style="text-align:center; color:#444; margin-top:20px;">No Results</div>';
-                    } else {
-                        idSnap.forEach(doc => renderUserCard(doc.data(), doc.id));
-                    }
-                } else {
-                    snap.forEach(doc => renderUserCard(doc.data(), doc.id));
-                }
-            } catch (e) {
-                handleFirebaseError(e);
-                list.innerHTML = '<div style="text-align:center; color:#ff2a6d;">Search Failed</div>';
-            }
-        }
-
-        // --- GLOBAL ERROR HANDLER ---
-        function handleFirebaseError(e) {
-            console.error(e);
-            const msg = e.message;
-            
-            // Check if it's an index error
-            if (msg.includes("index") || msg.includes("requires an index")) {
-                const modal = document.getElementById('error-modal');
-                const desc = document.getElementById('err-text');
-                const btn = document.getElementById('err-link');
-
-                desc.innerText = "Firestore Index Missing. This query requires a custom index to function. Click below to generate it instantly.";
-                
-                // Extract URL from error message
-                const urlMatch = msg.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-                if (urlMatch) {
-                    btn.href = urlMatch[0];
-                    btn.style.display = 'inline-block';
-                } else {
-                    btn.style.display = 'none';
-                    desc.innerText += " (Link could not be extracted. Check console.)";
-                }
-                
-                modal.style.display = 'flex';
-            }
-        }
-
+        // --- 4. RENDERER WITH REALTIME PRESENCE ---
         function renderUserCard(u, uid) {
+            allFetchedUsers.push({uid, ...u});
             const list = document.getElementById('user-list');
             const el = document.createElement('div');
             el.className = 'u-card';
             
-            // Check for new user (last 24h)
-            let isNew = false;
-            if (u.createdAt) {
-                const ts = u.createdAt.toDate ? u.createdAt.toDate().getTime() : new Date(u.createdAt).getTime();
-                if (Date.now() - ts < 86400000) isNew = true;
-            }
-
+            // PREPARE DATA
             const fullData = { ...u, uid: uid };
             el.onclick = () => openEditor(fullData);
             
             const badge = u.verified ? '<span class="material-icons-round v-badge">verified</span>' : '';
-            const dotClass = isNew ? 'status-dot new' : 'status-dot';
-
+            
+            // Initial State HTML
             el.innerHTML = `
                 <div class="u-main">
                     <img src="${u.photoURL || 'https://via.placeholder.com/50'}" class="u-pfp">
@@ -539,23 +462,86 @@
                         <p>@${u.username || '...'} • ${u.gooracNumber || 'N/A'}</p>
                     </div>
                 </div>
-                <div class="${dotClass}"></div>
+                <div class="u-state" id="status-${uid}">OFFLINE</div>
             `;
             list.appendChild(el);
+
+            // REALTIME LISTENER: Check if user is online
+            const statusRef = rdb.ref(`status/${uid}/state`);
+            statusRef.on('value', (snap) => {
+                const stateEl = document.getElementById(`status-${uid}`);
+                if(stateEl) {
+                    if (u.suspended) {
+                        stateEl.innerText = "SUSPENDED";
+                        stateEl.className = "u-state sus";
+                    } else if (snap.val() === 'online') {
+                        stateEl.innerText = "ONLINE";
+                        stateEl.className = "u-state online";
+                    } else {
+                        stateEl.innerText = "OFFLINE";
+                        stateEl.className = "u-state";
+                    }
+                }
+            });
         }
 
-        // --- EDITOR ---
+        // --- 5. SEARCH ENGINE ---
+        let debounce;
+        function handleSearch() {
+            clearTimeout(debounce);
+            const term = document.getElementById('search-input').value.trim();
+            if (!term) { resetList(); return; }
+            searchMode = true;
+            debounce = setTimeout(() => performSearch(term), 600);
+        }
+
+        async function performSearch(term) {
+            const list = document.getElementById('user-list');
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">SCANNING...</div>';
+            log(`Searching for "${term}"...`);
+            
+            try {
+                // Search 1: Username
+                let snap = await db.collection("users")
+                    .where("username", ">=", term)
+                    .where("username", "<=", term + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                list.innerHTML = '';
+                if (snap.empty) {
+                    // Search 2: Goorac Number
+                    const idSnap = await db.collection("users").where("gooracNumber", "==", term).limit(1).get();
+                    if (!idSnap.empty) {
+                        idSnap.forEach(doc => renderUserCard(doc.data(), doc.id));
+                        return;
+                    }
+                    list.innerHTML = '<div style="text-align:center; color:#444;">NO MATCHES FOUND</div>';
+                } else {
+                    snap.forEach(doc => renderUserCard(doc.data(), doc.id));
+                }
+            } catch (e) {
+                showToast("Search Failed", "error");
+            }
+        }
+
+        // --- 6. EDITOR LOGIC ---
         function openEditor(u) {
             editingUid = u.uid;
             document.getElementById('ed-pfp').src = u.photoURL || '';
             document.getElementById('ed-name').value = u.name || '';
+            document.getElementById('ed-head-name').innerText = u.name || 'Unknown';
             document.getElementById('ed-user').value = u.username || '';
             document.getElementById('ed-gid').value = u.gooracNumber || '';
             document.getElementById('ed-url').value = u.photoURL || '';
+            document.getElementById('ed-id-disp').innerText = `ID: ${u.uid}`;
             
-            const box = document.getElementById('ed-verify-box');
-            if(u.verified) box.classList.add('active');
-            else box.classList.remove('active');
+            // Toggles
+            const vBox = document.getElementById('ed-verify-box');
+            if(u.verified) vBox.classList.add('active'); else vBox.classList.remove('active');
+
+            const sBox = document.getElementById('ed-sus-box');
+            if(u.suspended) sBox.classList.add('active'); else sBox.classList.remove('active');
 
             document.getElementById('editor').style.display = 'flex';
         }
@@ -565,41 +551,91 @@
             editingUid = null;
         }
 
-        function toggleVerify() {
-            document.getElementById('ed-verify-box').classList.toggle('active');
+        function toggleBox(el) { el.classList.toggle('active'); }
+
+        function copyField(id) {
+            const val = document.getElementById(id).value;
+            navigator.clipboard.writeText(val);
+            showToast("Copied to Clipboard", "success");
         }
 
         async function saveData() {
             if(!editingUid) return;
+            log(`Updating Entity ${editingUid}...`);
             
             const updates = {
                 name: document.getElementById('ed-name').value,
                 username: document.getElementById('ed-user').value,
-                gooracNumber: document.getElementById('ed-gid').value,
                 photoURL: document.getElementById('ed-url').value,
-                verified: document.getElementById('ed-verify-box').classList.contains('active')
+                verified: document.getElementById('ed-verify-box').classList.contains('active'),
+                suspended: document.getElementById('ed-sus-box').classList.contains('active')
             };
 
             try {
                 await db.collection("users").doc(editingUid).update(updates);
                 
-                // Optional Sync
-                const noteSnap = await db.collection("notes").where("uid", "==", editingUid).where("isActive", "==", true).get();
+                // Sync Notes (Optional but recommended)
+                const noteSnap = await db.collection("notes").where("uid", "==", editingUid).get();
                 if(!noteSnap.empty) {
                     const batch = db.batch();
                     noteSnap.forEach(d => {
-                        batch.update(d.ref, { username: updates.name, pfp: updates.photoURL, verified: updates.verified });
+                        batch.update(d.ref, { 
+                            username: updates.name, 
+                            pfp: updates.photoURL, 
+                            verified: updates.verified 
+                        });
                     });
                     await batch.commit();
                 }
 
-                alert("User Updated");
+                showToast("Entity Updated Successfully", "success");
                 closeEditor();
-                if(searchMode) handleSearch(); 
-                else resetList(); 
+                if(!searchMode) resetList(); else handleSearch();
             } catch(e) {
-                alert("Error: " + e.message);
+                showToast(e.message, "error");
             }
+        }
+
+        async function deleteUser() {
+            if(!editingUid) return;
+            if(!confirm("⚠️ WARNING: DELETION IS PERMANENT.\n\nAre you sure you want to erase this user and all associated data?")) return;
+            
+            log(`Deleting Entity ${editingUid}...`);
+            try {
+                await db.collection("users").doc(editingUid).delete();
+                showToast("Entity Erased", "success");
+                closeEditor();
+                resetList();
+            } catch(e) {
+                showToast("Delete Failed: " + e.message, "error");
+            }
+        }
+
+        // --- 7. EXPORT SYSTEM ---
+        function exportData() {
+            if(allFetchedUsers.length === 0) { showToast("No data to export", "error"); return; }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allFetchedUsers, null, 2));
+            const node = document.createElement('a');
+            node.setAttribute("href", dataStr);
+            node.setAttribute("download", "nexus_export_" + Date.now() + ".json");
+            document.body.appendChild(node);
+            node.click();
+            node.remove();
+            showToast("Export Downloaded", "success");
+        }
+
+        function showToast(msg, type) {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            const icon = type === 'success' ? 'check_circle' : 'error';
+            t.innerHTML = `<i class="material-icons-round">${icon}</i> ${msg}`;
+            c.appendChild(t);
+            setTimeout(() => {
+                t.style.opacity = '0';
+                t.style.transform = 'translateY(20px)';
+                setTimeout(() => t.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>
