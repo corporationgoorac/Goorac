@@ -3,6 +3,7 @@ class ChatLoader extends HTMLElement {
         super();
         this._unsubInbox = null;
         this._unsubUser = null;
+        this._unsubNotifs = null; // New listener
         this.myUid = null;
         this.userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
         this.pinnedChats = [];
@@ -20,6 +21,7 @@ class ChatLoader extends HTMLElement {
     disconnectedCallback() {
         if (this._unsubInbox) this._unsubInbox();
         if (this._unsubUser) this._unsubUser();
+        if (this._unsubNotifs) this._unsubNotifs();
     }
 
     initFirebase() {
@@ -47,9 +49,11 @@ class ChatLoader extends HTMLElement {
                 this.myUid = user.uid;
                 this.loadUserData(); // Get pinned chats/following
                 this.startInboxListener(); // Start the heavy lifting
+                this.startNotificationListener(); // New: Start caching notifications
             } else {
                 this.myUid = null;
                 if(this._unsubInbox) this._unsubInbox();
+                if(this._unsubNotifs) this._unsubNotifs();
             }
         });
     }
@@ -111,6 +115,52 @@ class ChatLoader extends HTMLElement {
                     this.regenerateInboxCache(snapshot.docs);
                 }
             });
+    }
+
+    // New: Notification Caching Listener
+    startNotificationListener() {
+        if (!this.myUid) return;
+        const db = firebase.firestore();
+
+        // We listen to the same query as notifications.html
+        this._unsubNotifs = db.collection('notifications')
+            .where('recipientId', '==', this.myUid)
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .onSnapshot(snap => {
+                const notifs = [];
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    // Basic object construction for cache
+                    if (d.timestamp) {
+                        const timeMillis = d.timestamp.toMillis ? d.timestamp.toMillis() : Date.now();
+                        notifs.push({
+                            id: doc.id,
+                            type: d.type,
+                            senderId: d.senderId,
+                            senderName: d.senderName || "User",
+                            senderUsername: d.senderUsername || "", 
+                            senderPic: d.senderPic || "https://via.placeholder.com/50",
+                            timestamp: timeMillis,
+                            text: this.getNotifText(d.type),
+                            meta: d.meta,
+                            // Flag to tell notifications.html if it needs to fetch fresh user data
+                            needsFetch: !d.senderName
+                        });
+                    }
+                });
+
+                // CACHE: Save directly to the key notifications.html reads 0ms from
+                // We append UID so different logins don't mix
+                localStorage.setItem(`goorac_notif_cache_${this.myUid}`, JSON.stringify(notifs));
+                // console.log("⚡ BG Loader: Notifications cached");
+            });
+    }
+
+    getNotifText(type) {
+        if(type === 'comment') return "commented: ";
+        if(type === 'mention') return "mentioned you.";
+        return "interacted with you.";
     }
 
     async fetchAndCacheUser(uid) {
