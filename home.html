@@ -39,8 +39,8 @@
             color: var(--text-main);
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
-            /* FIX: Significantly increased top padding to push content down below fixed header */
-            padding-top: calc(110px + env(safe-area-inset-top)); 
+            /* FIX: Push content down so it clears the fixed header */
+            padding-top: calc(85px + env(safe-area-inset-top)); 
             padding-bottom: 100px;
             overflow-x: hidden;
             -webkit-touch-callout: none;
@@ -50,15 +50,15 @@
         header {
             position: fixed;
             top: 0; left: 0; right: 0;
-            background: rgba(0,0,0,0.95); /* High opacity to hide content scrolling behind */
+            background: rgba(0,0,0,0.92); /* High opacity to hide notes behind it */
             padding: 15px 20px; 
             display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); 
             z-index: 1000;
             backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
             padding-top: max(15px, env(safe-area-inset-top));
-            height: calc(70px + env(safe-area-inset-top));
-            box-shadow: 0 4px 30px rgba(0,0,0,0.5); /* Shadow to separate header from content */
+            height: calc(70px + env(safe-area-inset-top)); /* Explicit height */
+            box-shadow: 0 4px 30px rgba(0,0,0,0.5); /* Shadow to separate header */
         }
 
         .logo { 
@@ -100,35 +100,38 @@
         }
         .notif-badge.visible { opacity: 1; transform: scale(1); }
 
+        /* HEADER PROFILE PIC (Rounded Square/Squircle) */
         .header-pfp { 
             width: 38px; height: 38px; min-width: 38px; min-height: 38px;
-            border-radius: 12px; 
+            border-radius: 12px; /* Squircle style */
             object-fit: cover; border: 1px solid var(--border);
             cursor: pointer; background: #111;
         }
 
         /* --- NOTES CONTAINER --- */
         #notes-container {
-            display: flex; gap: 15px; padding: 10px 20px 20px 20px;
+            display: flex; gap: 15px; padding: 5px 20px 20px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
             background: var(--bg); 
             position: relative;
             z-index: 10;
-            margin-top: 0px; 
+            /* Extra margin just in case to push it down */
+            margin-top: 5px;
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
         .note-item { 
             display: flex; flex-direction: column; align-items: center; 
             min-width: 70px; cursor: pointer; position: relative;
-            margin-top: 10px; /* Extra space for bubbles */
+            margin-top: 10px;
         }
         
+        /* NOTE PROFILE PIC (Rounded Square) */
         .note-pfp {
             width: 65px; height: 65px; 
             min-width: 65px; min-height: 65px;
-            border-radius: 24px; 
+            border-radius: 24px; /* Squircle style matching screenshot */
             object-fit: cover; 
             border: 2px solid var(--border);
             padding: 2px; background: #000;
@@ -352,53 +355,6 @@
         }
     })();
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const noteViewer = document.getElementById('note-viewer');
-        const mainNav = document.getElementById('main-nav');
-        if (noteViewer && mainNav) {
-            mainNav.classList.remove('hidden-nav');
-            const observer = new MutationObserver(() => {
-                const style = window.getComputedStyle(noteViewer);
-                const isVisible = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') || noteViewer.classList.contains('active');
-                if (isVisible) mainNav.classList.add('hidden-nav');
-                else mainNav.classList.remove('hidden-nav');
-            });
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
-        }
-    });
-
-    function saveHomeState() {
-        const state = {
-            name: document.getElementById('welcome-name').innerText,
-            text: document.getElementById('welcome-text').innerText,
-            photoURL: document.getElementById('header-pfp').src,
-            msgState: {
-                header: document.getElementById('msg-header').innerText,
-                sub: document.getElementById('msg-subtext').innerText,
-                time: document.getElementById('msg-time').innerText,
-                pfpHTML: document.getElementById('msg-pfp-area').innerHTML,
-                hasCount: document.getElementById('msg-card').classList.contains('has-count')
-            },
-            callState: {
-                count: document.getElementById('call-count').innerText,
-                label: document.getElementById('call-label').innerText,
-                time: document.getElementById('call-time').innerText,
-                pfpHTML: document.getElementById('call-pfp-area').innerHTML,
-                isMissed: document.getElementById('call-card').classList.contains('missed-alert')
-            }
-        };
-        localStorage.setItem('goorac_home_data', JSON.stringify(state));
-    }
-
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); deferredPrompt = e;
-        setTimeout(() => document.getElementById('install-popup').classList.add('show'), 2000);
-    });
-    async function installPWA() {
-        if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
-    }
-
     // --- FIREBASE INIT ---
     // 1. Try to use the shared init function first (from config.js)
     if (typeof window.initFirebaseCore === 'function') {
@@ -413,6 +369,7 @@
     const db = firebase.firestore();
     let READ_KEY = "goorac_read_notifs"; 
 
+    // --- CLOCK ---
     setInterval(() => {
         document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
     }, 1000);
@@ -539,6 +496,25 @@
             saveHomeState();
         });
     }
+
+    // --- NAVBAR HIDER (Fixed) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const noteViewer = document.getElementById('note-viewer');
+        const mainNav = document.getElementById('main-nav');
+        if (noteViewer && mainNav) {
+            mainNav.classList.remove('hidden-nav');
+            const observer = new MutationObserver(() => {
+                const style = window.getComputedStyle(noteViewer);
+                // Check if viewer is visible
+                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                    mainNav.classList.add('hidden-nav');
+                } else {
+                    mainNav.classList.remove('hidden-nav');
+                }
+            });
+            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+        }
+    });
 </script>
 </body>
 </html>
