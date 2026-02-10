@@ -8,10 +8,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Search</title>
+    
+    <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script type="module" src="components/presence.js"></script>
+
+    <script type="module" src="components/presence.js"></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
 
     <style>
         :root {
@@ -240,8 +246,6 @@
     <div class="header-title">Find Contacts</div>
     <div style="font-size: 1.2rem; filter: drop-shadow(0 0 5px var(--accent));">🔍</div>
 </header>
-<script src="components/chatLoader.js" defer></script>
-<chat-loader></chat-loader>
 
 <div class="search-container">
     <span class="search-instructions">Secure Network Search</span>
@@ -278,16 +282,16 @@
 <main-navbar></main-navbar>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
-    };
-
-    firebase.initializeApp(firebaseConfig);
+    // --- FIREBASE INIT ---
+    // 1. Try to use the shared init function first (from config.js)
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } 
+    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
+    else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
+    
     const auth = firebase.auth();
     const db = firebase.firestore();
 
@@ -345,7 +349,7 @@
     };
 
     document.getElementById('view-profile-btn').onclick = () => {
-        if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
+        if(targetUsername) window.location.href = `profile.html?user=${targetUsername}`;
     };
 
     document.getElementById('message-btn').onclick = () => {
@@ -364,6 +368,3 @@
 <call-notifier></call-notifier>
 </body>
 </html>
-
-
-
