@@ -43,7 +43,7 @@
         .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         
         /* SEARCH */
-        .search-wrap { padding: 12px 20px; }
+        .search-wrap { padding: 12px 20px; padding-bottom: 0; }
         .search-input {
             width: 100%; background: #111; border: 1px solid var(--border);
             padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
@@ -51,15 +51,32 @@
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
 
+        /* FILTER CHIPS (NEW FEATURE) */
+        .filter-scroll {
+            display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
+            scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .filter-scroll::-webkit-scrollbar { display: none; }
+        
+        .filter-chip {
+            padding: 8px 16px; border-radius: 20px; background: #1a1a1a;
+            border: 1px solid var(--border); color: #888; font-size: 0.85rem;
+            font-weight: 600; white-space: nowrap; transition: all 0.2s;
+            cursor: pointer;
+        }
+        .filter-chip.active {
+            background: rgba(0, 210, 255, 0.15); color: var(--accent);
+            border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+        }
+
         /* CHAT LIST ITEM */
         .chat-item { 
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
-            transition: background 0.2s;
-            touch-action: pan-y;
-            position: relative;
+            transition: background 0.2s, transform 0.1s;
+            touch-action: pan-y; position: relative;
         }
-        .chat-item:active { background: var(--glass); }
+        .chat-item:active { background: var(--glass); transform: scale(0.98); }
 
         /* PFP Container for Online Dot */
         .pfp-container { position: relative; margin-right: 15px; }
@@ -98,19 +115,14 @@
             pointer-events: auto; /* MUST BE AUTO TO CLICK */
         }
 
+        /* UPDATED UNREAD BADGE - DOT ONLY, RANDOM COLORS */
         .unread-badge { 
-            background: var(--accent); color: #000; 
-            min-width: 18px; height: 18px; border-radius: 6px; 
-            font-size: 0.7rem; font-weight: 900;
-            display: flex; align-items: center; justify-content: center;
-            padding: 0 5px; box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+            width: 12px; height: 12px; 
+            border-radius: 50%; 
+            display: block;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
             flex-shrink: 0;
             animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        /* CSS Feature: If badge is empty (no number), turn it into a small dot */
-        .unread-badge:empty {
-            min-width: 10px; width: 10px; height: 10px; 
-            padding: 0; border-radius: 50%;
         }
         @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
 
@@ -163,13 +175,14 @@
     <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
 </div>
 
+<div class="filter-scroll">
+    <div class="filter-chip active" onclick="setFilter('all', this)">All</div>
+    <div class="filter-chip" onclick="setFilter('unread', this)">Unread</div>
+</div>
+
 <div id="search-results"></div>
 
 <div id="inbox-content">
-    <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; display:flex; justify-content:space-between;">
-        <span>Quantum Inbox</span>
-    </div>
-    
     <div id="chats-list">
         <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
         <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:30%"></div><div class="skeleton-line" style="width:60%"></div></div></div>
@@ -234,6 +247,13 @@
     let searchTimeout = null;
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
     let inboxListener = null;
+    
+    // Filter Variable
+    let currentFilter = 'all'; // 'all' or 'unread'
+    let currentChatData = []; // Store raw data for filtering
+
+    // Neon Palette for Badges
+    const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
 
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -301,7 +321,6 @@
 
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
-            const list = document.getElementById('chats-list');
             
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
@@ -328,114 +347,135 @@
                 return { id: d.id, chat, u: userData, otherUid, isPinned };
             });
 
-            const results = await Promise.all(chatPromises);
+            currentChatData = await Promise.all(chatPromises);
             
-            results.sort((a,b) => {
+            // Sort: Pinned first, then by date
+            currentChatData.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
                 return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
             });
 
-            if(results.length > 0) list.innerHTML = "";
-
-            results.forEach(({id, chat, u, otherUid, isPinned}) => {
-                if(!u) return;
-                
-                // --- ROBUST UNREAD LOGIC ---
-                let unreadVal = 0;
-                let showNumber = false;
-
-                // 1. Try to get the count from the object (ignoring type strictness to fix string issues)
-                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined && chat.unreadCount[myUid] !== null) {
-                    unreadVal = Number(chat.unreadCount[myUid]); // Force convert to number
-                    showNumber = true; 
-                } 
-                // 2. Legacy Fallback (Only used if unreadCount system is totally missing)
-                else if (chat.lastSender !== myUid && chat.seen === false) {
-                    unreadVal = 1; 
-                    showNumber = false; // We don't know the number, so don't show "1"
-                }
-
-                const isUnread = unreadVal > 0;
-                
-                // If unread and we know the number, show it (e.g. "5"). 
-                // If unread but don't know number, show empty string (CSS makes it a dot).
-                const displayCount = (isUnread && showNumber) ? (unreadVal > 99 ? "99+" : unreadVal) : "";
-
-                const amIFollowing = myFollowingList.some(item => {
-                    const uid = typeof item === 'string' ? item : item.uid;
-                    return uid === otherUid;
-                });
-
-                const finalName = u.name || u.displayName || u.username || "Unknown";
-                const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
-                
-                const safeUserStr = encodeURIComponent(JSON.stringify({
-                    name: finalName,
-                    username: u.username,
-                    photoURL: u.photoURL,
-                    verified: u.verified
-                }));
-
-                const item = document.createElement('div');
-                item.className = 'chat-item';
-                
-                item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
-                item.setAttribute("ontouchend", "endLongPress(this)");
-                item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
-                item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
-
-                // --- GREEN DOT PLACEHOLDER ---
-                item.innerHTML = `
-                    <div class="pfp-container">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                        <div class="online-indicator" id="online-${otherUid}"></div>
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-top-row">
-                            <span class="u-name" id="name-${id}">
-                                ${finalName} 
-                                ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
-                                ${isPinned ? `<span class="pin-indicator"></span>` : ''}
-                            </span>
-                            <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                                ${lastMsg}
-                            </div>
-                            <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
-                                ${isUnread ? `<div class="unread-badge">${displayCount}</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                list.appendChild(item);
-                
-                // Typing Indicator Listener
-                rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
-                    const msgEl = document.getElementById(`last-msg-${id}`);
-                    if(!msgEl) return;
-                    if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
-                    else { msgEl.innerHTML = lastMsg; }
-                });
-
-                // --- LISTEN FOR ONLINE STATUS ---
-                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
-                    const dot = document.getElementById(`online-${otherUid}`);
-                    if (dot) {
-                        if (snap.val() === 'online') dot.classList.add('active');
-                        else dot.classList.remove('active');
-                    }
-                });
-            });
-            
-            if(results.length === 0) list.innerHTML = "<p style='text-align:center; padding:50px; color:#333; font-weight:700;'>No data in this frequency.</p>";
-
-            // Save Cache
-            localStorage.setItem('goorac_inbox_html', list.innerHTML);
+            renderInbox();
         });
+    }
+
+    // --- NEW: FILTER LOGIC ---
+    window.setFilter = function(filterType, el) {
+        currentFilter = filterType;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        renderInbox();
+    }
+
+    function renderInbox() {
+        const list = document.getElementById('chats-list');
+        list.innerHTML = "";
+
+        // Filter Data based on selection
+        const filteredData = currentChatData.filter(({chat}) => {
+            if (currentFilter === 'all') return true;
+            if (currentFilter === 'unread') {
+                // Check robust unread logic
+                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) return Number(chat.unreadCount[myUid]) > 0;
+                return (chat.lastSender !== myUid && chat.seen === false);
+            }
+            return true;
+        });
+
+        if (filteredData.length === 0) {
+            list.innerHTML = `<p style='text-align:center; padding:50px; color:#444; font-weight:700;'>${currentFilter === 'unread' ? "All caught up!" : "No transmissions found."}</p>`;
+            return;
+        }
+
+        filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
+            if(!u) return;
+            
+            // --- LOGIC FOR UNREAD (NO NUMBERS, JUST BOOLEAN) ---
+            let isUnread = false;
+            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined && chat.unreadCount[myUid] !== null) {
+                isUnread = Number(chat.unreadCount[myUid]) > 0;
+            } else if (chat.lastSender !== myUid && chat.seen === false) {
+                isUnread = true; 
+            }
+
+            // --- RANDOM COLOR GENERATOR ---
+            // We use a random color each render, or seeded by ID for consistency? 
+            // Request said "each time in different colors", so random pick on render.
+            const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
+
+            const amIFollowing = myFollowingList.some(item => {
+                const uid = typeof item === 'string' ? item : item.uid;
+                return uid === otherUid;
+            });
+
+            const finalName = u.name || u.displayName || u.username || "Unknown";
+            const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+            
+            const safeUserStr = encodeURIComponent(JSON.stringify({
+                name: finalName,
+                username: u.username,
+                photoURL: u.photoURL,
+                verified: u.verified
+            }));
+
+            const item = document.createElement('div');
+            item.className = 'chat-item';
+            
+            item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
+            item.setAttribute("ontouchend", "endLongPress(this)");
+            item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
+            item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
+
+            item.innerHTML = `
+                <div class="pfp-container">
+                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                    <div class="online-indicator" id="online-${otherUid}"></div>
+                </div>
+                <div class="chat-info">
+                    <div class="chat-top-row">
+                        <span class="u-name" id="name-${id}">
+                            ${finalName} 
+                            ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                            ${isPinned ? `<span class="pin-indicator"></span>` : ''}
+                        </span>
+                        <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
+                            ${lastMsg}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
+                            ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
+                            ${isUnread ? `<div class="unread-badge" style="background:${randomColor}; box-shadow: 0 0 12px ${randomColor};"></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            list.appendChild(item);
+            
+            // Typing Indicator Listener
+            rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
+                const msgEl = document.getElementById(`last-msg-${id}`);
+                if(!msgEl) return;
+                if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
+                else { msgEl.innerHTML = lastMsg; }
+            });
+
+            // --- LISTEN FOR ONLINE STATUS ---
+            rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
+                const dot = document.getElementById(`online-${otherUid}`);
+                if (dot) {
+                    if (snap.val() === 'online') dot.classList.add('active');
+                    else dot.classList.remove('active');
+                }
+            });
+        });
+
+        // Save Cache
+        if(currentFilter === 'all') {
+            localStorage.setItem('goorac_inbox_html', list.innerHTML);
+        }
     }
 
     // --- GLOBAL HANDLERS (MUST BE ON WINDOW) ---
