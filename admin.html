@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Goorac | Admin Nexus</title>
     
-    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -52,6 +51,24 @@
         }
         .pin-btn:active { background: var(--accent); color: black; }
         .lock-err { color: var(--danger); font-size: 12px; margin-top: 20px; opacity: 0; letter-spacing: 2px; }
+
+        /* --- ERROR MODAL (INDEX FIXER) --- */
+        #error-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000;
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .err-box {
+            background: #1a1111; border: 1px solid var(--danger);
+            padding: 25px; border-radius: 16px; max-width: 400px; width: 100%;
+            text-align: center;
+        }
+        .err-title { color: var(--danger); font-weight: 800; font-size: 18px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .err-desc { font-size: 13px; color: #ccc; line-height: 1.5; margin-bottom: 20px; word-break: break-word; }
+        .err-btn {
+            background: var(--danger); color: white; border: none; padding: 12px 20px;
+            border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%;
+            text-decoration: none; display: inline-block;
+        }
 
         /* --- DASHBOARD --- */
         #dashboard { display: none; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
@@ -171,6 +188,17 @@
 </head>
 <body>
 
+    <div id="error-modal">
+        <div class="err-box">
+            <div class="err-title">
+                <span class="material-icons-round">warning</span> SYSTEM ALERT
+            </div>
+            <div class="err-desc" id="err-text">An unknown error occurred.</div>
+            <a href="#" target="_blank" class="err-btn" id="err-link">RESOLVE ISSUE</a>
+            <div style="margin-top:10px; font-size:11px; text-decoration:underline; cursor:pointer; color:#666;" onclick="document.getElementById('error-modal').style.display='none'">Dismiss</div>
+        </div>
+    </div>
+
     <div id="lock-screen">
         <div class="pin-display" id="pin-display">••••</div>
         <div class="pin-pad">
@@ -221,8 +249,7 @@
             </div>
         </div>
 
-        <div class="user-list" id="user-list">
-            </div>
+        <div class="user-list" id="user-list"></div>
         <div class="loading-spinner" id="bottom-loader">Loading more...</div>
     </div>
 
@@ -331,8 +358,6 @@
         function initDashboard() {
             resetList();
             setupInfiniteScroll();
-            // Optional: Get total stats separately if needed, otherwise skip to save reads
-            document.getElementById('s-active').innerText = "ONLINE";
         }
 
         function resetList() {
@@ -349,9 +374,10 @@
             document.getElementById('bottom-loader').style.display = 'block';
 
             try {
+                // IMPORTANT: This query requires users to have 'createdAt' field
                 let query = db.collection("users")
-                    .orderBy("createdAt", "desc") // Sort by newest
-                    .limit(10); // LIMIT 10 READS
+                    .orderBy("createdAt", "desc")
+                    .limit(10);
 
                 if (lastDoc) {
                     query = query.startAfter(lastDoc);
@@ -360,6 +386,11 @@
                 const snapshot = await query.get();
                 
                 if (snapshot.empty) {
+                    if(!lastDoc) {
+                        // If completely empty on first load, it might mean no docs have 'createdAt'
+                        document.getElementById('user-list').innerHTML = 
+                            '<div style="text-align:center; padding:40px; color:#555;">No records found sorted by date.<br><small>Ensure "createdAt" field exists on users.</small></div>';
+                    }
                     hasMore = false;
                     document.getElementById('bottom-loader').style.display = 'none';
                     isFetching = false;
@@ -372,12 +403,13 @@
                     renderUserCard(doc.data(), doc.id);
                 });
 
-                // Update Stats Estimate (Adding batch size to current count)
-                const currentCount = document.querySelectorAll('.u-card').length;
-                document.getElementById('s-total').innerText = currentCount + "+";
+                // Simple Stats Estimation
+                const count = document.querySelectorAll('.u-card').length;
+                document.getElementById('s-total').innerText = count + "+";
 
             } catch (e) {
-                console.error(e);
+                // --- ERROR HANDLING FOR INDEX ---
+                handleFirebaseError(e);
             } finally {
                 isFetching = false;
                 document.getElementById('bottom-loader').style.display = 'none';
@@ -400,7 +432,7 @@
             const term = document.getElementById('search-input').value.trim();
             
             if (!term) {
-                resetList(); // Return to pagination mode
+                resetList(); 
                 return;
             }
 
@@ -415,7 +447,7 @@
             list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Searching...</div>';
             
             try {
-                // Search by Username (Exact or Prefix)
+                // Search query
                 const snap = await db.collection("users")
                     .where("username", ">=", term)
                     .where("username", "<=", term + '\uf8ff')
@@ -424,7 +456,6 @@
 
                 list.innerHTML = '';
                 if (snap.empty) {
-                    // Try searching by Goorac ID if username fails
                     const idSnap = await db.collection("users").where("gooracNumber", "==", term).limit(1).get();
                     if (idSnap.empty) {
                         list.innerHTML = '<div style="text-align:center; color:#444; margin-top:20px;">No Results</div>';
@@ -435,8 +466,35 @@
                     snap.forEach(doc => renderUserCard(doc.data(), doc.id));
                 }
             } catch (e) {
-                console.error(e);
+                handleFirebaseError(e);
                 list.innerHTML = '<div style="text-align:center; color:#ff2a6d;">Search Failed</div>';
+            }
+        }
+
+        // --- GLOBAL ERROR HANDLER ---
+        function handleFirebaseError(e) {
+            console.error(e);
+            const msg = e.message;
+            
+            // Check if it's an index error
+            if (msg.includes("index") || msg.includes("requires an index")) {
+                const modal = document.getElementById('error-modal');
+                const desc = document.getElementById('err-text');
+                const btn = document.getElementById('err-link');
+
+                desc.innerText = "Firestore Index Missing. This query requires a custom index to function. Click below to generate it instantly.";
+                
+                // Extract URL from error message
+                const urlMatch = msg.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                if (urlMatch) {
+                    btn.href = urlMatch[0];
+                    btn.style.display = 'inline-block';
+                } else {
+                    btn.style.display = 'none';
+                    desc.innerText += " (Link could not be extracted. Check console.)";
+                }
+                
+                modal.style.display = 'flex';
             }
         }
 
@@ -452,7 +510,6 @@
                 if (Date.now() - ts < 86400000) isNew = true;
             }
 
-            // Attach data for editor
             const fullData = { ...u, uid: uid };
             el.onclick = () => openEditor(fullData);
             
@@ -511,7 +568,7 @@
             try {
                 await db.collection("users").doc(editingUid).update(updates);
                 
-                // Sync Notes if necessary
+                // Optional Sync
                 const noteSnap = await db.collection("notes").where("uid", "==", editingUid).where("isActive", "==", true).get();
                 if(!noteSnap.empty) {
                     const batch = db.batch();
@@ -523,9 +580,8 @@
 
                 alert("User Updated");
                 closeEditor();
-                // Refresh list if searching, or update specific card if implementing dynamic DOM update (skipping for simplicity)
                 if(searchMode) handleSearch(); 
-                else resetList(); // Refresh to see changes
+                else resetList(); 
             } catch(e) {
                 alert("Error: " + e.message);
             }
