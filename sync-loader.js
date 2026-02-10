@@ -1,4 +1,4 @@
-// sync-loader.js
+// sync-loader.js - The Storage Bridge
 if ('serviceWorker' in navigator) {
     // Request notification permission
     if (Notification.permission !== "granted") {
@@ -7,25 +7,34 @@ if ('serviceWorker' in navigator) {
 
     navigator.serviceWorker.register('/msgEngine.js').then(reg => {
         firebase.auth().onAuthStateChanged(user => {
-            if (user && reg.active) {
-                reg.active.postMessage({
-                    type: 'START_ENGINE',
-                    uid: user.uid,
-                    config: window.firebaseConfig
-                });
+            if (user) {
+                // Ensure worker is active before sending config
+                const startWorker = () => {
+                    const worker = reg.active || reg.installing || reg.waiting;
+                    worker.postMessage({
+                        type: 'START_ENGINE',
+                        uid: user.uid,
+                        config: window.firebaseConfig
+                    });
+                };
+
+                if (reg.active) startWorker();
+                else reg.addEventListener('updatefound', startWorker);
             }
         });
     });
 
+    // LISTENER: Saves data to LocalStorage keys
     navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.type === 'SYNC_DATA') {
+        if (event.data.type === 'SYNC_UPDATE') {
             const { chatId, meta, messages, myUid } = event.data;
 
-            // Sync chat messages
+            // Update chat history
             localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(messages));
 
-            // Sync Inbox HTML for messages.html
+            // Inject into Inbox HTML cache
             updateInboxCache(chatId, meta, myUid);
+            console.log("⚡ Storage Sync: Successful");
         }
     });
 }
@@ -36,7 +45,7 @@ function updateInboxCache(chatId, chat, myUid) {
     const u = userCache[otherUid] || { name: "User", username: "unknown" };
     const isUnread = (chat.unreadCount && chat.unreadCount[myUid] > 0) || (chat.lastSender !== myUid && chat.seen === false);
 
-    const updatedRow = `
+    const newRow = `
         <div class="chat-item" onclick="enterChat(event, '${u.username}')">
             <div class="pfp-container">
                 <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
@@ -55,5 +64,5 @@ function updateInboxCache(chatId, chat, myUid) {
             </div>
         </div>`;
 
-    localStorage.setItem('goorac_inbox_html', updatedRow);
+    localStorage.setItem('goorac_inbox_html', newRow);
 }
