@@ -16,11 +16,10 @@
     <script src="config.js"></script>
 
     <script>
-        /** * FIX: Ensure we use global variables assigned in config.js
-         * If they are not ready, we fall back to manual assignment.
-         */
+        // FIX: Ensuring global variables from config.js are utilized for sync
         const db = window.db || firebase.firestore();
         const auth = window.auth || firebase.auth();
+        const rdb = window.rdb || firebase.database();
     </script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -67,23 +66,22 @@
             padding: calc(10px + var(--safe-top)) 16px 10px;
             display: flex; align-items: center; justify-content: space-between;
         }
-        .header-left { display: flex; align-items: center; gap: 8px; }
+        .header-left { display: flex; align-items: center; gap: 12px; }
         .back-arrow { font-size: 24px; color: var(--primary); cursor: pointer; }
         .header-title { font-weight: 800; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--secondary); }
+        
         .icon-btn {
             background: transparent; border: none; color: var(--primary);
             width: 38px; height: 38px; border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer; transition: 0.2s;
         }
-        .icon-btn:active { transform: scale(0.9); background: var(--surface-press); }
 
-        /* SLEEK 3-BAR MENU ICON */
-        .menu-bars { display: flex; flex-direction: column; gap: 4px; width: 20px; }
+        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; }
         .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; }
-        .menu-bars span:nth-child(2) { width: 70%; align-self: flex-end; }
+        .menu-bars span:nth-child(2) { width: 60%; align-self: flex-end; }
 
-        /* BOTTOM MODAL STYLES */
+        /* MODAL STYLES */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
             z-index: 1000; display: none; backdrop-filter: blur(10px);
@@ -94,11 +92,19 @@
             border-radius: 24px 24px 0 0; z-index: 1001;
             padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
             transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            min-height: 55vh; /* Half screen and more */
         }
         .bottom-modal.active { bottom: 0; }
         .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
-        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; }
-        .modal-content { text-align: center; padding: 40px 0; color: var(--secondary); font-weight: 600; font-size: 14px; letter-spacing: 0.5px; }
+        
+        /* TOGGLE SWITCH CSS */
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); }
 
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
@@ -107,100 +113,36 @@
             border-bottom: 1px solid var(--border);
         }
 
-        .avatar-wrapper {
-            width: 90px; height: 90px; margin-bottom: 15px;
-            position: relative; padding: 3px;
-            background: linear-gradient(135deg, var(--border), transparent);
-            border-radius: 50%;
-        }
-        .avatar {
-            width: 100%; height: 100%; border-radius: 50%;
-            object-fit: cover; background: var(--surface);
-            display: block; border: 2px solid var(--bg);
-        }
+        .avatar-wrapper { width: 90px; height: 90px; margin-bottom: 15px; position: relative; padding: 3px; background: linear-gradient(135deg, var(--border), transparent); border-radius: 50%; }
+        .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--surface); display: block; border: 2px solid var(--bg); }
 
-        .user-name { 
-            font-size: 22px; font-weight: 800; margin-bottom: 4px; 
-            display: flex; align-items: center; gap: 6px; letter-spacing: -0.5px;
-            min-height: 32px;
-        }
+        .user-name { font-size: 22px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; letter-spacing: -0.5px; min-height: 32px; }
         .verified { color: var(--accent); font-size: 20px; }
         .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; }
 
-        .id-pill {
-            margin: 15px 0 20px;
-            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-            padding: 6px 14px; border-radius: 100px;
-            display: inline-flex; align-items: center; gap: 8px;
-            cursor: pointer; transition: 0.2s;
-            min-height: 32px;
-        }
-        .id-pill:active { background: var(--surface-press); transform: scale(0.97); }
+        .id-pill { margin: 15px 0 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 6px 14px; border-radius: 100px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s; min-height: 32px; }
         .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
         .id-value { font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); }
-        .copy-icon { font-size: 14px; color: var(--secondary); }
 
-        .bio {
-            font-size: 13px; line-height: 1.5; color: #a0a0a0; 
-            text-align: center; max-width: 90%; margin-bottom: 25px;
-            min-height: 38px;
-        }
+        .bio { font-size: 13px; line-height: 1.5; color: #a0a0a0; text-align: center; max-width: 90%; margin-bottom: 25px; min-height: 38px; }
 
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-            width: 100%; max-width: 400px; margin-bottom: 25px;
-        }
-        .stat-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--border);
-            padding: 12px; border-radius: 16px; text-align: center;
-            text-decoration: none; color: inherit; transition: 0.2s;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .stat-card:active { background: var(--surface-press); transform: scale(0.98); }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 25px; }
+        .stat-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 12px; border-radius: 16px; text-align: center; text-decoration: none; color: inherit; transition: 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
         .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-        .action-row {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-            width: 100%; max-width: 400px;
-        }
-        .btn {
-            height: 44px; border-radius: 14px;
-            font-size: 14px; font-weight: 700; text-align: center;
-            text-decoration: none; cursor: pointer; border: none;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; }
+        .btn { height: 44px; border-radius: 14px; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
         .btn-edit { background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
-        .btn:active { transform: scale(0.96); opacity: 0.8; }
 
-        .notes-section {
-            flex: 1;
-            padding: 0 24px;
-            margin-top: 10px;
-        }
+        .notes-section { flex: 1; padding: 0 24px; margin-top: 10px; }
 
-        .skeleton {
-            background: #111 !important;
-            position: relative; overflow: hidden;
-            border: none !important;
-        }
-        .skeleton::after {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-            animation: shimmer 1.5s infinite;
-        }
+        .skeleton { background: #111 !important; position: relative; overflow: hidden; border: none !important; }
+        .skeleton::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.5s infinite; }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        #toast {
-            position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px;
-            font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;
-        }
+        #toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.4s; z-index: 2000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
@@ -222,13 +164,22 @@
     <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
     <div class="bottom-modal" id="bottom-modal">
         <div class="modal-handle"></div>
-        <div class="modal-header">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span class="material-icons-round" onclick="toggleMenu(false)" style="cursor:pointer; color:var(--primary);">west</span>
-            <div class="header-title">Menu Options</div>
+            <span class="header-title">Privacy & Settings</span>
             <div style="width:24px;"></div>
         </div>
-        <div class="modal-content">
-            <p>ADVANCED COMMANDS COMING SOON...</p>
+
+        <div class="setting-row">
+            <span style="font-size:14px; font-weight:600;">Activity Status</span>
+            <label class="switch">
+                <input type="checkbox" id="activity-toggle" onchange="updateActivityPref(this.checked)">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div style="padding:40px 0; text-align:center; color:var(--secondary); font-size:12px; letter-spacing:1px; font-weight:800;">
+            ADVANCED COMMANDS COMING SOON...
         </div>
     </div>
 
@@ -284,11 +235,12 @@
     </div>
 
 <script>
-    // --- UI CONTROLS ---
+    // --- MODAL & BACK BUTTON HANDLER ---
     function toggleMenu(show) {
         const overlay = document.getElementById('modal-overlay');
         const modal = document.getElementById('bottom-modal');
         if (show) {
+            history.pushState({modalOpen: true}, ""); // Mobile back-button integration
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
             if(navigator.vibrate) navigator.vibrate(20);
@@ -296,6 +248,31 @@
             modal.classList.remove('active');
             setTimeout(() => overlay.style.display = 'none', 400);
         }
+    }
+
+    window.onpopstate = function(e) {
+        if(document.getElementById('bottom-modal').classList.contains('active')) {
+            toggleMenu(false);
+        }
+    };
+
+    // --- ACTIVITY TOGGLE ---
+    async function updateActivityPref(isEnabled) {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        await db.collection("users").doc(user.uid).update({
+            showActivityStatus: isEnabled
+        });
+
+        const statusRef = rdb.ref('/status/' + user.uid);
+        if (!isEnabled) {
+            await statusRef.set({ state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
+        } else {
+            await statusRef.set({ state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP });
+        }
+        
+        if (navigator.vibrate) navigator.vibrate(30);
     }
 
     // --- 1. IMMEDIATE CACHE LOAD ---
@@ -312,6 +289,7 @@
     // --- 2. AUTH & REALTIME SYNC ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
+            // FIX: Wait for profile-notes component to be ready
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) {
                 customElements.whenDefined('profile-notes').then(() => {
@@ -320,14 +298,11 @@
             }
             initRealtimeListener(user.uid);
         } else {
-            setTimeout(() => {
-                if(!auth.currentUser) window.location.href = 'login.html';
-            }, 1000);
+            setTimeout(() => { if(!auth.currentUser) window.location.href = 'login.html'; }, 1000);
         }
     });
 
     function initRealtimeListener(uid) {
-        // Uses the assigned db from script initialization
         db.collection("users").doc(uid).onSnapshot((doc) => {
             if (doc.exists) {
                 const data = doc.data();
@@ -368,6 +343,10 @@
 
         safeText('count-followers', (data.followers || []).length);
         safeText('count-following', (data.following || []).length);
+
+        // Sync toggle status
+        const toggle = document.getElementById('activity-toggle');
+        if(toggle) toggle.checked = data.showActivityStatus !== false;
     }
 
     function safeText(id, val) {
@@ -375,7 +354,6 @@
         if(el) el.innerText = val;
     }
 
-    // --- 4. ACTIONS ---
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(!txt || txt.includes('-')) return;
