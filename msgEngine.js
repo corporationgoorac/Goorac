@@ -22,12 +22,17 @@ self.addEventListener('message', (event) => {
                   const chatData = change.doc.data();
                   const chatId = change.doc.id;
 
-                  // 1. SMART NOTIFICATION LOGIC
+                  // 1. NOTIFICATION LOGIC (Only if not looking at chat)
                   if (change.type === "modified" && chatData.lastSender !== uid) {
-                      // Check if the user is already looking at THIS specific chat
-                      const isVisible = await isChatVisible(chatId);
+                      const isVisible = await isChatOpen(chatId);
                       if (!isVisible) {
-                          showPush(chatData, chatId);
+                          self.registration.showNotification("Goorac Transmission", {
+                              body: chatData.lastMessage || "New message received",
+                              icon: "/icon.png", 
+                              tag: chatId,
+                              renotify: true,
+                              data: { url: '/messages.html' }
+                          });
                       }
                   }
 
@@ -42,7 +47,7 @@ self.addEventListener('message', (event) => {
                       timestampIso: d.data().timestamp?.toDate().toISOString()
                   }));
 
-                  // 3. BROADCAST TO BRIDGE (sync-loader.js)
+                  // 3. SEND TO HOME PAGE
                   const allClients = await self.clients.matchAll();
                   allClients.forEach(client => {
                       client.postMessage({
@@ -58,28 +63,12 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// Helper to detect if the specific chat is currently open and focused
-async function isChatVisible(chatId) {
+async function isChatOpen(chatId) {
     const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windowClients) {
-        const url = new URL(client.url);
-        // Check if the URL contains the target user or matches chat.html
-        if (client.focused && url.pathname.includes('chat.html')) {
-            return true; 
-        }
+        if (client.focused && client.url.includes('chat.html')) return true;
     }
     return false;
-}
-
-function showPush(chat, chatId) {
-    self.registration.showNotification("New Message", {
-        body: chat.lastMessage || "You received a transmission",
-        icon: "/icon.png", 
-        badge: "/badge.png",
-        tag: chatId, // Using chatId as tag group notifications by conversation
-        renotify: true,
-        data: { url: '/messages.html' }
-    });
 }
 
 self.addEventListener('notificationclick', (event) => {
