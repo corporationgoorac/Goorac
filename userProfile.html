@@ -79,7 +79,7 @@
         .header-title { font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--primary); }
 
         /* MENU BARS */
-        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; cursor: pointer; }
+        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; cursor: pointer; padding: 5px; }
         .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; transition: 0.3s; }
         .menu-bars span:nth-child(2) { width: 60%; align-self: flex-end; }
 
@@ -219,8 +219,9 @@
         .bottom-modal.active { bottom: 0; }
         .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
         
-        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .setting-row:active { opacity: 0.7; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; pointer-events: auto; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
@@ -236,14 +237,14 @@
         .blocked-msg { color: var(--secondary); font-size: 14px; line-height: 1.5; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
     <header>
         <button class="nav-btn" onclick="history.back()">
             <span class="material-icons-round">arrow_back</span>
         </button>
         <div class="header-title" id="nav-name">Profile</div>
-        <div class="menu-bars" onclick="toggleMenu(true)">
+        <div class="menu-bars" id="menu-btn" onclick="toggleMenu(true)">
             <span></span>
             <span></span>
         </div>
@@ -255,16 +256,26 @@
         <div class="modal-header" style="margin-bottom: 10px;">
             <span class="header-title">User Options</span>
         </div>
-        <div class="setting-row">
+        
+        <div class="setting-row" onclick="document.getElementById('block-toggle').click()">
             <div>
                 <div style="font-size:15px; font-weight:700;">Block User</div>
-                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Prevent interaction and hide notes.</div>
+                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Erase chat and prevent interaction.</div>
             </div>
-            <label class="switch">
+            <label class="switch" onclick="event.stopPropagation()">
                 <input type="checkbox" id="block-toggle" onchange="handleBlockToggle(this.checked)">
                 <span class="slider"></span>
             </label>
         </div>
+
+        <div class="setting-row" onclick="shareProfile()">
+            <div>
+                <div style="font-size:15px; font-weight:700;">Share Profile</div>
+                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Share this agent's frequency.</div>
+            </div>
+            <span class="material-icons-round" style="color:var(--accent);">share</span>
+        </div>
+
         <div style="padding:30px 0; text-align:center; color:var(--secondary); font-size:11px; font-weight:800; letter-spacing:1px;">
             SECURE CONNECTION ACTIVE
         </div>
@@ -355,7 +366,7 @@
                 targetUid = data.uid;
                 renderProfile(data);
                 if (data.hasOwnProperty('amIFollowing')) {
-                    updateFollowButton(data.amIFollowing);
+                    updateFollowButton(data.amIFollowing, data.doIBlock || false);
                     removeBtnSkeletons();
                 }
                 if(targetUid) initNotesComponent(targetUid);
@@ -364,26 +375,51 @@
     }
     loadFromCache();
 
-    // --- MODAL & BACK BUTTON ---
+    // --- MODAL & BACK BUTTON SYNC ---
     function toggleMenu(show) {
         const overlay = document.getElementById('modal-overlay');
         const modal = document.getElementById('bottom-modal');
+        
         if (show) {
-            history.pushState({modalOpen: true}, ""); 
+            // Push state so back button closes modal
+            window.history.pushState({ modalOpen: true }, ""); 
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
             if(navigator.vibrate) navigator.vibrate(15);
         } else {
-            modal.classList.remove('active');
-            setTimeout(() => overlay.style.display = 'none', 400);
+            // If the user closed via touch/overlay, manually pop history if needed
+            if (window.history.state && window.history.state.modalOpen) {
+                window.history.back();
+            }
         }
     }
 
-    window.onpopstate = function(e) {
-        if(document.getElementById('bottom-modal').classList.contains('active')) {
-            toggleMenu(false);
+    // This handles both the physical back button AND history.back() from toggleMenu
+    window.addEventListener('popstate', (e) => {
+        const modal = document.getElementById('bottom-modal');
+        const overlay = document.getElementById('modal-overlay');
+        
+        if (modal.classList.contains('active')) {
+            modal.classList.remove('active');
+            setTimeout(() => overlay.style.display = 'none', 400);
         }
-    };
+    });
+
+    // --- SHARE PROFILE ---
+    function shareProfile() {
+        if (!targetUserData) return;
+        if (navigator.share) {
+            navigator.share({
+                title: `${targetUserData.name} on Goorac`,
+                text: `Check out ${targetUserData.name}'s profile on Goorac.`,
+                url: window.location.href
+            }).catch(err => console.log("Sharing failed", err));
+        } else {
+            copyGooracID();
+            showToast("Link copied to clipboard");
+        }
+        toggleMenu(false);
+    }
 
     // --- 2. AUTH & FRESH FETCH ---
     auth.onAuthStateChanged(user => {
@@ -402,7 +438,6 @@
             targetUid = doc.id;
             targetUserData = freshData;
 
-            // Check if profile owner blocked me
             checkIfBlocked(freshData);
             
             if(!amIBlocked) {
@@ -454,8 +489,12 @@
         document.getElementById('count-followers').innerText = (data.followers || []).length;
         document.getElementById('count-following').innerText = (data.following || []).length;
 
-        if(myUid === targetUid) document.getElementById('action-container').style.display = 'none';
-        else document.getElementById('action-container').style.display = 'grid';
+        if(myUid === targetUid) {
+            document.getElementById('action-container').style.display = 'none';
+            document.getElementById('menu-btn').style.display = 'none';
+        } else {
+            document.getElementById('action-container').style.display = 'grid';
+        }
     }
 
     function removeBtnSkeletons() {
@@ -475,9 +514,7 @@
         const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
         doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
-        // Sync toggle
         document.getElementById('block-toggle').checked = doIBlock;
-
         updateFollowButton(isFollowing, doIBlock);
         removeBtnSkeletons();
 
@@ -517,7 +554,6 @@
         if(!targetUid || !myUid || isProcessing) return;
         const btn = document.getElementById('btn-follow');
         
-        // Handle Unblock via Follow button shortcut
         if(btn.classList.contains('btn-unblock')) {
             document.getElementById('block-toggle').checked = false;
             handleBlockToggle(false);
@@ -565,6 +601,12 @@
         const theirRef = db.collection("users").doc(targetUid);
 
         try {
+            // Find shared chat to delete
+            const chatSnap = await db.collection("chats")
+                .where("participants", "array-contains", myUid).get();
+            let sharedChatDoc = null;
+            chatSnap.forEach(doc => { if(doc.data().participants.includes(targetUid)) sharedChatDoc = doc.ref; });
+
             await db.runTransaction(async (t) => {
                 const myD = await t.get(myRef);
                 const theirD = await t.get(theirRef);
@@ -575,29 +617,27 @@
                 const theirFollowers = theirD.data().followers || [];
 
                 if(isBlocking) {
-                    // 1. Add to blocked
                     t.update(myRef, {
                         blocked: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }),
-                        // 2. Remove them from my followers/following
                         following: myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid),
                         followers: myFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid)
                     });
-                    // 3. Remove me from their followers/following
                     t.update(theirRef, {
                         following: theirFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid),
                         followers: theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid)
                     });
+                    // Delete the shared chat document
+                    if(sharedChatDoc) t.delete(sharedChatDoc);
                 } else {
-                    // Unblock logic
                     const myBlocked = myD.data().blocked || [];
                     t.update(myRef, { blocked: myBlocked.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid) });
                 }
             });
             
-            showToast(isBlocking ? "User Blocked" : "User Unblocked");
+            showToast(isBlocking ? "User Blocked & Chat Deleted" : "User Unblocked");
             if(isBlocking) toggleMenu(false);
             checkRelation(targetUserData);
-        } catch (e) { console.error(e); showToast("Block action failed"); }
+        } catch (e) { console.error(e); showToast("Action failed"); }
         finally { btn.classList.remove('loading'); isProcessing = false; }
     }
 
