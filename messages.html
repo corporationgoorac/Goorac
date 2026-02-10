@@ -7,12 +7,16 @@
     
     <title>Goorac | Quantum Inbox</title>
     
+    <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script type="module" src="components/presence.js"></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
 
     <style>
         :root {
@@ -221,17 +225,24 @@
         }
     })();
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
+    // --- FIREBASE INIT ---
+    // Try to use the shared init function first
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } else if (!firebase.apps.length) {
+        // Fallback: Use window.firebaseConfig if available, else hardcoded safety
+        const fbConfig = window.firebaseConfig || {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            storageBucket: "goorac-c3b59.firebasestorage.app",
+            messagingSenderId: "746746595332",
+            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(fbConfig);
+    }
 
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const rdb = firebase.database();
     const auth = firebase.auth();
