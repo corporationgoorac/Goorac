@@ -1,45 +1,58 @@
 // components/presence.js
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-import { getFirestore, doc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-import { getDatabase, ref, onValue, off, onDisconnect, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+// 1. We remove the hardcoded imports and config to use the shared global instance
+// This prevents "Firebase App named '[DEFAULT]' already exists" errors
 
-const firebaseConfig = {
-    apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-    authDomain: "goorac-c3b59.firebaseapp.com",
-    projectId: "goorac-c3b59",
-    storageBucket: "goorac-c3b59.firebasestorage.app",
-    messagingSenderId: "746746595332",
-    appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-    measurementId: "G-M46FEVRYSS"
-};
+let app, auth, firestore, rdb;
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const firestore = getFirestore(app);
-const rdb = getDatabase(app);
+// 2. Initialize using the global core function (from config.js)
+if (typeof window.initFirebaseCore === 'function') {
+    window.initFirebaseCore();
+    // Use the global instances created by config.js
+    app = firebase.app(); // Get the default app
+    auth = firebase.auth();
+    firestore = firebase.firestore();
+    rdb = firebase.database();
+} else {
+    // Fallback if config.js wasn't loaded (Safety net)
+    // We use the compat libraries here to match the rest of your app's style
+    if (!firebase.apps.length) {
+        firebase.initializeApp({
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            storageBucket: "goorac-c3b59.firebasestorage.app",
+            messagingSenderId: "746746595332",
+            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+            measurementId: "G-M46FEVRYSS"
+        });
+    }
+    app = firebase.app();
+    auth = firebase.auth();
+    firestore = firebase.firestore();
+    rdb = firebase.database();
+}
 
 let presenceTimer;
 
-onAuthStateChanged(auth, (user) => {
+auth.onAuthStateChanged((user) => {
     if (user) {
         const uid = user.uid;
-        const userDocRef = doc(firestore, "users", uid);
-        const statusRef = ref(rdb, '/status/' + uid);
-        const connectedRef = ref(rdb, '.info/connected');
+        const userDocRef = firestore.collection("users").doc(uid);
+        const statusRef = rdb.ref('/status/' + uid);
+        const connectedRef = rdb.ref('.info/connected');
 
-        const offlineState = { state: 'offline', last_changed: serverTimestamp() };
-        const onlineState = { state: 'online', last_changed: serverTimestamp() };
+        const offlineState = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
+        const onlineState = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
-        onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
+        userDocRef.onSnapshot((docSnap) => {
+            if (docSnap.exists) {
                 const data = docSnap.data();
                 
                 // --- 1. SUSPENSION CHECK ---
                 if (data.suspended === true) {
                     renderLockoutScreen();
-                    set(statusRef, offlineState);
+                    statusRef.set(offlineState);
                     return; 
                 } else {
                     const existingLock = document.getElementById('nexus-lockout');
@@ -51,16 +64,16 @@ onAuthStateChanged(auth, (user) => {
 
                 // --- 2. INITIALIZE PREFERENCE ---
                 if (data.showActivityStatus === undefined) {
-                    updateDoc(userDocRef, { showActivityStatus: true });
+                    userDocRef.update({ showActivityStatus: true });
                 }
 
                 const isActivityEnabled = data.showActivityStatus !== false;
 
                 // --- 3. DYNAMIC PRESENCE ENGINE ---
                 // FIX: Remove old listeners to prevent multiple timers running at once
-                off(connectedRef); 
+                connectedRef.off(); 
 
-                onValue(connectedRef, (snapshot) => {
+                connectedRef.on('value', (snapshot) => {
                     if (snapshot.val() === false) return;
 
                     // ALWAYS clear existing timers first
@@ -68,19 +81,19 @@ onAuthStateChanged(auth, (user) => {
 
                     if (!isActivityEnabled) {
                         // FIX: If toggle is OFF, cancel all background hooks and force offline
-                        onDisconnect(statusRef).cancel(); 
-                        set(statusRef, offlineState);
+                        statusRef.onDisconnect().cancel(); 
+                        statusRef.set(offlineState);
                         return;
                     }
 
                     // --- 4. ZERO-FLICKER BUFFER ---
                     // "If I lose connection, tell the server I'm offline"
-                    onDisconnect(statusRef).set(offlineState).then(() => {
+                    statusRef.onDisconnect().set(offlineState).then(() => {
                         // "If I'm still connected after 4 seconds, tell the server I'm online"
                         presenceTimer = setTimeout(() => {
                             // Final check before pushing online status
                             if (isActivityEnabled) {
-                                set(statusRef, onlineState);
+                                statusRef.set(onlineState);
                             }
                         }, 4000);
                     });
@@ -131,4 +144,5 @@ function renderLockoutScreen() {
     document.body.style.overflow = 'hidden';
 }
 
-export { app, auth, firestore };
+// Export isn't strictly needed if loaded as a normal script, but kept for compatibility
+// export { app, auth, firestore };
