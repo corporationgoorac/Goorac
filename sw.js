@@ -1,50 +1,33 @@
-/**
- * GOORAC QUANTUM SERVICE WORKER v11
- * Handles:
- * 1. Background Activity Status (Zero-Flicker)
- * 2. Asset Caching (PWA Support)
- * 3. Offline Navigation
- * 4. Document Auto-Initialization
- */
-
 const CACHE_NAME = 'goorac-quantum-v11'; 
 const ASSETS = [
     '/',
     '/home.html',
     '/chat.html',
     '/config.js',
-    '/sync-loader.js',
+    '/notification-worker.js',
     'https://cdn-icons-png.flaticon.com/128/3067/3067451.png',
     'https://cdn-icons-png.flaticon.com/512/3067/3067451.png'
 ];
 
-// --- FIREBASE BACKGROUND LIBS ---
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js');
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js');
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js');
-
-let db, rdb;
-let presenceTimer = null;
-
-// --- 1. INSTALLATION & CACHING ---
+// 1. Install (Cache Files)
 self.addEventListener('install', (e) => {
     self.skipWaiting();
-    e.waitUntil(
-        caches.open(CACHE_NAME).then(c => {
-            return Promise.all(ASSETS.map(url => c.add(url).catch(err => console.warn(`Cache skip: ${url}`, err))));
-        })
-    );
+    e.waitUntil(caches.open(CACHE_NAME).then(c => {
+        // Use cache.addAll if you want strict "all or nothing" caching
+        // Your current method is fine if you want to be lenient
+        return Promise.all(ASSETS.map(url => c.add(url).catch(console.warn)));
+    }));
 });
 
-// --- 2. ACTIVATION & CLEANUP ---
+// 2. Activate (Clean old caches) - FIXED
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         Promise.all([
-            self.clients.claim(), 
+            self.clients.claim(), // Take control immediately
             caches.keys().then(keys => {
                 return Promise.all(
                     keys.map(key => {
+                        // Delete any cache that doesn't match the current CACHE_NAME
                         if (key !== CACHE_NAME) {
                             return caches.delete(key);
                         }
@@ -55,89 +38,19 @@ self.addEventListener('activate', (e) => {
     );
 });
 
-// --- 3. OFFLINE FETCH STRATEGY ---
+// 3. Fetch (Offline Support)
 self.addEventListener('fetch', (e) => {
     if (e.request.mode === 'navigate') {
         e.respondWith(fetch(e.request).catch(() => caches.match('/home.html')));
     } else {
+        // Cache First Strategy
         e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
     }
 });
 
-// --- 4. NOTIFICATION LOGIC ---
+// 4. Notification Click
 self.addEventListener('notificationclick', (e) => {
     e.notification.close();
     const url = e.notification.data?.url || '/home.html';
     e.waitUntil(clients.openWindow(url));
 });
-
-// --- 5. ACTIVITY STATUS ENGINE ---
-self.addEventListener('message', (event) => {
-    if (event.data.type === 'START_ACTIVITY_ENGINE') {
-        const { config, uid } = event.data;
-        
-        // Initialize Firebase inside the Worker if not already done
-        if (!firebase.apps.length) {
-            firebase.initializeApp(config);
-            db = firebase.firestore();
-            rdb = firebase.database();
-        }
-
-        runBackgroundActivitySync(uid);
-    }
-});
-
-/**
- * runBackgroundActivitySync
- * Manages the "Online" state with a 4-second delay to bridge page transitions.
- */
-function runBackgroundActivitySync(uid) {
-    const statusRef = rdb.ref('/status/' + uid);
-    const connectedRef = rdb.ref('.info/connected');
-    const userDocRef = db.collection("users").doc(uid);
-
-    const offlineState = {
-        state: 'offline',
-        last_changed: firebase.database.ServerValue.TIMESTAMP
-    };
-
-    const onlineState = {
-        state: 'online',
-        last_changed: firebase.database.ServerValue.TIMESTAMP
-    };
-
-    // Listen for Firestore document changes (Suspension & Activity Toggle)
-    userDocRef.onSnapshot((doc) => {
-        if (!doc.exists) return;
-        const data = doc.data();
-
-        // DEFAULT LOGIC: If 'showActivityStatus' field doesn't exist, create it as ON
-        if (data.showActivityStatus === undefined) {
-            userDocRef.update({ showActivityStatus: true });
-        }
-
-        const isActivityAllowed = data.showActivityStatus !== false;
-        const isSuspended = data.suspended === true;
-
-        connectedRef.on('value', (snapshot) => {
-            if (snapshot.val() === false) return;
-
-            // CLEAR PREVIOUS TIMER: Zero-Flicker transition
-            clearTimeout(presenceTimer);
-
-            // Handle clean exit if worker is terminated
-            statusRef.onDisconnect().set(offlineState).then(() => {
-                
-                // 4-SECOND DELAY: Bridges the unloading of one page and the loading of another
-                presenceTimer = setTimeout(() => {
-                    // Only push 'online' if user is allowed and NOT suspended
-                    if (isActivityAllowed && !isSuspended) {
-                        statusRef.set(onlineState);
-                    } else {
-                        statusRef.set(offlineState);
-                    }
-                }, 4000); 
-            });
-        });
-    }, (err) => console.error("SW Firestore Sync Error:", err));
-}
