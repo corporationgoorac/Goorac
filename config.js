@@ -29,10 +29,20 @@ window.initFirebaseCore = function() {
         }
 
         // 3. Expose Services Globally (Simplifies code in other files)
-        // This allows you to just use 'db', 'auth', or 'rdb' anywhere
-        if (!window.db) window.db = firebase.firestore();
-        if (!window.rdb) window.rdb = firebase.database();
+        // This allows you to just use 'db', 'auth', 'rdb', or 'storage' anywhere
+        
         if (!window.auth) window.auth = firebase.auth();
+        if (!window.db) window.db = firebase.firestore();
+        
+        // Realtime Database (Needed for Presence/Online Status)
+        if (firebase.database && !window.rdb) {
+            window.rdb = firebase.database();
+        }
+        
+        // Cloud Storage (Needed for Profile Pictures & Image Uploads)
+        if (firebase.storage && !window.storage) {
+            window.storage = firebase.storage();
+        }
 
         return true;
     } else {
