@@ -13,13 +13,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script type="module" src="components/presence.js"></script>
-    
-    <script src="components/chatLoader.js" defer></script>
-    <chat-loader></chat-loader>
 
     <style>
         :root {
@@ -40,21 +39,26 @@
             color: var(--text-main);
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
+            /* FIX: Push content down so it clears the fixed header */
+            padding-top: calc(90px + env(safe-area-inset-top)); 
             padding-bottom: 100px;
             overflow-x: hidden;
             -webkit-touch-callout: none;
         }
 
-        /* --- HEADER --- */
+        /* --- HEADER (Fixed) --- */
         header {
-            position: sticky; top: 0; 
-            background: rgba(0,0,0,0.95);
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.92); /* High opacity to hide notes behind it */
             padding: 15px 20px; 
             display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); 
             z-index: 1000;
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
             padding-top: max(15px, env(safe-area-inset-top));
+            height: calc(70px + env(safe-area-inset-top)); /* Explicit height */
+            box-shadow: 0 4px 30px rgba(0,0,0,0.5); /* Shadow to separate header */
         }
 
         .logo { 
@@ -96,6 +100,7 @@
         }
         .notif-badge.visible { opacity: 1; transform: scale(1); }
 
+        /* HEADER PFP (Squircle) */
         .header-pfp { 
             width: 38px; height: 38px; min-width: 38px; min-height: 38px;
             border-radius: 12px; 
@@ -103,18 +108,26 @@
             cursor: pointer; background: #111;
         }
 
+        /* --- NOTES CONTAINER --- */
         #notes-container {
-            display: flex; gap: 15px; padding: 15px 20px;
+            display: flex; gap: 15px; padding: 5px 20px 20px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
+            background: var(--bg); 
+            position: relative;
+            z-index: 10;
+            /* FIX: Added margin-top ensures bubbles don't clip against header */
+            margin-top: 5px; 
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
         .note-item { 
             display: flex; flex-direction: column; align-items: center; 
             min-width: 70px; cursor: pointer; position: relative;
+            margin-top: 10px;
         }
         
+        /* NOTE PFP (Squircle) */
         .note-pfp {
             width: 65px; height: 65px; 
             min-width: 65px; min-height: 65px;
@@ -132,10 +145,14 @@
         }
 
         .note-bubble {
-            position: absolute; top: 0; right: 0; background: var(--surface);
-            border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px;
-            font-size: 0.7rem; max-width: 60px; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; z-index: 2;
+            position: absolute; top: -15px; right: -10px; 
+            background: var(--surface);
+            border: 1px solid var(--border); 
+            padding: 4px 8px; border-radius: 10px;
+            font-size: 0.7rem; max-width: 80px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            z-index: 20;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
         .content { padding: 20px; }
@@ -390,10 +407,6 @@
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
 
     const auth = firebase.auth();
     const db = firebase.firestore();
