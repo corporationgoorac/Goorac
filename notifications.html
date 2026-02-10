@@ -164,31 +164,27 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    let CACHE_KEY = "goorac_notif_cache"; 
-    
-    // IMPORTANT: loadedMap maintains the data. We initialize it from cache immediately.
+    let CACHE_KEY = "goorac_notif_cache"; // Key for 0ms load
     let loadedMap = new Map();
 
     // --- 0ms INSTANT LOAD ---
-    // 1. Get last UID to find correct cache
-    const lastUid = localStorage.getItem("goorac_last_uid");
-    
-    // 2. Load and Render immediately
-    if (lastUid) {
-        const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
-        if (cachedData) {
-            try {
-                rawNotifications = JSON.parse(cachedData);
-                // Hydrate map instantly. This prevents duplicates because when Firebase
-                // loads the same ID later, it will just overwrite the map entry, not append.
-                rawNotifications.forEach(n => loadedMap.set(n.id, n));
-                
-                // Render visible items
-                renderNextBatch();
-                
-            } catch(e) { console.warn("Cache load error", e); }
+    // Try to load content immediately from LocalStorage before Firebase connects
+    (function loadFromCache() {
+        // We use the last known UID to fetch the right cache
+        const lastUid = localStorage.getItem("goorac_last_uid");
+        if(lastUid) {
+            const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
+            if(cachedData) {
+                try {
+                    rawNotifications = JSON.parse(cachedData);
+                    // Populate Map so live updates merge correctly later
+                    rawNotifications.forEach(n => loadedMap.set(n.id, n));
+                    // Render immediately
+                    renderNextBatch(); 
+                } catch(e) { console.warn("Cache load error", e); }
+            }
         }
-    }
+    })();
 
     // --- LOCAL STORAGE READ LOGIC ---
     function isNotificationRead(id) {
@@ -206,6 +202,7 @@
             if(!readList.includes(id)) {
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
+                window.dispatchEvent(new Event('storage'));
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -241,9 +238,9 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`;
+            // Store UID for next session's 0ms load
             localStorage.setItem("goorac_last_uid", myUid);
 
-            // Fetch who I follow to update buttons
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -256,7 +253,7 @@
     });
 
     function initListeners() {
-        // DO NOT clear loadedMap here. We want to merge live data into cached data.
+        // Don't clear list immediately to prevent flash, map handles merging
         
         // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
@@ -305,22 +302,19 @@
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}_${timeMillis}`;
                             
-                            const cached = loadedMap.get(notifId);
-                            
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
                                 senderId: f.uid,
-                                senderName: cached?.senderName || "User", 
-                                senderUsername: cached?.senderUsername || "",
-                                senderPic: cached?.senderPic || "https://via.placeholder.com/50",
-                                isVerified: cached?.isVerified || false,
+                                senderName: "User", 
+                                senderUsername: "",
+                                senderPic: "https://via.placeholder.com/50",
+                                isVerified: false,
                                 timestamp: timeMillis,
                                 text: "started following you.",
-                                needsFetch: !cached?.senderName 
+                                needsFetch: true 
                             });
-                            
-                            if(!cached?.senderName) fetchUserInfo(f.uid, notifId);
+                            fetchUserInfo(f.uid, notifId);
                         }
                     });
                     processAndRender();
@@ -339,22 +333,20 @@
                     if (!d.timestamp) return;
                     
                     const timeMillis = d.timestamp.toMillis ? d.timestamp.toMillis() : Date.now();
-                    const cached = loadedMap.get(doc.id);
 
                     loadedMap.set(doc.id, {
                         id: doc.id,
                         type: d.type,
                         senderId: d.senderId,
-                        senderName: d.senderName || cached?.senderName || "User",
-                        senderUsername: d.senderUsername || cached?.senderUsername || "", 
-                        senderPic: d.senderPic || cached?.senderPic || "https://via.placeholder.com/50",
+                        senderName: d.senderName || "User",
+                        senderUsername: d.senderUsername || "", 
+                        senderPic: d.senderPic || "https://via.placeholder.com/50",
                         timestamp: timeMillis,
                         text: getNotifText(d.type),
                         meta: d.meta,
-                        needsFetch: !d.senderName && !cached?.senderName
+                        needsFetch: !d.senderName
                     });
-                    
-                    if(!d.senderName && !cached?.senderName) fetchUserInfo(d.senderId, doc.id);
+                    if(!d.senderName) fetchUserInfo(d.senderId, doc.id);
                 });
                 processAndRender();
             });
@@ -378,7 +370,7 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // Live DOM Update (avoids full re-render)
+                    // Live DOM Update if element exists
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
@@ -387,6 +379,7 @@
                     if(pfpEl) pfpEl.src = item.senderPic;
                     if(rowEl) rowEl.dataset.username = item.senderUsername;
                     
+                    // Save updated info to cache
                     saveCache();
                 }
             }
@@ -396,17 +389,14 @@
     function processAndRender() {
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
-            // Convert map to array and sort
             rawNotifications = Array.from(loadedMap.values());
             rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             
-            // Save complete state to cache
+            // Save current state to cache for next 0ms load
             saveCache();
 
-            // Clear HTML to prevent duplicates
-            document.getElementById('notif-list').innerHTML = '';
-            
             displayedCount = 0;
+            document.getElementById('notif-list').innerHTML = '';
             renderNextBatch();
         }, 150);
     }
@@ -426,10 +416,8 @@
             return n.type === currentFilter;
         });
 
-        if (filtered.length === 0) {
-            if (displayedCount === 0) {
-                list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
-            }
+        if (filtered.length === 0 && displayedCount === 0) {
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
             loader.style.display = 'none';
             return;
         }
@@ -475,6 +463,7 @@
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
+                // Use 'background' for full gradient support
                 let bgStyle = notif.noteData.bgColor.includes('gradient') 
                     ? `background: ${notif.noteData.bgColor}` 
                     : `background-color: ${notif.noteData.bgColor}`;
