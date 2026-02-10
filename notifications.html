@@ -164,22 +164,21 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    let CACHE_KEY = "goorac_notif_cache"; // Key for 0ms load
+    let CACHE_KEY = "goorac_notif_cache"; 
     let loadedMap = new Map();
 
-    // --- 0ms INSTANT LOAD ---
-    // Try to load content immediately from LocalStorage before Firebase connects
+    // --- 0ms INSTANT LOAD (IMPROVED) ---
+    // Reads full objects (name, pic, verified) from LocalStorage and renders immediately.
     (function loadFromCache() {
-        // We use the last known UID to fetch the right cache
         const lastUid = localStorage.getItem("goorac_last_uid");
         if(lastUid) {
             const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
             if(cachedData) {
                 try {
                     rawNotifications = JSON.parse(cachedData);
-                    // Populate Map so live updates merge correctly later
+                    // Hydrate map immediately so we don't fetch duplicates later
+                    // This creates the "No Delay" effect because listeners will merge into this
                     rawNotifications.forEach(n => loadedMap.set(n.id, n));
-                    // Render immediately
                     renderNextBatch(); 
                 } catch(e) { console.warn("Cache load error", e); }
             }
@@ -238,8 +237,7 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`;
-            // Store UID for next session's 0ms load
-            localStorage.setItem("goorac_last_uid", myUid);
+            localStorage.setItem("goorac_last_uid", myUid); // Save current user for next boot
 
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
@@ -253,7 +251,9 @@
     });
 
     function initListeners() {
-        // Don't clear list immediately to prevent flash, map handles merging
+        // NOTE: We do NOT clear 'loadedMap' or 'innerHTML' here. 
+        // We let the cache stick around and merge Firebase updates into it.
+        // This ensures the 0ms load content stays on screen.
         
         // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
@@ -269,6 +269,7 @@
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const notifId = `like_${liker.uid}_${timeMillis}`;
 
+                            // Only update if not exists or properties changed
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'like',
@@ -302,19 +303,23 @@
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}_${timeMillis}`;
                             
+                            // Check if we already have this in cache to avoid re-fetch loop
+                            const cached = loadedMap.get(notifId);
+                            
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
                                 senderId: f.uid,
-                                senderName: "User", 
-                                senderUsername: "",
-                                senderPic: "https://via.placeholder.com/50",
-                                isVerified: false,
+                                senderName: cached?.senderName || "User", 
+                                senderUsername: cached?.senderUsername || "",
+                                senderPic: cached?.senderPic || "https://via.placeholder.com/50",
+                                isVerified: cached?.isVerified || false,
                                 timestamp: timeMillis,
                                 text: "started following you.",
-                                needsFetch: true 
+                                needsFetch: !cached?.senderName // Only fetch if we don't have name
                             });
-                            fetchUserInfo(f.uid, notifId);
+                            
+                            if(!cached?.senderName) fetchUserInfo(f.uid, notifId);
                         }
                     });
                     processAndRender();
@@ -333,20 +338,22 @@
                     if (!d.timestamp) return;
                     
                     const timeMillis = d.timestamp.toMillis ? d.timestamp.toMillis() : Date.now();
+                    const cached = loadedMap.get(doc.id);
 
                     loadedMap.set(doc.id, {
                         id: doc.id,
                         type: d.type,
                         senderId: d.senderId,
-                        senderName: d.senderName || "User",
-                        senderUsername: d.senderUsername || "", 
-                        senderPic: d.senderPic || "https://via.placeholder.com/50",
+                        senderName: d.senderName || cached?.senderName || "User",
+                        senderUsername: d.senderUsername || cached?.senderUsername || "", 
+                        senderPic: d.senderPic || cached?.senderPic || "https://via.placeholder.com/50",
                         timestamp: timeMillis,
                         text: getNotifText(d.type),
                         meta: d.meta,
-                        needsFetch: !d.senderName
+                        needsFetch: !d.senderName && !cached?.senderName
                     });
-                    if(!d.senderName) fetchUserInfo(d.senderId, doc.id);
+                    
+                    if(!d.senderName && !cached?.senderName) fetchUserInfo(d.senderId, doc.id);
                 });
                 processAndRender();
             });
@@ -370,7 +377,7 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // Live DOM Update if element exists
+                    // Live DOM Update
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
@@ -379,7 +386,7 @@
                     if(pfpEl) pfpEl.src = item.senderPic;
                     if(rowEl) rowEl.dataset.username = item.senderUsername;
                     
-                    // Save updated info to cache
+                    // CRITICAL: Save to cache immediately after fetching profile
                     saveCache();
                 }
             }
@@ -392,11 +399,14 @@
             rawNotifications = Array.from(loadedMap.values());
             rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             
-            // Save current state to cache for next 0ms load
+            // Save current state (including pictures/names) to cache for next 0ms load
             saveCache();
 
-            displayedCount = 0;
+            // Only clear and re-render if we are doing a full refresh, 
+            // but for smooth UX we usually just append.
+            // Here we rebuild to ensure order is correct.
             document.getElementById('notif-list').innerHTML = '';
+            displayedCount = 0;
             renderNextBatch();
         }, 150);
     }
