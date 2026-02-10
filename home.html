@@ -5,18 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Home</title>
     
+    <script src="config.js"></script>
+    <link rel="manifest" href="manifest.json">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script src="config.js"></script>
-    <link rel="manifest" href="manifest.json">
-
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
-
     <script type="module" src="components/presence.js"></script>
 
     <style>
@@ -143,7 +144,6 @@
             font-weight: 800; letter-spacing: 1.5px; margin-bottom: 15px; display: block;
         }
 
-        /* FIX: Overlapping Welcome Text logic */
         .welcome-card { 
             background: var(--surface); border: 1px solid var(--border); 
             padding: 25px; border-radius: 24px; margin-bottom: 25px; 
@@ -161,7 +161,6 @@
         .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
         .live-clock { color: var(--text-dim); font-family: monospace; font-size: 0.8rem; }
 
-        /* FIX: Adjusted typography to prevent overlap */
         .welcome-card h1 { 
             margin: 0; font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.2;
             word-wrap: break-word;
@@ -237,8 +236,6 @@
     </style>
 </head>
 <body oncontextmenu="return false;"> 
-<script src="components/chatLoader.js" defer></script>
-<chat-loader></chat-loader>
 
 <header>
     <div class="logo">GOORAC</div>
@@ -388,22 +385,17 @@
     }
 
     // --- FIREBASE INIT ---
-    let fbConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
-
-    // FIX: Check if firebase SDK is ready before calling initializeApp
-    if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    // 1. Try to use the shared init function first (from config.js)
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } 
+    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
+    else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
     }
 
-    const auth = firebase.auth(), db = firebase.firestore();
+    const auth = firebase.auth();
+    const db = firebase.firestore();
     let READ_KEY = "goorac_read_notifs"; 
 
     setInterval(() => {
