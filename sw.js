@@ -4,30 +4,35 @@ const ASSETS = [
     '/home.html',
     '/chat.html',
     '/config.js',
-    '/notification-worker.js',
     'https://cdn-icons-png.flaticon.com/128/3067/3067451.png',
     'https://cdn-icons-png.flaticon.com/512/3067/3067451.png'
 ];
+
+// --- ACTIVITY ENGINE VARIABLES ---
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js');
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js');
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js');
+
+let db, rdb;
+let presenceTimer = null;
 
 // 1. Install (Cache Files)
 self.addEventListener('install', (e) => {
     self.skipWaiting();
     e.waitUntil(caches.open(CACHE_NAME).then(c => {
-        // Use cache.addAll if you want strict "all or nothing" caching
-        // Your current method is fine if you want to be lenient
         return Promise.all(ASSETS.map(url => c.add(url).catch(console.warn)));
     }));
 });
 
-// 2. Activate (Clean old caches) - FIXED
+// 2. Activate (Clean old caches)
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         Promise.all([
-            self.clients.claim(), // Take control immediately
+            self.clients.claim(),
             caches.keys().then(keys => {
                 return Promise.all(
                     keys.map(key => {
-                        // Delete any cache that doesn't match the current CACHE_NAME
                         if (key !== CACHE_NAME) {
                             return caches.delete(key);
                         }
@@ -43,7 +48,6 @@ self.addEventListener('fetch', (e) => {
     if (e.request.mode === 'navigate') {
         e.respondWith(fetch(e.request).catch(() => caches.match('/home.html')));
     } else {
-        // Cache First Strategy
         e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
     }
 });
@@ -54,3 +58,63 @@ self.addEventListener('notificationclick', (e) => {
     const url = e.notification.data?.url || '/home.html';
     e.waitUntil(clients.openWindow(url));
 });
+
+// --- 5. ACTIVITY ENGINE LOGIC (INTEGRATED) ---
+self.addEventListener('message', (event) => {
+    if (event.data.type === 'START_ACTIVITY_ENGINE') {
+        const { config, uid } = event.data;
+        if (!firebase.apps.length) {
+            firebase.initializeApp(config);
+            db = firebase.firestore();
+            rdb = firebase.database();
+        }
+        runActivitySync(uid);
+    }
+});
+
+function runActivitySync(uid) {
+    const statusRef = rdb.ref('/status/' + uid);
+    const connectedRef = rdb.ref('.info/connected');
+    const userDocRef = db.collection("users").doc(uid);
+
+    const offlineState = { 
+        state: 'offline', 
+        last_changed: firebase.database.ServerValue.TIMESTAMP 
+    };
+    const onlineState = { 
+        state: 'online', 
+        last_changed: firebase.database.ServerValue.TIMESTAMP 
+    };
+
+    // Listen for Firestore Preference & Auto-Defaulting
+    userDocRef.onSnapshot((doc) => {
+        if (!doc.exists) return;
+        const data = doc.data();
+
+        // DEFAULT LOGIC: If no document found for status, create it as ON
+        if (data.showActivityStatus === undefined) {
+            userDocRef.update({ showActivityStatus: true });
+        }
+
+        const isEnabled = data.showActivityStatus !== false;
+
+        connectedRef.on('value', (snapshot) => {
+            if (snapshot.val() === false) return;
+
+            // ZERO-FLICKER LOGIC: Clear any pending offline trigger
+            clearTimeout(presenceTimer);
+
+            statusRef.onDisconnect().set(offlineState).then(() => {
+                // 4-SECOND DELAY: Bridges the gap during page transactions
+                presenceTimer = setTimeout(() => {
+                    // Only show online if preference is ON and not suspended
+                    if (isEnabled && !data.suspended) {
+                        statusRef.set(onlineState);
+                    } else {
+                        statusRef.set(offlineState);
+                    }
+                }, 4000);
+            });
+        });
+    });
+}
