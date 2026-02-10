@@ -1,68 +1,57 @@
-// sync-loader.js - The Storage Bridge
+/**
+ * GOORAC QUANTUM BRIDGE (sync-loader.js)
+ * 1. Registers the Service Worker (sw.js)
+ * 2. Handles the handshake between Firebase Auth and the Background Engine
+ * 3. Ensures Zero-Flicker activity status across page transitions
+ */
+
 if ('serviceWorker' in navigator) {
-    // Request notification permission
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log("📡 Quantum Bridge: Service Worker Registered");
 
-    navigator.serviceWorker.register('/msgEngine.js').then(reg => {
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                // Ensure worker is active before sending config
-                const startWorker = () => {
-                    const worker = reg.active || reg.installing || reg.waiting;
-                    worker.postMessage({
-                        type: 'START_ENGINE',
-                        uid: user.uid,
-                        config: window.firebaseConfig
-                    });
-                };
+            // Monitor Firebase Auth state
+            // This ensures the worker knows WHICH user to track
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    const startEngine = () => {
+                        // Locate the active controller (or installing/waiting)
+                        const worker = reg.active || reg.waiting || reg.installing;
+                        
+                        if (worker) {
+                            // Send the signal to start the Background Activity Engine
+                            // We send the config and UID so the worker can init Firebase independently
+                            worker.postMessage({
+                                type: 'START_ACTIVITY_ENGINE',
+                                uid: user.uid,
+                                config: window.firebaseConfig
+                            });
+                            console.log("⚡ Activity Engine: Start Signal Sent");
+                        }
+                    };
 
-                if (reg.active) startWorker();
-                else reg.addEventListener('updatefound', startWorker);
-            }
+                    // If the worker is already active, send the signal immediately
+                    if (reg.active) {
+                        startEngine();
+                    } else {
+                        // If it's still installing, wait for the state change to finish
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'activated') startEngine();
+                            });
+                        });
+                    }
+                }
+            });
+        }).catch(err => {
+            console.error("❌ Quantum Bridge Error:", err);
         });
     });
 
-    // LISTENER: Saves data to LocalStorage keys
+    // Handle messages FROM the Service Worker (if needed in future)
     navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.type === 'SYNC_UPDATE') {
-            const { chatId, meta, messages, myUid } = event.data;
-
-            // Update chat history
-            localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(messages));
-
-            // Inject into Inbox HTML cache
-            updateInboxCache(chatId, meta, myUid);
-            console.log("⚡ Storage Sync: Successful");
-        }
+        // You can use this space to receive data back from the background
+        // such as background-synced notifications or status updates
     });
-}
-
-function updateInboxCache(chatId, chat, myUid) {
-    const userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
-    const otherUid = chat.participants.find(id => id !== myUid);
-    const u = userCache[otherUid] || { name: "User", username: "unknown" };
-    const isUnread = (chat.unreadCount && chat.unreadCount[myUid] > 0) || (chat.lastSender !== myUid && chat.seen === false);
-
-    const newRow = `
-        <div class="chat-item" onclick="enterChat(event, '${u.username}')">
-            <div class="pfp-container">
-                <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                <div class="online-indicator" id="online-${otherUid}"></div>
-            </div>
-            <div class="chat-info">
-                <div class="chat-top-row">
-                    <span class="u-name">${u.name || u.username}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div class="last-msg" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                        ${chat.lastMessage || 'Transmission cleared'}
-                    </div>
-                    ${isUnread ? `<div class="unread-badge" style="background:#00d2ff;"></div>` : ''}
-                </div>
-            </div>
-        </div>`;
-
-    localStorage.setItem('goorac_inbox_html', newRow);
 }
