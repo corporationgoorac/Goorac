@@ -15,19 +15,20 @@ self.addEventListener('message', (event) => {
             db = firebase.firestore();
         }
 
-        // 1. Monitor all chats for unread changes and new messages
+        // 1. Monitor all chats for unread changes
         db.collection("chats")
           .where("participants", "array-contains", uid)
           .onSnapshot(snapshot => {
               snapshot.docChanges().forEach(async change => {
                   const chatId = change.doc.id;
                   const chatMeta = change.doc.data();
+                  const otherUid = chatMeta.participants.find(id => id !== uid);
 
-                  // 2. Fetch the latest slice of messages for instant chat loading
+                  // 2. Fetch latest messages for chat.html instant-load
                   const msgSnap = await db.collection("chats").doc(chatId)
                                         .collection("messages")
                                         .orderBy("timestamp", "desc")
-                                        .limit(15).get();
+                                        .limit(10).get();
 
                   const messages = msgSnap.docs.map(d => ({
                       id: d.id,
@@ -35,13 +36,14 @@ self.addEventListener('message', (event) => {
                       timestampIso: d.data().timestamp?.toDate().toISOString()
                   }));
 
-                  // 3. Broadcast to the Bridge (Home Page) to save immediately
+                  // 3. Broadcast to the Bridge (Home Page)
                   const allClients = await self.clients.matchAll();
                   allClients.forEach(client => {
                       client.postMessage({
-                          type: 'SYNC_COMPLETE',
+                          type: 'INBOX_SYNC',
                           chatId: chatId,
                           meta: chatMeta,
+                          otherUid: otherUid,
                           messages: messages
                       });
                   });
