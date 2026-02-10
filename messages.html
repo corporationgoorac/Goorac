@@ -163,7 +163,6 @@
 <div id="inbox-content">
     <div style="padding: 10px 22px; font-size: 0.65rem; color: #444; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; display:flex; justify-content:space-between;">
         <span>Quantum Inbox</span>
-        <span id="last-sync-time" style="opacity:0.5; font-weight:400;">Syncing...</span>
     </div>
     
     <div id="chats-list">
@@ -298,7 +297,8 @@
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
-            document.getElementById('last-sync-time').innerText = "Updated " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            // REMOVED TIMER UPDATE HERE
 
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
@@ -338,12 +338,17 @@
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
                 if(!u) return;
                 
-                const isUnread = (chat.lastSender !== myUid && chat.seen === false);
-                let displayCount = "";
-                if (chat.unreadCount && chat.unreadCount[myUid]) {
-                    const num = chat.unreadCount[myUid];
-                    displayCount = num > 99 ? "99+" : num;
+                // --- REFINED UNREAD LOGIC ---
+                let unreadVal = 0;
+                if (chat.unreadCount && typeof chat.unreadCount[myUid] === 'number') {
+                    unreadVal = chat.unreadCount[myUid];
+                } else if (chat.lastSender !== myUid && chat.seen === false) {
+                    // Fallback for legacy structure
+                    unreadVal = 1; 
                 }
+
+                const displayCount = unreadVal > 99 ? "99+" : unreadVal;
+                const isUnread = unreadVal > 0;
 
                 const amIFollowing = myFollowingList.some(item => {
                     const uid = typeof item === 'string' ? item : item.uid;
