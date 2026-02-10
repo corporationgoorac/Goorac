@@ -23,18 +23,21 @@ class ChatLoader extends HTMLElement {
     }
 
     initFirebase() {
-        // Reuse your existing config logic
-        if (!firebase.apps.length) {
-            // Fallback config if not defined globally
-            firebase.initializeApp({
-                apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-                authDomain: "goorac-c3b59.firebaseapp.com",
-                projectId: "goorac-c3b59",
-                storageBucket: "goorac-c3b59.firebasestorage.app",
-                messagingSenderId: "746746595332",
-                appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-                databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-            });
+        // 1. Try to use the global init function from config.js
+        if (typeof window.initFirebaseCore === 'function') {
+            const success = window.initFirebaseCore();
+            if (success) return; 
+        }
+
+        // 2. Fallback: If function didn't run, try using the global config object directly
+        if (!firebase.apps.length && window.firebaseConfig) {
+            firebase.initializeApp(window.firebaseConfig);
+            // Ensure globals are set for consistency with your config.js
+            window.db = firebase.firestore();
+            window.rdb = firebase.database();
+            window.auth = firebase.auth();
+        } else if (!firebase.apps.length) {
+            console.error("❌ ChatLoader: config.js not loaded or firebaseConfig missing!");
         }
     }
 
