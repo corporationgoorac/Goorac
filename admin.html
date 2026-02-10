@@ -106,12 +106,6 @@
             width: 100%; background: transparent; border: none; color: white;
             padding: 12px 5px; font-size: 14px; font-family: 'Inter', sans-serif;
         }
-        .icon-btn {
-            background: var(--surface); border: 1px solid var(--border);
-            width: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: var(--text-sec);
-        }
-        .icon-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
         /* USER LIST */
         .user-list { flex: 1; overflow-y: auto; padding: 10px 20px 80px; }
@@ -183,6 +177,12 @@
         /* INFINITE SCROLL LOADER */
         .loading-spinner {
             text-align: center; padding: 20px; color: var(--text-sec); font-size: 12px; display: none;
+        }
+        
+        .icon-btn {
+            background: var(--surface); border: 1px solid var(--border);
+            width: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-sec);
         }
     </style>
 </head>
@@ -374,22 +374,37 @@
             document.getElementById('bottom-loader').style.display = 'block';
 
             try {
-                // IMPORTANT: This query requires users to have 'createdAt' field
-                let query = db.collection("users")
-                    .orderBy("createdAt", "desc")
-                    .limit(10);
+                // ATTEMPT 1: Try sorting by date (Preferred)
+                // Note: Only users WITH the 'createdAt' field will appear here.
+                let query = db.collection("users").orderBy("createdAt", "desc").limit(10);
 
                 if (lastDoc) {
                     query = query.startAfter(lastDoc);
                 }
 
-                const snapshot = await query.get();
+                let snapshot = await query.get();
                 
+                // FALLBACK MECHANISM:
+                // If we found 0 records, it likely means users are missing 'createdAt'
+                // so we try again without sorting to ensure the admin panel isn't empty.
+                if (snapshot.empty && !lastDoc) {
+                    console.warn("Sort failed (missing 'createdAt'). Attempting fallback...");
+                    query = db.collection("users").limit(10); // Raw fetch
+                    snapshot = await query.get();
+                    
+                    if (!snapshot.empty) {
+                        // We found users in fallback!
+                        const list = document.getElementById('user-list');
+                        list.innerHTML += `<div style="padding:10px; background:#1a1100; color:#ffaa00; font-size:11px; text-align:center; border-radius:8px; margin-bottom:10px;">
+                            ⚠️ Showing unsorted results. Your users are missing the 'createdAt' field.
+                        </div>`;
+                    }
+                }
+
                 if (snapshot.empty) {
                     if(!lastDoc) {
-                        // If completely empty on first load, it might mean no docs have 'createdAt'
                         document.getElementById('user-list').innerHTML = 
-                            '<div style="text-align:center; padding:40px; color:#555;">No records found sorted by date.<br><small>Ensure "createdAt" field exists on users.</small></div>';
+                            '<div style="text-align:center; padding:40px; color:#555;">Database Empty.</div>';
                     }
                     hasMore = false;
                     document.getElementById('bottom-loader').style.display = 'none';
@@ -403,12 +418,12 @@
                     renderUserCard(doc.data(), doc.id);
                 });
 
-                // Simple Stats Estimation
+                // Stats Estimation
                 const count = document.querySelectorAll('.u-card').length;
                 document.getElementById('s-total').innerText = count + "+";
 
             } catch (e) {
-                // --- ERROR HANDLING FOR INDEX ---
+                // This catches ACTUAL index errors and shows the popup
                 handleFirebaseError(e);
             } finally {
                 isFetching = false;
