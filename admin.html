@@ -633,22 +633,29 @@
             btn.disabled = true;
 
             try {
-                // Uniqueness: Goorac Number
+                // REALTIME UNIQUENESS CHECK: Goorac Number
+                // We query the DB for this number.
                 const duplicateNum = await db.collection("users").where("gooracNumber", "==", numInt).get();
                 let isNumTaken = false;
-                duplicateNum.forEach(doc => { if(doc.id !== currentId) isNumTaken = true; });
+                
+                // If a document exists with this number AND it is not the current user, it's a collision.
+                duplicateNum.forEach(doc => { 
+                    if(doc.id !== currentId) isNumTaken = true; 
+                });
 
                 if(isNumTaken) {
-                    notify("COLLISION: ID already assigned", true);
+                    notify("COLLISION: ID #" + numInt + " is already assigned to another entity", true);
                     btn.innerText = "COMMIT UPDATES";
                     btn.disabled = false;
                     return;
                 }
 
-                // Uniqueness: Username
+                // REALTIME UNIQUENESS CHECK: Username
                 const duplicateUser = await db.collection("users").where("username", "==", userHandle).get();
                 let isUserTaken = false;
-                duplicateUser.forEach(doc => { if(doc.id !== currentId) isUserTaken = true; });
+                duplicateUser.forEach(doc => { 
+                    if(doc.id !== currentId) isUserTaken = true; 
+                });
 
                 if(isUserTaken) {
                     warnBox.innerText = `HANDLE @${userHandle} IS UNAVAILABLE`;
@@ -673,6 +680,7 @@
                 notify("ENTITY COMMITTED SUCCESSFULLY");
                 toggleDrawer(false);
             } catch(e) { 
+                console.error("Save Error:", e);
                 notify("DB REJECTION: " + e.message, true); 
             } finally {
                 btn.innerText = "COMMIT UPDATES";
