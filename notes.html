@@ -8,15 +8,15 @@
     <title>New Note | Goorac</title>
     
     <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-
-<script type="module" src="components/presence.js"></script>
-
-    
+    <script type="module" src="components/presence.js"></script>
     <script src="components/songPicker.js"></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
 
     <style>
         :root { 
@@ -186,8 +186,6 @@
     </style>
 </head>
 <body>
-<script src="components/chatLoader.js" defer></script>
-<chat-loader></chat-loader>
 
 <header>
     <div class="cancel-btn" onclick="clearAndBack()">Cancel</div>
@@ -252,17 +250,16 @@
 <song-picker id="song-picker"></song-picker>
 
 <script>
-    // --- 1. CONFIG ---
-    let fbConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    // --- FIREBASE INIT ---
+    // 1. Try to use the shared init function first
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } 
+    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
+    else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
+    
     const db = firebase.firestore();
     const auth = firebase.auth();
 
