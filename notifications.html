@@ -16,9 +16,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<script type="module" src="components/presence.js"></script>
-
-
+    <script type="module" src="components/presence.js"></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
     
     <style>
         :root { 
@@ -130,8 +130,6 @@
     </style>
 </head>
 <body>
-<script src="components/chatLoader.js" defer></script>
-<chat-loader></chat-loader>
 
     <header>
         <div class="top-row">
@@ -150,19 +148,21 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- CONFIG ---
-    let fbConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
-    };
-
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
-        fbConfig = window.CONFIG.firebase;
+    // --- FIREBASE INIT ---
+    // Try to use the shared init function first
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } else if (!firebase.apps.length) {
+        // Fallback: Use window.firebaseConfig if available, else hardcoded safety
+        const fbConfig = window.firebaseConfig || {
+            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+            authDomain: "goorac-c3b59.firebaseapp.com",
+            projectId: "goorac-c3b59",
+            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(fbConfig);
     }
 
-    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
     const db = firebase.firestore();
     const auth = firebase.auth();
     
@@ -428,7 +428,7 @@
             if(e.target.closest('button')) return;
             markNotificationRead(this.dataset.id);
             const user = this.dataset.username || notif.senderId;
-            window.location.href = `userProfile.html?user=${user}`;
+            window.location.href = `profile.html?user=${user}`;
         };
 
         let actionHtml = '';
