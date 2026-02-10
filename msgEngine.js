@@ -15,15 +15,15 @@ self.addEventListener('message', (event) => {
             db = firebase.firestore();
         }
 
-        // GLOBAL LISTENER: Watch for ANY change in your chats
+        // 1. Monitor all chats for unread changes and new messages
         db.collection("chats")
           .where("participants", "array-contains", uid)
           .onSnapshot(snapshot => {
               snapshot.docChanges().forEach(async change => {
                   const chatId = change.doc.id;
-                  const chatData = change.doc.data();
+                  const chatMeta = change.doc.data();
 
-                  // Fetch latest 15 messages for this specific chat
+                  // 2. Fetch the latest slice of messages for instant chat loading
                   const msgSnap = await db.collection("chats").doc(chatId)
                                         .collection("messages")
                                         .orderBy("timestamp", "desc")
@@ -32,18 +32,16 @@ self.addEventListener('message', (event) => {
                   const messages = msgSnap.docs.map(d => ({
                       id: d.id,
                       ...d.data(),
-                      // Convert to ISO string for LocalStorage compatibility
-                      timestampIso: d.data().timestamp?.toDate().toISOString(),
-                      seenAtIso: d.data().seenAt?.toDate().toISOString()
+                      timestampIso: d.data().timestamp?.toDate().toISOString()
                   }));
 
-                  // BROADCAST: Send data to the visible page (Bridge)
+                  // 3. Broadcast to the Bridge (Home Page) to save immediately
                   const allClients = await self.clients.matchAll();
                   allClients.forEach(client => {
                       client.postMessage({
-                          type: 'SYNC_UPDATE',
+                          type: 'SYNC_COMPLETE',
                           chatId: chatId,
-                          chatMeta: chatData, // Includes unreadCount, lastMessage, etc.
+                          meta: chatMeta,
                           messages: messages
                       });
                   });
