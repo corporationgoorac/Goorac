@@ -165,25 +165,30 @@
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
     let CACHE_KEY = "goorac_notif_cache"; 
+    
+    // IMPORTANT: loadedMap maintains the data. We initialize it from cache immediately.
     let loadedMap = new Map();
 
-    // --- 0ms INSTANT LOAD (IMPROVED) ---
-    // Reads full objects (name, pic, verified) from LocalStorage and renders immediately.
-    (function loadFromCache() {
-        const lastUid = localStorage.getItem("goorac_last_uid");
-        if(lastUid) {
-            const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
-            if(cachedData) {
-                try {
-                    rawNotifications = JSON.parse(cachedData);
-                    // Hydrate map immediately so we don't fetch duplicates later
-                    // This creates the "No Delay" effect because listeners will merge into this
-                    rawNotifications.forEach(n => loadedMap.set(n.id, n));
-                    renderNextBatch(); 
-                } catch(e) { console.warn("Cache load error", e); }
-            }
+    // --- 0ms INSTANT LOAD ---
+    // 1. Get last UID to find correct cache
+    const lastUid = localStorage.getItem("goorac_last_uid");
+    
+    // 2. Load and Render immediately
+    if (lastUid) {
+        const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
+        if (cachedData) {
+            try {
+                rawNotifications = JSON.parse(cachedData);
+                // Hydrate map instantly. This prevents duplicates because when Firebase
+                // loads the same ID later, it will just overwrite the map entry, not append.
+                rawNotifications.forEach(n => loadedMap.set(n.id, n));
+                
+                // Render visible items
+                renderNextBatch();
+                
+            } catch(e) { console.warn("Cache load error", e); }
         }
-    })();
+    }
 
     // --- LOCAL STORAGE READ LOGIC ---
     function isNotificationRead(id) {
@@ -201,7 +206,6 @@
             if(!readList.includes(id)) {
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
-                window.dispatchEvent(new Event('storage'));
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -237,8 +241,9 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`;
-            localStorage.setItem("goorac_last_uid", myUid); // Save current user for next boot
+            localStorage.setItem("goorac_last_uid", myUid);
 
+            // Fetch who I follow to update buttons
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -251,9 +256,7 @@
     });
 
     function initListeners() {
-        // NOTE: We do NOT clear 'loadedMap' or 'innerHTML' here. 
-        // We let the cache stick around and merge Firebase updates into it.
-        // This ensures the 0ms load content stays on screen.
+        // DO NOT clear loadedMap here. We want to merge live data into cached data.
         
         // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
@@ -269,7 +272,6 @@
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const notifId = `like_${liker.uid}_${timeMillis}`;
 
-                            // Only update if not exists or properties changed
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'like',
@@ -303,7 +305,6 @@
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}_${timeMillis}`;
                             
-                            // Check if we already have this in cache to avoid re-fetch loop
                             const cached = loadedMap.get(notifId);
                             
                             loadedMap.set(notifId, {
@@ -316,7 +317,7 @@
                                 isVerified: cached?.isVerified || false,
                                 timestamp: timeMillis,
                                 text: "started following you.",
-                                needsFetch: !cached?.senderName // Only fetch if we don't have name
+                                needsFetch: !cached?.senderName 
                             });
                             
                             if(!cached?.senderName) fetchUserInfo(f.uid, notifId);
@@ -377,7 +378,7 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
-                    // Live DOM Update
+                    // Live DOM Update (avoids full re-render)
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
@@ -386,7 +387,6 @@
                     if(pfpEl) pfpEl.src = item.senderPic;
                     if(rowEl) rowEl.dataset.username = item.senderUsername;
                     
-                    // CRITICAL: Save to cache immediately after fetching profile
                     saveCache();
                 }
             }
@@ -396,16 +396,16 @@
     function processAndRender() {
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
+            // Convert map to array and sort
             rawNotifications = Array.from(loadedMap.values());
             rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             
-            // Save current state (including pictures/names) to cache for next 0ms load
+            // Save complete state to cache
             saveCache();
 
-            // Only clear and re-render if we are doing a full refresh, 
-            // but for smooth UX we usually just append.
-            // Here we rebuild to ensure order is correct.
+            // Clear HTML to prevent duplicates
             document.getElementById('notif-list').innerHTML = '';
+            
             displayedCount = 0;
             renderNextBatch();
         }, 150);
@@ -426,8 +426,10 @@
             return n.type === currentFilter;
         });
 
-        if (filtered.length === 0 && displayedCount === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
+        if (filtered.length === 0) {
+            if (displayedCount === 0) {
+                list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
+            }
             loader.style.display = 'none';
             return;
         }
@@ -473,7 +475,6 @@
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
-                // Use 'background' for full gradient support
                 let bgStyle = notif.noteData.bgColor.includes('gradient') 
                     ? `background: ${notif.noteData.bgColor}` 
                     : `background-color: ${notif.noteData.bgColor}`;
