@@ -272,11 +272,10 @@
         });
 
         const statusRef = rdb.ref('/status/' + user.uid);
-        if (!isEnabled) {
-            await statusRef.set({ state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
-        } else {
-            await statusRef.set({ state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP });
-        }
+        await statusRef.set({ 
+            state: isEnabled ? 'online' : 'offline', 
+            last_changed: firebase.database.ServerValue.TIMESTAMP 
+        });
         
         if (navigator.vibrate) navigator.vibrate(30);
     }
@@ -298,14 +297,17 @@
             // FIX: Reliable initialization of profile-notes component
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) {
+                // Force set properties immediately on auth change
+                notesComp.uid = user.uid;
+                notesComp.setAttribute('uid', user.uid);
+                
                 customElements.whenDefined('profile-notes').then(() => {
-                    notesComp.setAttribute('uid', user.uid);
                     if(notesComp.init) notesComp.init(); 
                 });
             }
             initRealtimeListener(user.uid);
         } else {
-            // Redirect immediately if not logged in
+            // Instant redirect to login if logged out
             window.location.replace('login.html');
         }
     });
@@ -352,9 +354,11 @@
         safeText('count-followers', (data.followers || []).length);
         safeText('count-following', (data.following || []).length);
 
-        // Sync toggle status
+        // SYNC TOGGLE: Defaults to ON if the field is undefined or not explicitly false
         const toggle = document.getElementById('activity-toggle');
-        if(toggle) toggle.checked = data.showActivityStatus !== false;
+        if(toggle) {
+            toggle.checked = data.showActivityStatus !== false;
+        }
     }
 
     function safeText(id, val) {
