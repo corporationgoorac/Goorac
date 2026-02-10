@@ -7,23 +7,17 @@
     <meta name="theme-color" content="#000000">
     <title>My Profile | Goorac</title>
     
-    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script src="config.js"></script>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-            authDomain: "goorac-c3b59.firebaseapp.com",
-            projectId: "goorac-c3b59",
-            storageBucket: "goorac-c3b59.firebasestorage.app",
-            messagingSenderId: "746746595332",
-            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
-        };
-        // Init Firebase immediately to prevent component race conditions
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        // Use the 'db' and 'auth' already initialized by config.js or define them here
+        const db = window.db || firebase.firestore();
         const auth = firebase.auth();
     </script>
 
@@ -57,14 +51,13 @@
             color: var(--primary);
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            padding-bottom: 80px; /* Space for navbar */
+            padding-bottom: 80px;
             user-select: none; -webkit-user-select: none;
             -webkit-font-smoothing: antialiased;
             min-height: 100vh;
             display: flex; flex-direction: column;
         }
 
-        /* --- HEADER --- */
         header {
             position: sticky; top: 0; z-index: 50;
             background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -81,7 +74,6 @@
         }
         .icon-btn:active { transform: scale(0.9); background: var(--surface-press); }
 
-        /* --- TOP HALF: PROFILE CARD --- */
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
             padding: 20px 24px 30px;
@@ -89,7 +81,6 @@
             border-bottom: 1px solid var(--border);
         }
 
-        /* COMPACT AVATAR */
         .avatar-wrapper {
             width: 90px; height: 90px; margin-bottom: 15px;
             position: relative; padding: 3px;
@@ -102,7 +93,6 @@
             display: block; border: 2px solid var(--bg);
         }
 
-        /* INFO */
         .user-name { 
             font-size: 22px; font-weight: 800; margin-bottom: 4px; 
             display: flex; align-items: center; gap: 6px; letter-spacing: -0.5px;
@@ -111,7 +101,6 @@
         .verified { color: var(--accent); font-size: 20px; }
         .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; }
 
-        /* ID PILL */
         .id-pill {
             margin: 15px 0 20px;
             background: rgba(255,255,255,0.03); border: 1px solid var(--border);
@@ -131,7 +120,6 @@
             min-height: 38px;
         }
 
-        /* STATS GRID */
         .stats-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
             width: 100%; max-width: 400px; margin-bottom: 25px;
@@ -147,7 +135,6 @@
         .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
         .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-        /* ACTIONS */
         .action-row {
             display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
             width: 100%; max-width: 400px;
@@ -163,14 +150,12 @@
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
         .btn:active { transform: scale(0.96); opacity: 0.8; }
 
-        /* --- BOTTOM HALF: NOTES --- */
         .notes-section {
             flex: 1;
             padding: 0 24px;
             margin-top: 10px;
         }
 
-        /* --- SKELETON REFINED --- */
         .skeleton {
             background: #111 !important;
             position: relative; overflow: hidden;
@@ -183,7 +168,6 @@
         }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        /* --- TOAST --- */
         #toast {
             position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px);
             background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px;
@@ -192,7 +176,6 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
     </style>
 </head>
 <body>
@@ -250,7 +233,6 @@
     <view-notes id="view-notes-modal"></view-notes>
     <call-notifier></call-notifier>
     
-
     <div id="toast">
         <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
         ID Copied
@@ -264,19 +246,15 @@
             try {
                 const data = JSON.parse(cached);
                 renderUI(data);
-            } catch (e) {
-                console.error("Cache parse error", e);
-            }
+            } catch (e) { console.error("Cache parse error", e); }
         }
     })();
 
     // --- 2. AUTH & REALTIME SYNC ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            // Trigger Notes Component with UID
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) {
-                // Wait for custom element to be defined
                 customElements.whenDefined('profile-notes').then(() => {
                     notesComp.uid = user.uid;
                 });
@@ -296,52 +274,41 @@
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                 renderUI(data);
             } else {
-                console.warn("User document not found, redirecting to setup...");
                 window.location.href = "setup.html";
             }
         }, (error) => {
-            console.error("Firestore Listener Error:", error);
-            // If listener fails, we should still try to remove skeletons to show whatever we have
-            const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
-            skeletons.forEach(id => {
-                const el = document.getElementById(id);
-                if(el) el.classList.remove('skeleton');
-            });
+            console.error("Firestore Error:", error);
+            // Fallback: Remove skeletons if listener fails
+            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
         });
     }
 
     // --- 3. RENDER ENGINE ---
     function renderUI(data) {
-        // Remove skeletons and restore visibility
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
             const el = document.getElementById(id);
             if(el) {
                 el.classList.remove('skeleton');
-                el.style.width = ""; 
-                el.style.height = "";
+                el.style.width = ""; el.style.height = "";
             }
         });
 
-        // Restore hidden children visibility
         document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
 
         safeText('display-name', data.name || "User");
-        safeText('username', `@${data.username || 'username'}`);
-        safeText('bio', data.bio || "Welcome to my Goorac profile.");
+        safeText('username', `@${data.username || 'user'}`);
+        safeText('bio', data.bio || "Welcome to Goorac.");
         safeText('goorac-id', data.gooracNumber || "-------");
 
         const pfp = document.getElementById('pfp');
-        const newSrc = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
-        if(pfp && pfp.src !== newSrc) pfp.src = newSrc;
+        if(pfp) pfp.src = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
 
         const badge = document.getElementById('verified-badge');
         if(badge) badge.style.display = data.verified ? 'inline-block' : 'none';
 
-        const followers = data.followers || [];
-        const following = data.following || [];
-        safeText('count-followers', followers.length);
-        safeText('count-following', following.length);
+        safeText('count-followers', (data.followers || []).length);
+        safeText('count-following', (data.following || []).length);
     }
 
     function safeText(id, val) {
@@ -353,8 +320,8 @@
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(!txt || txt.includes('-')) return;
-        if(navigator.vibrate) navigator.vibrate(50);
         navigator.clipboard.writeText(txt).then(() => {
+            if(navigator.vibrate) navigator.vibrate(50);
             showToast("ID Copied");
         });
     }
@@ -362,12 +329,8 @@
     function logout() {
         if(confirm("Log out of Goorac?")) {
             auth.signOut().then(() => {
-                // Clear all local storage for the entire site
+                // Clear ALL site local storage
                 localStorage.clear(); 
-                window.location.href = "login.html";
-            }).catch(err => {
-                console.error("Logout Error:", err);
-                localStorage.clear();
                 window.location.href = "login.html";
             });
         }
@@ -375,7 +338,6 @@
 
     function showToast(msg) {
         const t = document.getElementById('toast');
-        if(!t) return;
         t.innerHTML = `<span class="material-icons-round" style="font-size:16px;">check_circle</span> ${msg}`;
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 2000);
