@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Goorac | Admin Nexus v3.0</title>
+    <title>Goorac | Nexus Command v3.0</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -11,28 +11,30 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --bg: #050505;
-            --surface: #0f0f0f;
-            --surface-hover: #161616;
+            --sidebar: #0a0a0a;
+            --surface: #111111;
             --border: #222;
-            --accent: #00f2ff; 
-            --accent-glow: rgba(0, 242, 255, 0.15);
-            --danger: #ff2a6d;
-            --success: #00ff9d;
-            --text: #ffffff;
-            --text-sec: #888888;
+            --primary: #3b82f6; /* Professional Blue */
+            --primary-glow: rgba(59, 130, 246, 0.15);
+            --accent: #00f2ff;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text: #e5e5e5;
+            --text-muted: #737373;
         }
 
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; user-select: none; }
-
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        
         body {
             background: var(--bg); color: var(--text); margin: 0;
-            font-family: 'Inter', sans-serif; height: 100vh;
-            display: flex; flex-direction: column; overflow: hidden;
+            font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden;
+            display: flex;
         }
 
         /* --- LOCK SCREEN --- */
@@ -40,497 +42,690 @@
             position: fixed; inset: 0; z-index: 9999;
             background: #000; display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            transition: opacity 0.4s ease;
+            transition: opacity 0.5s ease;
         }
-        .pin-display {
-            font-family: 'JetBrains Mono', monospace; font-size: 40px; letter-spacing: 12px;
-            margin-bottom: 50px; color: var(--accent); text-shadow: 0 0 20px var(--accent-glow);
-        }
-        .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .pin-btn {
-            width: 80px; height: 80px; border-radius: 24px; border: 1px solid var(--border);
-            background: var(--surface); color: white; font-size: 24px; font-weight: 600;
-            cursor: pointer; transition: 0.15s;
-        }
-        .pin-btn:active { background: var(--accent); color: black; transform: scale(0.95); }
-
-        /* --- DASHBOARD HEADER --- */
-        header {
-            padding: 15px 24px; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(5,5,5,0.8); backdrop-filter: blur(20px); z-index: 10;
-        }
-        .brand { display: flex; align-items: center; gap: 12px; }
-        .brand-icon { color: var(--accent); font-size: 24px; text-shadow: 0 0 15px var(--accent-glow); }
-        .brand-text { font-family: 'JetBrains Mono', monospace; font-weight: 800; letter-spacing: -1px; font-size: 1.2rem; }
+        .lock-logo { font-family: 'JetBrains Mono'; font-size: 24px; letter-spacing: 4px; color: var(--text); margin-bottom: 40px; }
+        .pin-dots { display: flex; gap: 15px; margin-bottom: 40px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); transition: 0.2s; }
+        .dot.filled { background: var(--text); border-color: var(--text); box-shadow: 0 0 10px rgba(255,255,255,0.3); }
         
-        .header-actions { display: flex; gap: 8px; }
-        .h-btn {
-            width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border);
-            background: var(--surface); color: var(--text-sec); display: flex; align-items: center; justify-content: center;
+        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .num-btn {
+            width: 70px; height: 70px; border-radius: 50%; background: #111;
+            border: 1px solid #222; color: white; font-size: 20px; font-family: 'JetBrains Mono';
             cursor: pointer; transition: 0.2s;
         }
-        .h-btn:hover { color: var(--text); border-color: #444; }
-        .h-btn:active { background: var(--accent); color: black; border-color: var(--accent); }
+        .num-btn:active { background: var(--text); color: black; }
 
-        /* --- STATS ROW --- */
-        .stats-row {
-            display: flex; gap: 12px; padding: 20px 24px 0; overflow-x: auto; flex-shrink: 0;
-            scrollbar-width: none;
+        /* --- MAIN LAYOUT --- */
+        #app-container { display: flex; width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s; display: none; }
+        
+        /* SIDEBAR */
+        aside {
+            width: 260px; background: var(--sidebar); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 20px; flex-shrink: 0;
+        }
+        .brand { font-family: 'JetBrains Mono'; font-weight: 700; font-size: 18px; margin-bottom: 40px; display: flex; align-items: center; gap: 10px; color: white; }
+        .nav-item {
+            padding: 12px 15px; border-radius: 8px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            font-size: 14px; font-weight: 500; transition: 0.2s; margin-bottom: 5px;
+        }
+        .nav-item:hover { background: #1a1a1a; color: white; }
+        .nav-item.active { background: var(--primary-glow); color: var(--primary); }
+        .nav-item i { font-size: 18px; }
+
+        /* MAIN CONTENT */
+        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        
+        /* TOP BAR */
+        .top-bar {
+            height: 70px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 30px; background: rgba(5,5,5,0.8); backdrop-filter: blur(10px);
+        }
+        
+        /* SEARCH ENGINE */
+        .search-engine {
+            position: relative; width: 400px;
+        }
+        .search-engine input {
+            width: 100%; background: var(--surface); border: 1px solid var(--border);
+            padding: 12px 15px 12px 45px; border-radius: 8px; color: white;
+            font-family: 'JetBrains Mono'; font-size: 13px; transition: 0.2s;
+        }
+        .search-engine input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
+        .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 18px; }
+
+        /* STATS BAR */
+        .stats-deck {
+            display: flex; gap: 20px; padding: 20px 30px; border-bottom: 1px solid var(--border);
+            background: #080808;
         }
         .stat-card {
             background: var(--surface); border: 1px solid var(--border);
-            min-width: 120px; padding: 16px; border-radius: 16px;
+            padding: 15px 20px; border-radius: 10px; min-width: 150px;
             display: flex; flex-direction: column;
         }
-        .s-val { font-size: 24px; font-weight: 800; color: white; line-height: 1; margin-bottom: 6px; }
-        .s-lbl { font-size: 11px; color: var(--text-sec); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .stat-val { font-size: 20px; font-weight: 700; color: white; }
+        .stat-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-top: 5px; letter-spacing: 0.5px; }
 
-        /* --- SEARCH --- */
-        .toolbar { padding: 20px 24px 10px; }
-        .search-wrap {
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: 14px; display: flex; align-items: center; padding: 0 16px;
-            transition: 0.3s; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        /* DATA GRID */
+        .data-view { flex: 1; overflow-y: auto; padding: 0; }
+        .table-header {
+            display: grid; grid-template-columns: 60px 2fr 1.5fr 1fr 1fr 100px;
+            padding: 15px 30px; border-bottom: 1px solid var(--border);
+            background: var(--bg); position: sticky; top: 0; z-index: 10;
+            color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase;
         }
-        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
-        .search-wrap input {
-            width: 100%; background: transparent; border: none; color: white;
-            padding: 16px 8px; font-size: 14px; font-weight: 500;
+        
+        .user-row {
+            display: grid; grid-template-columns: 60px 2fr 1.5fr 1fr 1fr 100px;
+            padding: 15px 30px; border-bottom: 1px solid var(--border);
+            align-items: center; transition: 0.15s; cursor: pointer;
         }
+        .user-row:hover { background: #0f0f0f; }
+        .user-row.suspended { opacity: 0.5; text-decoration: line-through; }
+        
+        .avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #222; }
+        .u-identity { display: flex; flex-direction: column; }
+        .u-name { font-weight: 600; font-size: 14px; color: white; display: flex; align-items: center; gap: 6px; }
+        .u-sub { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono'; }
+        
+        .badge {
+            padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; width: fit-content;
+        }
+        .badge.admin { background: rgba(59, 130, 246, 0.1); color: var(--primary); }
+        .badge.user { background: #1a1a1a; color: #888; }
+        .verified-icon { color: var(--accent); font-size: 14px; }
 
-        /* --- USER LIST --- */
-        .list-container { flex: 1; overflow-y: auto; padding: 10px 24px 40px; }
-        .list-header { 
-            font-size: 12px; font-weight: 700; color: var(--text-sec); 
-            margin: 10px 0; display: flex; justify-content: space-between;
-        }
-
-        .u-card {
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: 16px; padding: 16px; margin-bottom: 12px;
-            display: flex; align-items: center; justify-content: space-between;
-            transition: all 0.2s; cursor: pointer; position: relative;
-        }
-        .u-card:active { transform: scale(0.98); background: var(--surface-hover); }
-        
-        .u-left { display: flex; align-items: center; gap: 16px; }
-        .u-pfp { width: 48px; height: 48px; border-radius: 14px; object-fit: cover; background: #222; border: 1px solid #333; }
-        
-        .u-info { display: flex; flex-direction: column; justify-content: center; }
-        .u-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-        .u-meta { font-size: 12px; color: var(--text-sec); font-family: 'JetBrains Mono'; margin-top: 4px; }
-        
-        .v-badge { color: var(--accent); font-size: 16px; }
-        
-        .tag { font-size: 10px; padding: 4px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; }
-        .tag.sus { background: rgba(255, 42, 109, 0.15); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.3); }
-        .tag.admin { background: rgba(0, 242, 255, 0.15); color: var(--accent); border: 1px solid rgba(0, 242, 255, 0.3); margin-left: 6px; }
-
-        /* --- EDITOR SHEET --- */
-        #editor {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
-            display: none; justify-content: flex-end; backdrop-filter: blur(10px);
-        }
-        .sheet {
-            width: 100%; max-width: 500px; background: #080808; height: 100%;
-            border-left: 1px solid var(--border); display: flex; flex-direction: column;
-            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        /* ACTIONS & DRAWER */
+        #editor-drawer {
+            position: absolute; top: 0; right: 0; width: 400px; height: 100%;
+            background: #0c0c0c; border-left: 1px solid var(--border);
+            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 50; padding: 30px; display: flex; flex-direction: column;
             box-shadow: -20px 0 50px rgba(0,0,0,0.5);
         }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-
-        .sheet-head { padding: 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .sh-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        #editor-drawer.open { transform: translateX(0); }
         
-        .sheet-body { flex: 1; overflow-y: auto; padding: 24px; }
-
-        .profile-preview { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }
-        .lg-pfp { width: 80px; height: 80px; border-radius: 24px; object-fit: cover; border: 2px solid var(--border); }
+        .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+        .form-input {
+            width: 100%; background: #161616; border: 1px solid var(--border);
+            padding: 12px; border-radius: 6px; color: white; font-family: 'JetBrains Mono'; font-size: 13px;
+        }
         
-        .input-group { margin-bottom: 24px; }
-        .lbl { font-size: 11px; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .inp {
-            width: 100%; background: var(--surface); border: 1px solid var(--border);
-            color: white; padding: 16px; border-radius: 12px; font-size: 14px; font-family: 'JetBrains Mono';
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
+        .btn {
+            border: none; padding: 14px; border-radius: 8px; cursor: pointer;
+            font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: 0.2s;
         }
-        .inp:focus { border-color: var(--accent); background: #121212; }
-
-        .toggles-row { display: flex; gap: 12px; margin-bottom: 30px; }
-        .toggle-card {
-            flex: 1; background: var(--surface); border: 1px solid var(--border);
-            padding: 16px; border-radius: 14px; cursor: pointer; transition: 0.2s;
-        }
-        .toggle-card.active { border-color: var(--accent); background: var(--accent-glow); }
-        .toggle-card.danger.active { border-color: var(--danger); background: rgba(255, 42, 109, 0.1); }
-        
-        .tc-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
-        .tc-dot { width: 10px; height: 10px; border-radius: 50%; background: #333; }
-        .active .tc-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
-        .danger.active .tc-dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
-        .tc-lbl { font-size: 12px; font-weight: 800; }
-        .tc-desc { font-size: 10px; color: var(--text-sec); }
-
-        .sheet-foot {
-            padding: 24px; border-top: 1px solid var(--border); background: #050505;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-        }
-        .action-btn {
-            padding: 16px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
-            border: none; display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-save { background: white; color: black; grid-column: 1 / 3; } /* Save is full width normally, or split */
-        .btn-save:active { transform: scale(0.98); }
-        .btn-del { background: rgba(255, 42, 109, 0.1); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.3); }
+        .btn-primary { background: white; color: black; }
+        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
         
         /* TOAST */
         .toast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #111; color: white; padding: 12px 24px; border-radius: 30px;
-            border: 1px solid var(--border); font-weight: 600; font-size: 13px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 200;
-            display: flex; align-items: center; gap: 10px;
-            animation: floatUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #222; color: white; padding: 12px 20px; border-radius: 30px;
+            font-size: 13px; font-weight: 500; opacity: 0; transition: 0.3s;
+            display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); pointer-events: none; z-index: 100;
         }
-        @keyframes floatUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        /* LOADING */
+        .loader-row { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+
+        @media (max-width: 768px) {
+            aside { display: none; } /* Hide sidebar on mobile for now */
+            .table-header { display: none; } /* Hide headers on mobile */
+            .user-row { grid-template-columns: 50px 1fr; gap: 10px; position: relative; }
+            .user-row > *:not(:first-child):not(:nth-child(2)) { display: none; } /* Hide extra columns */
+            .top-bar { padding: 0 15px; }
+            .search-engine { width: 100%; }
+            #editor-drawer { width: 100%; }
+        }
     </style>
 </head>
 <body>
 
     <div id="lock-screen">
-        <div class="pin-display" id="pin-display">••••</div>
-        <div class="pin-pad">
-            <button class="pin-btn" onclick="typePin('1')">1</button>
-            <button class="pin-btn" onclick="typePin('2')">2</button>
-            <button class="pin-btn" onclick="typePin('3')">3</button>
-            <button class="pin-btn" onclick="typePin('4')">4</button>
-            <button class="pin-btn" onclick="typePin('5')">5</button>
-            <button class="pin-btn" onclick="typePin('6')">6</button>
-            <button class="pin-btn" onclick="typePin('7')">7</button>
-            <button class="pin-btn" onclick="typePin('8')">8</button>
-            <button class="pin-btn" onclick="typePin('9')">9</button>
-            <button class="pin-btn" onclick="typePin('C')" style="color:var(--danger)">C</button>
-            <button class="pin-btn" onclick="typePin('0')">0</button>
-            <button class="pin-btn" onclick="unlock()">→</button>
+        <div class="lock-logo">GOORAC NEXUS</div>
+        <div class="pin-dots" id="pin-dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="numpad">
+            <button class="num-btn" onclick="enterPin(1)">1</button>
+            <button class="num-btn" onclick="enterPin(2)">2</button>
+            <button class="num-btn" onclick="enterPin(3)">3</button>
+            <button class="num-btn" onclick="enterPin(4)">4</button>
+            <button class="num-btn" onclick="enterPin(5)">5</button>
+            <button class="num-btn" onclick="enterPin(6)">6</button>
+            <button class="num-btn" onclick="enterPin(7)">7</button>
+            <button class="num-btn" onclick="enterPin(8)">8</button>
+            <button class="num-btn" onclick="enterPin(9)">9</button>
+            <button class="num-btn" style="color:var(--danger)" onclick="clearPin()">C</button>
+            <button class="num-btn" onclick="enterPin(0)">0</button>
+            <button class="num-btn" style="background:var(--text); color:black;" onclick="submitPin()">→</button>
         </div>
     </div>
 
-    <div id="dashboard">
-        <header>
-            <div class="brand">
-                <span class="material-icons-round brand-icon">security</span>
-                <span class="brand-text">NEXUS</span>
+    <div id="app-container">
+        <aside>
+            <div class="brand"><span class="material-icons-round" style="color:var(--primary)">admin_panel_settings</span> NEXUS</div>
+            <div class="nav-item active"><i class="material-icons-round">people</i> Users</div>
+            <div class="nav-item"><i class="material-icons-round">bar_chart</i> Analytics</div>
+            <div class="nav-item"><i class="material-icons-round">settings</i> Settings</div>
+            
+            <div style="margin-top:auto; font-size:11px; color:var(--text-muted);">
+                v3.0.1 Stable<br>Server: Online
             </div>
-            <div class="header-actions">
-                <button class="h-btn" onclick="exportData()"><span class="material-icons-round">download</span></button>
-                <button class="h-btn" onclick="initDashboard()"><span class="material-icons-round">refresh</span></button>
-            </div>
-        </header>
+        </aside>
 
-        <div class="stats-row">
-            <div class="stat-card">
-                <span class="s-val" id="s-total">--</span>
-                <span class="s-lbl">Database Size</span>
+        <main>
+            <div class="top-bar">
+                <div class="search-engine">
+                    <i class="material-icons-round search-icon">search</i>
+                    <input type="text" id="search-input" placeholder="Search ID, Name, Username..." oninput="handleSearch()">
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn" style="background:var(--surface); border:1px solid var(--border); padding:8px 12px;" onclick="refreshData()">
+                        <i class="material-icons-round">refresh</i>
+                    </button>
+                    <button class="btn" style="background:var(--surface); border:1px solid var(--border); padding:8px 12px;" onclick="exportJSON()">
+                        <i class="material-icons-round">download</i>
+                    </button>
+                </div>
             </div>
-            <div class="stat-card">
-                <span class="s-val" style="color:var(--success);" id="s-online">--</span>
-                <span class="s-lbl">Online Now</span>
-            </div>
-            <div class="stat-card">
-                <span class="s-val" style="color:var(--danger);" id="s-sus">0</span>
-                <span class="s-lbl">Suspended</span>
-            </div>
-        </div>
 
-        <div class="toolbar">
-            <div class="search-wrap">
-                <span class="material-icons-round" style="color:var(--text-sec); margin-right:10px;">search</span>
-                <input type="text" id="univ-search" placeholder="Search ID, Name, Username..." oninput="runUniversalSearch()">
+            <div class="stats-deck">
+                <div class="stat-card">
+                    <span class="stat-val" id="count-total">-</span>
+                    <span class="stat-label">Total Users</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" id="count-online" style="color:var(--success)">-</span>
+                    <span class="stat-label">Active Now</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" id="count-sus" style="color:var(--danger)">-</span>
+                    <span class="stat-label">Suspended</span>
+                </div>
             </div>
-        </div>
 
-        <div class="list-container">
-            <div class="list-header">
-                <span>ENTITY LIST</span>
-                <span id="list-count">LOADING...</span>
+            <div class="table-header">
+                <div></div>
+                <div>User Identity</div>
+                <div>Goorac ID</div>
+                <div>Status</div>
+                <div>Verification</div>
+                <div>Actions</div>
             </div>
-            <div id="user-list"></div>
-        </div>
-    </div>
 
-    <div id="editor">
-        <div class="sheet">
-            <div class="sheet-head">
-                <span class="sh-title">Entity Editor</span>
-                <button class="h-btn" style="border:none; background:transparent;" onclick="closeEditor()">
-                    <span class="material-icons-round">close</span>
-                </button>
+            <div class="data-view" id="user-grid">
+                </div>
+            <div id="loader" class="loader-row" style="display:none">LOADING MORE RECORDS...</div>
+        </main>
+
+        <div id="editor-drawer">
+            <div class="drawer-head">
+                <h2 style="margin:0; font-size:18px;">Edit Profile</h2>
+                <button onclick="closeDrawer()" style="background:none; border:none; color:white; cursor:pointer;"><i class="material-icons-round">close</i></button>
             </div>
             
-            <div class="sheet-body">
-                <div class="profile-preview">
-                    <img id="ed-pfp" class="lg-pfp">
-                    <div>
-                        <div style="font-size:11px; color:var(--text-sec); font-family:'JetBrains Mono'; margin-bottom:4px;" id="ed-uid">ID: --</div>
-                        <div style="font-size:18px; font-weight:800;" id="ed-display-name">User</div>
-                        <div style="font-size:13px; color:var(--accent);" id="ed-status">Offline</div>
-                    </div>
-                </div>
+            <div style="text-align:center; margin-bottom:20px;">
+                <img id="edit-pfp" src="" style="width:80px; height:80px; border-radius:20px; background:#222; object-fit:cover;">
+                <div id="edit-uid" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-muted); margin-top:10px;"></div>
+            </div>
 
-                <div class="toggles-row">
-                    <div class="toggle-card" id="tog-ver" onclick="toggleCard(this)">
-                        <div class="tc-head"><span class="tc-lbl">VERIFIED</span><div class="tc-dot"></div></div>
-                        <div class="tc-desc">System Trust Badge</div>
-                    </div>
-                    <div class="toggle-card danger" id="tog-sus" onclick="toggleCard(this)">
-                        <div class="tc-head"><span class="tc-lbl">SUSPENDED</span><div class="tc-dot"></div></div>
-                        <div class="tc-desc">Revoke All Access</div>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input type="text" id="edit-name" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Username (@)</label>
+                <input type="text" id="edit-user" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Goorac Number</label>
+                <input type="text" id="edit-gid" class="form-input" readonly style="color:#666">
+            </div>
 
-                <div class="input-group">
-                    <label class="lbl">Full Name</label>
-                    <input type="text" class="inp" id="inp-name">
+            <div class="form-group" style="display:flex; gap:10px; margin-top:10px;">
+                <div onclick="toggleBool('verified')" id="btn-verify" class="btn" style="flex:1; background:#111; border:1px solid #333;">
+                    Verified
                 </div>
-                <div class="input-group">
-                    <label class="lbl">Username Handle</label>
-                    <input type="text" class="inp" id="inp-user">
-                </div>
-                <div class="input-group">
-                    <label class="lbl">Goorac ID (Immutable)</label>
-                    <input type="text" class="inp" id="inp-gid" readonly style="color:#666;">
-                </div>
-                <div class="input-group">
-                    <label class="lbl">Photo URL</label>
-                    <input type="text" class="inp" id="inp-url">
+                <div onclick="toggleBool('suspended')" id="btn-suspend" class="btn" style="flex:1; background:#111; border:1px solid #333;">
+                    Suspended
                 </div>
             </div>
 
-            <div class="sheet-foot">
-                <button class="action-btn btn-del" onclick="deleteEntity()">
-                    <span class="material-icons-round">delete</span> DELETE
-                </button>
-                <button class="action-btn btn-save" onclick="saveEntity()">
-                    <span class="material-icons-round">save</span> SAVE CHANGES
-                </button>
+            <div class="action-grid">
+                <button class="btn btn-primary" onclick="saveChanges()">Save Changes</button>
+                <button class="btn btn-danger" onclick="deleteUser()">Delete User</button>
             </div>
         </div>
+    </div>
+
+    <div id="toast" class="toast">
+        <i class="material-icons-round" id="toast-icon">info</i>
+        <span id="toast-msg">Notification</span>
     </div>
 
     <script>
-        // --- CONFIG ---
-        const fbConfig = {
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-            authDomain: "goorac-c3b59.firebaseapp.com",
-            projectId: "goorac-c3b59",
-            databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+        // ==========================================
+        // 1. CONFIGURATION (REPLACE WITH YOUR KEYS)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"
         };
-        firebase.initializeApp(fbConfig);
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
         const rdb = firebase.database();
 
-        // --- AUTH ---
-        let currentPin = "";
-        const TARGET = 1542021; // Hash for 2502
+        // ==========================================
+        // 2. STATE MANAGEMENT
+        // ==========================================
+        let allUsers = [];     // Local cache of fetched users
+        let lastDoc = null;    // Pagination cursor
+        let isLoading = false; // Loading state
+        let currentEdit = null;// User currently being edited
+        let searchMode = false;
 
-        function fastHash(s) {
-            let h=0; for(let i=0;i<s.length;i++) h=Math.imul(31,h)+s.charCodeAt(i)|0;
-            return Math.abs(h);
+        // ==========================================
+        // 3. SECURITY (PIN SYSTEM)
+        // ==========================================
+        let pin = "";
+        const TARGET_PIN = "2026"; // Change this PIN
+
+        function enterPin(n) {
+            if(pin.length < 4) {
+                pin += n;
+                updateDots();
+            }
         }
-
-        function typePin(n) {
-            if(n==='C') currentPin=""; else if(currentPin.length<4) currentPin+=n;
-            document.getElementById('pin-display').innerText = "•".repeat(currentPin.length).padEnd(4,'•');
+        function clearPin() { pin = ""; updateDots(); }
+        function updateDots() {
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((d, i) => {
+                if(i < pin.length) d.classList.add('filled');
+                else d.classList.remove('filled');
+            });
         }
-
-        function unlock() {
-            if(fastHash(currentPin) === TARGET) {
-                document.getElementById('lock-screen').style.opacity=0;
-                setTimeout(()=>{
-                    document.getElementById('lock-screen').style.display='none';
-                    document.getElementById('dashboard').style.display='flex';
-                    setTimeout(()=>document.getElementById('dashboard').style.opacity=1, 50);
-                    initDashboard();
-                },400);
+        function submitPin() {
+            if(pin === TARGET_PIN) {
+                document.getElementById('lock-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('lock-screen').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'flex';
+                    setTimeout(() => document.getElementById('app-container').style.opacity = '1', 100);
+                    initApp();
+                }, 500);
             } else {
-                currentPin="";
-                document.getElementById('pin-display').innerText="••••";
                 showToast("Access Denied", "error");
+                pin = "";
+                updateDots();
             }
         }
 
-        // --- DATA ENGINE ---
-        let allUsers = []; // Local cache for instant search
-        let editingId = null;
+        // ==========================================
+        // 4. DATA CORE
+        // ==========================================
+        function initApp() {
+            fetchUsers();
+            updateStats();
+        }
 
-        async function initDashboard() {
-            document.getElementById('list-count').innerText = "SYNCING...";
-            document.getElementById('user-list').innerHTML = '<div style="text-align:center; padding:40px; color:#444;">DOWNLOADING DATABASE...</div>';
-            
-            try {
-                // Fetch up to 100 recent users for speed
-                const snap = await db.collection("users").limit(100).get();
+        async function fetchUsers(isRefresh = false) {
+            if (isLoading) return;
+            isLoading = true;
+            if(isRefresh) {
+                lastDoc = null;
                 allUsers = [];
+                document.getElementById('user-grid').innerHTML = '';
+            }
+            
+            document.getElementById('loader').style.display = 'block';
+
+            try {
+                let query = db.collection('users').orderBy('createdAt', 'desc').limit(25);
                 
+                // Fallback if createdAt doesn't exist on all docs, simply allow default ordering
+                // If you get index errors, remove .orderBy and just use .limit(25)
+                if(!isRefresh && lastDoc) {
+                    query = query.startAfter(lastDoc);
+                }
+
+                const snap = await query.get();
+                
+                if (snap.empty) {
+                    isLoading = false;
+                    document.getElementById('loader').style.display = 'none';
+                    return;
+                }
+
+                lastDoc = snap.docs[snap.docs.length - 1];
+
                 snap.forEach(doc => {
-                    allUsers.push({ id: doc.id, ...doc.data() });
+                    const data = doc.data();
+                    const userObj = { uid: doc.id, ...data };
+                    allUsers.push(userObj);
+                    renderRow(userObj);
                 });
 
-                updateStats();
-                renderList(allUsers);
-            } catch(e) {
-                showToast("Sync Failed: " + e.message, "error");
+            } catch (error) {
+                console.error("Fetch error:", error);
+                // If orderBy fails due to missing index, try basic fetch
+                if(error.code === 'failed-precondition') {
+                    showToast("Missing Index. Fetching basic list.", "warning");
+                    // Retry logic here if needed without orderBy
+                }
+            } finally {
+                isLoading = false;
+                document.getElementById('loader').style.display = 'none';
             }
         }
 
-        function updateStats() {
-            document.getElementById('s-total').innerText = allUsers.length;
-            document.getElementById('s-sus').innerText = allUsers.filter(u => u.suspended).length;
-            
-            // Online count from Realtime DB
-            rdb.ref('status').once('value', snap => {
-                let online = 0;
-                snap.forEach(child => { if(child.val().state === 'online') online++; });
-                document.getElementById('s-online').innerText = online;
+        // ==========================================
+        // 5. RENDERER
+        // ==========================================
+        function renderRow(u) {
+            const grid = document.getElementById('user-grid');
+            const div = document.createElement('div');
+            div.className = `user-row ${u.suspended ? 'suspended' : ''}`;
+            div.onclick = (e) => {
+                // Prevent click if copying ID or clicking button
+                if(e.target.closest('.btn-action')) return;
+                openDrawer(u);
+            };
+
+            const verifBadge = u.verified ? `<i class="material-icons-round verified-icon">verified</i>` : '';
+            const statusClass = u.suspended ? 'badge suspended' : 'badge admin'; // Simplified logic
+
+            div.innerHTML = `
+                <div><img src="${u.photoURL || 'https://via.placeholder.com/40'}" class="avatar"></div>
+                <div class="u-identity">
+                    <div class="u-name">${u.name || 'Unknown'} ${verifBadge}</div>
+                    <div class="u-sub">@${u.username || '...'}</div>
+                </div>
+                <div class="u-sub" style="font-family:'JetBrains Mono'">${u.gooracNumber || 'N/A'}</div>
+                <div><span id="status-${u.uid}" class="badge user">OFFLINE</span></div>
+                <div>${u.verified ? '<span style="color:var(--accent)">Verified</span>' : '<span style="color:#555">Unverified</span>'}</div>
+                <div>
+                    <button class="btn btn-action" style="padding:5px; background:transparent; color:#666; border:1px solid #333;" onclick="copyId('${u.uid}')" title="Copy UID">
+                        <i class="material-icons-round" style="font-size:16px;">content_copy</i>
+                    </button>
+                </div>
+            `;
+            grid.appendChild(div);
+
+            // Listen for Realtime Online Status
+            rdb.ref(`status/${u.uid}/state`).on('value', (snap) => {
+                const el = document.getElementById(`status-${u.uid}`);
+                if(el) {
+                    if(snap.val() === 'online') {
+                        el.innerText = "ONLINE";
+                        el.style.color = "var(--success)";
+                        el.style.background = "rgba(16, 185, 129, 0.1)";
+                    } else {
+                        el.innerText = "OFFLINE";
+                        el.style.color = "#666";
+                        el.style.background = "#1a1a1a";
+                    }
+                }
             });
         }
 
-        function renderList(data) {
-            const list = document.getElementById('user-list');
-            document.getElementById('list-count').innerText = `${data.length} ENTITIES`;
-            list.innerHTML = "";
-
-            if(data.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding:40px; color:#444;">NO MATCHES FOUND</div>';
+        // ==========================================
+        // 6. OMNI-SEARCH ENGINE
+        // ==========================================
+        let searchDebounce;
+        
+        async function handleSearch() {
+            clearTimeout(searchDebounce);
+            const term = document.getElementById('search-input').value.trim().toLowerCase();
+            const grid = document.getElementById('user-grid');
+            
+            if(term === "") {
+                searchMode = false;
+                grid.innerHTML = '';
+                allUsers.forEach(u => renderRow(u)); // Restore full list
                 return;
             }
 
-            data.forEach(u => {
-                const el = document.createElement('div');
-                el.className = 'u-card';
+            searchDebounce = setTimeout(async () => {
+                searchMode = true;
+                grid.innerHTML = '<div class="loader-row">SEARCHING DATABASE...</div>';
                 
-                let tags = "";
-                if(u.verified) tags += `<span class="material-icons-round v-badge">verified</span>`;
-                if(u.isAdmin) tags += `<span class="tag admin">ADMIN</span>`;
-                if(u.suspended) tags += `<span class="tag sus">SUSPENDED</span>`;
+                // 1. Client Side Filter (Fast)
+                const localMatches = allUsers.filter(u => 
+                    (u.name && u.name.toLowerCase().includes(term)) ||
+                    (u.username && u.username.toLowerCase().includes(term)) ||
+                    (u.gooracNumber && String(u.gooracNumber).includes(term)) ||
+                    (u.uid === term)
+                );
 
-                el.onclick = () => openEditor(u);
+                // 2. Render Local Matches First
+                grid.innerHTML = '';
+                localMatches.forEach(renderRow);
 
-                el.innerHTML = `
-                    <div class="u-left">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/50'}" class="u-pfp">
-                        <div class="u-info">
-                            <div class="u-name">${u.name || 'Unknown'} ${tags}</div>
-                            <div class="u-meta">@${u.username || '...'} • ${u.gooracNumber || 'N/A'}</div>
-                        </div>
-                    </div>
-                    <span class="material-icons-round" style="color:#333;">chevron_right</span>
-                `;
-                list.appendChild(el);
-            });
+                // 3. If few matches, Deep Search Firestore (server-side)
+                // Note: Firestore text search is limited. We prioritize exact username or gooracNumber matches.
+                if (localMatches.length < 5) {
+                    try {
+                        // Parallel queries for Username and GooracID
+                        const [qUser, qId] = await Promise.all([
+                            db.collection('users').where('username', '==', term).get(), // Exact match username (remove toLowerCase if stored case sensitive)
+                            db.collection('users').where('gooracNumber', '==', term).get()
+                        ]);
+
+                        const deepMatches = [];
+                        
+                        // Helper to process docs
+                        const process = (snap) => {
+                            snap.forEach(doc => {
+                                // Avoid duplicates
+                                if(!localMatches.find(m => m.uid === doc.id) && !deepMatches.find(m => m.uid === doc.id)) {
+                                    const d = { uid: doc.id, ...doc.data() };
+                                    deepMatches.push(d);
+                                    allUsers.push(d); // Add to cache
+                                    renderRow(d);
+                                }
+                            });
+                        };
+
+                        process(qUser);
+                        process(qId);
+                        
+                        if(localMatches.length === 0 && deepMatches.length === 0) {
+                            grid.innerHTML = '<div class="loader-row">NO USERS FOUND</div>';
+                        }
+                    } catch (e) {
+                        console.log("Deep search limit", e);
+                    }
+                }
+
+            }, 500);
         }
 
-        // --- UNIVERSAL SEARCH ---
-        function runUniversalSearch() {
-            const term = document.getElementById('univ-search').value.toLowerCase();
-            if(!term) { renderList(allUsers); return; }
+        // ==========================================
+        // 7. EDITING & ACTIONS
+        // ==========================================
+        let editState = { verified: false, suspended: false };
 
-            const filtered = allUsers.filter(u => {
-                const n = (u.name || "").toLowerCase();
-                const un = (u.username || "").toLowerCase();
-                const gid = (u.gooracNumber || "").toString();
-                const uid = u.id.toLowerCase();
-                return n.includes(term) || un.includes(term) || gid.includes(term) || uid.includes(term);
-            });
-            renderList(filtered);
+        function openDrawer(u) {
+            currentEdit = u;
+            editState.verified = u.verified || false;
+            editState.suspended = u.suspended || false;
+
+            document.getElementById('edit-pfp').src = u.photoURL || '';
+            document.getElementById('edit-uid').innerText = u.uid;
+            document.getElementById('edit-name').value = u.name || '';
+            document.getElementById('edit-user').value = u.username || '';
+            document.getElementById('edit-gid').value = u.gooracNumber || '';
+
+            updateToggleUI();
+            document.getElementById('editor-drawer').classList.add('open');
         }
 
-        // --- EDITOR LOGIC ---
-        function openEditor(u) {
-            editingId = u.id;
+        function closeDrawer() {
+            document.getElementById('editor-drawer').classList.remove('open');
+            currentEdit = null;
+        }
+
+        function toggleBool(key) {
+            editState[key] = !editState[key];
+            updateToggleUI();
+        }
+
+        function updateToggleUI() {
+            const btnV = document.getElementById('btn-verify');
+            const btnS = document.getElementById('btn-suspend');
+
+            if(editState.verified) {
+                btnV.style.background = 'rgba(0, 242, 255, 0.2)';
+                btnV.style.borderColor = 'var(--accent)';
+                btnV.style.color = 'var(--accent)';
+            } else {
+                btnV.style.background = '#111';
+                btnV.style.borderColor = '#333';
+                btnV.style.color = 'white';
+            }
+
+            if(editState.suspended) {
+                btnS.style.background = 'rgba(239, 68, 68, 0.2)';
+                btnS.style.borderColor = 'var(--danger)';
+                btnS.style.color = 'var(--danger)';
+            } else {
+                btnS.style.background = '#111';
+                btnS.style.borderColor = '#333';
+                btnS.style.color = 'white';
+            }
+        }
+
+        async function saveChanges() {
+            if(!currentEdit) return;
+            const uid = currentEdit.uid;
             
-            // Populate
-            document.getElementById('ed-uid').innerText = `ID: ${u.id}`;
-            document.getElementById('ed-display-name').innerText = u.name || 'Unknown';
-            document.getElementById('ed-pfp').src = u.photoURL || '';
-            
-            document.getElementById('inp-name').value = u.name || '';
-            document.getElementById('inp-user').value = u.username || '';
-            document.getElementById('inp-gid').value = u.gooracNumber || '';
-            document.getElementById('inp-url').value = u.photoURL || '';
-
-            // Toggles
-            const v = document.getElementById('tog-ver');
-            u.verified ? v.classList.add('active') : v.classList.remove('active');
-
-            const s = document.getElementById('tog-sus');
-            u.suspended ? s.classList.add('active') : s.classList.remove('active');
-
-            document.getElementById('editor').style.display = 'flex';
-        }
-
-        function closeEditor() {
-            document.getElementById('editor').style.display = 'none';
-            editingId = null;
-        }
-
-        function toggleCard(el) { el.classList.toggle('active'); }
-
-        async function saveEntity() {
-            if(!editingId) return;
             const updates = {
-                name: document.getElementById('inp-name').value,
-                username: document.getElementById('inp-user').value,
-                photoURL: document.getElementById('inp-url').value,
-                verified: document.getElementById('tog-ver').classList.contains('active'),
-                suspended: document.getElementById('tog-sus').classList.contains('active')
+                name: document.getElementById('edit-name').value,
+                username: document.getElementById('edit-user').value,
+                verified: editState.verified,
+                suspended: editState.suspended
             };
 
             try {
-                await db.collection("users").doc(editingId).update(updates);
+                await db.collection('users').doc(uid).update(updates);
                 
-                // Update Local Cache
-                const idx = allUsers.findIndex(u => u.id === editingId);
-                if(idx !== -1) allUsers[idx] = { ...allUsers[idx], ...updates };
+                // Update local cache
+                const idx = allUsers.findIndex(u => u.uid === uid);
+                if(idx !== -1) {
+                    allUsers[idx] = { ...allUsers[idx], ...updates };
+                }
                 
-                renderList(allUsers); // Re-render immediately
-                showToast("Entity Saved", "success");
-                closeEditor();
+                // Refresh View
+                if(!searchMode) {
+                    document.getElementById('user-grid').innerHTML = '';
+                    allUsers.forEach(renderRow);
+                } else {
+                    handleSearch(); // Re-run search
+                }
+
+                showToast("Profile Updated", "success");
+                closeDrawer();
             } catch(e) {
-                showToast("Save Failed", "error");
+                showToast("Update Failed: " + e.message, "error");
             }
         }
 
-        async function deleteEntity() {
-            if(!confirm("⚠️ PERMANENT DELETE\n\nAre you absolutely sure?")) return;
+        async function deleteUser() {
+            if(!confirm("Are you surely you want to DELETE this user? This cannot be undone.")) return;
             try {
-                await db.collection("users").doc(editingId).delete();
-                allUsers = allUsers.filter(u => u.id !== editingId);
-                renderList(allUsers);
-                closeEditor();
-                showToast("Entity Deleted", "success");
+                await db.collection('users').doc(currentEdit.uid).delete();
+                showToast("User Deleted", "success");
+                closeDrawer();
+                refreshData();
             } catch(e) {
-                showToast("Delete Failed", "error");
+                showToast("Error: " + e.message, "error");
             }
         }
 
-        function exportData() {
-            const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers, null, 2));
-            const a = document.createElement('a');
-            a.href = str; a.download = `nexus_dump_${Date.now()}.json`;
-            a.click();
+        // ==========================================
+        // 8. UTILS
+        // ==========================================
+        function refreshData() {
+            fetchUsers(true);
         }
 
-        function showToast(msg, type) {
-            const t = document.createElement('div');
-            t.className = 'toast';
-            t.style.border = type === 'error' ? '1px solid #ff2a6d' : '1px solid #00ff9d';
-            t.innerHTML = `<span class="material-icons-round">${type==='error'?'error':'check_circle'}</span> ${msg}`;
-            document.body.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
+        function copyId(id) {
+            navigator.clipboard.writeText(id);
+            showToast("UID Copied", "success");
         }
+
+        function updateStats() {
+            // In a real app, use a dedicated 'stats' document in Firestore 
+            // Counting client-side is expensive for large DBs. 
+            // For now, we estimate based on loaded + total count if available.
+            db.collection('users').get().then(snap => {
+                document.getElementById('count-total').innerText = snap.size;
+                const sus = snap.docs.filter(d => d.data().suspended).length;
+                document.getElementById('count-sus').innerText = sus;
+            });
+
+            // Online count from RDB
+            rdb.ref('status').on('value', snap => {
+                let count = 0;
+                snap.forEach(child => {
+                    if(child.val().state === 'online') count++;
+                });
+                document.getElementById('count-online').innerText = count;
+            });
+        }
+
+        function exportJSON() {
+            const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers));
+            const node = document.createElement('a');
+            node.setAttribute("href", str);
+            node.setAttribute("download", "goorac_export.json");
+            document.body.appendChild(node);
+            node.click();
+            node.remove();
+        }
+
+        function showToast(msg, type="info") {
+            const t = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            document.getElementById('toast-msg').innerText = msg;
+            
+            icon.innerText = type === 'success' ? 'check_circle' : (type === 'error' ? 'error' : 'info');
+            icon.style.color = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--danger)' : 'var(--primary)');
+            
+            t.classList.add('visible');
+            setTimeout(() => t.classList.remove('visible'), 3000);
+        }
+
+        // Infinite Scroll
+        document.getElementById('user-grid').addEventListener('scroll', (e) => {
+            if(searchMode) return; // Disable infinite scroll during search
+            const { scrollTop, scrollHeight, clientHeight } = e.target;
+            if(scrollTop + clientHeight >= scrollHeight - 20) {
+                fetchUsers();
+            }
+        });
+
     </script>
 </body>
 </html>
