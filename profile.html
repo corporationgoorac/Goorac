@@ -102,14 +102,42 @@
         .bottom-modal.active { bottom: 0; }
         .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
         
+        /* FULLSCREEN MODAL (BLOCKED LIST) */
+        .fullscreen-modal {
+            position: fixed; inset: 0; background: var(--bg);
+            z-index: 1002; display: none; flex-direction: column;
+            padding-top: var(--safe-top);
+        }
+        .fullscreen-modal.active { display: flex; animation: slideInUp 0.3s ease; }
+        @keyframes slideInUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
         /* TOGGLE SWITCH CSS */
-        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .setting-row:active { background: var(--surface-press); }
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--accent); }
         input:checked + .slider:before { transform: translateX(20px); }
+
+        /* BLOCKED LIST ITEMS */
+        .blocked-list { padding: 0 20px; overflow-y: auto; flex: 1; }
+        .blocked-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .blocked-user-info { display: flex; align-items: center; gap: 12px; }
+        .blocked-pfp { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: #111; }
+        .unblock-btn { 
+            padding: 8px 16px; border-radius: 10px; border: 1px solid var(--danger); 
+            color: var(--danger); font-size: 12px; font-weight: 700; background: transparent; 
+            cursor: pointer; position: relative; min-width: 80px; text-align: center;
+        }
+        .unblock-btn.loading { color: transparent; pointer-events: none; }
+        .unblock-btn.loading::after {
+            content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
+            margin: -7px 0 0 -7px; border: 2px solid var(--danger); border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
@@ -147,7 +175,7 @@
         .skeleton::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.5s infinite; }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        #toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.4s; z-index: 2000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px; }
+        #toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.4s; z-index: 3000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
@@ -167,6 +195,7 @@
     </header>
 
     <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
+    
     <div class="bottom-modal" id="bottom-modal">
         <div class="modal-handle"></div>
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -183,8 +212,25 @@
             </label>
         </div>
 
-        <div style="padding:40px 0; text-align:center; color:var(--secondary); font-size:12px; letter-spacing:1px; font-weight:800;">
-            ADVANCED COMMANDS COMING SOON...
+        <div class="setting-row" onclick="openBlockedList()">
+            <span style="font-size:14px; font-weight:600;">Blocked Accounts</span>
+            <span class="material-icons-round" style="color:var(--secondary);">chevron_right</span>
+        </div>
+
+        <div style="padding:40px 0; text-align:center; color:var(--secondary); font-size:11px; letter-spacing:1px; font-weight:800;">
+            ADVANCED COMMANDS ACTIVE
+        </div>
+    </div>
+
+    <div class="fullscreen-modal" id="blocked-modal">
+        <header>
+            <div class="header-left">
+                <span class="material-icons-round back-arrow" onclick="closeBlockedList()">west</span>
+                <div class="header-title">Restricted Agents</div>
+            </div>
+        </header>
+        <div class="blocked-list" id="blocked-user-container">
+            <p style="text-align:center; padding:50px; color:var(--secondary); font-size:13px;">Frequency scanning...</p>
         </div>
     </div>
 
@@ -245,7 +291,7 @@
         const overlay = document.getElementById('modal-overlay');
         const modal = document.getElementById('bottom-modal');
         if (show) {
-            history.pushState({modalOpen: true}, ""); 
+            history.pushState({modal: 'settings'}, ""); 
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
             if(navigator.vibrate) navigator.vibrate(20);
@@ -255,9 +301,24 @@
         }
     }
 
-    // Back button to close modal
+    function openBlockedList() {
+        history.pushState({modal: 'blocked'}, "");
+        document.getElementById('blocked-modal').classList.add('active');
+        fetchBlockedUsers();
+    }
+
+    function closeBlockedList() {
+        document.getElementById('blocked-modal').classList.remove('active');
+        if(window.history.state && window.history.state.modal === 'blocked') {
+            history.back();
+        }
+    }
+
+    // Fixed Back Button Logic
     window.onpopstate = function(e) {
-        if(document.getElementById('bottom-modal').classList.contains('active')) {
+        if(document.getElementById('blocked-modal').classList.contains('active')) {
+            document.getElementById('blocked-modal').classList.remove('active');
+        } else if(document.getElementById('bottom-modal').classList.contains('active')) {
             toggleMenu(false);
         }
     };
@@ -266,48 +327,102 @@
     async function updateActivityPref(isEnabled) {
         const user = auth.currentUser;
         if (!user) return;
-
-        await db.collection("users").doc(user.uid).update({
-            showActivityStatus: isEnabled
-        });
-
+        await db.collection("users").doc(user.uid).update({ showActivityStatus: isEnabled });
         const statusRef = rdb.ref('/status/' + user.uid);
-        await statusRef.set({ 
-            state: isEnabled ? 'online' : 'offline', 
-            last_changed: firebase.database.ServerValue.TIMESTAMP 
-        });
-        
+        await statusRef.set({ state: isEnabled ? 'online' : 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
         if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    // --- BLOCKED USERS LOGIC ---
+    async function fetchBlockedUsers() {
+        const container = document.getElementById('blocked-user-container');
+        const user = auth.currentUser;
+        if (!user) return;
+
+        db.collection("users").doc(user.uid).onSnapshot(async (doc) => {
+            const blockedArray = doc.data().blocked || [];
+            if (blockedArray.length === 0) {
+                container.innerHTML = `<p style="text-align:center; padding:50px; color:var(--secondary); font-size:13px;">No agents currently restricted.</p>`;
+                return;
+            }
+
+            container.innerHTML = "";
+            for (const bEntry of blockedArray) {
+                const bId = typeof bEntry === 'string' ? bEntry : bEntry.uid;
+                const bDoc = await db.collection("users").doc(bId).get();
+                if (bDoc.exists) {
+                    const bData = bDoc.data();
+                    const div = document.createElement('div');
+                    div.className = 'blocked-item';
+                    div.innerHTML = `
+                        <div class="blocked-user-info">
+                            <img src="${bData.photoURL || 'https://via.placeholder.com/150/111/fff'}" class="blocked-pfp">
+                            <div>
+                                <div style="font-weight:700; font-size:14px;">${bData.name}</div>
+                                <div style="color:var(--secondary); font-size:12px;">@${bData.username}</div>
+                            </div>
+                        </div>
+                        <button class="unblock-btn" onclick="handleUnblock(this, '${bId}')">Unblock</button>
+                    `;
+                    container.appendChild(div);
+                }
+            }
+        });
+    }
+
+    async function handleUnblock(btn, targetUid) {
+        btn.classList.add('loading');
+        const user = auth.currentUser;
+        
+        try {
+            // Firestore array remove logic
+            await db.collection("users").doc(user.uid).update({
+                blocked: firebase.firestore.FieldValue.arrayRemove({
+                    uid: targetUid,
+                    timestamp: firebase.firestore.Timestamp.now() // Note: Match stored structure or use ID-only check if needed
+                })
+            });
+            
+            // Structure check: If blocking stored simple IDs, use arrayRemove(targetUid)
+            // Let's also try to find the specific entry to be safe:
+            const myDoc = await db.collection("users").doc(user.uid).get();
+            const currentBlocked = myDoc.data().blocked || [];
+            const entryToRemove = currentBlocked.find(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+            
+            if(entryToRemove) {
+                await db.collection("users").doc(user.uid).update({
+                    blocked: firebase.firestore.FieldValue.arrayRemove(entryToRemove)
+                });
+            }
+
+            showToast("Agent restored to network");
+        } catch (e) {
+            console.error(e);
+            showToast("Frequency clear failed");
+        } finally {
+            btn.classList.remove('loading');
+        }
     }
 
     // --- 1. IMMEDIATE CACHE LOAD ---
     (function loadCache() {
         const cached = localStorage.getItem('my_goorac_profile');
         if (cached) {
-            try {
-                const data = JSON.parse(cached);
-                renderUI(data);
-            } catch (e) { console.error("Cache parse error", e); }
+            try { renderUI(JSON.parse(cached)); } catch (e) { console.error(e); }
         }
     })();
 
     // --- 2. AUTH & REALTIME SYNC ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            // FIX: Reliable initialization of profile-notes component
             const notesComp = document.getElementById('profile-notes');
             if(notesComp) {
-                // Force set properties immediately on auth change
                 notesComp.uid = user.uid;
                 notesComp.setAttribute('uid', user.uid);
-                
-                customElements.whenDefined('profile-notes').then(() => {
-                    if(notesComp.init) notesComp.init(); 
-                });
+                customElements.whenDefined('profile-notes').then(() => { if(notesComp.init) notesComp.init(); });
             }
             initRealtimeListener(user.uid);
         } else {
-            // Instant redirect to login if logged out
             window.location.replace('login.html');
         }
     });
@@ -318,12 +433,7 @@
                 const data = doc.data();
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                 renderUI(data);
-            } else {
-                window.location.replace("setup.html");
-            }
-        }, (error) => {
-            console.error("Firestore Error:", error);
-            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
+            } else { window.location.replace("setup.html"); }
         });
     }
 
@@ -332,10 +442,7 @@
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
-                el.classList.remove('skeleton');
-                el.style.width = ""; el.style.height = "";
-            }
+            if(el) { el.classList.remove('skeleton'); el.style.width = ""; el.style.height = ""; }
         });
 
         document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
@@ -354,33 +461,21 @@
         safeText('count-followers', (data.followers || []).length);
         safeText('count-following', (data.following || []).length);
 
-        // SYNC TOGGLE: Defaults to ON if the field is undefined or not explicitly false
         const toggle = document.getElementById('activity-toggle');
-        if(toggle) {
-            toggle.checked = data.showActivityStatus !== false;
-        }
+        if(toggle) toggle.checked = data.showActivityStatus !== false;
     }
 
-    function safeText(id, val) {
-        const el = document.getElementById(id);
-        if(el) el.innerText = val;
-    }
+    function safeText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 
     function copyID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(!txt || txt.includes('-')) return;
-        navigator.clipboard.writeText(txt).then(() => {
-            if(navigator.vibrate) navigator.vibrate(50);
-            showToast("ID Copied");
-        });
+        navigator.clipboard.writeText(txt).then(() => { if(navigator.vibrate) navigator.vibrate(50); showToast("ID Copied"); });
     }
 
     function logout() {
         if(confirm("Log out of Goorac?")) {
-            auth.signOut().then(() => {
-                localStorage.clear(); 
-                window.location.replace("login.html");
-            });
+            auth.signOut().then(() => { localStorage.clear(); window.location.replace("login.html"); });
         }
     }
 
