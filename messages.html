@@ -298,8 +298,6 @@
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
             
-            // REMOVED TIMER UPDATE HERE
-
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
@@ -339,15 +337,16 @@
                 if(!u) return;
                 
                 // --- FIXED UNREAD LOGIC ---
-                // We rely strictly on the counter for the current user.
-                // We do NOT use chat.seen for visibility, to prevent reloading resetting it 
-                // if the global flag is inconsistent.
-                
                 let unreadVal = 0;
-                if (chat.unreadCount && typeof chat.unreadCount[myUid] !== 'undefined') {
-                    unreadVal = chat.unreadCount[myUid];
-                } else if (chat.lastSender !== myUid && chat.seen === false) {
-                    // Legacy Fallback
+                
+                // Check if the unreadCount OBJECT exists in the document
+                if (chat.unreadCount) {
+                    // If the object exists, we TRUST it. 
+                    // If myUid is not in the object, it implies 0 unread messages.
+                    unreadVal = chat.unreadCount[myUid] || 0;
+                } 
+                // ONLY fall back to legacy 'seen' flag if the unreadCount system is totally missing
+                else if (chat.lastSender !== myUid && chat.seen === false) {
                     unreadVal = 1; 
                 }
 
