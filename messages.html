@@ -107,6 +107,11 @@
             flex-shrink: 0;
             animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        /* CSS Feature: If badge is empty (no number), turn it into a small dot */
+        .unread-badge:empty {
+            min-width: 10px; width: 10px; height: 10px; 
+            padding: 0; border-radius: 50%;
+        }
         @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
 
         /* SKELETON */
@@ -336,22 +341,26 @@
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
                 if(!u) return;
                 
-                // --- FIXED UNREAD LOGIC ---
+                // --- ROBUST UNREAD LOGIC ---
                 let unreadVal = 0;
-                
-                // Check if the unreadCount OBJECT exists in the document
-                if (chat.unreadCount) {
-                    // If the object exists, we TRUST it. 
-                    // If myUid is not in the object, it implies 0 unread messages.
-                    unreadVal = chat.unreadCount[myUid] || 0;
+                let showNumber = false;
+
+                // 1. Try to get the count from the object (ignoring type strictness to fix string issues)
+                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined && chat.unreadCount[myUid] !== null) {
+                    unreadVal = Number(chat.unreadCount[myUid]); // Force convert to number
+                    showNumber = true; 
                 } 
-                // ONLY fall back to legacy 'seen' flag if the unreadCount system is totally missing
+                // 2. Legacy Fallback (Only used if unreadCount system is totally missing)
                 else if (chat.lastSender !== myUid && chat.seen === false) {
                     unreadVal = 1; 
+                    showNumber = false; // We don't know the number, so don't show "1"
                 }
 
                 const isUnread = unreadVal > 0;
-                const displayCount = unreadVal > 99 ? "99+" : unreadVal;
+                
+                // If unread and we know the number, show it (e.g. "5"). 
+                // If unread but don't know number, show empty string (CSS makes it a dot).
+                const displayCount = (isUnread && showNumber) ? (unreadVal > 99 ? "99+" : unreadVal) : "";
 
                 const amIFollowing = myFollowingList.some(item => {
                     const uid = typeof item === 'string' ? item : item.uid;
