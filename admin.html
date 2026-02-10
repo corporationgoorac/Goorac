@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Goorac | Nexus v3.0</title>
+    <title>Goorac | Nexus Enterprise</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -11,20 +11,21 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg: #000000;
-            --surface: #0a0a0a;
-            --surface-light: #141414;
-            --border: #222;
-            --accent: #00f2ff; 
-            --accent-dim: rgba(0, 242, 255, 0.1);
-            --danger: #ff2a6d;
-            --success: #00ff9d;
+            --bg: #050505;
+            --surface: #0f0f0f;
+            --surface-2: #181818;
+            --border: #262626;
+            --accent: #3b82f6; 
+            --accent-glow: rgba(59, 130, 246, 0.15);
+            --danger: #ef4444;
+            --success: #10b981;
             --text: #ffffff;
             --text-sec: #888888;
+            --glass: rgba(15, 15, 15, 0.8);
         }
 
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -33,6 +34,10 @@
             background: var(--bg); color: var(--text); margin: 0;
             font-family: 'Inter', sans-serif; height: 100vh;
             display: flex; flex-direction: column; overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
         }
 
         /* --- LOCK SCREEN --- */
@@ -44,163 +49,181 @@
         }
         .pin-display {
             font-family: 'JetBrains Mono', monospace; font-size: 32px; letter-spacing: 12px;
-            margin-bottom: 40px; color: var(--accent); min-height: 40px; text-shadow: 0 0 15px var(--accent-dim);
+            margin-bottom: 40px; color: white; min-height: 40px; 
         }
         .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .pin-btn {
             width: 72px; height: 72px; border-radius: 20px; border: 1px solid var(--border);
-            background: var(--surface); color: white; font-size: 24px; font-weight: 600;
-            cursor: pointer; transition: 0.1s; font-family: 'JetBrains Mono';
+            background: var(--surface); color: white; font-size: 24px; font-weight: 500;
+            cursor: pointer; transition: 0.1s; font-family: 'Inter';
         }
-        .pin-btn:active { background: var(--accent); color: black; box-shadow: 0 0 20px var(--accent-dim); border-color: var(--accent); }
+        .pin-btn:active { background: white; color: black; }
 
-        /* --- DASHBOARD LAYOUT --- */
-        #dashboard { display: none; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
-        
-        /* Header */
+        /* --- DASHBOARD HEADER --- */
         header {
-            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            padding: 16px 24px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: rgba(5,5,5,0.9); backdrop-filter: blur(10px); z-index: 10;
+            background: var(--glass); backdrop-filter: blur(20px); z-index: 10;
         }
         .brand { display: flex; align-items: center; gap: 10px; }
-        .brand-icon { color: var(--accent); font-size: 22px; text-shadow: 0 0 10px var(--accent-dim); }
-        .brand-text { font-family: 'JetBrains Mono', monospace; font-weight: 800; letter-spacing: -1px; font-size: 1.1rem; }
+        .brand-icon { color: white; font-size: 20px; }
+        .brand-text { font-weight: 700; letter-spacing: -0.5px; font-size: 1.1rem; }
         
         .h-actions { display: flex; gap: 8px; }
         .h-btn {
-            width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+            width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
             background: var(--surface); color: var(--text-sec); display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.2s;
         }
-        .h-btn:active { background: var(--accent); color: black; border-color: var(--accent); }
+        .h-btn:hover { color: white; border-color: #444; }
+        .h-btn:active { background: white; color: black; border-color: white; }
 
-        /* Stats Row */
+        /* --- STATS ROW --- */
         .stats-row {
-            display: flex; gap: 12px; padding: 20px; overflow-x: auto; flex-shrink: 0;
+            display: flex; gap: 12px; padding: 20px 24px 0; overflow-x: auto; flex-shrink: 0;
             scrollbar-width: none;
         }
         .stat-card {
             background: var(--surface); border: 1px solid var(--border);
-            min-width: 110px; padding: 16px; border-radius: 14px;
-            display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            min-width: 130px; padding: 16px; border-radius: 12px;
+            display: flex; flex-direction: column; justify-content: center;
         }
-        .s-val { font-size: 22px; font-weight: 800; color: white; margin-bottom: 4px; }
-        .s-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .s-val { font-size: 20px; font-weight: 700; color: white; margin-bottom: 4px; font-family: 'JetBrains Mono'; }
+        .s-lbl { font-size: 10px; color: var(--text-sec); font-weight: 600; letter-spacing: 0.5px; }
 
-        /* Search Bar */
-        .search-container { padding: 0 20px 15px; flex-shrink: 0; }
+        /* --- SEARCH --- */
+        .search-container { padding: 20px 24px 10px; flex-shrink: 0; }
         .search-wrap {
             background: var(--surface); border: 1px solid var(--border);
-            border-radius: 12px; display: flex; align-items: center; padding: 0 14px;
-            transition: 0.3s;
+            border-radius: 10px; display: flex; align-items: center; padding: 0 14px;
+            transition: 0.2s;
         }
-        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-dim); }
+        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
         .search-wrap input {
             width: 100%; background: transparent; border: none; color: white;
-            padding: 14px 8px; font-size: 14px; font-weight: 500; font-family: 'Inter';
+            padding: 12px 8px; font-size: 13px; font-weight: 500;
         }
 
-        /* User List (Scrollable Area) */
-        .list-wrapper { flex: 1; overflow-y: auto; padding: 0 20px 80px; position: relative; }
+        /* --- LIST --- */
+        .list-wrapper { flex: 1; overflow-y: auto; padding: 0 24px 40px; }
         .list-header { 
-            font-size: 11px; font-weight: 700; color: var(--text-sec); 
-            margin-bottom: 12px; display: flex; justify-content: space-between; position: sticky; top: 0;
+            font-size: 10px; font-weight: 700; color: var(--text-sec); letter-spacing: 1px;
+            margin: 10px 0; display: flex; justify-content: space-between; position: sticky; top: 0;
             background: var(--bg); padding: 10px 0; z-index: 5;
         }
 
         .u-card {
             background: var(--surface); border: 1px solid var(--border);
-            border-radius: 14px; padding: 14px; margin-bottom: 10px;
+            border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
             display: flex; align-items: center; justify-content: space-between;
             transition: 0.2s; cursor: pointer;
         }
-        .u-card:active { transform: scale(0.98); background: var(--surface-light); border-color: #444; }
+        .u-card:hover { border-color: #444; }
+        .u-card:active { transform: scale(0.99); background: var(--surface-2); }
         
         .u-left { display: flex; align-items: center; gap: 14px; }
-        .u-pfp { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: #222; border: 1px solid #333; }
-        .u-info { display: flex; flex-direction: column; }
-        .u-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-        .u-meta { font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono'; margin-top: 3px; }
+        .u-pfp { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; background: #222; border: 1px solid #333; }
+        .u-name { font-size: 14px; font-weight: 600; color: #eee; }
+        .u-meta { font-size: 11px; color: var(--text-sec); font-family: 'JetBrains Mono'; margin-top: 2px; }
         
         /* Badges */
-        .badge { font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
-        .b-ver { color: var(--accent); background: rgba(0, 242, 255, 0.1); border: 1px solid rgba(0, 242, 255, 0.2); }
-        .b-sus { color: var(--danger); background: rgba(255, 42, 109, 0.1); border: 1px solid rgba(255, 42, 109, 0.2); }
-        .b-adm { color: #ffd700; background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); }
+        .badges { display: flex; gap: 6px; }
+        .badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; border: 1px solid; }
+        .b-ver { color: var(--accent); border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); }
+        .b-sus { color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); }
 
-        /* EDITOR MODAL (Layout Fix) */
+        /* --- EDITOR SHEET (FIXED LAYOUT) --- */
         #editor {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
             display: none; justify-content: flex-end; backdrop-filter: blur(8px);
         }
         .sheet {
-            width: 100%; max-width: 500px; background: #080808; height: 100%;
+            width: 100%; max-width: 480px; background: #080808; height: 100%;
             border-left: 1px solid var(--border); display: flex; flex-direction: column;
-            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: -20px 0 60px rgba(0,0,0,0.9);
+            animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: -10px 0 40px rgba(0,0,0,0.8);
         }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-        /* Header Fixed */
-        .sheet-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #080808; }
-        .sh-title { font-size: 18px; font-weight: 800; }
+        /* Head */
+        .sheet-head { padding: 20px 28px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #080808; }
+        .sh-title { font-size: 16px; font-weight: 700; color: white; }
 
-        /* Body Scrollable */
-        .sheet-body { flex: 1; overflow-y: auto; padding: 24px; }
+        /* Body (Scrollable) */
+        .sheet-body { flex: 1; overflow-y: auto; padding: 28px; }
 
-        /* Profile Top */
-        .ed-top { display: flex; gap: 20px; align-items: center; margin-bottom: 30px; }
-        .ed-pfp { width: 75px; height: 75px; border-radius: 20px; object-fit: cover; border: 2px solid var(--border); }
-        
+        /* Profile Block */
+        .ed-profile { display: flex; gap: 20px; align-items: center; margin-bottom: 30px; }
+        .ed-pfp { width: 72px; height: 72px; border-radius: 18px; object-fit: cover; border: 1px solid var(--border); }
+        .ed-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: white; }
+        .ed-id-box { 
+            font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-sec); 
+            background: var(--surface-2); padding: 4px 8px; border-radius: 6px; display: inline-block; cursor: pointer;
+        }
+        .ed-id-box:active { color: white; background: #333; }
+
+        /* Status Dot */
+        .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-sec); margin-top: 6px; }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+        .dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
         /* Toggles */
-        .toggle-row { display: flex; gap: 12px; margin-bottom: 25px; }
+        .toggle-row { display: flex; gap: 12px; margin-bottom: 30px; }
         .toggle-card {
             flex: 1; background: var(--surface); border: 1px solid var(--border);
-            padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.2s;
+            padding: 14px; border-radius: 10px; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        .toggle-card.active { border-color: var(--accent); background: var(--accent-dim); }
-        .toggle-card.danger.active { border-color: var(--danger); background: rgba(255, 42, 109, 0.1); }
-        .tc-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; margin-bottom: 6px; }
-        .active .tc-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-        .danger.active .tc-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-        .tc-txt { font-size: 11px; font-weight: 700; }
+        .toggle-card:hover { border-color: #444; }
+        .toggle-card.active { border-color: var(--accent); background: var(--accent-glow); }
+        .toggle-card.danger.active { border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        
+        .tc-txt { font-size: 12px; font-weight: 600; }
+        .tc-switch { width: 32px; height: 18px; background: #333; border-radius: 20px; position: relative; transition: 0.2s; }
+        .tc-switch::after { content:''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: 0.2s; }
+        .active .tc-switch { background: var(--accent); }
+        .danger.active .tc-switch { background: var(--danger); }
+        .active .tc-switch::after, .danger.active .tc-switch::after { transform: translateX(14px); }
 
         /* Inputs */
-        .input-wrap { margin-bottom: 20px; }
-        .lbl { display: block; font-size: 10px; font-weight: 700; color: var(--text-sec); margin-bottom: 8px; text-transform: uppercase; }
+        .input-wrap { margin-bottom: 24px; }
+        .lbl { display: block; font-size: 11px; font-weight: 600; color: var(--text-sec); margin-bottom: 8px; }
         .inp {
             width: 100%; background: var(--surface); border: 1px solid var(--border);
-            color: white; padding: 14px; border-radius: 10px; font-size: 14px; font-family: 'JetBrains Mono';
+            color: white; padding: 14px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; font-family: 'Inter';
             transition: 0.2s;
         }
-        .inp:focus { border-color: var(--accent); background: #121212; }
+        .inp:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); outline: none; }
+        .inp[readonly] { color: #555; cursor: default; }
 
-        /* Footer Fixed (Buttons) */
+        /* Foot (Fixed Buttons) */
         .sheet-foot {
-            padding: 20px 24px; border-top: 1px solid var(--border); background: #080808;
+            padding: 24px 28px; border-top: 1px solid var(--border); background: #080808;
             display: grid; grid-template-columns: 1fr 2fr; gap: 12px;
-            /* Safe area for mobile */
-            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            padding-bottom: max(24px, env(safe-area-inset-bottom));
         }
         .btn {
-            padding: 16px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
-            border: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 14px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer;
+            border: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;
         }
         .btn-save { background: white; color: black; }
-        .btn-save:active { transform: scale(0.98); }
-        .btn-del { background: rgba(255, 42, 109, 0.1); color: var(--danger); border: 1px solid rgba(255, 42, 109, 0.3); }
+        .btn-save:active { transform: scale(0.97); background: #ddd; }
+        .btn-del { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+        .btn-del:active { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); }
         
         /* TOAST */
         .toast {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #111; color: white; padding: 12px 24px; border-radius: 30px;
-            border: 1px solid var(--border); font-weight: 600; font-size: 13px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.7); z-index: 200;
-            display: flex; align-items: center; gap: 10px;
-            animation: floatUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background: #111; color: white; padding: 10px 20px; border-radius: 30px;
+            border: 1px solid #333; font-weight: 500; font-size: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 200;
+            display: flex; align-items: center; gap: 8px;
+            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        @keyframes floatUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .t-icon { font-size: 16px; }
+        .t-suc { color: var(--success); }
+        .t-err { color: var(--danger); }
+        @keyframes slideUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
     </style>
 </head>
@@ -229,12 +252,12 @@
     <div id="dashboard">
         <header>
             <div class="brand">
-                <span class="material-icons-round brand-icon">admin_panel_settings</span>
-                <span class="brand-text">NEXUS</span>
+                <span class="material-icons-round brand-icon">dns</span>
+                <span class="brand-text">NEXUS <span style="opacity:0.5; font-weight:400;">ENT</span></span>
             </div>
             <div class="h-actions">
-                <button class="h-btn" onclick="exportData()" title="Download JSON"><span class="material-icons-round">download</span></button>
-                <button class="h-btn" onclick="refreshData()" title="Reload DB"><span class="material-icons-round">refresh</span></button>
+                <button class="h-btn" onclick="exportData()"><span class="material-icons-round" style="font-size:18px;">download</span></button>
+                <button class="h-btn" onclick="refreshData()"><span class="material-icons-round" style="font-size:18px;">refresh</span></button>
             </div>
         </header>
 
@@ -255,15 +278,15 @@
 
         <div class="search-container">
             <div class="search-wrap">
-                <span class="material-icons-round" style="color:var(--text-sec); margin-right:8px;">search</span>
-                <input type="text" id="search-input" placeholder="Search Names, Usernames, IDs..." oninput="handleSearch()">
+                <span class="material-icons-round" style="color:var(--text-sec); font-size:20px; margin-right:8px;">search</span>
+                <input type="text" id="search-input" placeholder="Search Users, IDs, Handles..." oninput="handleSearch()">
             </div>
         </div>
 
         <div class="list-wrapper">
             <div class="list-header">
-                <span>ENTITY LIST</span>
-                <span id="list-counter">SYNCING...</span>
+                <span>ENTITY DIRECTORY</span>
+                <span id="list-counter">CONNECTING...</span>
             </div>
             <div id="user-list">
                 </div>
@@ -273,33 +296,33 @@
     <div id="editor">
         <div class="sheet">
             <div class="sheet-head">
-                <span class="sh-title">Edit Entity</span>
+                <span class="sh-title">Manage Entity</span>
                 <button class="h-btn" style="border:none; background:transparent;" onclick="closeEditor()">
                     <span class="material-icons-round">close</span>
                 </button>
             </div>
             
             <div class="sheet-body">
-                <div class="ed-top">
+                <div class="ed-profile">
                     <img id="ed-pfp" class="ed-pfp">
                     <div>
-                        <div id="ed-id" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-sec); margin-bottom:4px;">ID: ---</div>
-                        <div id="ed-name-disp" style="font-weight:800; font-size:18px;">User</div>
+                        <div class="ed-name" id="ed-name-disp">User Name</div>
+                        <div class="ed-id-box" id="ed-id" onclick="copyId()" title="Click to Copy">ID: ---</div>
+                        <div class="status-pill">
+                            <div class="dot" id="ed-dot"></div>
+                            <span id="ed-status-text">Offline</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="toggle-row">
                     <div class="toggle-card" id="tog-ver" onclick="toggleCard(this)">
-                        <div class="tc-dot"></div>
-                        <div class="tc-txt">VERIFIED</div>
-                    </div>
-                    <div class="toggle-card" id="tog-adm" onclick="toggleCard(this)">
-                        <div class="tc-dot"></div>
-                        <div class="tc-txt">ADMIN</div>
+                        <span class="tc-txt">VERIFIED</span>
+                        <div class="tc-switch"></div>
                     </div>
                     <div class="toggle-card danger" id="tog-sus" onclick="toggleCard(this)">
-                        <div class="tc-dot"></div>
-                        <div class="tc-txt">SUSPENDED</div>
+                        <span class="tc-txt">SUSPENDED</span>
+                        <div class="tc-switch"></div>
                     </div>
                 </div>
 
@@ -312,28 +335,24 @@
                     <input type="text" class="inp" id="inp-user">
                 </div>
                 <div class="input-wrap">
-                    <label class="lbl">Goorac ID (Static)</label>
-                    <input type="text" class="inp" id="inp-gid" style="color:var(--text-sec);" readonly>
+                    <label class="lbl">Goorac ID (Immutable)</label>
+                    <input type="text" class="inp" id="inp-gid" readonly>
                 </div>
                 <div class="input-wrap">
-                    <label class="lbl">Avatar Source</label>
+                    <label class="lbl">Avatar Source URL</label>
                     <input type="text" class="inp" id="inp-url">
                 </div>
             </div>
 
             <div class="sheet-foot">
-                <button class="btn btn-del" onclick="deleteEntity()">
-                    <span class="material-icons-round">delete</span> ERASE
-                </button>
-                <button class="btn btn-save" onclick="saveEntity()">
-                    <span class="material-icons-round">save</span> SAVE DATA
-                </button>
+                <button class="btn btn-del" onclick="deleteEntity()">ERASE USER</button>
+                <button class="btn btn-save" onclick="saveEntity()">SAVE CHANGES</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- 1. FIREBASE CONFIG ---
         const fbConfig = {
             apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
             authDomain: "goorac-c3b59.firebaseapp.com",
@@ -344,34 +363,29 @@
         const db = firebase.firestore();
         const rdb = firebase.database();
 
-        // --- AUTH (PIN SYSTEM) ---
+        // --- 2. PIN SECURITY ---
         let currentPin = "";
-        const TARGET_HASH = 1542021; // Simple hash for security
+        const TARGET = 1542021; 
 
-        function fastHash(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash = hash & hash; 
-            }
-            return Math.abs(hash);
+        function fastHash(s) {
+            let h=0; for(let i=0;i<s.length;i++) h=Math.imul(31,h)+s.charCodeAt(i)|0;
+            return Math.abs(h);
         }
 
-        function typePin(key) {
-            if (key === 'C') { currentPin = ""; }
-            else if (currentPin.length < 4) { currentPin += key; }
-            document.getElementById('pin-display').innerText = "•".repeat(currentPin.length).padEnd(4, '•');
+        function typePin(n) {
+            if(n==='C') currentPin=""; else if(currentPin.length<4) currentPin+=n;
+            document.getElementById('pin-display').innerText = "•".repeat(currentPin.length).padEnd(4,'•');
         }
 
         function unlock() {
-            if (fastHash(currentPin) === TARGET_HASH) {
+            if(fastHash(currentPin) === TARGET) {
                 const ls = document.getElementById('lock-screen');
                 ls.style.opacity = '0';
                 setTimeout(() => {
                     ls.style.display = 'none';
                     document.getElementById('dashboard').style.display = 'flex';
                     setTimeout(() => document.getElementById('dashboard').style.opacity = '1', 50);
-                    initData(); // START DATA LOAD
+                    initData(); 
                 }, 400);
             } else {
                 currentPin = "";
@@ -380,50 +394,51 @@
             }
         }
 
-        // --- DATA & SEARCH ENGINE ---
-        let allUsers = []; // Master list for client-side search
+        // --- 3. DATA ENGINE ---
+        let allUsers = []; 
         let editingId = null;
 
         async function initData() {
-            document.getElementById('list-counter').innerText = "DOWNLOADING...";
-            document.getElementById('user-list').innerHTML = '<div style="text-align:center; padding:40px; color:#444;">SYNCING DATABASE...</div>';
+            document.getElementById('list-counter').innerText = "FETCHING...";
+            document.getElementById('user-list').innerHTML = '<div style="text-align:center; padding:40px; color:#444; font-size:12px;">DOWNLOADING DATABASE...</div>';
             
             try {
-                // Fetch ALL users (suitable for <10k users). 
-                // This makes search INSTANT and fixes "Search not working" issues.
-                const snap = await db.collection("users").orderBy("username").get();
+                // Universal Fetch: Gets all users so search works instantly.
+                // Works perfectly for databases < 10k users.
+                const snap = await db.collection("users").get();
                 
                 allUsers = [];
                 snap.forEach(doc => {
                     allUsers.push({ id: doc.id, ...doc.data() });
                 });
 
-                // Update UI
+                // Sort Alphabetically
+                allUsers.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+
                 renderList(allUsers);
                 updateStats();
                 showToast("Database Synced", "success");
 
             } catch(e) {
-                // Fallback for huge DBs or errors
                 console.error(e);
-                document.getElementById('user-list').innerHTML = '<div style="text-align:center; color:#ff2a6d;">SYNC ERROR</div>';
+                document.getElementById('user-list').innerHTML = '<div style="text-align:center; color:#ef4444; font-size:12px;">SYNC ERROR</div>';
             }
         }
 
         function refreshData() { initData(); }
 
-        // --- RENDER LOGIC ---
+        // --- 4. RENDERER ---
         function renderList(data) {
             const list = document.getElementById('user-list');
-            document.getElementById('list-counter').innerText = `${data.length} ENTITIES`;
+            document.getElementById('list-counter').innerText = `${data.length} RECORDS`;
             list.innerHTML = "";
 
             if(data.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding:30px; color:#444;">NO MATCHES FOUND</div>';
+                list.innerHTML = '<div style="text-align:center; padding:30px; color:#444; font-size:12px;">NO MATCHES FOUND</div>';
                 return;
             }
 
-            // Limit render to 50 items for DOM performance if list is huge
+            // Virtual Scroll Optimization: Render first 50
             const viewData = data.slice(0, 50);
 
             viewData.forEach(u => {
@@ -433,7 +448,6 @@
 
                 let badges = "";
                 if(u.verified) badges += `<span class="badge b-ver">VERIFIED</span> `;
-                if(u.isAdmin) badges += `<span class="badge b-adm">ADMIN</span> `;
                 if(u.suspended) badges += `<span class="badge b-sus">SUSPENDED</span>`;
 
                 el.innerHTML = `
@@ -444,7 +458,7 @@
                             <div class="u-meta">@${u.username || '...'} • ${u.gooracNumber || 'N/A'}</div>
                         </div>
                     </div>
-                    <div style="text-align:right;">${badges}</div>
+                    <div class="badges">${badges}</div>
                 `;
                 list.appendChild(el);
             });
@@ -454,7 +468,7 @@
             document.getElementById('s-total').innerText = allUsers.length;
             document.getElementById('s-sus').innerText = allUsers.filter(u => u.suspended).length;
             
-            // Get Online Count
+            // Check Online Status from RDB
             rdb.ref('status').once('value', snap => {
                 let online = 0;
                 snap.forEach(c => { if(c.val().state === 'online') online++; });
@@ -462,7 +476,7 @@
             });
         }
 
-        // --- UNIVERSAL SEARCH (The Fix) ---
+        // --- 5. SEARCH ---
         let debounce;
         function handleSearch() {
             clearTimeout(debounce);
@@ -473,8 +487,6 @@
                     renderList(allUsers);
                     return;
                 }
-                
-                // Fuzzy search logic
                 const filtered = allUsers.filter(u => {
                     const n = (u.name || "").toLowerCase();
                     const un = (u.username || "").toLowerCase();
@@ -482,28 +494,42 @@
                     const uid = u.id.toLowerCase();
                     return n.includes(term) || un.includes(term) || gid.includes(term) || uid.includes(term);
                 });
-                
                 renderList(filtered);
-            }, 300);
+            }, 250);
         }
 
-        // --- EDITOR LOGIC ---
+        // --- 6. EDITOR ---
         function openEditor(u) {
             editingId = u.id;
             
-            // Set fields
-            document.getElementById('ed-id').innerText = `UID: ${u.id}`;
+            // Header
+            document.getElementById('ed-id').innerText = `ID: ${u.id}`;
             document.getElementById('ed-name-disp').innerText = u.name || 'Unknown';
             document.getElementById('ed-pfp').src = u.photoURL || '';
             
+            // Live Status Check
+            const dot = document.getElementById('ed-dot');
+            const txt = document.getElementById('ed-status-text');
+            rdb.ref(`status/${u.id}/state`).once('value', s => {
+                if(s.val() === 'online') {
+                    dot.className = 'dot online';
+                    txt.innerText = "Online Now";
+                    txt.style.color = "var(--success)";
+                } else {
+                    dot.className = 'dot';
+                    txt.innerText = "Offline";
+                    txt.style.color = "var(--text-sec)";
+                }
+            });
+
+            // Inputs
             document.getElementById('inp-name').value = u.name || '';
             document.getElementById('inp-user').value = u.username || '';
             document.getElementById('inp-gid').value = u.gooracNumber || '';
             document.getElementById('inp-url').value = u.photoURL || '';
 
-            // Set toggles
+            // Toggles
             setToggle('tog-ver', u.verified);
-            setToggle('tog-adm', u.isAdmin);
             setToggle('tog-sus', u.suspended);
 
             document.getElementById('editor').style.display = 'flex';
@@ -520,6 +546,11 @@
             if(status) el.classList.add('active'); else el.classList.remove('active');
         }
 
+        function copyId() {
+            navigator.clipboard.writeText(editingId);
+            showToast("ID Copied", "success");
+        }
+
         async function saveEntity() {
             if(!editingId) return;
             
@@ -528,36 +559,32 @@
                 username: document.getElementById('inp-user').value,
                 photoURL: document.getElementById('inp-url').value,
                 verified: document.getElementById('tog-ver').classList.contains('active'),
-                isAdmin: document.getElementById('tog-adm').classList.contains('active'),
                 suspended: document.getElementById('tog-sus').classList.contains('active')
             };
 
             try {
                 await db.collection("users").doc(editingId).update(updates);
                 
-                // Update local array immediately (Optimistic UI)
+                // Optimistic UI Update
                 const idx = allUsers.findIndex(u => u.id === editingId);
                 if(idx !== -1) allUsers[idx] = { ...allUsers[idx], ...updates };
                 
-                renderList(allUsers); // Re-render list to show changes
+                renderList(allUsers); 
                 closeEditor();
-                showToast("Entity Updated", "success");
+                showToast("Entity Saved", "success");
             } catch(e) {
-                showToast("Save Error: " + e.message, "error");
+                showToast("Save Error", "error");
             }
         }
 
         async function deleteEntity() {
-            if(!confirm("⚠️ PERMANENT DELETE\n\nAre you sure you want to erase this user? This cannot be undone.")) return;
+            if(!confirm("⚠️ PERMANENT DELETE\n\nThis action cannot be undone. Confirm?")) return;
             
             try {
                 await db.collection("users").doc(editingId).delete();
-                
-                // Remove from local array
                 allUsers = allUsers.filter(u => u.id !== editingId);
                 renderList(allUsers);
                 updateStats();
-                
                 closeEditor();
                 showToast("Entity Deleted", "success");
             } catch(e) {
@@ -565,9 +592,9 @@
             }
         }
 
-        // --- UTILS ---
+        // --- 7. UTILS ---
         function exportData() {
-            if(allUsers.length === 0) return showToast("No data to export", "error");
+            if(allUsers.length === 0) return showToast("No Data", "error");
             const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers, null, 2));
             const a = document.createElement('a');
             a.href = str; a.download = `nexus_export_${Date.now()}.json`;
@@ -578,8 +605,8 @@
             const c = document.getElementById('toast-container');
             const t = document.createElement('div');
             t.className = 'toast';
-            t.style.border = type === 'error' ? '1px solid #ff2a6d' : '1px solid #00ff9d';
-            t.innerHTML = `<span class="material-icons-round">${type==='error'?'error':'check_circle'}</span> ${msg}`;
+            const icon = type === 'success' ? 'check_circle' : 'error';
+            t.innerHTML = `<span class="material-icons-round t-icon ${type === 'success' ? 't-suc' : 't-err'}">${icon}</span> ${msg}`;
             c.appendChild(t);
             setTimeout(() => {
                 t.style.opacity = '0';
