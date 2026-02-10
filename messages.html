@@ -298,8 +298,6 @@
         .onSnapshot(async snap => {
             const list = document.getElementById('chats-list');
             
-            // REMOVED TIMER UPDATE HERE
-
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
@@ -338,17 +336,21 @@
             results.forEach(({id, chat, u, otherUid, isPinned}) => {
                 if(!u) return;
                 
-                // --- REFINED UNREAD LOGIC ---
+                // --- FIXED UNREAD LOGIC ---
+                // We rely strictly on the counter for the current user.
+                // We do NOT use chat.seen for visibility, to prevent reloading resetting it 
+                // if the global flag is inconsistent.
+                
                 let unreadVal = 0;
-                if (chat.unreadCount && typeof chat.unreadCount[myUid] === 'number') {
+                if (chat.unreadCount && typeof chat.unreadCount[myUid] !== 'undefined') {
                     unreadVal = chat.unreadCount[myUid];
                 } else if (chat.lastSender !== myUid && chat.seen === false) {
-                    // Fallback for legacy structure
+                    // Legacy Fallback
                     unreadVal = 1; 
                 }
 
-                const displayCount = unreadVal > 99 ? "99+" : unreadVal;
                 const isUnread = unreadVal > 0;
+                const displayCount = unreadVal > 99 ? "99+" : unreadVal;
 
                 const amIFollowing = myFollowingList.some(item => {
                     const uid = typeof item === 'string' ? item : item.uid;
