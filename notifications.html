@@ -148,8 +148,7 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 1. FIREBASE INIT (FIXED) ---
-    // Use config.js shared init, or fallback to window config
+    // --- 1. FIREBASE INIT ---
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (!firebase.apps.length && window.firebaseConfig) {
@@ -186,7 +185,7 @@
                 // Prepare initial render list
                 rawNotifications = Array.from(loadedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
                 
-                // Deduplicate for display (Group multiple likes from same user)
+                // Deduplicate for display
                 const deduped = deduplicateNotifications(rawNotifications);
                 
                 // Render
@@ -202,7 +201,6 @@
     // --- 3. HELPER FUNCTIONS ---
 
     // Deduplicate: Keep only the latest event per user per type
-    // Example: If User A likes 3 notes, show only the latest like.
     function deduplicateNotifications(items) {
         const seen = new Set();
         return items.filter(item => {
@@ -385,8 +383,8 @@
     function getNotifText(type) {
         if(type === 'comment') return "commented: ";
         if(type === 'mention') return "mentioned you.";
-        if(type === 'like') return "liked your note."; // Explicit handler
-        if(type === 'follow') return "started following you."; // Explicit handler
+        if(type === 'like') return "liked your note."; 
+        if(type === 'follow') return "started following you."; 
         return "interacted with you.";
     }
 
@@ -403,13 +401,23 @@
                     item.needsFetch = false;
                     saveCache();
                     
-                    // Light DOM update if element exists (avoids re-rendering whole list)
+                    // Light DOM update
                     const el = document.querySelector(`div[data-id="${notifId}"]`);
                     if(el) {
                         const nameEl = el.querySelector('.n-username');
                         const imgEl = el.querySelector('.n-avatar');
                         if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                         if(imgEl) imgEl.src = item.senderPic;
+                        // Also update redirect logic now that we have username
+                        if(item.senderUsername) {
+                            const newUrl = `userProfile.html?user=${item.senderUsername}`;
+                            el.onclick = function(e) {
+                                if(e.target.closest('button')) return;
+                                markNotificationRead(notifId);
+                                window.location.href = newUrl;
+                            }
+                            if(imgEl) imgEl.setAttribute('onclick', `event.stopPropagation(); window.location.href='${newUrl}'`);
+                        }
                     }
                 }
             }
@@ -426,7 +434,6 @@
             allItems.sort((a, b) => b.timestamp - a.timestamp);
             
             // 3. Deduplicate: Remove multiple events from same user of same type
-            //    (e.g. only show latest like from User X)
             rawNotifications = deduplicateNotifications(allItems);
 
             // 4. Save clean list to cache
@@ -441,7 +448,6 @@
 
     function saveCache() {
         if(myUid) {
-            // Save the raw map values to ensure we have all data points
             localStorage.setItem(CACHE_KEY + "_" + myUid, JSON.stringify(Array.from(loadedMap.values())));
         }
     }
@@ -461,33 +467,32 @@
             return;
         }
 
-        const nextBatch = filtered.slice(displayedCount, displayedCount + BATCH_SIZE);
+        const nextBatch = filtered.slice(0, BATCH_SIZE);
         
-        if (nextBatch.length > 0) {
-            nextBatch.forEach(notif => {
-                const el = createNotificationElement(notif);
-                list.appendChild(el);
-            });
-            displayedCount += nextBatch.length;
-        }
+        // Simple rebuild
+        list.innerHTML = '';
+        nextBatch.forEach(n => list.appendChild(createNotificationElement(n)));
+        
+        displayedCount = nextBatch.length;
         loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
     }
 
     function createNotificationElement(notif) {
         const isRead = isNotificationRead(notif.id);
-        
         const div = document.createElement('div');
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
 
-        // Gaze Detection Listener
         if(!isRead) gazeObserver.observe(div);
+
+        // Redirect with username priority
+        const userParam = notif.senderUsername || notif.senderId;
+        const profileUrl = `userProfile.html?user=${userParam}`;
 
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
-            markNotificationRead(this.dataset.id);
-            const user = notif.senderUsername || notif.senderId;
-            window.location.href = `userProfile.html?user=${user}`;
+            markNotificationRead(notif.id);
+            window.location.href = profileUrl;
         };
 
         let actionHtml = '';
@@ -516,7 +521,7 @@
         }
 
         div.innerHTML = `
-            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${notif.senderUsername || notif.senderId}'">
+            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" class="n-avatar" onclick="event.stopPropagation(); window.location.href='${profileUrl}'">
             <div class="n-content">
                 <span class="n-username">${notif.senderName} ${verifyIcon}</span>
                 <span class="n-text">${notif.text}</span>
@@ -552,7 +557,7 @@
         currentFilter = type;
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-        processAndRender(); // Re-render from map
+        processAndRender(); 
     }
 
     function timeAgo(millis) {
