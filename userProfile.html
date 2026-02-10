@@ -33,7 +33,7 @@
 
     <script src="components/viewNotes.js" defer></script>
     <script src="components/profileNotes.js" defer></script>
-<script type="module" src="components/presence.js"></script>
+    <script type="module" src="components/presence.js"></script>
     
     <style>
         :root {
@@ -45,6 +45,7 @@
             --secondary: #888888;
             --accent: #00d2ff;
             --accent-glow: rgba(0, 210, 255, 0.15);
+            --danger: #ff4444;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
         }
@@ -76,6 +77,11 @@
         }
         .nav-btn:active { background: var(--surface-press); }
         .header-title { font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--primary); }
+
+        /* MENU BARS */
+        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; cursor: pointer; }
+        .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; transition: 0.3s; }
+        .menu-bars span:nth-child(2) { width: 60%; align-self: flex-end; }
 
         /* --- TOP HALF: PROFILE CARD --- */
         .profile-top-section {
@@ -154,6 +160,7 @@
         }
         .btn-follow { background: var(--accent); color: #000; box-shadow: 0 4px 20px var(--accent-glow); }
         .btn-following { background: transparent; border: 1px solid #333; color: var(--primary); box-shadow: none; }
+        .btn-unblock { background: var(--danger); color: #fff; }
         .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
         .btn-msg:active { background: var(--surface-press); }
 
@@ -196,6 +203,37 @@
             display: flex; align-items: center; gap: 8px;
         }
         #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 1000; display: none; backdrop-filter: blur(10px);
+        }
+        .bottom-modal {
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: var(--surface); border-top: 1px solid var(--border);
+            border-radius: 24px 24px 0 0; z-index: 1001;
+            padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
+            transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bottom-modal.active { bottom: 0; }
+        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
+        
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--danger); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .blocked-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 100px 40px; text-align: center;
+        }
+        .blocked-icon { font-size: 60px; color: var(--secondary); margin-bottom: 20px; }
+        .blocked-title { font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+        .blocked-msg { color: var(--secondary); font-size: 14px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -205,56 +243,86 @@
             <span class="material-icons-round">arrow_back</span>
         </button>
         <div class="header-title" id="nav-name">Profile</div>
-        <button class="nav-btn">
-            <span class="material-icons-round">more_vert</span>
-        </button>
+        <div class="menu-bars" onclick="toggleMenu(true)">
+            <span></span>
+            <span></span>
+        </div>
     </header>
 
-    <div class="profile-top-section">
-        <div class="avatar-wrapper" id="pfp-container">
-            <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
+    <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
+    <div class="bottom-modal" id="bottom-modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header" style="margin-bottom: 10px;">
+            <span class="header-title">User Options</span>
         </div>
-
-        <div class="user-name">
-            <span id="display-name" class="skeleton" style="width:160px; height:28px; border-radius: 6px;"></span>
-            <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
-        </div>
-        
-        <div class="user-handle skeleton" id="username" style="width: 90px; height:16px; margin-top: 8px; border-radius: 4px;"></div>
-
-        <div class="id-pill skeleton" id="id-pill-container" onclick="copyGooracID()" style="width: 140px; border-radius: 12px;">
-            <span class="id-label" id="id-label-text" style="visibility: hidden;">ID</span>
-            <span class="id-value" id="goorac-id"></span>
-            <span class="material-icons-round copy-icon" id="id-copy-icon" style="visibility: hidden;">content_copy</span>
-        </div>
-
-        <p class="bio skeleton" id="bio" style="width: 80%; height: 36px; border-radius: 8px;"></p>
-
-        <div class="stats-grid">
-            <div class="stat-card skeleton" id="stat-fol" onclick="viewFollowers()">
-                <span class="stat-num" id="count-followers" style="visibility: hidden;">0</span>
-                <span class="stat-label" style="visibility: hidden;">Followers</span>
+        <div class="setting-row">
+            <div>
+                <div style="font-size:15px; font-weight:700;">Block User</div>
+                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Prevent interaction and hide notes.</div>
             </div>
-            <div class="stat-card skeleton" id="stat-fing" onclick="viewFollowing()">
-                <span class="stat-num" id="count-following" style="visibility: hidden;">0</span>
-                <span class="stat-label" style="visibility: hidden;">Following</span>
-            </div>
+            <label class="switch">
+                <input type="checkbox" id="block-toggle" onchange="handleBlockToggle(this.checked)">
+                <span class="slider"></span>
+            </label>
         </div>
-
-        <div class="action-row" id="action-container">
-            <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">
-                <div class="loader-circle"></div>
-                <span id="btn-follow-text">Follow</span>
-            </button>
-            <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
-                <span class="material-icons-round" style="font-size:18px;">chat_bubble_outline</span>
-                <span>Message</span>
-            </button>
+        <div style="padding:30px 0; text-align:center; color:var(--secondary); font-size:11px; font-weight:800; letter-spacing:1px;">
+            SECURE CONNECTION ACTIVE
         </div>
     </div>
 
-    <div class="notes-section">
-        <profile-notes id="profile-notes"></profile-notes>
+    <div id="main-profile-content">
+        <div class="profile-top-section">
+            <div class="avatar-wrapper" id="pfp-container">
+                <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
+            </div>
+
+            <div class="user-name">
+                <span id="display-name" class="skeleton" style="width:160px; height:28px; border-radius: 6px;"></span>
+                <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
+            </div>
+            
+            <div class="user-handle skeleton" id="username" style="width: 90px; height:16px; margin-top: 8px; border-radius: 4px;"></div>
+
+            <div class="id-pill skeleton" id="id-pill-container" onclick="copyGooracID()" style="width: 140px; border-radius: 12px;">
+                <span class="id-label" id="id-label-text" style="visibility: hidden;">ID</span>
+                <span class="id-value" id="goorac-id"></span>
+                <span class="material-icons-round copy-icon" id="id-copy-icon" style="visibility: hidden;">content_copy</span>
+            </div>
+
+            <p class="bio skeleton" id="bio" style="width: 80%; height: 36px; border-radius: 8px;"></p>
+
+            <div class="stats-grid" id="stats-area">
+                <div class="stat-card skeleton" id="stat-fol" onclick="viewFollowers()">
+                    <span class="stat-num" id="count-followers" style="visibility: hidden;">0</span>
+                    <span class="stat-label" style="visibility: hidden;">Followers</span>
+                </div>
+                <div class="stat-card skeleton" id="stat-fing" onclick="viewFollowing()">
+                    <span class="stat-num" id="count-following" style="visibility: hidden;">0</span>
+                    <span class="stat-label" style="visibility: hidden;">Following</span>
+                </div>
+            </div>
+
+            <div class="action-row" id="action-container">
+                <button class="btn btn-follow skeleton" id="btn-follow" onclick="handleFollow()">
+                    <div class="loader-circle"></div>
+                    <span id="btn-follow-text">Follow</span>
+                </button>
+                <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
+                    <span class="material-icons-round" style="font-size:18px;">chat_bubble_outline</span>
+                    <span>Message</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="notes-section" id="notes-area">
+            <profile-notes id="profile-notes"></profile-notes>
+        </div>
+    </div>
+
+    <div id="blocked-by-user-view" style="display:none;" class="blocked-container">
+        <span class="material-icons-round blocked-icon">block</span>
+        <div class="blocked-title">User Restricted</div>
+        <div class="blocked-msg">You have been restricted from viewing this profile or interacting with this agent.</div>
     </div>
 
     <view-notes id="view-notes-modal"></view-notes>
@@ -273,8 +341,10 @@
     let targetUid = null;
     let targetUserData = null;
     let isProcessing = false; 
+    let amIBlocked = false;
+    let doIBlock = false;
     
-    // --- 1. LOCAL STORAGE CACHE (Restored) ---
+    // --- 1. LOCAL STORAGE CACHE ---
     function loadFromCache() {
         if(!targetUsername) return;
         const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
@@ -283,25 +353,37 @@
                 const data = JSON.parse(cached);
                 targetUserData = data;
                 targetUid = data.uid;
-                
-                // Render UI immediately
                 renderProfile(data);
-                
-                // Update Follow Button State from cache
                 if (data.hasOwnProperty('amIFollowing')) {
                     updateFollowButton(data.amIFollowing);
                     removeBtnSkeletons();
                 }
-
-                // *** FIX: Safely initialize notes from cache ***
-                if(targetUid) {
-                    initNotesComponent(targetUid);
-                }
-
+                if(targetUid) initNotesComponent(targetUid);
             } catch (e) { console.error("Cache Error", e); }
         }
     }
     loadFromCache();
+
+    // --- MODAL & BACK BUTTON ---
+    function toggleMenu(show) {
+        const overlay = document.getElementById('modal-overlay');
+        const modal = document.getElementById('bottom-modal');
+        if (show) {
+            history.pushState({modalOpen: true}, ""); 
+            overlay.style.display = 'block';
+            setTimeout(() => modal.classList.add('active'), 10);
+            if(navigator.vibrate) navigator.vibrate(15);
+        } else {
+            modal.classList.remove('active');
+            setTimeout(() => overlay.style.display = 'none', 400);
+        }
+    }
+
+    window.onpopstate = function(e) {
+        if(document.getElementById('bottom-modal').classList.contains('active')) {
+            toggleMenu(false);
+        }
+    };
 
     // --- 2. AUTH & FRESH FETCH ---
     auth.onAuthStateChanged(user => {
@@ -315,50 +397,47 @@
         db.collection("users").where("username", "==", targetUsername).limit(1)
         .onSnapshot((snapshot) => {
             if(snapshot.empty) return; 
-            
             const doc = snapshot.docs[0];
             const freshData = doc.data();
             targetUid = doc.id;
             targetUserData = freshData;
 
-            renderProfile(freshData);
+            // Check if profile owner blocked me
+            checkIfBlocked(freshData);
             
-            // Pass UID to Notes Component
-            initNotesComponent(targetUid);
-
-            checkRelation(freshData);
+            if(!amIBlocked) {
+                renderProfile(freshData);
+                initNotesComponent(targetUid);
+                checkRelation(freshData);
+            }
         });
     }
 
-    // --- 3. SAFE COMPONENT INITIALIZER (The Fix for Loading) ---
+    function checkIfBlocked(data) {
+        const blockedByThem = data.blocked || [];
+        amIBlocked = blockedByThem.some(u => (typeof u === 'string' ? u : u.uid) === myUid);
+        
+        if(amIBlocked) {
+            document.getElementById('main-profile-content').style.display = 'none';
+            document.getElementById('blocked-by-user-view').style.display = 'flex';
+        }
+    }
+
+    // --- 3. SAFE COMPONENT INITIALIZER ---
     function initNotesComponent(uid) {
         const notesComp = document.getElementById('profile-notes');
         if(!notesComp) return;
-
-        // Ensure the component script is loaded before setting properties
-        if (customElements.get('profile-notes')) {
-            notesComp.uid = uid;
-        } else {
-            customElements.whenDefined('profile-notes').then(() => {
-                notesComp.uid = uid;
-            });
-        }
+        if (customElements.get('profile-notes')) { notesComp.uid = uid; } 
+        else { customElements.whenDefined('profile-notes').then(() => { notesComp.uid = uid; }); }
     }
 
     // --- RENDER LOGIC ---
     function renderProfile(data) {
-        // Remove skeletons
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
-                el.classList.remove('skeleton');
-                el.style.width = ""; 
-                el.style.height = "";
-            }
+            if(el) { el.classList.remove('skeleton'); el.style.width = ""; el.style.height = ""; }
         });
-        
-        // Restore Visibility
         document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
 
         document.getElementById('nav-name').innerText = (data.username || "Profile").toUpperCase();
@@ -370,20 +449,13 @@
         const img = document.getElementById('pfp');
         const newSrc = data.photoURL || 'https://via.placeholder.com/150/111/333?text=?';
         if (img.src !== newSrc) img.src = newSrc;
-
         document.getElementById('verified-badge').style.display = data.verified ? 'inline-block' : 'none';
 
-        const followers = data.followers || [];
-        const following = data.following || [];
-        document.getElementById('count-followers').innerText = followers.length;
-        document.getElementById('count-following').innerText = following.length;
+        document.getElementById('count-followers').innerText = (data.followers || []).length;
+        document.getElementById('count-following').innerText = (data.following || []).length;
 
-        // Hide Actions if Own Profile
-        if(myUid && targetUid && myUid === targetUid) {
-            document.getElementById('action-container').style.display = 'none';
-        } else {
-            document.getElementById('action-container').style.display = 'grid';
-        }
+        if(myUid === targetUid) document.getElementById('action-container').style.display = 'none';
+        else document.getElementById('action-container').style.display = 'grid';
     }
 
     function removeBtnSkeletons() {
@@ -391,129 +463,149 @@
         document.getElementById('btn-msg').classList.remove('skeleton');
     }
 
-    // --- FOLLOW/UNFOLLOW ---
+    // --- RELATION & BLOCKING ---
     async function checkRelation(freshData) {
         if(!myUid || !targetUid || myUid === targetUid) return;
 
         const myDoc = await db.collection("users").doc(myUid).get();
-        const myFollowing = myDoc.data().following || [];
+        const myData = myDoc.data();
+        const myFollowing = myData.following || [];
+        const myBlocked = myData.blocked || [];
 
-        const isFollowing = myFollowing.some(item => {
-            const id = typeof item === 'string' ? item : item.uid;
-            return id === targetUid;
-        });
+        const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+        doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
-        updateFollowButton(isFollowing);
+        // Sync toggle
+        document.getElementById('block-toggle').checked = doIBlock;
+
+        updateFollowButton(isFollowing, doIBlock);
         removeBtnSkeletons();
 
-        // Update Local Storage Cache
-        const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing };
+        if(doIBlock) {
+            document.getElementById('notes-area').style.opacity = '0.3';
+            document.getElementById('notes-area').style.pointerEvents = 'none';
+        } else {
+            document.getElementById('notes-area').style.opacity = '1';
+            document.getElementById('notes-area').style.pointerEvents = 'auto';
+        }
+
+        const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
         localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
 
-    function updateFollowButton(isFollowing) {
+    function updateFollowButton(isFollowing, isBlocked) {
         const btn = document.getElementById('btn-follow');
         const txt = document.getElementById('btn-follow-text');
-        if(isFollowing) {
-            txt.innerText = "Following";
-            btn.className = "btn btn-following";
+        
+        if(isBlocked) {
+            txt.innerText = "Unblock";
+            btn.className = "btn btn-unblock";
+            document.getElementById('btn-msg').style.display = 'none';
         } else {
-            txt.innerText = "Follow";
-            btn.className = "btn btn-follow";
+            document.getElementById('btn-msg').style.display = 'flex';
+            if(isFollowing) {
+                txt.innerText = "Following";
+                btn.className = "btn btn-following";
+            } else {
+                txt.innerText = "Follow";
+                btn.className = "btn btn-follow";
+            }
         }
     }
 
     async function handleFollow() {
         if(!targetUid || !myUid || isProcessing) return;
-        
-        isProcessing = true; // Lock
         const btn = document.getElementById('btn-follow');
-        const isCurrentlyFollowing = btn.classList.contains('btn-following');
         
+        // Handle Unblock via Follow button shortcut
+        if(btn.classList.contains('btn-unblock')) {
+            document.getElementById('block-toggle').checked = false;
+            handleBlockToggle(false);
+            return;
+        }
+
+        isProcessing = true; 
+        const isCurrentlyFollowing = btn.classList.contains('btn-following');
         btn.classList.add('loading');
         if(navigator.vibrate) navigator.vibrate(15);
 
-        const countEl = document.getElementById('count-followers');
-        let currentCount = parseInt(countEl.innerText);
-        const ts = firebase.firestore.Timestamp.now();
-
         try {
-            await db.runTransaction(async (transaction) => {
+            await db.runTransaction(async (t) => {
                 const myRef = db.collection("users").doc(myUid);
                 const theirRef = db.collection("users").doc(targetUid);
+                const myD = await t.get(myRef);
+                const theirD = await t.get(theirRef);
 
-                const myDoc = await transaction.get(myRef);
-                const theirDoc = await transaction.get(theirRef);
+                const myFing = myD.data().following || [];
+                const theirFing = theirD.data().followers || [];
+                const ts = firebase.firestore.Timestamp.now();
 
-                const myFollowing = myDoc.data().following || [];
-                const theirFollowers = theirDoc.data().followers || [];
-
-                const actuallyFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
-
-                if (!isCurrentlyFollowing && !actuallyFollowing) {
-                    // FOLLOW
-                    transaction.update(myRef, {
-                        following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts })
-                    });
-                    transaction.update(theirRef, {
-                        followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts })
-                    });
-                    
-                    // Notification
-                    const notifRef = db.collection("notifications").doc();
-                    transaction.set(notifRef, {
-                        recipientId: targetUid,
-                        senderId: myUid,
-                        type: "follow",
-                        timestamp: ts,
-                        seen: false
-                    });
-                } else if (isCurrentlyFollowing && actuallyFollowing) {
-                    // UNFOLLOW
-                    const newFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
-                    const newFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
-                    transaction.update(myRef, { following: newFollowing });
-                    transaction.update(theirRef, { followers: newFollowers });
+                if (!isCurrentlyFollowing) {
+                    t.update(myRef, { following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) });
+                    t.update(theirRef, { followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
+                    t.set(db.collection("notifications").doc(), { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
+                } else {
+                    t.update(myRef, { following: myFing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid) });
+                    t.update(theirRef, { followers: theirFing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid) });
                 }
             });
+            updateFollowButton(!isCurrentlyFollowing, false); 
+        } catch (e) { showToast("Error updating relationship"); } 
+        finally { btn.classList.remove('loading'); isProcessing = false; }
+    }
 
-            // Success Update UI
-            updateFollowButton(!isCurrentlyFollowing); 
-            countEl.innerText = isCurrentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1;
+    async function handleBlockToggle(isBlocking) {
+        if(!targetUid || !myUid || isProcessing) return;
+        isProcessing = true;
+        const btn = document.getElementById('btn-follow');
+        btn.classList.add('loading');
+        
+        const ts = firebase.firestore.Timestamp.now();
+        const myRef = db.collection("users").doc(myUid);
+        const theirRef = db.collection("users").doc(targetUid);
 
-            // Cache Update
-            const cached = JSON.parse(localStorage.getItem(`goorac_user_${targetUsername}`) || '{}');
-            cached.amIFollowing = !isCurrentlyFollowing;
-            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cached));
+        try {
+            await db.runTransaction(async (t) => {
+                const myD = await t.get(myRef);
+                const theirD = await t.get(theirRef);
+                
+                const myFollowing = myD.data().following || [];
+                const myFollowers = myD.data().followers || [];
+                const theirFollowing = theirD.data().following || [];
+                const theirFollowers = theirD.data().followers || [];
 
-            // *** CRITICAL FIX: Reload Notes Component Logic ***
-            // This toggles the UID on the component, forcing it to re-check privacy (Public/Private)
-            const notesComp = document.getElementById('profile-notes');
-            if (notesComp) {
-                notesComp.uid = null; // Clear it
-                setTimeout(() => { notesComp.uid = targetUid; }, 50); // Set it back immediately
-            }
-
-        } catch (e) {
-            console.error(e);
-            updateFollowButton(isCurrentlyFollowing);
-            countEl.innerText = currentCount;
-            showToast("Error updating connection");
-        } finally {
-            btn.classList.remove('loading');
-            isProcessing = false; // Unlock
-        }
+                if(isBlocking) {
+                    // 1. Add to blocked
+                    t.update(myRef, {
+                        blocked: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }),
+                        // 2. Remove them from my followers/following
+                        following: myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid),
+                        followers: myFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid)
+                    });
+                    // 3. Remove me from their followers/following
+                    t.update(theirRef, {
+                        following: theirFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid),
+                        followers: theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid)
+                    });
+                } else {
+                    // Unblock logic
+                    const myBlocked = myD.data().blocked || [];
+                    t.update(myRef, { blocked: myBlocked.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid) });
+                }
+            });
+            
+            showToast(isBlocking ? "User Blocked" : "User Unblocked");
+            if(isBlocking) toggleMenu(false);
+            checkRelation(targetUserData);
+        } catch (e) { console.error(e); showToast("Block action failed"); }
+        finally { btn.classList.remove('loading'); isProcessing = false; }
     }
 
     // --- UTILS ---
     function copyGooracID() {
         const txt = document.getElementById('goorac-id').innerText;
         if(txt === "N/A" || txt.includes("-")) return;
-        
-        navigator.clipboard.writeText(txt).then(() => {
-            if(navigator.vibrate) navigator.vibrate(50);
-            showToast("ID Copied");
-        });
+        navigator.clipboard.writeText(txt).then(() => { if(navigator.vibrate) navigator.vibrate(50); showToast("ID Copied"); });
     }
 
     function showToast(msg) {
@@ -523,17 +615,9 @@
         setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    function openChat() {
-        if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`;
-    }
-    
-    function viewFollowers() {
-        if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`;
-    }
-
-    function viewFollowing() {
-        if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`;
-    }
+    function openChat() { if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`; }
+    function viewFollowers() { if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`; }
+    function viewFollowing() { if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`; }
 </script>
 </body>
 </html>
