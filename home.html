@@ -40,7 +40,7 @@
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
             /* FIX: Push content down so it clears the fixed header */
-            padding-top: calc(85px + env(safe-area-inset-top)); 
+            padding-top: calc(90px + env(safe-area-inset-top)); 
             padding-bottom: 100px;
             overflow-x: hidden;
             -webkit-touch-callout: none;
@@ -100,10 +100,10 @@
         }
         .notif-badge.visible { opacity: 1; transform: scale(1); }
 
-        /* HEADER PROFILE PIC (Rounded Square/Squircle) */
+        /* HEADER PFP (Squircle) */
         .header-pfp { 
             width: 38px; height: 38px; min-width: 38px; min-height: 38px;
-            border-radius: 12px; /* Squircle style */
+            border-radius: 12px; 
             object-fit: cover; border: 1px solid var(--border);
             cursor: pointer; background: #111;
         }
@@ -116,8 +116,8 @@
             background: var(--bg); 
             position: relative;
             z-index: 10;
-            /* Extra margin just in case to push it down */
-            margin-top: 5px;
+            /* FIX: Added margin-top ensures bubbles don't clip against header */
+            margin-top: 5px; 
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
@@ -127,11 +127,11 @@
             margin-top: 10px;
         }
         
-        /* NOTE PROFILE PIC (Rounded Square) */
+        /* NOTE PFP (Squircle) */
         .note-pfp {
             width: 65px; height: 65px; 
             min-width: 65px; min-height: 65px;
-            border-radius: 24px; /* Squircle style matching screenshot */
+            border-radius: 24px; 
             object-fit: cover; 
             border: 2px solid var(--border);
             padding: 2px; background: #000;
@@ -355,6 +355,53 @@
         }
     })();
 
+    document.addEventListener('DOMContentLoaded', () => {
+        const noteViewer = document.getElementById('note-viewer');
+        const mainNav = document.getElementById('main-nav');
+        if (noteViewer && mainNav) {
+            mainNav.classList.remove('hidden-nav');
+            const observer = new MutationObserver(() => {
+                const style = window.getComputedStyle(noteViewer);
+                const isVisible = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') || noteViewer.classList.contains('active');
+                if (isVisible) mainNav.classList.add('hidden-nav');
+                else mainNav.classList.remove('hidden-nav');
+            });
+            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+        }
+    });
+
+    function saveHomeState() {
+        const state = {
+            name: document.getElementById('welcome-name').innerText,
+            text: document.getElementById('welcome-text').innerText,
+            photoURL: document.getElementById('header-pfp').src,
+            msgState: {
+                header: document.getElementById('msg-header').innerText,
+                sub: document.getElementById('msg-subtext').innerText,
+                time: document.getElementById('msg-time').innerText,
+                pfpHTML: document.getElementById('msg-pfp-area').innerHTML,
+                hasCount: document.getElementById('msg-card').classList.contains('has-count')
+            },
+            callState: {
+                count: document.getElementById('call-count').innerText,
+                label: document.getElementById('call-label').innerText,
+                time: document.getElementById('call-time').innerText,
+                pfpHTML: document.getElementById('call-pfp-area').innerHTML,
+                isMissed: document.getElementById('call-card').classList.contains('missed-alert')
+            }
+        };
+        localStorage.setItem('goorac_home_data', JSON.stringify(state));
+    }
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); deferredPrompt = e;
+        setTimeout(() => document.getElementById('install-popup').classList.add('show'), 2000);
+    });
+    async function installPWA() {
+        if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
+    }
+
     // --- FIREBASE INIT ---
     // 1. Try to use the shared init function first (from config.js)
     if (typeof window.initFirebaseCore === 'function') {
@@ -369,7 +416,6 @@
     const db = firebase.firestore();
     let READ_KEY = "goorac_read_notifs"; 
 
-    // --- CLOCK ---
     setInterval(() => {
         document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
     }, 1000);
@@ -496,25 +542,6 @@
             saveHomeState();
         });
     }
-
-    // --- NAVBAR HIDER (Fixed) ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const noteViewer = document.getElementById('note-viewer');
-        const mainNav = document.getElementById('main-nav');
-        if (noteViewer && mainNav) {
-            mainNav.classList.remove('hidden-nav');
-            const observer = new MutationObserver(() => {
-                const style = window.getComputedStyle(noteViewer);
-                // Check if viewer is visible
-                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                    mainNav.classList.add('hidden-nav');
-                } else {
-                    mainNav.classList.remove('hidden-nav');
-                }
-            });
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
-        }
-    });
 </script>
 </body>
 </html>
