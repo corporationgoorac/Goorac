@@ -4,7 +4,7 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Profile Settings</title>
     
     <script src="config.js"></script>
@@ -12,6 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <script src="components/imagePicker.js" defer></script>
     <script type="module" src="components/presence.js"></script>
@@ -22,7 +23,7 @@
         :root { 
             --bg: #000000; 
             --surface: #0a0a0a; 
-            --accent: #ffffff; 
+            --accent: #00d2ff; 
             --text-main: #ffffff;
             --text-dim: #777777;
             --border: #1a1a1a;
@@ -47,22 +48,22 @@
             background: var(--glass);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 24px; box-sizing: border-box;
+            padding: calc(12px + env(safe-area-inset-top)) 24px 12px; 
+            box-sizing: border-box;
             border-bottom: 1px solid var(--border);
         }
 
         .container {
             width: 100%; max-width: 440px; 
-            padding: 70px 24px 120px 24px; 
+            padding: calc(90px + env(safe-area-inset-top)) 24px 120px 24px; 
             box-sizing: border-box;
-            opacity: 1; /* Always visible for instant feel */
         }
 
         .back-link {
             background: transparent; border: none; color: white;
             width: 32px; height: 32px; display: flex; align-items: center; cursor: pointer;
         }
-        .page-title { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; }
+        .page-title { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; text-transform: uppercase; }
 
         /* Profile Hero */
         .profile-hero {
@@ -73,13 +74,13 @@
             position: relative; width: 100px; height: 100px; cursor: pointer;
         }
         .pfp-image {
-            width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
-            border: 1px solid var(--border); background: #111;
+            width: 100%; height: 100%; border-radius: 28px; /* Squircle style consistent with app */
+            object-fit: cover; border: 1px solid var(--border); background: #111;
         }
         .pfp-edit-btn {
-            position: absolute; bottom: 0; right: 0;
+            position: absolute; bottom: -5px; right: -5px;
             background: var(--accent); color: black; border-radius: 50%;
-            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
             border: 3px solid var(--bg);
         }
         .pfp-edit-btn svg { width: 14px; height: 14px; }
@@ -105,27 +106,25 @@
             font-size: 0.9rem; outline: none; box-sizing: border-box;
             transition: 0.2s;
         }
-        .input-box:focus { border-color: #333; }
+        .input-box:focus { border-color: var(--accent); }
 
-        #status {
-            font-size: 0.75rem; margin-top: 8px; font-weight: 600; height: 1rem;
-        }
+        #status { font-size: 0.75rem; margin-top: 8px; font-weight: 600; height: 1rem; }
 
         /* Fixed Bottom Action Dock */
         .action-dock {
             position: fixed; bottom: 0; width: 100%; max-width: 440px;
             background: linear-gradient(to top, #000 70%, transparent);
-            padding: 20px 24px 30px 24px; box-sizing: border-box;
-            z-index: 100;
+            padding: 20px 24px calc(30px + env(safe-area-inset-bottom)); 
+            box-sizing: border-box; z-index: 100;
         }
 
         .btn-save {
-            background: var(--accent); color: #000; border: none;
+            background: #ffffff; color: #000; border: none;
             width: 100%; padding: 18px; border-radius: 14px;
             font-weight: 800; font-size: 1rem; cursor: pointer;
             box-shadow: 0 10px 20px rgba(255,255,255,0.05);
-            transition: opacity 0.3s ease, transform 0.2s ease;
-            display: none; /* Hidden by default for security check */
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: none;
         }
         .btn-save:active { transform: scale(0.97); }
         .btn-save:disabled { opacity: 0.4; filter: grayscale(1); }
@@ -148,7 +147,7 @@
 <div class="container" id="mainContainer">
     <div class="profile-hero">
         <div class="pfp-wrapper" onclick="changePFP()">
-            <img id="user-pfp" src="https://via.placeholder.com/150" class="pfp-image">
+            <img id="user-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="pfp-image">
             <div class="pfp-edit-btn">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </div>
@@ -179,12 +178,9 @@
 
 <script>
     // --- FIREBASE INIT ---
-    // 1. Try to use the shared init function first (from config.js)
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
-    } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
+    } else if (!firebase.apps.length && window.firebaseConfig) {
         firebase.initializeApp(window.firebaseConfig);
     }
     
@@ -199,13 +195,11 @@
     const userInp = document.getElementById('username');
     const statusMsg = document.getElementById('status');
     const launchBtn = document.getElementById('launchBtn');
-    const container = document.getElementById('mainContainer');
 
     // --- 0ms PRE-LOAD LOGIC ---
-    // This executes before Firebase Auth resolves
     const initialCache = JSON.parse(localStorage.getItem('goorac_profile'));
     if (initialCache) {
-        populateUI(initialCache, false); // Populate but don't show button yet
+        populateUI(initialCache, false);
     }
 
     function populateUI(data, showButton = true) {
@@ -213,23 +207,21 @@
         document.getElementById('username').value = data.username || "";
         document.getElementById('bio').value = data.bio || "";
         document.getElementById('display-id').innerText = data.gooracNumber || "--------";
-        document.getElementById('user-pfp').src = data.photoURL || "https://via.placeholder.com/150";
+        
+        const src = data.photoURL || "https://via.placeholder.com/150";
+        document.getElementById('user-pfp').src = src;
+        
         currentPhotoURL = data.photoURL;
         finalGooracID = data.gooracNumber;
         currentSavedUsername = data.username;
         
-        if (showButton) {
-            launchBtn.style.display = "block";
-        }
+        if (showButton) launchBtn.style.display = "block";
     }
 
     function resetToAuthDefaults(user) {
         document.getElementById('full-name').value = user.displayName || "";
         document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
         currentPhotoURL = user.photoURL;
-        document.getElementById('username').value = "";
-        document.getElementById('bio').value = "";
-        document.getElementById('display-id').innerText = "--------";
         launchBtn.style.display = "none";
     }
 
@@ -247,17 +239,12 @@
         if (user) {
             activeUser = user;
             const localProfile = JSON.parse(localStorage.getItem('goorac_profile'));
-            
             if (localProfile && localProfile.uid === user.uid) {
-                // UID Verified - Reveal the button
                 populateUI(localProfile, true);
             } else {
-                // Security Mismatch: Wipe cache and show current Auth session details
                 localStorage.removeItem('goorac_profile');
                 resetToAuthDefaults(user);
             }
-            
-            // Background Refresh
             syncWithCloud(user);
         } else {
             window.location.href = "login.html";
@@ -272,14 +259,11 @@
                 localStorage.setItem('goorac_profile', JSON.stringify(cloudData));
                 populateUI(cloudData, true);
             } else {
-                // New Account Initialization
                 if (!finalGooracID) finalGooracID = Math.floor(1000000000 + Math.random() * 9000000000);
                 document.getElementById('display-id').innerText = finalGooracID;
                 launchBtn.style.display = "block";
             }
-        } catch (error) {
-            console.error("Cloud Sync failed:", error);
-        }
+        } catch (error) { console.error("Cloud Sync failed:", error); }
     }
 
     userInp.addEventListener('input', async () => {
@@ -299,7 +283,6 @@
             return;
         }
 
-        // Debounce or simple check
         try {
             const query = await db.collection("users").where("username", "==", val).get();
             if (query.empty) {
@@ -329,23 +312,13 @@
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        if (!currentSavedUsername) {
-            profileData.joinedAt = firebase.firestore.FieldValue.serverTimestamp();
-        }
-
         try {
-            // Save to local for next 0ms boot
             localStorage.setItem('goorac_profile', JSON.stringify(profileData));
-            
-            // Save to cloud
             await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
-            
-            // Update Auth Object
             await activeUser.updateProfile({
-                displayName: document.getElementById('full-name').value,
+                displayName: profileData.name,
                 photoURL: currentPhotoURL
             });
-            
             window.location.href = "home.html";
         } catch (e) {
             alert("Save Error: " + e.message);
