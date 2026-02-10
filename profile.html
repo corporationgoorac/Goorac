@@ -21,6 +21,7 @@
             messagingSenderId: "746746595332",
             appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
         };
+        // Init Firebase immediately to prevent component race conditions
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
@@ -33,7 +34,7 @@
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/profileNotes.js" defer></script>
-<script type="module" src="components/presence.js"></script>
+    <script type="module" src="components/presence.js"></script>
 
     <style>
         :root {
@@ -274,8 +275,12 @@
         if (user) {
             // Trigger Notes Component with UID
             const notesComp = document.getElementById('profile-notes');
-            if(notesComp) notesComp.uid = user.uid;
-
+            if(notesComp) {
+                // Wait for custom element to be defined
+                customElements.whenDefined('profile-notes').then(() => {
+                    notesComp.uid = user.uid;
+                });
+            }
             initRealtimeListener(user.uid);
         } else {
             setTimeout(() => {
@@ -291,8 +296,17 @@
                 localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                 renderUI(data);
             } else {
+                console.warn("User document not found, redirecting to setup...");
                 window.location.href = "setup.html";
             }
+        }, (error) => {
+            console.error("Firestore Listener Error:", error);
+            // If listener fails, we should still try to remove skeletons to show whatever we have
+            const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
+            skeletons.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.remove('skeleton');
+            });
         });
     }
 
@@ -313,15 +327,16 @@
         document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
 
         safeText('display-name', data.name || "User");
-        safeText('username', `@${data.username}`);
+        safeText('username', `@${data.username || 'username'}`);
         safeText('bio', data.bio || "Welcome to my Goorac profile.");
         safeText('goorac-id', data.gooracNumber || "-------");
 
         const pfp = document.getElementById('pfp');
         const newSrc = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
-        if(pfp.src !== newSrc) pfp.src = newSrc;
+        if(pfp && pfp.src !== newSrc) pfp.src = newSrc;
 
-        document.getElementById('verified-badge').style.display = data.verified ? 'inline-block' : 'none';
+        const badge = document.getElementById('verified-badge');
+        if(badge) badge.style.display = data.verified ? 'inline-block' : 'none';
 
         const followers = data.followers || [];
         const following = data.following || [];
@@ -347,7 +362,12 @@
     function logout() {
         if(confirm("Log out of Goorac?")) {
             auth.signOut().then(() => {
-                localStorage.removeItem('my_goorac_profile'); 
+                // Clear all local storage for the entire site
+                localStorage.clear(); 
+                window.location.href = "login.html";
+            }).catch(err => {
+                console.error("Logout Error:", err);
+                localStorage.clear();
                 window.location.href = "login.html";
             });
         }
@@ -355,6 +375,7 @@
 
     function showToast(msg) {
         const t = document.getElementById('toast');
+        if(!t) return;
         t.innerHTML = `<span class="material-icons-round" style="font-size:16px;">check_circle</span> ${msg}`;
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 2000);
