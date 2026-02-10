@@ -1,13 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
-
-    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000"> 
     <title>Notifications | Goorac</title>
 
     <script src="config.js"></script>
@@ -15,6 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script type="module" src="components/presence.js"></script>
     <script src="components/chatLoader.js" defer></script>
@@ -149,12 +147,9 @@
 
 <script>
     // --- FIREBASE INIT ---
-    // 1. Try to use the shared init function first (from config.js)
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
-    } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
+    } else if (!firebase.apps.length && window.firebaseConfig) {
         firebase.initializeApp(window.firebaseConfig);
     }
     
@@ -169,7 +164,27 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
+    let CACHE_KEY = "goorac_notif_cache"; // Key for 0ms load
     let loadedMap = new Map();
+
+    // --- 0ms INSTANT LOAD ---
+    // Try to load content immediately from LocalStorage before Firebase connects
+    (function loadFromCache() {
+        // We use the last known UID to fetch the right cache
+        const lastUid = localStorage.getItem("goorac_last_uid");
+        if(lastUid) {
+            const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
+            if(cachedData) {
+                try {
+                    rawNotifications = JSON.parse(cachedData);
+                    // Populate Map so live updates merge correctly later
+                    rawNotifications.forEach(n => loadedMap.set(n.id, n));
+                    // Render immediately
+                    renderNextBatch(); 
+                } catch(e) { console.warn("Cache load error", e); }
+            }
+        }
+    })();
 
     // --- LOCAL STORAGE READ LOGIC ---
     function isNotificationRead(id) {
@@ -222,7 +237,9 @@
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
-            READ_KEY = `goorac_read_${myUid}`; 
+            READ_KEY = `goorac_read_${myUid}`;
+            // Store UID for next session's 0ms load
+            localStorage.setItem("goorac_last_uid", myUid);
 
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
@@ -236,22 +253,17 @@
     });
 
     function initListeners() {
-        const list = document.getElementById('notif-list');
-        list.innerHTML = ''; 
-        loadedMap = new Map();
-        const now = Date.now();
-
-        // 1. LIKES FROM 'NOTES' COLLECTION (FIXED)
-        // Querying "notes" collection where user is author
+        // Don't clear list immediately to prevent flash, map handles merging
+        
+        // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
             .where("uid", "==", myUid)
-            .limit(30) // Safety limit, client-side sort
+            .limit(30) 
             .onSnapshot(snapshot => {
                 snapshot.forEach(doc => {
                     const noteData = doc.data();
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
-                            // Skip self-likes and missing timestamps
                             if (!liker.timestamp || liker.uid === myUid) return;
 
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
@@ -280,7 +292,7 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS (Collection: 'users' -> array 'followers')
+        // 2. FOLLOWERS
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -310,7 +322,7 @@
             }
         });
 
-        // 3. GENERAL NOTIFICATIONS (Collection: 'notifications')
+        // 3. GENERAL NOTIFICATIONS
         db.collection('notifications')
             .where('recipientId', '==', myUid)
             .orderBy('timestamp', 'desc')
@@ -358,6 +370,7 @@
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
                     
+                    // Live DOM Update if element exists
                     const nameEl = document.getElementById(`name-${notifId}`);
                     const pfpEl = document.getElementById(`pfp-${notifId}`);
                     const rowEl = document.querySelector(`div[data-id="${notifId}"]`);
@@ -365,6 +378,9 @@
                     if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                     if(pfpEl) pfpEl.src = item.senderPic;
                     if(rowEl) rowEl.dataset.username = item.senderUsername;
+                    
+                    // Save updated info to cache
+                    saveCache();
                 }
             }
         });
@@ -376,10 +392,19 @@
             rawNotifications = Array.from(loadedMap.values());
             rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             
+            // Save current state to cache for next 0ms load
+            saveCache();
+
             displayedCount = 0;
             document.getElementById('notif-list').innerHTML = '';
             renderNextBatch();
         }, 150);
+    }
+
+    function saveCache() {
+        if(myUid) {
+            localStorage.setItem(CACHE_KEY + "_" + myUid, JSON.stringify(rawNotifications));
+        }
     }
 
     function renderNextBatch() {
