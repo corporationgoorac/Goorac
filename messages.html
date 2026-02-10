@@ -12,6 +12,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <script type="module" src="components/presence.js"></script>
+
     <style>
         :root {
             --bg: #000;
@@ -241,7 +243,7 @@
     let myPinnedChats = [];
     let myBlockedList = []; 
     let myShowActivityStatus = true;
-    let presenceTransitionTimer;
+    let offlineTimers = {}; // TRACKS OFFLINE DELAY FOR EACH USER
     
     // Interaction Variables
     let longPressTimer;
@@ -282,7 +284,7 @@
         }
     });
 
-    // --- REALTIME PRESENCE SYSTEM (WITH 30S TRANSACTION DELAY) ---
+    // --- REALTIME PRESENCE HEARTBEAT (USER'S OWN STATUS) ---
     function setupPresence() {
         const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
         const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
@@ -290,18 +292,9 @@
 
         rdb.ref('.info/connected').on('value', (snapshot) => {
             if (snapshot.val() === false) return;
-            
-            clearTimeout(presenceTransitionTimer);
-
             userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
-                // 30 SECOND DELAY: Bridges page transitions or high-latency "transactions"
-                presenceTransitionTimer = setTimeout(() => {
-                    if(myShowActivityStatus) {
-                        userStatusDatabaseRef.set(isOnlineForDatabase);
-                    } else {
-                        userStatusDatabaseRef.set(isOfflineForDatabase);
-                    }
-                }, 30000); 
+                // INSTANT ONLINE
+                userStatusDatabaseRef.set(isOnlineForDatabase);
             });
         });
     }
@@ -341,14 +334,13 @@
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
                 
-                // --- BLOCKED PERSON FILTER ---
-                // Fetch other user's block list to check reciprocal block
+                // Fetch other user's block list for reciprocal block check
                 const otherDoc = await db.collection("users").doc(otherUid).get();
                 const otherData = otherDoc.data();
                 const theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
 
                 if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
-                    return null; // Erase from transmission list
+                    return null; // FILTER BLOCKED PERSON CHAT
                 }
 
                 let userData = otherData || userCache[otherUid];
@@ -372,7 +364,7 @@
             });
 
             const results = await Promise.all(chatPromises);
-            currentChatData = results.filter(c => c !== null); // Remove blocked entries
+            currentChatData = results.filter(c => c !== null); 
             
             currentChatData.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
@@ -469,14 +461,23 @@
                 else { msgEl.innerHTML = lastMsg; }
             });
 
-            // --- ACTIVITY STATUS LOGIC ---
-            // Only show other people's status if I have enabled my own status
+            // --- INSTANT ONLINE / 20S OFFLINE DELAY LOGIC ---
             if (myShowActivityStatus) {
                 rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
                     const dot = document.getElementById(`online-${otherUid}`);
-                    if (dot) {
-                        if (snap.val() === 'online') dot.classList.add('active');
-                        else dot.classList.remove('active');
+                    if (!dot) return;
+
+                    const state = snap.val();
+                    if (state === 'online') {
+                        // CANCEL ANY PENDING OFFLINE HIDE
+                        clearTimeout(offlineTimers[otherUid]);
+                        dot.classList.add('active'); // SHOW INSTANTLY
+                    } else {
+                        // DELAY REMOVAL BY 20 SECONDS
+                        clearTimeout(offlineTimers[otherUid]);
+                        offlineTimers[otherUid] = setTimeout(() => {
+                            dot.classList.remove('active');
+                        }, 20000);
                     }
                 });
             }
