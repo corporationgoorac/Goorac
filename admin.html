@@ -8,12 +8,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Nexus Command v5.0</title>
     
+    <script src="config.js"></script>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    
-    <script src="config.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -44,11 +44,10 @@
             display: flex; flex-direction: column; font-size: 14px;
         }
 
-        /* --- AUTH GATE --- */
         #auth-gate {
             position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.5s, transform 0.5s var(--ease-out);
+            transition: opacity 0.5s, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .pin-display { display: flex; gap: 16px; margin-bottom: 40px; }
@@ -70,7 +69,6 @@
 
         #pin-entry { position: absolute; opacity: 0; pointer-events: none; }
 
-        /* --- DASHBOARD UI --- */
         header {
             height: 64px; border-bottom: 1px solid var(--border-subtle);
             display: flex; align-items: center; justify-content: space-between;
@@ -122,6 +120,7 @@
         .u-primary { font-weight: 600; font-size: 15px; color: var(--text-main); display: block; margin-bottom: 2px; }
         .u-secondary { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
         
+        .u-status { text-align: right; }
         .tag { 
             font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; 
             display: inline-block; text-transform: uppercase; margin-left: 4px;
@@ -129,54 +128,60 @@
         .tag.ver { background: rgba(0, 122, 255, 0.15); color: var(--accent-blue); }
         .tag.sus { background: rgba(255, 69, 58, 0.15); color: var(--danger); }
 
-        /* --- DRAWER --- */
         #modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
-            z-index: 100; opacity: 0; pointer-events: none; transition: 0.3s var(--ease-out);
+            z-index: 100; opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         #modal-overlay.active { opacity: 1; pointer-events: all; }
         
         .drawer {
             position: fixed; bottom: 0; left: 0; right: 0; top: 40px;
             background: #1c1c1e; border-radius: 20px 20px 0 0;
-            transform: translateY(100%); transition: 0.4s var(--ease-out);
+            transform: translateY(100%); transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
         }
         #modal-overlay.active .drawer { transform: translateY(0); }
         
+        .drawer-head { padding: 30px 24px 10px; display: flex; justify-content: space-between; align-items: center; }
         .drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px 120px; }
         
         .profile-hero { display: flex; gap: 20px; align-items: center; margin-bottom: 32px; }
         .ph-img { width: 70px; height: 70px; border-radius: 20px; object-fit: cover; }
+        .ph-meta h2 { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-main); }
+        .ph-meta span { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
-        .inp-group { margin-bottom: 24px; }
+        .inp-group { margin-bottom: 20px; }
         .inp-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
         .inp-field {
             width: 100%; background: #2c2c2e; border: 1px solid transparent;
-            color: var(--text-main); padding: 14px; border-radius: 12px; font-size: 15px; font-family: var(--font-mono);
+            color: #fff; padding: 14px; border-radius: 12px; font-family: var(--font-mono);
         }
-
         .toggle-btn {
             background: #2c2c2e; padding: 16px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
-            cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; cursor: pointer;
         }
-        .toggle-btn.active { background: rgba(50, 215, 75, 0.1); border: 1px solid var(--success); }
-        .toggle-btn.active.danger { background: rgba(255, 69, 58, 0.1); border: 1px solid var(--danger); }
+        .toggle-btn.active { border: 1px solid var(--success); background: rgba(50, 215, 75, 0.05); }
 
         .drawer-foot { 
             position: absolute; bottom: 0; left: 0; right: 0;
             padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
-            background: #1c1c1e; display: grid; grid-template-columns: 1fr 2fr; gap: 12px;
+            background: #1c1c1e;
+            display: grid; grid-template-columns: 1fr 2fr; gap: 12px;
         }
-        .btn { height: 54px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; }
+        .btn {
+            height: 54px; border-radius: 14px; font-size: 15px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; border: none;
+        }
         .btn-pri { background: var(--text-main); color: #000; }
         .btn-sec { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
 
         .toast {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
             background: rgba(44, 44, 46, 0.95); backdrop-filter: blur(10px);
-            color: #fff; padding: 12px 24px; border-radius: 25px; z-index: 2000; transition: 0.4s;
+            color: #fff; padding: 12px 24px; border-radius: 25px;
+            font-size: 13px; font-weight: 600; border: 1px solid #3a3a3c;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 2000;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .toast.show { transform: translateX(-50%) translateY(0); }
     </style>
@@ -204,7 +209,7 @@
             <div class="key action" onclick="checkAuth()"><span class="material-icons-round" style="color:var(--success)">check_circle</span></div>
         </div>
         
-        <input type="password" id="pin-entry" maxlength="4" style="opacity:0; position:absolute;">
+        <input type="password" id="pin-entry" maxlength="6">
     </div>
 
     <div id="dashboard">
@@ -246,46 +251,45 @@
 
     <div id="modal-overlay" onclick="if(event.target===this) toggleDrawer(false)">
         <div class="drawer">
+            <div class="drawer-head">
+                <span style="font-weight:800; font-size:18px;">Edit Entity</span>
+                <span class="material-icons-round" style="color:var(--text-muted); cursor:pointer;" onclick="toggleDrawer(false)">close</span>
+            </div>
             <div class="drawer-body">
                 <div class="profile-hero">
                     <img id="ed-img" class="ph-img" src="">
                     <div class="ph-meta">
-                        <h2 id="ed-disp-name" style="margin:0">Loading...</h2>
-                        <span id="ed-uid" style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono)">UID: ...</span>
+                        <h2 id="ed-disp-name">Loading...</h2>
+                        <span id="ed-uid">UID: ...</span>
                     </div>
                 </div>
 
                 <div class="inp-group">
-                    <label class="inp-label">Identity Name</label>
+                    <label class="inp-label">Full Name</label>
                     <input type="text" class="inp-field" id="inp-name">
                 </div>
-                
                 <div class="inp-group">
-                    <label class="inp-label">Username Handle</label>
+                    <label class="inp-label">Username</label>
                     <input type="text" class="inp-field" id="inp-handle">
                 </div>
-
                 <div class="inp-group">
                     <label class="inp-label">Goorac ID (10-Digit)</label>
-                    <input type="number" class="inp-field" id="inp-num" oninput="validateNumberLive()">
+                    <input type="number" class="inp-field" id="inp-num">
                 </div>
-
                 <div class="inp-group">
                     <label class="inp-label">Avatar URL</label>
                     <input type="text" class="inp-field" id="inp-photo">
                 </div>
 
-                <div class="toggle-btn" id="tog-ver" onclick="toggleChip(this)">
+                <div class="toggle-btn" id="tog-ver" onclick="this.classList.toggle('active')">
                     <span>Verified Status</span>
                     <span class="material-icons-round" style="color:var(--accent-blue)">verified</span>
                 </div>
-
-                <div class="toggle-btn danger" id="tog-sus" onclick="toggleChip(this)">
+                <div class="toggle-btn" id="tog-sus" onclick="this.classList.toggle('active')">
                     <span>Restrict Access</span>
                     <span class="material-icons-round" style="color:var(--danger)">block</span>
                 </div>
             </div>
-
             <div class="drawer-foot">
                 <button class="btn btn-sec" onclick="deleteUser()">PURGE</button>
                 <button class="btn btn-pri" id="btn-save" onclick="saveChanges()">SAVE CHANGES</button>
@@ -294,22 +298,24 @@
     </div>
 
     <script>
-        // --- BRIDGE TO CONFIG.JS ---
-        let db, rdb;
+        // --- 3. INITIALIZE USING EXTERNAL CONFIG (Same logic as home.html) ---
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig); // firebaseConfig is loaded from config.js
+        }
+        const db = firebase.firestore();
+        const rdb = firebase.database();
 
         // --- STATE ---
         let usersData = [];
         let currentId = null;
-        let originalNum = null;
 
-        // --- AUTH LOGIC ---
+        // --- AUTH ---
         function kp(n) {
             const input = document.getElementById('pin-entry');
             if(n === 'C') input.value = input.value.slice(0, -1);
             else if(input.value.length < 4) input.value += n;
-            
             updatePinDots();
-            if(input.value.length === 4) setTimeout(checkAuth, 200);
+            if(input.value.length === 4) setTimeout(checkAuth, 100);
         }
 
         function updatePinDots() {
@@ -320,35 +326,23 @@
 
         function checkAuth() {
             const pin = document.getElementById('pin-entry').value;
-            // Access Key: 2502
-            if (pin === "2502") {
+            if (pin === "2502") { 
                 document.getElementById('auth-gate').style.opacity = '0';
                 document.getElementById('auth-gate').style.transform = 'translateY(-100%)';
                 setTimeout(() => {
                     document.getElementById('auth-gate').style.display = 'none';
                     document.getElementById('dashboard').style.display = 'flex';
                     setTimeout(() => document.getElementById('dashboard').style.opacity = '1', 50);
-                    initConnection();
+                    initLoad();
                 }, 500);
-            } else {
+            } else if(pin.length >= 4) {
                 notify("Invalid Access Key", true);
                 document.getElementById('pin-entry').value = "";
                 updatePinDots();
             }
         }
 
-        // --- DATA ENGINE ---
-        function initConnection() {
-            // Check if config.js successfully populated window.db
-            if (window.db && window.rdb) {
-                db = window.db;
-                rdb = window.rdb;
-                initLoad();
-            } else {
-                notify("Firebase Link Offline", true);
-            }
-        }
-
+        // --- CORE DATA ---
         async function initLoad() {
             try {
                 const snap = await db.collection("users").orderBy("username").limit(300).get();
@@ -357,8 +351,7 @@
                 refreshUI();
                 notify("System Synchronized");
             } catch(e) { 
-                notify("Sync Failed", true); 
-                console.error(e);
+                notify("Sync Failed: " + e.message, true); 
             }
         }
 
@@ -366,7 +359,6 @@
             document.getElementById('stat-total').innerText = usersData.length;
             document.getElementById('stat-flagged').innerText = usersData.filter(u => u.suspended).length;
             
-            // Online count from Realtime Database
             rdb.ref('status').once('value', s => {
                 let count = 0;
                 s.forEach(c => { if(c.val().state === 'online') count++ });
@@ -386,9 +378,9 @@
                     <img src="${u.photoURL || 'https://via.placeholder.com/100'}" class="u-avatar">
                     <div class="u-content">
                         <span class="u-primary">${u.name || 'Unknown'}</span>
-                        <span class="u-secondary">@${u.username || 'user'} • #${u.gooracNumber || '----'}</span>
+                        <span class="u-secondary">@${u.username} • #${u.gooracNumber || '----'}</span>
                     </div>
-                    <div>
+                    <div class="u-status">
                         ${u.verified ? '<span class="tag ver">VERIFIED</span>' : ''}
                         ${u.suspended ? '<span class="tag sus">BLOCKED</span>' : ''}
                     </div>
@@ -397,19 +389,8 @@
             });
         }
 
-        function runSearch() {
-            const q = document.getElementById('search').value.toLowerCase();
-            const filtered = usersData.filter(u => 
-                (u.name||'').toLowerCase().includes(q) || 
-                (u.username||'').toLowerCase().includes(q)
-            );
-            renderTable(filtered);
-        }
-
-        // --- EDITING LOGIC ---
         function openEdit(u) {
             currentId = u.id;
-            originalNum = u.gooracNumber;
             document.getElementById('ed-img').src = u.photoURL || '';
             document.getElementById('ed-disp-name').innerText = u.name;
             document.getElementById('ed-uid').innerText = "UID: " + u.id;
@@ -417,15 +398,14 @@
             document.getElementById('inp-handle').value = u.username || '';
             document.getElementById('inp-num').value = u.gooracNumber || '';
             document.getElementById('inp-photo').value = u.photoURL || '';
-            
-            setChip('tog-ver', u.verified);
-            setChip('tog-sus', u.suspended);
+            document.getElementById('tog-ver').classList.toggle('active', !!u.verified);
+            document.getElementById('tog-sus').classList.toggle('active', !!u.suspended);
             toggleDrawer(true);
         }
 
         async function saveChanges() {
             const btn = document.getElementById('btn-save');
-            btn.innerText = "UPLOADING...";
+            btn.innerText = "UPDATING...";
             const updates = {
                 name: document.getElementById('inp-name').value,
                 username: document.getElementById('inp-handle').value,
@@ -434,53 +414,41 @@
                 verified: document.getElementById('tog-ver').classList.contains('active'),
                 suspended: document.getElementById('tog-sus').classList.contains('active')
             };
-
             try {
                 await db.collection("users").doc(currentId).update(updates);
-                notify("Entity Updated");
-                initLoad(); // Refresh local list
+                notify("Update Successful");
                 toggleDrawer(false);
-            } catch(e) { notify("Update Failed", true); }
-            finally { btn.innerText = "SAVE CHANGES"; }
+                initLoad();
+            } catch(e) { notify("Save Failed", true); }
+            btn.innerText = "SAVE CHANGES";
         }
 
         async function deleteUser() {
-            if(!confirm("⚠️ PURGE ENTITY PERMANENTLY?")) return;
-            try {
-                await db.collection("users").doc(currentId).delete();
-                notify("Entity Deleted");
-                initLoad();
-                toggleDrawer(false);
-            } catch(e) { notify("Purge Failed", true); }
+            if(!confirm("Purge this entity from Goorac?")) return;
+            await db.collection("users").doc(currentId).delete();
+            notify("Entity Erased");
+            toggleDrawer(false);
+            initLoad();
         }
 
-        // --- UTILS ---
-        function toggleDrawer(show) {
-            document.getElementById('modal-overlay').classList.toggle('active', show);
+        function runSearch() {
+            const q = document.getElementById('search').value.toLowerCase();
+            const filtered = usersData.filter(u => 
+                (u.name||'').toLowerCase().includes(q) || (u.username||'').toLowerCase().includes(q)
+            );
+            renderTable(filtered);
         }
 
-        function toggleChip(el) { el.classList.toggle('active'); }
-        function setChip(id, active) {
-            const el = document.getElementById(id);
-            active ? el.classList.add('active') : el.classList.remove('active');
-        }
-
+        function refreshDB() { initLoad(); notify("System Refreshed"); }
+        function toggleDrawer(show) { document.getElementById('modal-overlay').classList.toggle('active', show); }
         function notify(msg, err=false) {
             const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.style.background = err ? "var(--danger)" : "#2c2c2e";
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+            t.innerText = msg; t.style.background = err ? "var(--danger)" : "var(--success)";
+            t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
         }
-
-        function refreshDB() { initLoad(); }
-
         function downloadJSON() {
-            const data = JSON.stringify(usersData, null, 2);
-            const blob = new Blob([data], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = "nexus_dump.json"; a.click();
+            const s = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(usersData,null,2));
+            const a = document.createElement('a'); a.href=s; a.download="nexus_backup.json"; a.click();
         }
     </script>
 </body>
