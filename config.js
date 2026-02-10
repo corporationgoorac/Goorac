@@ -7,24 +7,44 @@ const firebaseConfig = {
   storageBucket: "goorac-c3b59.firebasestorage.app",
   messagingSenderId: "746746595332",
   appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-  measurementId: "G-M46FEVRYSS"
+  measurementId: "G-M46FEVRYSS",
+  // IMPORTANT: Required for Online Status / Presence features
+  databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
 };
 
+// 1. Expose config globally so other scripts can access it if needed
 window.firebaseConfig = firebaseConfig;
 
-// Use a function to initialize so we can call it safely
+// 2. Define the Universal Initialization Function
 window.initFirebaseCore = function() {
+    // Check if the Firebase SDK (gstatic) has loaded
     if (typeof firebase !== 'undefined') {
+        
+        // Prevent "App already exists" errors
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
+            console.log("🚀 Firebase App Initialized via config.js");
+        } else {
+            console.log("♻️ Firebase App already running");
         }
-        window.db = firebase.firestore();
-        window.rdb = firebase.database();
-        window.auth = firebase.auth();
-        console.log("✅ Firebase Core Initialized");
+
+        // 3. Expose Services Globally (Simplifies code in other files)
+        // This allows you to just use 'db', 'auth', or 'rdb' anywhere
+        if (!window.db) window.db = firebase.firestore();
+        if (!window.rdb) window.rdb = firebase.database();
+        if (!window.auth) window.auth = firebase.auth();
+
         return true;
     } else {
-        console.error("❌ Firebase SDK not loaded yet!");
+        // SDK not loaded yet - The HTML file will need to call this function 
+        // after the script tags, or this function will auto-retry.
+        console.warn("⚠️ Firebase SDK not detected yet. Waiting for script tags...");
         return false;
     }
 };
+
+// 3. Auto-Attempt Initialization
+// If config.js loads AFTER the SDKs (rare but possible), this starts it immediately.
+if (typeof firebase !== 'undefined') {
+    window.initFirebaseCore();
+}
