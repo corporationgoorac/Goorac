@@ -1,5 +1,6 @@
 // sync-loader.js
 if ('serviceWorker' in navigator) {
+    // Request notification permission
     if (Notification.permission !== "granted") {
         Notification.requestPermission();
     }
@@ -20,20 +21,19 @@ if ('serviceWorker' in navigator) {
         if (event.data.type === 'SYNC_DATA') {
             const { chatId, meta, messages, myUid } = event.data;
 
-            // Update chat history for chat.html
+            // Sync chat messages
             localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(messages));
 
-            // Force update the HTML cache for messages.html
-            updateGlobalInboxCache(chatId, meta, myUid);
+            // Sync Inbox HTML for messages.html
+            updateInboxCache(chatId, meta, myUid);
         }
     });
 }
 
-function updateGlobalInboxCache(chatId, chat, myUid) {
+function updateInboxCache(chatId, chat, myUid) {
     const userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
     const otherUid = chat.participants.find(id => id !== myUid);
     const u = userCache[otherUid] || { name: "User", username: "unknown" };
-
     const isUnread = (chat.unreadCount && chat.unreadCount[myUid] > 0) || (chat.lastSender !== myUid && chat.seen === false);
 
     const updatedRow = `
@@ -48,7 +48,7 @@ function updateGlobalInboxCache(chatId, chat, myUid) {
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div class="last-msg" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                        ${chat.lastMessage || 'Frequency cleared'}
+                        ${chat.lastMessage || 'Transmission cleared'}
                     </div>
                     ${isUnread ? `<div class="unread-badge" style="background:#00d2ff;"></div>` : ''}
                 </div>
