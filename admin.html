@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Nexus Command v5.0</title>
@@ -17,32 +20,23 @@
 
     <style>
         :root {
-            /* Pure Professional Palette - OLED Optimized */
             --bg-body: #000000;
             --bg-panel: #0a0a0a;
             --bg-input: #121212;
-            
             --border-subtle: #1c1c1e;
             --border-focus: #3a3a3c;
-            
             --text-main: #ffffff;
             --text-muted: #8e8e93;
             --text-dim: #444444;
-            
             --accent: #ffffff; 
             --accent-blue: #007aff;
             --danger: #ff453a;
             --success: #32d74b;
-            
-            --shadow-card: 0 4px 20px rgba(0,0,0,0.4);
-            --shadow-float: 0 10px 40px rgba(0,0,0,0.6);
-            
             --font-ui: 'Inter', system-ui, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* --- RESET & BASE --- */
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
         body {
             background: var(--bg-body); color: var(--text-main); margin: 0;
@@ -50,25 +44,20 @@
             display: flex; flex-direction: column; font-size: 14px;
         }
 
-        /* --- AUTH SCREEN (ON-SCREEN PIN) --- */
         #auth-gate {
             position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.5s, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        .pin-display {
-            display: flex; gap: 16px; margin-bottom: 40px;
-        }
+        .pin-display { display: flex; gap: 16px; margin-bottom: 40px; }
         .pin-dot {
             width: 14px; height: 14px; border: 2px solid #333; border-radius: 50%;
             transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .pin-dot.active { background: #fff; border-color: #fff; transform: scale(1.2); }
 
-        .keypad {
-            display: grid; grid-template-columns: repeat(3, 80px); gap: 16px;
-        }
+        .keypad { display: grid; grid-template-columns: repeat(3, 80px); gap: 16px; }
         .key {
             width: 80px; height: 80px; border-radius: 50%; background: #1c1c1e;
             display: flex; align-items: center; justify-content: center;
@@ -78,12 +67,8 @@
         .key:active { background: #3a3a3c; }
         .key.action { background: transparent; color: var(--text-muted); }
 
-        /* Hidden input for internal logic compatibility */
         #pin-entry { position: absolute; opacity: 0; pointer-events: none; }
 
-        /* --- UI COMPONENTS --- */
-        
-        /* 1. HEADER */
         header {
             height: 64px; border-bottom: 1px solid var(--border-subtle);
             display: flex; align-items: center; justify-content: space-between;
@@ -101,7 +86,6 @@
         }
         .btn-icon:hover { color: var(--text-main); border-color: var(--text-muted); background: var(--bg-input); }
 
-        /* 2. DASHBOARD AREA */
         #dashboard { display: none; flex: 1; flex-direction: column; opacity: 0; transition: opacity 0.5s; overflow: hidden; }
 
         .kpi-row {
@@ -112,7 +96,6 @@
         .kpi-val { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--text-main); }
         .kpi-lbl { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
-        /* 3. SEARCH & LIST */
         .toolbar { padding: 12px 20px; background: var(--bg-body); position: sticky; top: 64px; z-index: 9; }
         .search-wrap { position: relative; width: 100%; }
         .search-input {
@@ -145,7 +128,6 @@
         .tag.ver { background: rgba(0, 122, 255, 0.15); color: var(--accent-blue); }
         .tag.sus { background: rgba(255, 69, 58, 0.15); color: var(--danger); }
 
-        /* 4. EDITOR MODAL (BOTTOM SHEET) */
         #modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
             z-index: 100; opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -165,7 +147,7 @@
             border-radius: 3px; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
         }
 
-        .drawer-head { padding: 30px 24px 10px; border-bottom: 1px solid transparent; display: flex; justify-content: space-between; align-items: center; }
+        .drawer-head { padding: 30px 24px 10px; display: flex; justify-content: space-between; align-items: center; }
         .drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px 120px; }
         
         .profile-hero { display: flex; gap: 20px; align-items: center; margin-bottom: 32px; }
@@ -173,7 +155,6 @@
         .ph-meta h2 { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-main); }
         .ph-meta span { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
-        /* Input Groups */
         .inp-group { margin-bottom: 24px; }
         .inp-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.03em; }
         .inp-field {
@@ -183,7 +164,6 @@
         }
         .inp-field:focus { border-color: var(--accent-blue); background: #3a3a3c; }
 
-        /* Toggles */
         .toggle-btn {
             background: #2c2c2e; padding: 16px; border-radius: 12px;
             display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
@@ -192,7 +172,6 @@
         .toggle-btn.active { background: rgba(50, 215, 75, 0.1); border: 1px solid var(--success); }
         .toggle-btn.active.danger { background: rgba(255, 69, 58, 0.1); border: 1px solid var(--danger); }
 
-        /* Footer Actions */
         .drawer-foot { 
             position: absolute; bottom: 0; left: 0; right: 0;
             padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
@@ -206,7 +185,6 @@
         .btn-pri { background: var(--text-main); color: #000; }
         .btn-sec { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
 
-        /* TOAST */
         .toast {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
             background: rgba(44, 44, 46, 0.95); backdrop-filter: blur(10px);
@@ -278,8 +256,7 @@
             </div>
         </div>
 
-        <div class="list-container" id="render-area">
-            </div>
+        <div class="list-container" id="render-area"></div>
     </div>
 
     <div id="modal-overlay" onclick="if(event.target===this) toggleDrawer(false)">
@@ -340,10 +317,22 @@
     </div>
 
     <script>
-        // --- CONFIG (Imported from config.js) ---
-        if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
-        const db = firebase.firestore();
-        const rdb = firebase.database();
+        // --- GLOBAL INITIALIZATION (Fixes TDZ Error) ---
+        var db, rdb; 
+
+        (function() {
+            // Check if config exists and init Firebase
+            if (!firebase.apps.length && window.firebaseConfig) {
+                firebase.initializeApp(window.firebaseConfig);
+            }
+            // Explicitly attach to window for other components/modules
+            window.db = firebase.firestore();
+            window.rdb = firebase.database();
+            
+            // Local references
+            db = window.db;
+            rdb = window.rdb;
+        })();
 
         // --- STATE ---
         let usersData = [];
@@ -379,7 +368,6 @@
             let hash = 0;
             for(let i=0; i<pin.length; i++) hash = ((hash << 5) - hash) + pin.charCodeAt(i);
             
-            // Validation for PIN 2502 or legacy hash
             if (pin === "2502" || Math.abs(hash) === 1542021) {
                 document.getElementById('auth-gate').style.opacity = '0';
                 document.getElementById('auth-gate').style.transform = 'translateY(-100%)';
@@ -399,12 +387,16 @@
         // --- CORE DATA ---
         async function initLoad() {
             try {
+                // Now using initialized global 'db'
                 const snap = await db.collection("users").orderBy("username").limit(300).get();
                 usersData = [];
                 snap.forEach(doc => usersData.push({ id: doc.id, ...doc.data() }));
                 refreshUI();
                 notify("System Synchronized");
-            } catch(e) { notify("Sync Failed: " + e.message, true); }
+            } catch(e) { 
+                notify("Sync Failed: " + e.message, true); 
+                console.error("Initialization failed:", e);
+            }
         }
 
         function refreshUI() {
@@ -423,7 +415,6 @@
             initLoad(); 
         }
 
-        // --- RENDER ---
         function renderTable(list) {
             const el = document.getElementById('render-area');
             el.innerHTML = "";
@@ -447,7 +438,6 @@
             });
         }
 
-        // --- SEARCH ---
         let debounce;
         function runSearch() {
             clearTimeout(debounce);
@@ -463,7 +453,6 @@
             }, 200);
         }
 
-        // --- EDITOR LOGIC ---
         function openEdit(u) {
             currentId = u.id;
             originalNum = u.gooracNumber;
@@ -481,7 +470,6 @@
             toggleDrawer(true);
         }
 
-        // BACK BUTTON LOGIC
         function toggleDrawer(show) {
             const ol = document.getElementById('modal-overlay');
             if(show) {
