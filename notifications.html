@@ -34,6 +34,7 @@
         
         html, body { height: 100%; width: 100%; background: var(--bg); color: var(--text); overflow-x: hidden; }
 
+        /* HEADER */
         header { 
             position: sticky; top: 0; z-index: 100;
             padding: 10px 16px; padding-top: calc(env(safe-area-inset-top) + 12px);
@@ -46,6 +47,7 @@
         .back-btn { font-size: 1.8rem; cursor: pointer; color: var(--text); background:none; border:none; padding:0; display: flex; align-items: center; }
         .header-action { font-size: 0.9rem; color: var(--accent); cursor: pointer; background: none; border: none; font-weight: 600; }
 
+        /* TABS */
         .tabs-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
         .tabs-container::-webkit-scrollbar { display: none; }
         
@@ -58,6 +60,7 @@
         }
         .tab-pill.active { background: var(--text); color: #000; border-color: var(--text); }
 
+        /* LIST */
         #notif-list { padding: 0 0 80px 0; min-height: 50vh; }
         
         .notif-item {
@@ -67,6 +70,8 @@
             cursor: pointer;
         }
         .notif-item:active { background: var(--item-hover); }
+        
+        /* Unread Styling */
         .notif-item.unread { background: var(--unread-bg); }
         
         .unread-dot {
@@ -89,6 +94,7 @@
 
         .n-action { flex-shrink: 0; margin-left: 4px; }
 
+        /* MINI NOTE PREVIEW */
         .mini-note {
             display: inline-flex; align-items: center; justify-content: center;
             width: 44px; height: 44px; border-radius: 10px;
@@ -98,6 +104,7 @@
             overflow: hidden;
         }
 
+        /* BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
             padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
@@ -110,6 +117,7 @@
 
         .v-badge { width: 13px; height: 13px; vertical-align: -2px; margin-left: 2px; }
 
+        /* LOADING */
         .empty-state {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             height: 60vh; color: var(--text-secondary); text-align: center; gap: 15px;
@@ -138,7 +146,7 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 1. FIREBASE INIT ---
+    // --- FIREBASE INIT ---
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (!firebase.apps.length && window.firebaseConfig) {
@@ -161,7 +169,7 @@
     // The Master Map holds all raw data
     let loadedMap = new Map();
 
-    // --- 2. INSTANT LOAD (SYNC) ---
+    // --- 0ms INSTANT LOAD (SYNC) ---
     // Reads cache and renders immediately before Firebase connects
     try {
         const lastUid = localStorage.getItem("goorac_last_uid");
@@ -188,7 +196,7 @@
         }
     } catch(e) { console.warn("Cache load error", e); }
 
-    // --- 3. HELPER FUNCTIONS ---
+    // --- HELPER FUNCTIONS ---
 
     // Deduplicate: Keep only the latest event per user per type
     // Example: If User A likes 3 notes, show only the latest like.
@@ -232,7 +240,21 @@
         });
     }
 
-    // --- 4. AUTH & LIVE DATA ---
+    // --- GAZE DETECTION (AUTO READ) ---
+    const gazeObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const row = entry.target;
+                const id = row.dataset.id;
+                if(id && row.classList.contains('unread')) {
+                    markNotificationRead(id);
+                    gazeObserver.unobserve(row); 
+                }
+            }
+        });
+    }, { threshold: 0.6 });
+
+    // --- AUTH & LIVE DATA ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
@@ -429,14 +451,16 @@
             return;
         }
 
-        // Only append new items if we aren't rebuilding (usually rebuilding in this logic)
-        const batch = filtered.slice(0, BATCH_SIZE);
+        const nextBatch = filtered.slice(displayedCount, displayedCount + BATCH_SIZE);
         
-        // Simple rebuild for robustness
-        list.innerHTML = '';
-        batch.forEach(n => list.appendChild(createNotificationElement(n)));
-        
-        loader.style.display = (batch.length < filtered.length) ? 'flex' : 'none';
+        if (nextBatch.length > 0) {
+            nextBatch.forEach(notif => {
+                const el = createNotificationElement(notif);
+                list.appendChild(el);
+            });
+            displayedCount += nextBatch.length;
+        }
+        loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
     }
 
     function createNotificationElement(notif) {
@@ -533,6 +557,12 @@
         if (days < 7) return `${days}d`;
         return `${Math.floor(days/7)}w`;
     }
+
+    const scrollObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) renderNextBatch();
+    }, { root: null, threshold: 0.1 });
+    scrollObserver.observe(document.getElementById('loader'));
+
 </script>
 </body>
 </html>
