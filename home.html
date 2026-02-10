@@ -11,7 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script src="config.js"></script>
-    <script src="sync-loader.js" defer></script>
     <link rel="manifest" href="manifest.json">
 
     <script src="components/navbar.js" defer></script>
@@ -339,30 +338,6 @@
         }
     })();
 
-    // FIX: Trigger Firebase initialization from config.js
-    if (window.initFirebaseCore) {
-        window.initFirebaseCore();
-    }
-
-    const auth = firebase.auth(), db = firebase.firestore();
-    let READ_KEY = "goorac_read_notifs"; 
-
-    setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
-    }, 1000);
-
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            READ_KEY = `goorac_read_${user.uid}`;
-            const doc = await db.collection("users").doc(user.uid).get();
-            if (doc.exists) {
-                updateUI(doc.data());
-                startLiveCounters(user.uid);
-                listenNotifications(user.uid);
-            } else window.location.href = "setup.html";
-        } else window.location.href = "login.html";
-    });
-
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
@@ -377,36 +352,6 @@
             observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
         }
     });
-
-    function updateUI(data) {
-        const nameEl = document.getElementById('welcome-name');
-        const textEl = document.getElementById('welcome-text');
-        const pfpEl = document.getElementById('header-pfp');
-        const notePfp = document.getElementById('my-note-pfp');
-
-        nameEl.classList.remove('skeleton');
-        const hour = new Date().getHours();
-        let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
-        
-        const src = data.photoURL || 'https://via.placeholder.com/150';
-        pfpEl.src = src; pfpEl.classList.remove('skeleton');
-        notePfp.src = src; notePfp.classList.remove('skeleton');
-        
-        textEl.classList.remove('skeleton');
-        textEl.innerText = "System operational. Connection secure.";
-        saveHomeState();
-    }
-
-    function formatTime(ts) {
-        if (!ts) return "";
-        const date = ts.toDate ? ts.toDate() : new Date(ts);
-        const sec = Math.floor((new Date() - date) / 1000);
-        if (sec < 60) return "Just now";
-        if (sec < 3600) return Math.floor(sec/60) + "m ago";
-        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
-        return Math.floor(sec/86400) + "d ago";
-    }
 
     function saveHomeState() {
         const state = {
@@ -429,6 +374,80 @@
             }
         };
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
+    }
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); deferredPrompt = e;
+        setTimeout(() => document.getElementById('install-popup').classList.add('show'), 2000);
+    });
+    async function installPWA() {
+        if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
+    }
+
+    // --- FIREBASE INIT ---
+    let fbConfig = {
+        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
+        authDomain: "goorac-c3b59.firebaseapp.com",
+        projectId: "goorac-c3b59",
+        storageBucket: "goorac-c3b59.firebasestorage.app",
+        messagingSenderId: "746746595332",
+        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
+        databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
+    };
+
+    // FIX: Check if firebase SDK is ready before calling initializeApp
+    if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) firebase.initializeApp(fbConfig);
+    }
+
+    const auth = firebase.auth(), db = firebase.firestore();
+    let READ_KEY = "goorac_read_notifs"; 
+
+    setInterval(() => {
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
+    }, 1000);
+
+    function formatTime(ts) {
+        if (!ts) return "";
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        const sec = Math.floor((new Date() - date) / 1000);
+        if (sec < 60) return "Just now";
+        if (sec < 3600) return Math.floor(sec/60) + "m ago";
+        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
+        return Math.floor(sec/86400) + "d ago";
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            READ_KEY = `goorac_read_${user.uid}`;
+            const doc = await db.collection("users").doc(user.uid).get();
+            if (doc.exists) {
+                updateUI(doc.data());
+                startLiveCounters(user.uid);
+                listenNotifications(user.uid);
+            } else window.location.href = "setup.html";
+        } else window.location.href = "login.html";
+    });
+
+    function updateUI(data) {
+        const nameEl = document.getElementById('welcome-name');
+        const textEl = document.getElementById('welcome-text');
+        const pfpEl = document.getElementById('header-pfp');
+        const notePfp = document.getElementById('my-note-pfp');
+
+        nameEl.classList.remove('skeleton');
+        const hour = new Date().getHours();
+        let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+        nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+        
+        const src = data.photoURL || 'https://via.placeholder.com/150';
+        pfpEl.src = src; pfpEl.classList.remove('skeleton');
+        notePfp.src = src; notePfp.classList.remove('skeleton');
+        
+        textEl.classList.remove('skeleton');
+        textEl.innerText = "System operational. Connection secure.";
+        saveHomeState();
     }
 
     function listenNotifications(uid) {
@@ -510,15 +529,6 @@
             }
             saveHomeState();
         });
-    }
-
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); deferredPrompt = e;
-        setTimeout(() => document.getElementById('install-popup').classList.add('show'), 2000);
-    });
-    async function installPWA() {
-        if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
     }
 </script>
 </body>
