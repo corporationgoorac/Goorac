@@ -28,6 +28,7 @@
             --text-main: #ffffff;
             --text-muted: #a0a0a0;
             --accent-blue: #007aff;
+            --accent-purple: #af52de;
             --danger: #ff453a;
             --success: #32d74b;
             --warning: #ffd60a;
@@ -35,19 +36,36 @@
             --font-mono: 'JetBrains Mono', monospace;
         }
 
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        /* --- GLOBAL RESET --- */
+        * { 
+            box-sizing: border-box; 
+            outline: none; 
+            -webkit-tap-highlight-color: transparent; 
+        }
         
         body {
-            background: var(--bg-body); color: var(--text-main); margin: 0;
-            font-family: var(--font-ui); height: 100vh; overflow: hidden;
-            display: flex; flex-direction: column; font-size: 14px;
+            background: var(--bg-body); 
+            color: var(--text-main); 
+            margin: 0;
+            font-family: var(--font-ui); 
+            height: 100vh; 
+            overflow: hidden;
+            display: flex; 
+            flex-direction: column; 
+            font-size: 14px;
         }
 
-        /* --- AUTH GATE --- */
+        /* --- AUTH GATE & ACCESS OVERLAY --- */
         #auth-gate {
             position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #access-denied {
+            position: fixed; inset: 0; background: #000; z-index: 2000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 40px;
         }
         
         .pin-display { display: flex; gap: 16px; margin-bottom: 50px; }
@@ -55,7 +73,12 @@
             width: 14px; height: 14px; border: 2px solid #333; border-radius: 50%;
             transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .pin-dot.active { background: var(--accent-blue); border-color: var(--accent-blue); transform: scale(1.3); box-shadow: 0 0 15px var(--accent-blue); }
+        .pin-dot.active { 
+            background: var(--accent-blue); 
+            border-color: var(--accent-blue); 
+            transform: scale(1.3); 
+            box-shadow: 0 0 15px var(--accent-blue); 
+        }
 
         .keypad { display: grid; grid-template-columns: repeat(3, 80px); gap: 16px; }
         .key {
@@ -69,7 +92,7 @@
 
         #pin-entry { position: absolute; opacity: 0; pointer-events: none; }
 
-        /* --- DASHBOARD --- */
+        /* --- DASHBOARD LAYOUT --- */
         header {
             height: 70px; border-bottom: 1px solid var(--border-subtle);
             display: flex; align-items: center; justify-content: space-between;
@@ -85,6 +108,7 @@
             background: var(--bg-input); color: var(--text-muted); cursor: pointer;
             display: flex; align-items: center; justify-content: center; transition: 0.2s;
         }
+        .btn-icon:hover { color: #fff; border-color: #555; }
         .btn-icon:active { transform: scale(0.9); background: #222; }
 
         #dashboard { display: none; flex: 1; flex-direction: column; opacity: 0; transition: 0.5s; overflow: hidden; }
@@ -97,6 +121,27 @@
         .kpi-val { font-family: var(--font-mono); font-size: 24px; font-weight: 700; }
         .kpi-lbl { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
 
+        /* --- LIVE MONITORING (NETWATCH) --- */
+        .netwatch-bar {
+            padding: 16px 24px; background: #080808; border-bottom: 1px solid var(--border-subtle);
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .nw-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: var(--success); letter-spacing: 0.1em; text-transform: uppercase; }
+        .nw-pulse { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        
+        .nw-users { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .nw-users::-webkit-scrollbar { display: none; }
+        .nw-avatar-wrap { position: relative; cursor: help; transition: 0.2s; }
+        .nw-avatar-wrap:hover { transform: translateY(-3px); }
+        .nw-avatar { width: 42px; height: 42px; border-radius: 12px; border: 1px solid #333; object-fit: cover; background: #111; }
+        .nw-badge { 
+            position: absolute; bottom: -2px; right: -2px; width: 12px; height: 12px; 
+            background: #000; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center;
+        }
+        .nw-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+        /* --- TOOLBAR & SEARCH --- */
         .toolbar { padding: 16px 20px; background: var(--bg-body); position: sticky; top: 70px; z-index: 9; }
         .search-wrap { position: relative; width: 100%; }
         .search-input {
@@ -107,8 +152,8 @@
         .search-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 4px rgba(0,122,255,0.1); }
         .search-icon { position: absolute; left: 14px; top: 14px; color: var(--text-muted); }
         
+        /* --- LIST RENDERER --- */
         .list-container { flex: 1; overflow-y: auto; padding-bottom: 100px; }
-        
         .list-item {
             padding: 16px 24px; border-bottom: 1px solid var(--border-subtle);
             display: flex; align-items: center; gap: 16px; transition: 0.2s; cursor: pointer;
@@ -121,14 +166,16 @@
         .u-primary { font-weight: 700; font-size: 15px; color: var(--text-main); display: block; margin-bottom: 2px; }
         .u-secondary { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
         
+        /* --- DYNAMIC TAGS --- */
         .tag { 
             font-size: 9px; font-weight: 900; padding: 3px 8px; border-radius: 6px; 
             display: inline-block; text-transform: uppercase; margin-left: 6px;
         }
         .tag.ver { background: rgba(0, 122, 255, 0.15); color: var(--accent-blue); border: 1px solid rgba(0, 122, 255, 0.2); }
         .tag.sus { background: rgba(255, 69, 58, 0.15); color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.2); }
+        .tag.adm { background: rgba(175, 82, 222, 0.15); color: var(--accent-purple); border: 1px solid rgba(175, 82, 222, 0.2); }
 
-        /* --- MODAL / DRAWER --- */
+        /* --- CONFIGURATION DRAWER --- */
         #modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
             z-index: 100; opacity: 0; pointer-events: none; transition: 0.4s;
@@ -151,6 +198,7 @@
         .ph-meta h2 { margin: 0; font-size: 22px; font-weight: 800; }
         .ph-meta span { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
+        /* --- FORM FIELDS --- */
         .inp-group { margin-bottom: 24px; }
         .inp-label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
         .inp-field {
@@ -159,18 +207,19 @@
         }
         .inp-field:focus { border-color: var(--accent-blue); background: #222; }
 
-        /* --- PREMIUM TOGGLE --- */
+        /* --- TOGGLE ROWS --- */
         .toggle-row {
             display: flex; align-items: center; justify-content: space-between;
             background: #1c1c1c; padding: 18px; border-radius: 16px; margin-bottom: 12px;
-            border: 1px solid #333; transition: 0.3s;
+            border: 1px solid #333; transition: 0.3s; cursor: pointer;
         }
         .toggle-row.active-ver { border-color: var(--accent-blue); background: rgba(0, 122, 255, 0.05); }
         .toggle-row.active-sus { border-color: var(--danger); background: rgba(255, 69, 58, 0.05); }
+        .toggle-row.active-adm { border-color: var(--accent-purple); background: rgba(175, 82, 222, 0.05); }
         
         .switch {
             position: relative; width: 50px; height: 28px;
-            background: #333; border-radius: 20px; transition: 0.3s; cursor: pointer;
+            background: #333; border-radius: 20px; transition: 0.3s;
         }
         .switch::after {
             content: ''; position: absolute; top: 3px; left: 3px;
@@ -178,6 +227,7 @@
         }
         .toggle-row.active .switch.blue { background: var(--accent-blue); }
         .toggle-row.active .switch.red { background: var(--danger); }
+        .toggle-row.active .switch.purple { background: var(--accent-purple); }
         .toggle-row.active .switch::after { left: 25px; }
 
         .drawer-foot { 
@@ -207,6 +257,15 @@
 <body>
 
     <div id="toast" class="toast">Action Successful</div>
+
+    <div id="access-denied">
+        <span class="material-icons-round" style="font-size: 80px; color: var(--danger); margin-bottom: 20px;">lock_person</span>
+        <h1 style="font-weight: 900; margin: 0;">ACCESS RESTRICTED</h1>
+        <p style="color: var(--text-muted); max-width: 300px; line-height: 1.6; margin-top: 10px;">
+            Your account does not have Admin Authority. Unauthorized access to Nexus Command is logged.
+        </p>
+        <button class="btn btn-pri" style="margin-top: 30px; padding: 0 40px;" onclick="window.location.href='login.html'">RETURN TO LOGIN</button>
+    </div>
 
     <div id="auth-gate">
         <div class="brand" style="margin-bottom: 60px; flex-direction: column;">
@@ -240,6 +299,7 @@
             <div class="header-actions">
                 <button class="btn-icon" onclick="downloadJSON()"><span class="material-icons-round">cloud_download</span></button>
                 <button class="btn-icon" onclick="refreshDB()"><span class="material-icons-round">sync</span></button>
+                <button class="btn-icon" onclick="firebase.auth().signOut()"><span class="material-icons-round">logout</span></button>
             </div>
         </header>
 
@@ -255,6 +315,16 @@
             <div class="kpi-card">
                 <span class="kpi-val" id="stat-flagged" style="color:var(--danger)">--</span>
                 <span class="kpi-lbl">Flagged / Ban</span>
+            </div>
+        </div>
+
+        <div class="netwatch-bar">
+            <div class="nw-head">
+                <div class="nw-pulse"></div>
+                <span>NETWATCH: LIVE SIGNALS</span>
+            </div>
+            <div class="nw-users" id="live-user-feed">
+                <span style="color:var(--text-muted); font-family:var(--font-mono); font-size:10px;">Establishing link...</span>
             </div>
         </div>
 
@@ -287,17 +357,32 @@
                     <label class="inp-label">Identity Name</label>
                     <input type="text" class="inp-field" id="inp-name" placeholder="Full legal name">
                 </div>
+                
                 <div class="inp-group">
                     <label class="inp-label">Nexus Handle (@)</label>
-                    <input type="text" class="inp-field" id="inp-handle" placeholder="username">
+                    <input type="text" class="inp-field" id="inp-handle" placeholder="username" oninput="formatHandle(this)">
+                    <div id="handle-warn" style="font-size:10px; color:var(--danger); margin-top:5px; font-weight:700; display:none;"></div>
                 </div>
+
                 <div class="inp-group">
                     <label class="inp-label">Goorac ID (Strict 10-Digit)</label>
                     <input type="number" class="inp-field" id="inp-num" placeholder="e.g. 1029384756">
                 </div>
+
                 <div class="inp-group">
                     <label class="inp-label">Profile Image Vector (URL)</label>
                     <input type="text" class="inp-field" id="inp-photo">
+                </div>
+
+                <div class="toggle-row" id="tog-adm-row" onclick="toggleSwitch('tog-adm-row')">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span class="material-icons-round" style="color:var(--accent-purple)">admin_panel_settings</span>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:700;">Admin Authority</span>
+                            <span style="font-size:10px; color:var(--text-muted)">Grant full control over Nexus nodes</span>
+                        </div>
+                    </div>
+                    <div class="switch purple"></div>
                 </div>
 
                 <div class="toggle-row" id="tog-ver-row" onclick="toggleSwitch('tog-ver-row')">
@@ -322,6 +407,7 @@
                     <div class="switch red"></div>
                 </div>
             </div>
+            
             <div class="drawer-foot">
                 <button class="btn btn-sec" onclick="deleteUser()" style="color:var(--danger); border-color: rgba(255,69,58,0.2)">PURGE</button>
                 <button class="btn btn-pri" id="btn-save" onclick="saveChanges()">COMMIT UPDATES</button>
@@ -330,17 +416,52 @@
     </div>
 
     <script>
-        // --- 3. FIREBASE INITIALIZATION (Ensures correct order) ---
+        // --- 1. CORE INITIALIZATION ---
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig); 
         }
         const db = firebase.firestore();
         const rdb = firebase.database();
+        const auth = firebase.auth();
 
         let usersData = [];
         let currentId = null;
+        let currentUserProfile = null;
 
-        // --- PIN LOGIC ---
+        // --- 2. SECURITY MIDDLEWARE (Access Control) ---
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                // If not logged in, force redirect to login
+                window.location.href = "login.html";
+                return;
+            }
+
+            try {
+                const doc = await db.collection("users").doc(user.uid).get();
+                if (doc.exists) {
+                    currentUserProfile = doc.data();
+                    const handle = currentUserProfile.username || "";
+                    
+                    // ADMIN ACCESS LOGIC:
+                    // Condition: admin flag is true OR username is hardcoded bypass
+                    const isGodMode = (handle === "sivamanihandan" || handle === "goorac");
+                    const isAdmin = currentUserProfile.admin === true || isGodMode;
+
+                    if (!isAdmin) {
+                        document.getElementById('access-denied').style.display = 'flex';
+                        document.getElementById('dashboard').style.display = 'none';
+                    }
+                } else {
+                    // No profile exists, likely not an admin
+                    document.getElementById('access-denied').style.display = 'flex';
+                }
+            } catch (err) {
+                console.error("Auth Validation Failed", err);
+                notify("Security Sync Error", true);
+            }
+        });
+
+        // --- 3. PIN LOGIC ---
         function kp(n) {
             const input = document.getElementById('pin-entry');
             if(n === 'C') input.value = input.value.slice(0, -1);
@@ -357,6 +478,7 @@
 
         function checkAuth() {
             const pin = document.getElementById('pin-entry').value;
+            // Static PIN Gate
             if (pin === "2502") { 
                 document.getElementById('auth-gate').style.opacity = '0';
                 document.getElementById('auth-gate').style.transform = 'scale(1.1)';
@@ -367,32 +489,59 @@
                     initLoad();
                 }, 500);
             } else if(pin.length >= 4) {
-                notify("ACCESS DENIED", true);
+                notify("TERMINAL LOCKED: WRONG PIN", true);
                 document.getElementById('pin-entry').value = "";
                 updatePinDots();
                 if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
             }
         }
 
-        // --- DATA LOAD ---
+        // --- 4. DATA ENGINE ---
         async function initLoad() {
             try {
-                const snap = await db.collection("users").orderBy("username").limit(500).get();
-                usersData = [];
-                snap.forEach(doc => usersData.push({ id: doc.id, ...doc.data() }));
-                refreshUI();
+                // Realtime sync for statistics and list
+                db.collection("users").orderBy("username").limit(500).onSnapshot(snap => {
+                    usersData = [];
+                    snap.forEach(doc => usersData.push({ id: doc.id, ...doc.data() }));
+                    refreshUI();
+                });
+                initRealtimePresence(); 
             } catch(e) { notify("Sync Failure: " + e.message, true); }
+        }
+
+        function initRealtimePresence() {
+            rdb.ref('status').on('value', snapshot => {
+                const container = document.getElementById('live-user-feed');
+                container.innerHTML = '';
+                let count = 0;
+                
+                snapshot.forEach(child => {
+                    const data = child.val();
+                    if(data.state === 'online') {
+                        count++;
+                        const localU = usersData.find(u => u.id === child.key) || {};
+                        const img = localU.photoURL || 'https://via.placeholder.com/50';
+                        const nme = localU.username || 'unknown';
+                        
+                        const div = document.createElement('div');
+                        div.className = 'nw-avatar-wrap';
+                        div.title = `@${nme} (Active Now)`;
+                        div.innerHTML = `
+                            <img src="${img}" class="nw-avatar">
+                            <div class="nw-badge"><div class="nw-dot"></div></div>
+                        `;
+                        container.appendChild(div);
+                    }
+                });
+                
+                document.getElementById('stat-online').innerText = count;
+                if(count === 0) container.innerHTML = '<span style="color:var(--text-muted); font-size:10px;">No signals detected in sector.</span>';
+            });
         }
 
         function refreshUI() {
             document.getElementById('stat-total').innerText = usersData.length;
             document.getElementById('stat-flagged').innerText = usersData.filter(u => u.suspended).length;
-            
-            rdb.ref('status').once('value', s => {
-                let count = 0;
-                s.forEach(c => { if(c.val().state === 'online') count++ });
-                document.getElementById('stat-online').innerText = count;
-            });
             renderTable(usersData);
         }
 
@@ -410,31 +559,49 @@
                         <span class="u-secondary">@${u.username} • #${u.gooracNumber || 'UNSET'}</span>
                     </div>
                     <div class="u-status">
+                        ${u.admin ? '<span class="tag adm">ADMIN</span>' : ''}
                         ${u.verified ? '<span class="tag ver">VERIFIED</span>' : ''}
-                        ${u.suspended ? '<span class="tag sus">RESTRICTED</span>' : ''}
+                        ${u.suspended ? '<span class="tag sus">SUSPENDED</span>' : ''}
                     </div>
                 `;
                 el.appendChild(row);
             });
         }
 
+        // --- 5. EDITING LOGIC ---
         function openEdit(u) {
             currentId = u.id;
             document.getElementById('ed-img').src = u.photoURL || '';
             document.getElementById('ed-disp-name').innerText = u.name;
             document.getElementById('ed-uid').innerText = "UID: " + u.id;
             document.getElementById('inp-name').value = u.name || '';
-            document.getElementById('inp-handle').value = u.username || '';
+            
+            const hInput = document.getElementById('inp-handle');
+            hInput.value = u.username || '';
+            
             document.getElementById('inp-num').value = u.gooracNumber || '';
             document.getElementById('inp-photo').value = u.photoURL || '';
+            document.getElementById('handle-warn').style.display = 'none';
             
+            // Set Toggle states
             const rowVer = document.getElementById('tog-ver-row');
             const rowSus = document.getElementById('tog-sus-row');
+            const rowAdm = document.getElementById('tog-adm-row');
             
             u.verified ? rowVer.classList.add('active', 'active-ver') : rowVer.classList.remove('active', 'active-ver');
             u.suspended ? rowSus.classList.add('active', 'active-sus') : rowSus.classList.remove('active', 'active-sus');
+            u.admin ? rowAdm.classList.add('active', 'active-adm') : rowAdm.classList.remove('active', 'active-adm');
             
             toggleDrawer(true);
+        }
+
+        function formatHandle(input) {
+            const clean = input.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            if (input.value !== clean) {
+                notify("STRICT: Lowercase & Text Only", true);
+            }
+            input.value = clean;
+            document.getElementById('handle-warn').style.display = 'none';
         }
 
         function toggleSwitch(rowId) {
@@ -442,16 +609,23 @@
             row.classList.toggle('active');
             if(rowId === 'tog-ver-row') row.classList.toggle('active-ver');
             if(rowId === 'tog-sus-row') row.classList.toggle('active-sus');
+            if(rowId === 'tog-adm-row') row.classList.toggle('active-adm');
         }
 
         async function saveChanges() {
             const btn = document.getElementById('btn-save');
             const numVal = document.getElementById('inp-num').value;
             const numInt = parseInt(numVal);
+            const userHandle = document.getElementById('inp-handle').value;
+            const warnBox = document.getElementById('handle-warn');
 
-            // 1. Validation: 10 Digits
             if (numVal.length !== 10 || isNaN(numInt)) {
-                notify("ERROR: ID must be 10 digits", true);
+                notify("ERROR: ID must be exactly 10 digits", true);
+                return;
+            }
+
+            if (!userHandle || userHandle.length < 3) {
+                notify("ERROR: Handle is required", true);
                 return;
             }
 
@@ -459,18 +633,27 @@
             btn.disabled = true;
 
             try {
-                // 2. Uniqueness Check
-                const duplicateCheck = await db.collection("users")
-                    .where("gooracNumber", "==", numInt)
-                    .get();
-                
-                let isTaken = false;
-                duplicateCheck.forEach(doc => {
-                    if(doc.id !== currentId) isTaken = true;
-                });
+                // Uniqueness: Goorac Number
+                const duplicateNum = await db.collection("users").where("gooracNumber", "==", numInt).get();
+                let isNumTaken = false;
+                duplicateNum.forEach(doc => { if(doc.id !== currentId) isNumTaken = true; });
 
-                if(isTaken) {
-                    notify("ERROR: Goorac ID already assigned", true);
+                if(isNumTaken) {
+                    notify("COLLISION: ID already assigned", true);
+                    btn.innerText = "COMMIT UPDATES";
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Uniqueness: Username
+                const duplicateUser = await db.collection("users").where("username", "==", userHandle).get();
+                let isUserTaken = false;
+                duplicateUser.forEach(doc => { if(doc.id !== currentId) isUserTaken = true; });
+
+                if(isUserTaken) {
+                    warnBox.innerText = `HANDLE @${userHandle} IS UNAVAILABLE`;
+                    warnBox.style.display = 'block';
+                    notify("COLLISION: Username taken", true);
                     btn.innerText = "COMMIT UPDATES";
                     btn.disabled = false;
                     return;
@@ -478,17 +661,17 @@
 
                 const updates = {
                     name: document.getElementById('inp-name').value,
-                    username: document.getElementById('inp-handle').value,
+                    username: userHandle,
                     photoURL: document.getElementById('inp-photo').value,
                     gooracNumber: numInt,
                     verified: document.getElementById('tog-ver-row').classList.contains('active'),
-                    suspended: document.getElementById('tog-sus-row').classList.contains('active')
+                    suspended: document.getElementById('tog-sus-row').classList.contains('active'),
+                    admin: document.getElementById('tog-adm-row').classList.contains('active')
                 };
 
                 await db.collection("users").doc(currentId).update(updates);
-                notify("ENTITY UPDATED");
+                notify("ENTITY COMMITTED SUCCESSFULLY");
                 toggleDrawer(false);
-                initLoad();
             } catch(e) { 
                 notify("DB REJECTION: " + e.message, true); 
             } finally {
@@ -498,15 +681,15 @@
         }
 
         async function deleteUser() {
-            if(!confirm("DANGER: Permanently purge this entity?")) return;
+            if(!confirm("DANGER: This will permanently erase the entity profile. Continue?")) return;
             try {
                 await db.collection("users").doc(currentId).delete();
-                notify("ENTITY ERASED");
+                notify("ENTITY PURGED FROM DATABASE");
                 toggleDrawer(false);
-                initLoad();
-            } catch(e) { notify("PURGE FAILED", true); }
+            } catch(e) { notify("PURGE SEQUENCE FAILED", true); }
         }
 
+        // --- 6. UTILITIES ---
         function runSearch() {
             const q = document.getElementById('search').value.toLowerCase();
             const filtered = usersData.filter(u => 
@@ -515,7 +698,7 @@
             renderTable(filtered);
         }
 
-        function refreshDB() { initLoad(); notify("DATA REFRESHED"); }
+        function refreshDB() { initLoad(); notify("DATA SYNCED WITH CLOUD"); }
         function toggleDrawer(show) { document.getElementById('modal-overlay').classList.toggle('active', show); }
         
         function notify(msg, err=false) {
