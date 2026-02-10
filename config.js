@@ -10,21 +10,21 @@ const firebaseConfig = {
   measurementId: "G-M46FEVRYSS"
 };
 
-// 1. Expose config to window so the main script can see it
 window.firebaseConfig = firebaseConfig;
 
-// 2. Initialize Firebase immediately (Compat/Namespaced style)
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-
-// 3. Initialize Firestore and Analytics immediately
-// This ensures 'db' is ready before the main script runs
-const app = firebase.app();
-const analytics = firebase.analytics();
-
-// 4. CRITICAL: Assign these to window so your HTML script can find 'db'
-window.db = firebase.firestore();
-window.rdb = firebase.database();
-
-console.log("Firebase (Compat) Initialized for Nexus Command");
+// Use a function to initialize so we can call it safely
+window.initFirebaseCore = function() {
+    if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        window.db = firebase.firestore();
+        window.rdb = firebase.database();
+        window.auth = firebase.auth();
+        console.log("✅ Firebase Core Initialized");
+        return true;
+    } else {
+        console.error("❌ Firebase SDK not loaded yet!");
+        return false;
+    }
+};
