@@ -239,6 +239,9 @@
     let myFollowingList = [];
     let myFollowersList = [];
     let myPinnedChats = [];
+    let myBlockedList = []; 
+    let myShowActivityStatus = true;
+    let presenceTransitionTimer;
     
     // Interaction Variables
     let longPressTimer;
@@ -265,12 +268,13 @@
                 myFollowingList = data?.following || [];
                 myFollowersList = data?.followers || [];
                 myPinnedChats = data?.pinnedChats || [];
+                myBlockedList = (data?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+                myShowActivityStatus = data?.showActivityStatus !== false;
                 listenToInbox();
             });
         } else { window.location.href = 'login.html'; }
     });
 
-    // --- FORCE REFRESH WHEN RETURNING FROM CHAT (Back Button Fix) ---
     window.addEventListener('pageshow', (event) => {
         if (event.persisted && myUid) {
             console.log("♻️ Page restored from cache - refreshing inbox");
@@ -278,22 +282,26 @@
         }
     });
 
-    // --- REALTIME PRESENCE SYSTEM ---
+    // --- REALTIME PRESENCE SYSTEM (WITH 30S TRANSACTION DELAY) ---
     function setupPresence() {
         const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
-        const isOfflineForDatabase = {
-            state: 'offline',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
-        const isOnlineForDatabase = {
-            state: 'online',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
+        const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
+        const isOnlineForDatabase = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
         rdb.ref('.info/connected').on('value', (snapshot) => {
             if (snapshot.val() === false) return;
+            
+            clearTimeout(presenceTransitionTimer);
+
             userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
-                userStatusDatabaseRef.set(isOnlineForDatabase);
+                // 30 SECOND DELAY: Bridges page transitions or high-latency "transactions"
+                presenceTransitionTimer = setTimeout(() => {
+                    if(myShowActivityStatus) {
+                        userStatusDatabaseRef.set(isOnlineForDatabase);
+                    } else {
+                        userStatusDatabaseRef.set(isOfflineForDatabase);
+                    }
+                }, 30000); 
             });
         });
     }
@@ -313,7 +321,6 @@
                 const freshData = snap.data();
                 const cachedData = userCache[uid];
                 if (!cachedData || JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
-                    console.log(`♻️ Updating cache for: ${freshData.username}`);
                     userCache[uid] = freshData;
                     localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                     return freshData;
@@ -325,7 +332,6 @@
 
     function listenToInbox() {
         if(!myUid) return;
-        // Don't kill the listener if it's already active, just let it run
         if(inboxListener) inboxListener();
 
         inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
@@ -335,7 +341,17 @@
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
                 
-                let userData = userCache[otherUid];
+                // --- BLOCKED PERSON FILTER ---
+                // Fetch other user's block list to check reciprocal block
+                const otherDoc = await db.collection("users").doc(otherUid).get();
+                const otherData = otherDoc.data();
+                const theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+
+                if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
+                    return null; // Erase from transmission list
+                }
+
+                let userData = otherData || userCache[otherUid];
                 syncUserProfile(otherUid).then(fresh => {
                     if(fresh) {
                         const nameEl = document.getElementById(`name-${d.id}`);
@@ -346,8 +362,7 @@
                 });
 
                 if (!userData) {
-                    const doc = await db.collection("users").doc(otherUid).get();
-                    userData = doc.data();
+                    userData = otherData;
                     userCache[otherUid] = userData;
                     localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                 }
@@ -356,9 +371,9 @@
                 return { id: d.id, chat, u: userData, otherUid, isPinned };
             });
 
-            currentChatData = await Promise.all(chatPromises);
+            const results = await Promise.all(chatPromises);
+            currentChatData = results.filter(c => c !== null); // Remove blocked entries
             
-            // Sort: Pinned first, then by date
             currentChatData.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -377,12 +392,11 @@
     }
 
     function renderInbox() {
-        if (!myUid) return; // Prevent render before auth matches
+        if (!myUid) return;
 
         const list = document.getElementById('chats-list');
         list.innerHTML = "";
 
-        // Filter Data
         const filteredData = currentChatData.filter(({chat}) => {
             if (currentFilter === 'all') return true;
             if (currentFilter === 'unread') {
@@ -400,41 +414,22 @@
         filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
             if(!u) return;
             
-            // --- FIXED UNREAD LOGIC ---
-            // If specific count is > 0, unread. If count is 0, check legacy boolean.
             let isUnread = false;
             let count = 0;
-            
-            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) {
-                count = Number(chat.unreadCount[myUid]);
-            }
-
-            if (count > 0) {
-                 isUnread = true;
-            } else if (chat.lastSender && chat.lastSender !== myUid) {
-                 isUnread = chat.seen === false;
-            }
+            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) count = Number(chat.unreadCount[myUid]);
+            if (count > 0) isUnread = true;
+            else if (chat.lastSender && chat.lastSender !== myUid) isUnread = chat.seen === false;
 
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
-
-            const amIFollowing = myFollowingList.some(item => {
-                const uid = typeof item === 'string' ? item : item.uid;
-                return uid === otherUid;
-            });
+            const amIFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
 
             const finalName = u.name || u.displayName || u.username || "Unknown";
             const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
             
-            const safeUserStr = encodeURIComponent(JSON.stringify({
-                name: finalName,
-                username: u.username,
-                photoURL: u.photoURL,
-                verified: u.verified
-            }));
+            const safeUserStr = encodeURIComponent(JSON.stringify({ name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified }));
 
             const item = document.createElement('div');
             item.className = 'chat-item';
-            
             item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
             item.setAttribute("ontouchend", "endLongPress(this)");
             item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
@@ -467,7 +462,6 @@
             `;
             list.appendChild(item);
             
-            // Typing Indicator Listener
             rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
                 const msgEl = document.getElementById(`last-msg-${id}`);
                 if(!msgEl) return;
@@ -475,20 +469,20 @@
                 else { msgEl.innerHTML = lastMsg; }
             });
 
-            // Online Status
-            rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
-                const dot = document.getElementById(`online-${otherUid}`);
-                if (dot) {
-                    if (snap.val() === 'online') dot.classList.add('active');
-                    else dot.classList.remove('active');
-                }
-            });
+            // --- ACTIVITY STATUS LOGIC ---
+            // Only show other people's status if I have enabled my own status
+            if (myShowActivityStatus) {
+                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
+                    const dot = document.getElementById(`online-${otherUid}`);
+                    if (dot) {
+                        if (snap.val() === 'online') dot.classList.add('active');
+                        else dot.classList.remove('active');
+                    }
+                });
+            }
         });
 
-        // CACHE HTML ONLY IF FILTER IS ALL
-        if(currentFilter === 'all') {
-            localStorage.setItem('goorac_inbox_html', list.innerHTML);
-        }
+        if(currentFilter === 'all') localStorage.setItem('goorac_inbox_html', list.innerHTML);
     }
 
     // --- GLOBAL HANDLERS ---
@@ -496,7 +490,6 @@
     window.startLongPress = function(el, chatId, isPinned, userStr) {
         isLongPress = false;
         const u = JSON.parse(decodeURIComponent(userStr));
-        
         longPressTimer = setTimeout(() => {
             isLongPress = true; 
             if(navigator.vibrate) navigator.vibrate(30);
@@ -506,65 +499,38 @@
         }, 600);
     };
 
-    window.cancelLongPress = function(el) {
-        clearTimeout(longPressTimer);
-        el.style.transform = "scale(1)";
-    };
-
-    window.endLongPress = function(el) {
-        clearTimeout(longPressTimer);
-        el.style.transform = "scale(1)";
-    };
+    window.cancelLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
+    window.endLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
 
     window.enterChat = function(e, username) {
         if(isLongPress || e.target.closest('button')) return;
-        
-        // Note: We do NOT manipulate LocalStorage here manually to avoid
-        // overwriting incoming message states if they happen simultaneously.
-        // We rely on Firestore 'pageshow' refresh.
         window.location.href = `chat.html?user=${username}`;
     };
 
-    window.visitProfile = function(e, username) {
-        e.stopPropagation();
-        window.location.href = `profile.html?user=${username}`;
-    };
-
-    // --- MENU ACTIONS ---
+    window.visitProfile = function(e, username) { e.stopPropagation(); window.location.href = `profile.html?user=${username}`; };
 
     function openDeleteMenu(chatId, isPinned, userObj) {
         activeChatId = chatId;
-        
         history.pushState({ menuOpen: true }, "", "#menu");
-
         document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
         document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
         document.getElementById('active-username').innerText = `@${userObj.username}`;
-
         const pinBtn = document.getElementById('pin-chat-btn');
         pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
         pinBtn.onclick = () => togglePin(chatId, isPinned);
-        
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
     }
 
-    window.onpopstate = (e) => {
-        if(document.getElementById('delete-menu').classList.contains('active')) {
-            closeDeleteMenu(false);
-        }
-    };
+    window.onpopstate = (e) => { if(document.getElementById('delete-menu').classList.contains('active')) closeDeleteMenu(false); };
 
     async function togglePin(chatId, isPinned) {
         closeDeleteMenu(true);
         const userRef = db.collection("users").doc(myUid);
-        if (isPinned) {
-            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
-        } else {
-            await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
-        }
+        if (isPinned) await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
+        else await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
     }
 
     window.closeDeleteMenu = function(shouldGoBack) {
@@ -573,9 +539,7 @@
         document.getElementById('overlay').style.display = 'none';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
-        if(shouldGoBack && window.location.hash === "#menu") {
-            history.back();
-        }
+        if(shouldGoBack && window.location.hash === "#menu") history.back();
     }
 
     document.getElementById('confirm-delete').onclick = async () => {
@@ -595,28 +559,16 @@
         }
     };
 
-    // --- SEARCH ---
-
-    window.handleSearch = function(val) {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => searchUsers(val), 400);
-    }
+    window.handleSearch = function(val) { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => searchUsers(val), 400); }
 
     function searchUsers(val) {
         const results = document.getElementById('search-results');
         const content = document.getElementById('inbox-content');
         if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
-        
         results.style.display = 'block'; content.style.display = 'none';
         const q = val.toLowerCase();
-        
-        const allContacts = [...new Set([...myFollowingList, ...myFollowersList]
-            .map(f => typeof f === 'string' ? f : f.uid))];
-
-        if(allContacts.length === 0) {
-            results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>";
-            return;
-        }
+        const allContacts = [...new Set([...myFollowingList, ...myFollowersList].map(f => typeof f === 'string' ? f : f.uid))];
+        if(allContacts.length === 0) { results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>"; return; }
 
         db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
         .get().then(snap => {
@@ -625,14 +577,7 @@
                 return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
             }).map(d => {
                 const u = d.data();
-                return `
-                    <div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'">
-                        <img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;">
-                        <div class="chat-info">
-                            <div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div>
-                            <div style="font-size:0.8rem; color:#444;">@${u.username}</div>
-                        </div>
-                    </div>`;
+                return `<div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'"><img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;"><div class="chat-info"><div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div><div style="font-size:0.8rem; color:#444;">@${u.username}</div></div></div>`;
             }).join('');
         });
     }
@@ -640,11 +585,7 @@
     function formatTime(date) {
         const now = new Date();
         const diff = now - date;
-        const sec = Math.floor(diff / 1000);
-        const min = Math.floor(sec / 60);
-        const hour = Math.floor(min / 60);
-        const day = Math.floor(hour / 24);
-
+        const sec = Math.floor(diff / 1000), min = Math.floor(sec / 60), hour = Math.floor(min / 60), day = Math.floor(hour / 24);
         if(sec < 60) return "Just now";
         if(min < 60) return `${min}m ago`;
         if(hour < 24) return `${hour}h ago`;
