@@ -1,47 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
-
-    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Goorac | Secure Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <title>Goorac | Login</title>
+
+    <script src="config.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
     <style>
         :root {
-            /* X (Twitter) Professional Dark Palette */
             --bg: #000000;
-            --card: #000000;
             --text: #eff3f4;
             --text-muted: #71767b;
             --accent: #1d9bf0;
             --error: #f4212e;
             --border: #333639;
-            --btn-hover: #e6e6e6;
+            --btn-hover: #d7dbdc;
+            --input-bg: #000000;
         }
 
-        /* Anti-Copy and Anti-Zoom System */
         * {
             -webkit-user-select: none;
-            -ms-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
             background-color: var(--bg);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -53,187 +50,382 @@
             width: 100%;
             max-width: 400px;
             padding: 2rem;
-            animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        /* X-Style Iconography */
         .logo-box {
             font-size: 3.5rem;
             font-weight: 900;
             margin-bottom: 2.5rem;
             color: var(--text);
-            display: flex;
-            justify-content: center;
         }
 
         h1 { 
-            font-size: 2.5rem; 
+            font-size: 2rem; 
             margin-bottom: 0.5rem; 
             font-weight: 800; 
-            letter-spacing: -1px;
-            line-height: 1.2;
+            text-align: left;
+            width: 100%;
         }
 
         p { 
             color: var(--text-muted); 
-            margin-bottom: 3rem; 
-            font-size: 1.1rem; 
-            font-weight: 400;
+            margin-bottom: 2.5rem; 
+            font-size: 1rem; 
+            width: 100%;
         }
 
         .btn-group {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            width: 100%;
+        }
+
+        /* Standard Pill Button */
+        .auth-btn {
+            border: none;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            width: 100%;
         }
 
         .google-btn {
             background: #ffffff;
             color: #0f1419;
-            border: none;
-            padding: 14px 24px;
-            border-radius: 9999px; /* X-Style Pill */
-            width: 100%;
-            font-weight: 700;
+        }
+        .google-btn:active { background: var(--btn-hover); transform: scale(0.98); }
+
+        .phone-btn {
+            background: transparent;
+            color: #ffffff;
+            border: 1px solid var(--border);
+        }
+        .phone-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.98); }
+
+        .or-divider {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 1rem;
+            width: 100%;
+            margin: 10px 0;
+            color: var(--text-muted);
+            font-size: 0.8rem;
         }
-
-        .google-btn:hover {
-            background: var(--btn-hover);
-            transform: scale(0.98);
-        }
-
-        .google-btn:active {
-            transform: scale(0.95);
-        }
-
-        .google-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .or-divider::before, .or-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+            margin: 0 10px;
         }
 
         #status-msg {
-            margin-top: 2rem;
-            font-size: 0.9rem;
-            min-height: 1.2rem;
-            text-align: center;
-            font-weight: 500;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
+            min-height: 20px;
         }
 
-        .error-text { color: var(--error); }
-        .success-text { color: var(--accent); }
-
-        .footer-note {
-            margin-top: 4rem;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            line-height: 1.5;
+        /* --- PHONE MODAL (Full Screen) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: var(--bg);
+            z-index: 1000;
+            flex-direction: column;
+            animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .footer-note span {
-            color: var(--accent);
-            cursor: pointer;
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
         }
+
+        .modal-header {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .close-btn {
+            background: none; border: none; color: var(--text);
+            font-size: 1.5rem; cursor: pointer; padding: 0 10px 0 0;
+        }
+
+        .modal-title {
+            font-weight: 700; font-size: 1.1rem; flex: 1;
+        }
+
+        .modal-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Twitter style input */
+        .input-group {
+            position: relative;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            background: var(--input-bg);
+            transition: 0.2s;
+        }
+        .input-group:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .input-label {
+            font-size: 0.8rem; color: var(--text-muted);
+            display: block; margin-bottom: 2px;
+        }
+
+        .modern-input {
+            width: 100%; background: transparent; border: none;
+            color: white; font-size: 1.1rem; outline: none;
+        }
+
+        .action-btn {
+            background: var(--text);
+            color: var(--bg);
+            margin-top: 10px;
+        }
+        .action-btn:disabled { opacity: 0.5; }
+
+        #recaptcha-container { margin-top: 10px; }
+        
+        .hidden { display: none; }
     </style>
 </head>
 <body oncontextmenu="return false;"> 
 
 <div class="login-card">
     <div class="logo-box">G</div>
-    <h1>Secure. Quantum. <br>Universal.</h1>
+    <h1>Happening now</h1>
     <p>Join Goorac today.</p>
     
     <div class="btn-group">
-        <button id="login-btn" class="google-btn">
+        <button id="google-btn" class="auth-btn google-btn">
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
             Sign up with Google
         </button>
+        
+        <div class="or-divider">or</div>
+
+        <button id="phone-btn" class="auth-btn phone-btn">
+            Sign up with Phone
+        </button>
     </div>
 
-    <div id="status-msg">Ready to initialize</div>
+    <div id="status-msg"></div>
+</div>
+
+<div id="phone-modal" class="modal">
+    <div class="modal-header">
+        <button class="close-btn" onclick="closeModal()">×</button>
+        <div class="modal-title">Step 1 of 2</div>
+        <div class="logo-box" style="font-size: 1.2rem; margin:0;">G</div>
+    </div>
     
-    <div class="footer-note">
-        By signing up, you agree to the <span>Terms of Service</span> and <span>Privacy Policy</span>, including <span>Cookie Use</span>.
+    <div class="modal-body">
+        <h2 style="font-size: 1.5rem; margin-bottom: 10px;">Enter your phone</h2>
+        
+        <div id="step-phone">
+            <div class="input-group">
+                <label class="input-label">Phone</label>
+                <input type="tel" id="phone-input" class="modern-input" placeholder="+1 234 567 8900">
+            </div>
+            <div id="recaptcha-container"></div>
+            <button id="get-code-btn" class="auth-btn action-btn">Next</button>
+        </div>
+
+        <div id="step-otp" class="hidden">
+            <div class="input-group">
+                <label class="input-label">Verification Code</label>
+                <input type="number" id="otp-input" class="modern-input" placeholder="123456">
+            </div>
+            <button id="verify-btn" class="auth-btn action-btn">Verify</button>
+            <p style="margin-top:15px; font-size:0.8rem; color:var(--accent); cursor:pointer;" onclick="resetPhoneFlow()">Change phone number</p>
+        </div>
+        
+        <div id="modal-status" style="color:var(--error); font-size:0.9rem; margin-top:10px;"></div>
     </div>
 </div>
 
-<script type="module">
-    // Using stable CDN imports
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<script>
+    // --- FIREBASE INIT ---
+    // 1. Try config.js init
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
 
-    // Your Goorac Firebase Configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-        authDomain: "goorac-c3b59.firebaseapp.com",
-        projectId: "goorac-c3b59",
-        storageBucket: "goorac-c3b59.firebasestorage.app",
-        messagingSenderId: "746746595332",
-        appId: "1:746746595332:web:d3f8527d27fe8ca2530d51"
-    };
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    let confirmationResult = null;
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
+    // --- ELEMENTS ---
+    const googleBtn = document.getElementById('google-btn');
+    const phoneBtn = document.getElementById('phone-btn');
+    const statusMsg = document.getElementById('status-msg');
+    
+    // Modal Elements
+    const modal = document.getElementById('phone-modal');
+    const phoneInput = document.getElementById('phone-input');
+    const getCodeBtn = document.getElementById('get-code-btn');
+    const otpInput = document.getElementById('otp-input');
+    const verifyBtn = document.getElementById('verify-btn');
+    const modalStatus = document.getElementById('modal-status');
+    const stepPhone = document.getElementById('step-phone');
+    const stepOtp = document.getElementById('step-otp');
 
-    const btn = document.getElementById('login-btn');
-    const msg = document.getElementById('status-msg');
-
-    // Anti-Zoom Script for Mobile
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
-
-    btn.addEventListener('click', async () => {
-        msg.innerText = "Authenticating...";
-        msg.className = "success-text";
-        btn.disabled = true;
-
+    // --- GOOGLE LOGIN ---
+    googleBtn.addEventListener('click', async () => {
+        googleBtn.disabled = true;
+        statusMsg.innerText = "Authenticating with Google...";
+        const provider = new firebase.auth.GoogleAuthProvider();
         try {
-            // 1. Authenticate with Google
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
-            
-            msg.innerText = "Checking profile...";
-
-            // 2. Check Firestore 'users' collection for the user's document
-            const userDocRef = doc(db, "users", user.uid);
-            const userSnap = await getDoc(userDocRef);
-
-            if (userSnap.exists()) {
-                msg.innerText = "Welcome back! Redirecting...";
-                setTimeout(() => { window.location.href = "home.html"; }, 500);
-            } else {
-                msg.innerText = "New user! Redirecting to setup...";
-                setTimeout(() => { window.location.href = "setup.html"; }, 500);
-            }
-
+            const result = await auth.signInWithPopup(provider);
+            handleUserLogin(result.user);
         } catch (error) {
-            console.error("Login Error:", error);
-            btn.disabled = false;
-            msg.className = "error-text";
-            
-            if (error.code === 'auth/unauthorized-domain') {
-                msg.innerText = "Error: Domain not authorized.";
-            } else if (error.code === 'auth/popup-closed-by-user') {
-                msg.innerText = "Login cancelled.";
-            } else {
-                msg.innerText = "Error: " + error.message;
-            }
+            console.error(error);
+            statusMsg.innerText = "Error: " + error.message;
+            googleBtn.disabled = false;
         }
     });
+
+    // --- PHONE LOGIN LOGIC ---
+    
+    // 1. Open Modal & Push History State
+    phoneBtn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        // Push state so back button closes modal
+        history.pushState({ modalOpen: true }, "", "#phone-login");
+        
+        if (!window.recaptchaVerifier) {
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    // reCAPTCHA solved
+                }
+            });
+        }
+    });
+
+    // 2. Handle Browser Back Button
+    window.addEventListener('popstate', () => {
+        modal.style.display = 'none';
+        resetPhoneFlow();
+    });
+
+    // 3. Manual Close (X button)
+    window.closeModal = function() {
+        history.back(); // Triggers popstate
+    };
+
+    // 4. Send Code
+    getCodeBtn.addEventListener('click', () => {
+        const phoneNumber = phoneInput.value.trim();
+        if(!phoneNumber) {
+            modalStatus.innerText = "Please enter a valid phone number (e.g., +1...)";
+            return;
+        }
+
+        getCodeBtn.disabled = true;
+        modalStatus.innerText = "Sending code...";
+
+        auth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier)
+            .then((res) => {
+                confirmationResult = res;
+                stepPhone.classList.add('hidden');
+                stepOtp.classList.remove('hidden');
+                modalStatus.innerText = "Code sent!";
+                modalStatus.style.color = "var(--accent)";
+            }).catch((error) => {
+                console.error(error);
+                modalStatus.innerText = error.message;
+                modalStatus.style.color = "var(--error)";
+                getCodeBtn.disabled = false;
+                window.recaptchaVerifier.render().then(widgetId => {
+                    grecaptcha.reset(widgetId);
+                });
+            });
+    });
+
+    // 5. Verify Code
+    verifyBtn.addEventListener('click', () => {
+        const code = otpInput.value.trim();
+        if(!code) return;
+
+        verifyBtn.innerText = "Verifying...";
+        verifyBtn.disabled = true;
+
+        confirmationResult.confirm(code).then((result) => {
+            handleUserLogin(result.user);
+        }).catch((error) => {
+            modalStatus.innerText = "Invalid code. Please try again.";
+            modalStatus.style.color = "var(--error)";
+            verifyBtn.disabled = false;
+            verifyBtn.innerText = "Verify";
+        });
+    });
+
+    // 6. Reset Flow
+    window.resetPhoneFlow = function() {
+        stepPhone.classList.remove('hidden');
+        stepOtp.classList.add('hidden');
+        phoneInput.value = '';
+        otpInput.value = '';
+        modalStatus.innerText = '';
+        getCodeBtn.disabled = false;
+        verifyBtn.disabled = false;
+        verifyBtn.innerText = "Verify";
+    }
+
+    // --- COMMON REDIRECT LOGIC ---
+    async function handleUserLogin(user) {
+        statusMsg.innerText = "Checking profile...";
+        if(modal.style.display === 'flex') modalStatus.innerText = "Success! Redirecting...";
+
+        try {
+            const userDoc = await db.collection("users").doc(user.uid).get();
+            if (userDoc.exists) {
+                window.location.href = "home.html";
+            } else {
+                window.location.href = "setup.html"; // Or home.html depending on your flow
+            }
+        } catch (e) {
+            console.error("Profile check failed", e);
+            window.location.href = "home.html"; // Fallback
+        }
+    }
+
+    // Existing Auth Listener Check (Auto-redirect)
+    auth.onAuthStateChanged(user => {
+        if(user) {
+            // Optional: Auto redirect if already logged in
+            // handleUserLogin(user);
+        }
+    });
+
 </script>
 
 </body>
-
 </html>
