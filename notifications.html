@@ -16,33 +16,38 @@
 
     <style>
         :root {
-            --bg: #000;
+            --bg: #000000;
             --surface: #121212;
-            --surface-light: #1e1e1e;
+            --surface-light: #1c1c1e;
             --accent: #00d2ff;
             --text: #ffffff;
-            --dim: #a0a0a0;
-            --border: #2a2a2a;
-            --unread-bg: rgba(0, 210, 255, 0.05);
+            --dim: #8e8e93;
+            --border: #2c2c2e;
+            --unread-bg: rgba(0, 210, 255, 0.08);
+            --danger: #ff453a;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background: var(--bg); color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-            margin: 0; padding-top: 112px; padding-bottom: 40px;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            margin: 0; 
+            padding-top: 106px; /* Header (54) + Tabs (52) */
+            padding-bottom: 20px;
             overflow-x: hidden;
+            overscroll-behavior-y: none;
         }
 
         /* --- ERROR TOAST --- */
         #error-toast {
             position: fixed; top: 10px; left: 50%; transform: translateX(-50%) translateY(-100px);
             background: rgba(255, 59, 48, 0.95); color: white; 
-            padding: 12px 24px; border-radius: 50px; 
+            padding: 10px 20px; border-radius: 50px; 
             z-index: 9999; font-size: 0.85rem; font-weight: 500;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex; align-items: center; gap: 8px; white-space: nowrap;
         }
         #error-toast.show { transform: translateX(-50%) translateY(0); }
@@ -50,123 +55,170 @@
         /* --- HEADER --- */
         .header {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.9); z-index: 100; padding: 0 16px; height: 54px;
+            background: rgba(0,0,0,0.92); 
+            z-index: 100; padding: 0 12px; height: 54px;
             border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            display: flex; align-items: center; gap: 15px;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; align-items: center; gap: 10px;
         }
         
         .back-btn {
             background: none; border: none; color: white;
-            font-size: 1.5rem; cursor: pointer; padding: 5px; margin-left: -5px;
+            width: 40px; height: 40px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.2s;
         }
+        .back-btn:active { background: rgba(255,255,255,0.1); }
 
-        .header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; flex: 1; }
+        .header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; flex: 1; letter-spacing: 0.3px; }
         
         .mark-read-btn {
-            font-size: 0.75rem; color: var(--accent); font-weight: 600;
-            cursor: pointer; padding: 6px 12px; background: rgba(0, 210, 255, 0.1);
-            border-radius: 20px;
+            font-size: 0.8rem; color: var(--accent); font-weight: 600;
+            cursor: pointer; padding: 6px 12px; 
+            background: rgba(0, 210, 255, 0.1); border-radius: 16px;
+            transition: opacity 0.2s;
         }
+        .mark-read-btn:active { opacity: 0.6; }
 
         /* --- TABS --- */
         .tabs-container {
             position: fixed; top: 54px; left: 0; width: 100%;
-            background: rgba(0,0,0,0.95); z-index: 99;
+            background: rgba(0,0,0,0.92); z-index: 99;
             display: flex; border-bottom: 1px solid var(--border);
-            height: 48px;
+            height: 52px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         }
         .tab {
             flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: 0.9rem; font-weight: 500; color: var(--dim);
+            font-size: 0.95rem; font-weight: 500; color: var(--dim);
             cursor: pointer; position: relative; transition: color 0.2s;
         }
         .tab.active { color: #fff; font-weight: 600; }
         .tab.active::after {
             content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 40px; height: 2px; background: var(--accent);
+            width: 40px; height: 3px; background: var(--accent); border-radius: 2px 2px 0 0;
         }
 
-        /* --- LIST --- */
-        .notif-list { display: flex; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; min-height: 50vh; }
+        /* --- LIST CONTAINER --- */
+        .notif-list { 
+            display: flex; flex-direction: column; width: 100%; 
+            max-width: 600px; margin: 0 auto; min-height: 60vh; 
+        }
 
         .notif-item {
-            display: flex; align-items: flex-start; gap: 14px; padding: 16px; position: relative;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            background: transparent; transition: background 0.2s; cursor: pointer;
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 16px; position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: transparent; transition: background 0.2s;
+            cursor: pointer;
         }
-        .notif-item.unread { background: var(--unread-bg); }
+        
+        .notif-item.unread { 
+            background: var(--unread-bg); 
+            border-left: 2px solid var(--accent);
+        }
         .notif-item:active { background: rgba(255,255,255,0.03); }
 
         .notif-pfp-wrapper { position: relative; flex-shrink: 0; margin-top: 2px; }
         .notif-pfp {
-            width: 42px; height: 42px; border-radius: 50%; 
-            object-fit: cover; background: #222; border: 1px solid var(--border);
+            width: 44px; height: 44px; border-radius: 50%; 
+            object-fit: cover; background: #1c1c1e; border: 1px solid rgba(255,255,255,0.1);
         }
         .notif-icon-badge {
-            position: absolute; bottom: -4px; right: -4px;
+            position: absolute; bottom: -2px; right: -2px;
             width: 20px; height: 20px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            border: 2px solid #000; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid #000; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
         .notif-icon-badge svg { width: 11px; height: 11px; }
         .icon-like { background: #ff3b30; }
         .icon-follow { background: #00d2ff; }
 
-        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-        .notif-text { font-size: 0.95rem; line-height: 1.4; color: #e0e0e0; }
-        .notif-username { font-weight: 700; color: #fff; margin-right: 4px; }
-        .v-badge { width: 14px; height: 14px; vertical-align: -2px; margin-left: 2px; }
-        .notif-meta { font-size: 0.75rem; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        
+        .notif-text { font-size: 0.95rem; line-height: 1.45; color: #e0e0e0; }
+        .notif-username { font-weight: 700; color: #fff; margin-right: 2px; }
+        
+        /* Verified Badge */
+        .v-badge { 
+            width: 14px; height: 14px; vertical-align: middle; 
+            margin-left: 3px; transform: translateY(-1px); 
+        }
+        
+        .notif-meta { font-size: 0.8rem; color: var(--dim); display: flex; align-items: center; gap: 6px; }
 
-        /* PREVIEW */
+        /* --- NOTE PREVIEW BUBBLE --- */
         .notif-preview-box {
-            margin-top: 8px; padding: 12px 16px; border-radius: 16px;
+            margin-top: 6px; padding: 12px 16px; border-radius: 16px;
             font-size: 0.9rem; position: relative; overflow: hidden;
-            display: inline-flex; flex-direction: column; align-items: center;
-            width: fit-content; max-width: 100%; align-self: flex-start;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.08);
+            display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; max-width: 320px; align-self: flex-start;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
+            border: 1px solid rgba(255,255,255,0.08);
+            background-size: cover; background-position: center;
         }
         .preview-note-text {
-            font-family: system-ui; text-align: center; font-weight: 500;
+            font-family: system-ui; text-align: center; font-weight: 600;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            line-height: 1.35; width: 100%;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         .preview-song-tag {
-            display: flex; align-items: center; gap: 5px; margin-top: 8px;
-            font-size: 0.75rem; opacity: 0.9; background: rgba(0,0,0,0.2);
-            padding: 4px 10px; border-radius: 20px; color: rgba(255,255,255,0.9);
+            display: flex; align-items: center; gap: 5px; margin-top: 10px;
+            font-size: 0.75rem; opacity: 0.95; background: rgba(0,0,0,0.3);
+            padding: 4px 10px; border-radius: 20px; color: rgba(255,255,255,1);
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
         }
 
+        /* --- VIEW PROFILE BUTTON --- */
         .view-profile-btn {
             background: var(--surface-light); color: var(--text); 
-            border: 1px solid var(--border); padding: 8px 14px; border-radius: 10px; 
-            font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-left: 10px; 
-            flex-shrink: 0; align-self: center; white-space: nowrap;
+            border: 1px solid var(--border);
+            padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; margin-left: 10px; flex-shrink: 0; 
+            align-self: center; white-space: nowrap;
+            transition: all 0.2s;
         }
+        .view-profile-btn:active { background: #333; transform: scale(0.95); }
+
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            margin-top: 8px; flex-shrink: 0; box-shadow: 0 0 8px var(--accent);
+            margin-top: 8px; flex-shrink: 0; box-shadow: 0 0 10px var(--accent);
         }
 
-        /* LOAD MORE */
-        .load-more-container { padding: 20px; text-align: center; }
-        .load-more-btn {
-            background: transparent; color: var(--accent); border: 1px solid var(--accent);
-            padding: 10px 24px; border-radius: 20px; font-weight: 600; cursor: pointer;
+        /* LOAD MORE SPINNER */
+        #scroll-sentinel {
+            height: 60px; display: flex; align-items: center; justify-content: center;
+            width: 100%; opacity: 0; transition: opacity 0.3s;
         }
-        .load-more-btn:active { background: rgba(0, 210, 255, 0.1); }
+        #scroll-sentinel.visible { opacity: 1; }
+        .spinner {
+            width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        .empty-state { text-align: center; padding: 60px 20px; color: var(--dim); }
-        .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
-        
+        /* SKELETONS */
+        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; border-bottom: 1px solid var(--border); }
         .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.06); }
+        .sk-pfp { width: 44px; height: 44px; border-radius: 50%; }
+        .sk-content { flex: 1; }
+        .sk-line { height: 12px; border-radius: 6px; margin-bottom: 8px; width: 60%; }
+        .sk-line.short { width: 30%; }
         @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
+
+        .empty-state { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 80px 20px; color: var(--dim); text-align: center; 
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
     </style>
 </head>
 <body>
 
-<div id="error-toast"><span>⚠️</span> <span id="error-msg">Error</span></div>
+<div id="error-toast">
+    <span>⚠️</span> <span id="error-msg">Error occurred</span>
+</div>
 
 <div class="header">
     <button class="back-btn" onclick="window.history.back()">
@@ -183,18 +235,28 @@
 </div>
 
 <div class="notif-list" id="notif-list">
-    <div style="padding:16px; display:flex; gap:14px; align-items:center;">
-        <div class="skeleton" style="width:42px; height:42px; border-radius:50%;"></div>
-        <div style="flex:1"><div class="skeleton" style="height:12px; width:60%; margin-bottom:8px; border-radius:6px;"></div><div class="skeleton" style="height:12px; width:40%; border-radius:6px;"></div></div>
+    <div class="skeleton-wrapper">
+        <div class="skeleton sk-pfp"></div>
+        <div class="sk-content">
+            <div class="skeleton sk-line"></div>
+            <div class="skeleton sk-line short"></div>
+        </div>
+    </div>
+    <div class="skeleton-wrapper">
+        <div class="skeleton sk-pfp"></div>
+        <div class="sk-content">
+            <div class="skeleton sk-line" style="width:50%"></div>
+            <div class="skeleton sk-line short"></div>
+        </div>
     </div>
 </div>
 
-<div class="load-more-container">
-    <button id="load-more-btn" class="load-more-btn" onclick="loadMore()" style="display:none;">Load More</button>
+<div id="scroll-sentinel">
+    <div class="spinner"></div>
 </div>
 
 <script>
-    // --- 1. UTILS ---
+    // --- 1. UTILS & ERROR HANDLING ---
     function showError(msg) {
         const toast = document.getElementById('error-toast');
         document.getElementById('error-msg').innerText = msg;
@@ -202,12 +264,14 @@
         setTimeout(() => toast.classList.remove('show'), 4000);
     }
 
-    // --- 2. FIREBASE INIT ---
-    if (typeof firebase === 'undefined') showError("Firebase SDK missing");
-    else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
-
-    let db, auth;
-    try { db = firebase.firestore(); auth = firebase.auth(); } catch(e) { showError(e.message); }
+    // --- 2. FIREBASE SETUP ---
+    if (typeof firebase === 'undefined') {
+        showError("Firebase SDK Error");
+    } else {
+        if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const auth = firebase.auth();
 
     // --- 3. STATE ---
     let currentUser = null;
@@ -215,11 +279,13 @@
     let likesData = [];
     let currentTab = 'all';
     
-    // LIMITS FOR COST SAVING
-    let limitCount = 10; // 10 follows + 10 likes = 20 reads on load. Very safe.
+    // PAGINATION
+    let limitCount = 10; 
     let followsUnsubscribe = null;
     let likesUnsubscribe = null;
+    let isLoading = false;
 
+    // ASSETS
     const ICONS = {
         heart: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
         user: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
@@ -227,51 +293,66 @@
         music: `<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`
     };
 
-    if(auth) {
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                setupListeners(limitCount);
-                // Clear badge safely
-                db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(() => {});
-            } else {
-                window.location.href = 'login.html';
-            }
-        });
-    }
+    // --- 4. INIT ---
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            setupListeners(limitCount);
+            setupInfiniteScroll();
+            // Clear unread badge
+            db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(() => {});
+        } else {
+            window.location.href = 'login.html';
+        }
+    });
 
+    // --- 5. DATA FETCHING (Cost Optimized) ---
     function setupListeners(limit) {
         if(!currentUser) return;
         const myUid = currentUser.uid;
+        isLoading = true;
 
-        // Detach old listeners if any (important for load more)
+        // Clean up old listeners
         if(followsUnsubscribe) followsUnsubscribe();
         if(likesUnsubscribe) likesUnsubscribe();
 
-        // Listener A: Follows (Limit protected)
+        // 1. Follows Listener
         followsUnsubscribe = db.collection("users").doc(myUid).collection("notifications")
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 followsData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'sub' }));
                 renderNotifications();
-            }, err => showError("Follows error: " + err.message));
+                isLoading = false;
+            }, err => console.log(err));
 
-        // Listener B: Likes (Limit protected)
+        // 2. Likes Listener
         likesUnsubscribe = db.collection("notifications")
             .where("toUid", "==", myUid)
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 likesData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'root' }));
                 renderNotifications();
-            }, err => showError("Likes error: " + err.message));
-        
-        // Show Load More button if we have data
-        document.getElementById('load-more-btn').style.display = 'inline-block';
+                isLoading = false;
+            }, err => console.log(err));
     }
 
-    function loadMore() {
-        limitCount += 15; // Increase limit
-        setupListeners(limitCount); // Re-attach with higher limit
+    // --- 6. INFINITE SCROLL ---
+    function setupInfiniteScroll() {
+        const sentinel = document.getElementById('scroll-sentinel');
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !isLoading) {
+                // User hit bottom, load 10 more
+                document.getElementById('scroll-sentinel').classList.add('visible');
+                limitCount += 10;
+                setupListeners(limitCount);
+                // Hide spinner after small delay
+                setTimeout(() => {
+                    document.getElementById('scroll-sentinel').classList.remove('visible');
+                }, 1000);
+            }
+        }, { threshold: 0.5 });
+        
+        observer.observe(sentinel);
     }
 
     function switchTab(tabName) {
@@ -281,20 +362,28 @@
         renderNotifications();
     }
 
+    // --- 7. RENDERING ---
     function renderNotifications() {
         const list = document.getElementById('notif-list');
         
+        // Merge & Sort both streams
         let all = [...followsData, ...likesData].sort((a, b) => {
             const tA = a.timestamp ? a.timestamp.seconds : 0;
             const tB = b.timestamp ? b.timestamp.seconds : 0;
             return tB - tA; 
         });
 
+        // Client-side Filter
         if (currentTab === 'likes') all = all.filter(n => n.type === 'like');
         else if (currentTab === 'follows') all = all.filter(n => n.type === 'follow');
 
         if (all.length === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><h3>No activity</h3><p>Nothing here yet.</p></div>`;
+            list.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">🔔</div>
+                    <h3>No new activity</h3>
+                    <p>Interactions will appear here.</p>
+                </div>`;
             return;
         }
 
@@ -303,7 +392,11 @@
         all.forEach(n => {
             const isRead = n.isRead === true || n.isSeen === true;
             const type = n.type || 'unknown';
-            const rawName = n.senderName || n.fromUsername || 'Someone';
+            
+            // --- SMART DATA EXTRACTION ---
+            // Prioritize 'username' for logic, 'senderName' for display
+            const displayName = n.senderName || n.fromUsername || 'Someone';
+            // Fallback: If verification info missing, assume false
             const isVerified = n.isSenderVerified === true || n.isVerified === true; 
             const pfpUrl = n.senderPfp || n.fromPhoto || 'https://via.placeholder.com/150';
 
@@ -312,15 +405,35 @@
             
             let iconClass = '', iconHtml = '', bodyHtml = '', actionHtml = '';
 
+            // --- LIKE UI ---
             if (type === 'like') {
                 iconClass = 'icon-like'; iconHtml = ICONS.heart;
                 bodyHtml = `
-                    <span class="notif-text"><span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span> liked your note.</span>
-                    ${n.noteText ? `<div class="notif-preview-box" style="background:${n.noteBgColor || '#222'}; color:${n.noteTextColor || '#fff'}"><div class="preview-note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>${n.noteSongName ? `<div class="preview-song-tag">${ICONS.music} ${escapeHtml(n.noteSongName)}</div>` : ''}</div>` : ''}
+                    <span class="notif-text">
+                        <span class="notif-username">${escapeHtml(displayName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
+                        liked your note.
+                    </span>
+                    ${n.noteText ? `
+                        <div class="notif-preview-box" style="background:${n.noteBgColor || '#1c1c1e'}; color:${n.noteTextColor || '#fff'}">
+                            <div class="preview-note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>
+                            ${n.noteSongName ? `
+                                <div class="preview-song-tag">
+                                    ${ICONS.music} ${escapeHtml(n.noteSongName)}
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
                 `;
-            } else if (type === 'follow') {
+            } 
+            // --- FOLLOW UI ---
+            else if (type === 'follow') {
                 iconClass = 'icon-follow'; iconHtml = ICONS.user;
-                bodyHtml = `<span class="notif-text"><span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span> started following you.</span>`;
+                bodyHtml = `
+                    <span class="notif-text">
+                        <span class="notif-username">${escapeHtml(displayName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
+                        started following you.
+                    </span>
+                `;
                 actionHtml = `<button class="view-profile-btn">View Profile</button>`;
             }
 
@@ -329,24 +442,31 @@
                     <img src="${pfpUrl}" class="notif-pfp" loading="lazy">
                     <div class="notif-icon-badge ${iconClass}">${iconHtml}</div>
                 </div>
-                <div class="notif-content">${bodyHtml}<div class="notif-meta">${timeAgo(n.timestamp)}</div></div>
+                <div class="notif-content">
+                    ${bodyHtml}
+                    <div class="notif-meta">${timeAgo(n.timestamp)}</div>
+                </div>
                 ${actionHtml}
                 ${!isRead ? `<div class="unread-dot"></div>` : ''}
             `;
 
+            // Redirect Handler
             item.onclick = (e) => {
-                if(e.target.classList.contains('view-profile-btn')) return handleNotifClick(n);
-                handleNotifClick(n);
+                // Don't fire twice if button clicked
+                if(e.target.classList.contains('view-profile-btn')) return handleRedirect(n);
+                handleRedirect(n);
             };
+
             const btn = item.querySelector('.view-profile-btn');
-            if(btn) btn.onclick = (e) => { e.stopPropagation(); handleNotifClick(n); };
+            if(btn) btn.onclick = (e) => { e.stopPropagation(); handleRedirect(n); };
 
             list.appendChild(item);
         });
     }
 
-    async function handleNotifClick(notif) {
-        // Mark Read
+    // --- 8. SMART REDIRECT ---
+    async function handleRedirect(notif) {
+        // 1. Background Mark as Read
         const isRead = notif.isSeen === true || notif.isRead === true;
         if(!isRead) {
             try {
@@ -355,24 +475,34 @@
             } catch(e) {}
         }
 
-        // REDIRECT - USERNAME PRIORITY
-        let targetUser = notif.username || notif.fromUsername; // Priority 1: Direct Username field
-        
-        if (!targetUser && notif.senderName && !notif.senderName.includes(" ")) {
-            targetUser = notif.senderName; // Priority 2: SenderName if it looks like a username
-        }
-        
-        if (!targetUser) targetUser = notif.fromUid || notif.uid; // Priority 3: UID
+        // 2. Determine Target User (Prioritize Username)
+        let targetUser = null;
 
-        if (targetUser) window.location.href = `userProfile.html?user=${targetUser}`;
-        else showError("User not found");
+        // A. Direct Username (Best)
+        if (notif.username) targetUser = notif.username;
+        else if (notif.fromUsername) targetUser = notif.fromUsername;
+        
+        // B. Heuristic: SenderName (Only if it looks like a username, no spaces)
+        else if (notif.senderName && !notif.senderName.includes(" ")) targetUser = notif.senderName;
+        
+        // C. Fallback: UID (Works if your profile page handles ?user=UID)
+        else if (notif.fromUid) targetUser = notif.fromUid;
+        else if (notif.uid) targetUser = notif.uid;
+
+        if (targetUser) {
+            window.location.href = `userProfile.html?user=${targetUser}`;
+        } else {
+            showError("User profile not found");
+        }
     }
 
     async function markAllAsRead() {
         const batch = db.batch();
         let count = 0;
         
-        [...followsData, ...likesData].forEach(n => {
+        // Only mark loaded items to save reads/writes
+        const all = [...followsData, ...likesData];
+        all.forEach(n => {
             const isRead = n.isRead === true || n.isSeen === true;
             if(!isRead) {
                 if(n._collection === 'root') batch.update(db.collection('notifications').doc(n.id), { isSeen: true });
@@ -381,7 +511,7 @@
             }
         });
 
-        if(count > 0) {
+        if (count > 0) {
             try { await batch.commit(); } catch(e) { showError("Mark read failed"); }
         }
     }
@@ -392,6 +522,7 @@
         if (seconds < 60) return 'Just now';
         const m = Math.floor(seconds / 60); if (m < 60) return `${m}m`;
         const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
+        const d = Math.floor(h / 24); if (d < 7) return `${d}d`;
         return timestamp.toDate().toLocaleDateString();
     }
     
