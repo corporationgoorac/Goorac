@@ -20,10 +20,7 @@
     <script type="module" src="components/presence.js"></script>
 
     <script>
-        /**
-         * FIREBASE INITIALIZATION
-         * Ensures the app is initialized only once regardless of loading order.
-         */
+        // --- FIREBASE INIT ---
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
         } 
@@ -52,15 +49,9 @@
             --danger: #ff4444;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
-            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-            -webkit-tap-highlight-color: transparent; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background-color: var(--bg);
@@ -68,489 +59,192 @@
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
             min-height: 100vh;
-            display: flex; 
-            flex-direction: column;
-            -webkit-user-select: none;
-            user-select: none;
+            display: flex; flex-direction: column;
         }
 
-        /* --- HEADER NAVIGATION --- */
+        /* --- HEADER --- */
         header {
-            position: sticky; 
-            top: 0; 
-            z-index: 100;
-            background: rgba(0,0,0,0.8); 
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             padding: calc(10px + var(--safe-top)) 16px 10px;
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
         }
-
         .nav-btn {
-            background: none; 
-            border: none; 
-            color: var(--primary);
-            width: 40px; 
-            height: 40px; 
-            border-radius: 50%;
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            cursor: pointer; 
-            transition: var(--transition);
+            background: none; border: none; color: var(--primary);
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.2s;
         }
+        .nav-btn:active { background: var(--surface-press); }
+        .header-title { font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--primary); }
 
-        .nav-btn:active { 
-            background: var(--surface-press); 
-            transform: scale(0.9);
-        }
+        /* MENU BARS */
+        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; cursor: pointer; padding: 5px; }
+        .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; transition: 0.3s; }
+        .menu-bars span:nth-child(2) { width: 60%; align-self: flex-end; }
 
-        .header-title { 
-            font-weight: 700; 
-            font-size: 13px; 
-            letter-spacing: 1.5px; 
-            text-transform: uppercase; 
-            color: var(--primary); 
-            opacity: 0.9;
-        }
-
-        .menu-bars { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 5px; 
-            width: 24px; 
-            cursor: pointer; 
-            padding: 5px; 
-        }
-
-        .menu-bars span { 
-            display: block; 
-            height: 2px; 
-            width: 100%; 
-            background: var(--primary); 
-            border-radius: 2px; 
-            transition: 0.3s ease; 
-        }
-
-        .menu-bars span:nth-child(2) { 
-            width: 65%; 
-            align-self: flex-end; 
-        }
-
-        .menu-bars:hover span:nth-child(2) {
-            width: 100%;
-        }
-
-        /* --- PROFILE TOP SECTION --- */
+        /* --- TOP HALF: PROFILE CARD --- */
         .profile-top-section {
-            background: linear-gradient(180deg, #0f0f0f 0%, #000000 100%);
-            padding: 24px 24px 35px;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center;
+            background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
+            padding: 20px 24px 30px;
+            display: flex; flex-direction: column; align-items: center;
             border-bottom: 1px solid var(--border);
         }
 
         .avatar-wrapper {
-            width: 96px; 
-            height: 96px; 
-            margin-bottom: 18px;
-            position: relative; 
-            padding: 3px;
+            width: 90px; height: 90px; margin-bottom: 15px;
+            position: relative; padding: 3px;
             background: linear-gradient(135deg, var(--border), transparent);
             border-radius: 50%;
-            transition: transform 0.5s ease;
         }
-
-        .avatar-wrapper:active {
-            transform: scale(0.95);
-        }
-
         .avatar {
-            width: 100%; 
-            height: 100%; 
-            border-radius: 50%;
-            object-fit: cover; 
-            background: var(--surface);
-            display: block; 
-            border: 3px solid var(--bg);
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; background: var(--surface);
+            display: block; border: 2px solid var(--bg);
         }
 
         .user-name { 
-            font-size: 24px; 
-            font-weight: 800; 
-            margin-bottom: 4px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 6px; 
-            letter-spacing: -0.8px;
+            font-size: 22px; font-weight: 800; margin-bottom: 4px; 
+            display: flex; align-items: center; justify-content: center; gap: 6px; letter-spacing: -0.5px;
             min-height: 32px;
         }
-
-        .verified { 
-            color: var(--accent); 
-            font-size: 20px; 
-            filter: drop-shadow(0 0 8px var(--accent-glow));
-        }
-
-        .user-handle { 
-            color: var(--secondary); 
-            font-size: 14px; 
-            font-weight: 500; 
-            min-height: 20px; 
-            text-align: center; 
-            margin-bottom: 4px;
-        }
+        .verified { color: var(--accent); font-size: 20px; }
+        .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; text-align: center; }
 
         .id-pill {
             margin: 15px 0 20px;
-            background: rgba(255,255,255,0.03); 
-            border: 1px solid var(--border);
-            padding: 8px 16px; 
-            border-radius: 100px;
-            display: inline-flex; 
-            align-items: center; 
-            gap: 10px;
-            cursor: pointer; 
-            transition: var(--transition);
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            padding: 6px 14px; border-radius: 100px;
+            display: inline-flex; align-items: center; gap: 8px;
+            cursor: pointer; transition: 0.2s;
+            min-height: 32px;
         }
-
-        .id-pill:active { 
-            background: var(--surface-press); 
-            transform: translateY(1px); 
-        }
-
-        .id-label { 
-            font-size: 9px; 
-            font-weight: 900; 
-            color: var(--secondary); 
-            text-transform: uppercase; 
-            letter-spacing: 1.2px; 
-        }
-
-        .id-value { 
-            font-family: 'Inter', monospace; 
-            font-size: 13px; 
-            font-weight: 600; 
-            color: var(--primary); 
-        }
-
-        .copy-icon { 
-            font-size: 15px; 
-            color: var(--secondary); 
-        }
+        .id-pill:active { background: var(--surface-press); transform: scale(0.97); }
+        .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .id-value { font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); }
+        .copy-icon { font-size: 14px; color: var(--secondary); }
 
         .bio {
-            font-size: 14px; 
-            line-height: 1.6; 
-            color: #b0b0b0; 
-            text-align: center; 
-            max-width: 85%; 
-            margin-bottom: 25px;
-            min-height: 20px;
+            font-size: 13px; line-height: 1.5; color: #a0a0a0; 
+            text-align: center; max-width: 90%; margin-bottom: 25px;
+            min-height: 38px;
             white-space: pre-wrap;
-            font-weight: 400;
         }
 
-        /* --- STATS GRID --- */
         .stats-grid {
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 12px;
-            width: 100%; 
-            max-width: 420px; 
-            margin-bottom: 25px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            width: 100%; max-width: 400px; margin-bottom: 25px;
         }
-
         .stat-card {
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
-            padding: 14px; 
-            border-radius: 18px; 
-            text-align: center;
-            text-decoration: none; 
-            color: inherit; 
-            transition: var(--transition);
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center;
+            padding: 12px; border-radius: 16px; text-align: center;
+            text-decoration: none; color: inherit; transition: 0.2s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             cursor: pointer;
         }
+        .stat-card:active { background: var(--surface-press); transform: scale(0.98); }
+        .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
+        .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-        .stat-card:active { 
-            background: var(--surface-press); 
-            transform: scale(0.97); 
-        }
-
-        .stat-num { 
-            font-size: 20px; 
-            font-weight: 800; 
-            color: var(--primary); 
-            margin-bottom: 2px; 
-        }
-
-        .stat-label { 
-            font-size: 10px; 
-            font-weight: 700; 
-            color: var(--secondary); 
-            text-transform: uppercase; 
-            letter-spacing: 1px; 
-        }
-
-        /* --- ACTION BUTTONS --- */
         .action-row {
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 12px;
-            width: 100%; 
-            max-width: 420px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            width: 100%; max-width: 400px;
         }
-
         .btn {
-            height: 48px; 
-            border-radius: 16px;
-            font-size: 15px; 
-            font-weight: 700; 
-            text-align: center;
-            text-decoration: none; 
-            cursor: pointer; 
-            border: none;
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 8px;
-            transition: var(--transition);
+            height: 44px; border-radius: 14px;
+            font-size: 14px; font-weight: 700; text-align: center;
+            text-decoration: none; cursor: pointer; border: none;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .btn-follow { background: var(--accent); color: #000; box-shadow: 0 4px 20px var(--accent-glow); }
+        .btn-following { background: transparent; border: 1px solid #333; color: var(--primary); box-shadow: none; }
+        .btn-unblock { background: var(--danger); color: #fff; }
+        .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
+        .btn-msg:active { background: var(--surface-press); }
 
-        .btn-follow { 
-            background: var(--primary); 
-            color: #000; 
-            box-shadow: 0 4px 15px rgba(255,255,255,0.1); 
-        }
-
-        .btn-following { 
-            background: transparent; 
-            border: 1px solid #2a2a2a; 
-            color: var(--primary); 
-        }
-
-        .btn-unblock { 
-            background: var(--danger); 
-            color: #fff; 
-        }
-
-        .btn-msg { 
-            background: var(--surface); 
-            color: var(--primary); 
-            border: 1px solid var(--border); 
-        }
-
-        .btn:active { 
-            transform: scale(0.96); 
-            opacity: 0.9;
-        }
-
-        /* --- NOTES SECTION --- */
+        /* --- BOTTOM HALF: NOTES --- */
         .notes-section {
             flex: 1;
             padding: 0 24px;
-            margin-top: 15px;
-            padding-bottom: 80px;
+            margin-top: 10px;
+            padding-bottom: 50px;
         }
 
-        /* --- SKELETON ANIMATIONS --- */
         .skeleton {
             background: #111 !important;
-            position: relative; 
-            overflow: hidden;
+            position: relative; overflow: hidden;
             border: none !important;
-            color: transparent !important;
         }
-
         .skeleton::after {
-            content: ""; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
-            animation: shimmer 1.8s infinite;
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            animation: shimmer 1.5s infinite;
         }
-
-        @keyframes shimmer { 
-            0% { transform: translateX(-100%); } 
-            100% { transform: translateX(100%); } 
-        }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
         .loader-circle {
-            width: 18px; 
-            height: 18px; 
-            border: 2px solid rgba(255,255,255,0.2);
-            border-top: 2px solid currentColor; 
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite; 
-            display: none;
+            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid var(--primary); border-radius: 50%;
+            animation: spin 0.8s linear infinite; display: none;
         }
-
+        .btn-follow .loader-circle { border-top-color: #000; border-color: rgba(0,0,0,0.2); }
         .loading .loader-circle { display: block; }
-        .loading span, .loading .material-icons-round { display: none; }
+        .loading span { display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        @keyframes spin { 
-            0% { transform: rotate(0deg); } 
-            100% { transform: rotate(360deg); } 
-        }
-
-        /* --- TOAST & MODALS --- */
         #toast {
-            position: fixed; 
-            bottom: 40px; 
-            left: 50%; 
-            transform: translate(-50%, 30px);
-            background: #ffffff; 
-            color: #000; 
-            padding: 12px 24px; 
-            border-radius: 100px;
-            font-size: 14px; 
-            font-weight: 700; 
-            opacity: 0; 
-            pointer-events: none;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
-            z-index: 2000;
-            display: flex; 
-            align-items: center; 
-            gap: 10px;
+            position: fixed; bottom: 40px; left: 50%; transform: translate(-50%, 20px);
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+            color: #000; padding: 12px 24px; border-radius: 100px;
+            font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none;
+            transition: 0.4s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 2000;
+            display: flex; align-items: center; gap: 8px;
         }
+        #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-        #toast.show { 
-            opacity: 1; 
-            transform: translate(-50%, 0); 
-        }
-
+        /* MODAL STYLES */
         .modal-overlay {
-            position: fixed; 
-            inset: 0; 
-            background: rgba(0,0,0,0.75);
-            z-index: 1000; 
-            display: none; 
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 1000; display: none; backdrop-filter: blur(10px);
         }
-
         .bottom-modal {
-            position: fixed; 
-            bottom: -100%; 
-            left: 0; 
-            width: 100%;
-            background: #0d0d0d; 
-            border-top: 1px solid var(--border);
-            border-radius: 28px 28px 0 0; 
-            z-index: 1001;
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: var(--surface); border-top: 1px solid var(--border);
+            border-radius: 24px 24px 0 0; z-index: 1001;
             padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
             transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
-
-        .bottom-modal.active { 
-            bottom: 0; 
-        }
-
-        .modal-handle { 
-            width: 36px; 
-            height: 4px; 
-            background: #333; 
-            border-radius: 10px; 
-            margin: 0 auto 24px; 
-        }
+        .bottom-modal.active { bottom: 0; }
+        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
         
-        .setting-row { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 20px 0; 
-            border-bottom: 1px solid var(--border); 
-            cursor: pointer; 
-        }
-
-        /* --- SWITCH UI --- */
-        .switch { 
-            position: relative; 
-            display: inline-block; 
-            width: 46px; 
-            height: 26px; 
-        }
-
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .setting-row:active { opacity: 0.7; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; pointer-events: auto; }
         .switch input { opacity: 0; width: 0; height: 0; }
-
-        .slider { 
-            position: absolute; 
-            cursor: pointer; 
-            inset: 0; 
-            background-color: #222; 
-            transition: .4s; 
-            border-radius: 24px; 
-        }
-
-        .slider:before { 
-            position: absolute; 
-            content: ""; 
-            height: 20px; 
-            width: 20px; 
-            left: 3px; 
-            bottom: 3px; 
-            background-color: white; 
-            transition: .4s; 
-            border-radius: 50%; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--danger); }
         input:checked + .slider:before { transform: translateX(20px); }
 
         .blocked-container {
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center;
-            padding: 120px 40px; 
-            text-align: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 100px 40px; text-align: center;
         }
-
-        .blocked-icon { 
-            font-size: 70px; 
-            color: var(--border); 
-            margin-bottom: 24px; 
-        }
-
-        .blocked-title { 
-            font-weight: 800; 
-            font-size: 20px; 
-            margin-bottom: 12px; 
-            letter-spacing: -0.5px;
-        }
-
-        .blocked-msg { 
-            color: var(--secondary); 
-            font-size: 15px; 
-            line-height: 1.6; 
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 0; background: transparent; }
+        .blocked-icon { font-size: 60px; color: var(--secondary); margin-bottom: 20px; }
+        .blocked-title { font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+        .blocked-msg { color: var(--secondary); font-size: 14px; line-height: 1.5; }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
     <header>
-        <button class="nav-btn" onclick="handleHeaderBack()">
+        <button class="nav-btn" onclick="history.back()">
             <span class="material-icons-round">arrow_back</span>
         </button>
-        <div class="header-title" id="nav-name">Goorac Profile</div>
+        <div class="header-title" id="nav-name">Profile</div>
         <div class="menu-bars" id="menu-btn" onclick="toggleMenu(true)">
             <span></span>
             <span></span>
@@ -558,17 +252,16 @@
     </header>
 
     <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
-    
     <div class="bottom-modal" id="bottom-modal">
         <div class="modal-handle"></div>
-        <div class="modal-header" style="margin-bottom: 15px;">
-            <span class="header-title" style="font-size: 11px;">Agent Configuration</span>
+        <div class="modal-header" style="margin-bottom: 10px;">
+            <span class="header-title">User Options</span>
         </div>
         
-        <div class="setting-row" onclick="triggerBlockToggle()">
+        <div class="setting-row" onclick="document.getElementById('block-toggle').click()">
             <div>
-                <div style="font-size:16px; font-weight:700;">Restrict Agent</div>
-                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Terminate frequency and erase data.</div>
+                <div style="font-size:15px; font-weight:700;">Block User</div>
+                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Erase chat and prevent interaction.</div>
             </div>
             <label class="switch" onclick="event.stopPropagation()">
                 <input type="checkbox" id="block-toggle" onchange="handleBlockToggle(this.checked)">
@@ -578,37 +271,37 @@
 
         <div class="setting-row" onclick="shareProfile()">
             <div>
-                <div style="font-size:16px; font-weight:700;">Broadcast Profile</div>
-                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Share this agent's unique ID.</div>
+                <div style="font-size:15px; font-weight:700;">Share Profile</div>
+                <div style="font-size:12px; color:var(--secondary); margin-top:4px;">Share this agent's frequency.</div>
             </div>
-            <span class="material-icons-round" style="color:var(--accent); font-size: 24px;">ios_share</span>
+            <span class="material-icons-round" style="color:var(--accent);">share</span>
         </div>
 
-        <div style="padding:40px 0 10px; text-align:center; color:var(--border); font-size:10px; font-weight:900; letter-spacing:2px;">
-            ENCRYPTED NODE: <span id="node-id-display">...</span>
+        <div style="padding:30px 0; text-align:center; color:var(--secondary); font-size:11px; font-weight:800; letter-spacing:1px;">
+            SECURE CONNECTION ACTIVE
         </div>
     </div>
 
     <div id="main-profile-content">
         <div class="profile-top-section">
             <div class="avatar-wrapper" id="pfp-container">
-                <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Profile">
+                <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
             </div>
 
             <div class="user-name">
-                <span id="display-name" class="skeleton" style="width:180px; height:28px; border-radius: 8px;"></span>
+                <span id="display-name" class="skeleton" style="width:160px; height:28px; border-radius: 6px;"></span>
                 <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
             </div>
             
-            <div class="user-handle skeleton" id="username" style="width: 100px; height:18px; margin-top: 8px; border-radius: 4px;"></div>
+            <div class="user-handle skeleton" id="username" style="width: 90px; height:16px; margin-top: 8px; border-radius: 4px;"></div>
 
-            <div class="id-pill skeleton" id="id-pill-container" onclick="copyGooracID()" style="width: 160px; border-radius: 100px;">
-                <span class="id-label" id="id-label-text" style="visibility: hidden;">Agent ID</span>
+            <div class="id-pill skeleton" id="id-pill-container" onclick="copyGooracID()" style="width: 140px; border-radius: 12px;">
+                <span class="id-label" id="id-label-text" style="visibility: hidden;">ID</span>
                 <span class="id-value" id="goorac-id"></span>
                 <span class="material-icons-round copy-icon" id="id-copy-icon" style="visibility: hidden;">content_copy</span>
             </div>
 
-            <p class="bio skeleton" id="bio" style="width: 85%; height: 40px; border-radius: 10px;"></p>
+            <p class="bio skeleton" id="bio" style="width: 80%; height: 36px; border-radius: 8px;"></p>
 
             <div class="stats-grid" id="stats-area">
                 <div class="stat-card skeleton" id="stat-fol" onclick="viewFollowers()">
@@ -627,7 +320,7 @@
                     <span id="btn-follow-text">Follow</span>
                 </button>
                 <button class="btn btn-msg skeleton" id="btn-msg" onclick="openChat()">
-                    <span class="material-icons-round" style="font-size:20px;">chat_bubble</span>
+                    <span class="material-icons-round" style="font-size:18px;">chat_bubble_outline</span>
                     <span>Message</span>
                 </button>
             </div>
@@ -639,22 +332,20 @@
     </div>
 
     <div id="blocked-by-user-view" style="display:none;" class="blocked-container">
-        <span class="material-icons-round blocked-icon">visibility_off</span>
-        <div class="blocked-title">Access Denied</div>
-        <div class="blocked-msg">This agent has restricted your access. You can no longer view this profile or its activities.</div>
+        <span class="material-icons-round blocked-icon">block</span>
+        <div class="blocked-title">User Restricted</div>
+        <div class="blocked-msg">You have been restricted from viewing this profile or interacting with this agent.</div>
     </div>
 
     <view-notes id="view-notes-modal"></view-notes>
 
     <div id="toast">
-        <span class="material-icons-round">check_circle</span>
+        <span class="material-icons-round" style="color: #000;">check_circle</span>
         <span id="toast-msg">Copied to clipboard</span>
     </div>
 
 <script>
-    /**
-     * GLOBAL STATE MANAGEMENT
-     */
+    // --- GLOBAL VARS ---
     const params = new URLSearchParams(window.location.search);
     const targetUsername = params.get('user');
     
@@ -664,11 +355,8 @@
     let isProcessing = false; 
     let amIBlocked = false;
     let doIBlock = false;
-    let lastActionTime = 0; // Throttling for 429 errors
-
-    /**
-     * CACHE LAYER (Offline First approach)
-     */
+    
+    // --- 1. LOCAL STORAGE CACHE ---
     function loadFromCache() {
         if(!targetUsername) return;
         const cached = localStorage.getItem(`goorac_user_${targetUsername}`);
@@ -683,23 +371,12 @@
                     removeBtnSkeletons();
                 }
                 if(targetUid) initNotesComponent(targetUid);
-            } catch (e) { 
-                console.warn("Local cache corrupt, waiting for network..."); 
-            }
+            } catch (e) { console.error("Cache Error", e); }
         }
     }
+    loadFromCache();
 
-    /**
-     * UI NAVIGATION & MODALS
-     */
-    function handleHeaderBack() {
-        if (window.history.length > 1) {
-            history.back();
-        } else {
-            window.location.href = 'index.html';
-        }
-    }
-
+    // --- MODAL & BACK BUTTON SYNC ---
     function toggleMenu(show) {
         const overlay = document.getElementById('modal-overlay');
         const modal = document.getElementById('bottom-modal');
@@ -708,7 +385,7 @@
             window.history.pushState({ modalOpen: true }, ""); 
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
-            if(navigator.vibrate) navigator.vibrate(10);
+            if(navigator.vibrate) navigator.vibrate(15);
         } else {
             if (window.history.state && window.history.state.modalOpen) {
                 window.history.back();
@@ -719,39 +396,41 @@
     window.addEventListener('popstate', (e) => {
         const modal = document.getElementById('bottom-modal');
         const overlay = document.getElementById('modal-overlay');
+        
         if (modal.classList.contains('active')) {
             modal.classList.remove('active');
-            setTimeout(() => overlay.style.display = 'none', 300);
+            setTimeout(() => overlay.style.display = 'none', 400);
         }
     });
 
-    function triggerBlockToggle() {
-        const input = document.getElementById('block-toggle');
-        input.checked = !input.checked;
-        handleBlockToggle(input.checked);
+    // --- SHARE PROFILE ---
+    function shareProfile() {
+        if (!targetUserData) return;
+        if (navigator.share) {
+            navigator.share({
+                title: `${targetUserData.name} on Goorac`,
+                text: `Check out ${targetUserData.name}'s profile on Goorac.`,
+                url: window.location.href
+            }).catch(err => console.log("Sharing failed", err));
+        } else {
+            copyGooracID();
+            showToast("Link copied to clipboard");
+        }
+        toggleMenu(false);
     }
 
-    /**
-     * DATA FETCHING & AUTH
-     */
+    // --- 2. AUTH & FRESH FETCH ---
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            document.getElementById('node-id-display').innerText = myUid.substring(0, 8).toUpperCase();
             if(targetUsername) fetchProfileFresh();
-        } else {
-            window.location.href = 'login.html';
         }
     });
 
     function fetchProfileFresh() {
-        // Optimized fetch to prevent 429
-        db.collection("users").where("username", "==", targetUsername).limit(1).get()
-        .then((snapshot) => {
-            if(snapshot.empty) {
-                showToast("Agent not found");
-                return;
-            } 
+        db.collection("users").where("username", "==", targetUsername).limit(1)
+        .onSnapshot((snapshot) => {
+            if(snapshot.empty) return; 
             const doc = snapshot.docs[0];
             const freshData = doc.data();
             targetUid = doc.id;
@@ -764,21 +443,12 @@
                 initNotesComponent(targetUid);
                 checkRelation(freshData);
             }
-        }).catch(err => {
-            console.error("Firestore Error:", err);
-            if(err.message.includes("429")) {
-                showToast("API Limit reached. Wait 60s.");
-            }
         });
     }
 
     function checkIfBlocked(data) {
         const blockedByThem = data.blocked || [];
-        // Support both string IDs and object IDs in arrays
-        amIBlocked = blockedByThem.some(u => {
-            const uid = (typeof u === 'string') ? u : u.uid;
-            return uid === myUid;
-        });
+        amIBlocked = blockedByThem.some(u => (typeof u === 'string' ? u : u.uid) === myUid);
         
         if(amIBlocked) {
             document.getElementById('main-profile-content').style.display = 'none';
@@ -789,46 +459,32 @@
     function initNotesComponent(uid) {
         const notesComp = document.getElementById('profile-notes');
         if(!notesComp) return;
-        if (customElements.get('profile-notes')) { 
-            notesComp.uid = uid; 
-        } else { 
-            customElements.whenDefined('profile-notes').then(() => { 
-                notesComp.uid = uid; 
-            }); 
-        }
+        if (customElements.get('profile-notes')) { notesComp.uid = uid; } 
+        else { customElements.whenDefined('profile-notes').then(() => { notesComp.uid = uid; }); }
     }
 
-    /**
-     * VIEW RENDERING
-     */
+    // --- RENDER LOGIC ---
     function renderProfile(data) {
         const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
         skeletons.forEach(id => {
             const el = document.getElementById(id);
-            if(el) { 
-                el.classList.remove('skeleton'); 
-                el.style.width = ""; 
-                el.style.height = ""; 
-            }
+            if(el) { el.classList.remove('skeleton'); el.style.width = ""; el.style.height = ""; }
         });
-        
         document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
 
-        document.getElementById('nav-name').innerText = `@${data.username || "agent"}`;
-        document.getElementById('display-name').innerText = data.name || "Unknown Agent";
+        document.getElementById('nav-name').innerText = (data.username || "Profile").toUpperCase();
+        document.getElementById('display-name').innerText = data.name || "Unknown";
         document.getElementById('username').innerText = `@${data.username}`;
-        document.getElementById('bio').innerText = data.bio || "No profile transmission data.";
-        document.getElementById('goorac-id').innerText = data.gooracNumber || "----";
+        document.getElementById('bio').innerText = data.bio || "";
+        document.getElementById('goorac-id').innerText = data.gooracNumber || "N/A";
         
         const img = document.getElementById('pfp');
-        const avatarUrl = data.photoURL || `https://ui-avatars.com/api/?name=${data.name}&background=111&color=fff`;
-        if (img.src !== avatarUrl) img.src = avatarUrl;
-        
+        const newSrc = data.photoURL || 'https://via.placeholder.com/150/111/333?text=?';
+        if (img.src !== newSrc) img.src = newSrc;
         document.getElementById('verified-badge').style.display = data.verified ? 'inline-block' : 'none';
 
-        // Animate count change
-        animateValue('count-followers', (data.followers || []).length);
-        animateValue('count-following', (data.following || []).length);
+        document.getElementById('count-followers').innerText = (data.followers || []).length;
+        document.getElementById('count-following').innerText = (data.following || []).length;
 
         if(myUid === targetUid) {
             document.getElementById('action-container').style.display = 'none';
@@ -838,51 +494,39 @@
         }
     }
 
-    function animateValue(id, value) {
-        const obj = document.getElementById(id);
-        obj.innerText = value;
-    }
-
     function removeBtnSkeletons() {
         document.getElementById('btn-follow').classList.remove('skeleton');
         document.getElementById('btn-msg').classList.remove('skeleton');
     }
 
-    /**
-     * RELATIONSHIP LOGIC (Follow / Block)
-     */
+    // --- RELATION & BLOCKING ---
     async function checkRelation(freshData) {
         if(!myUid || !targetUid || myUid === targetUid) return;
 
-        try {
-            const myDoc = await db.collection("users").doc(myUid).get();
-            if (!myDoc.exists) return;
+        const myDoc = await db.collection("users").doc(myUid).get();
+        if (!myDoc.exists) return;
+        
+        const myData = myDoc.data();
+        const myFollowing = myData.following || [];
+        const myBlocked = myData.blocked || [];
 
-            const myData = myDoc.data();
-            const myFollowing = myData.following || [];
-            const myBlocked = myData.blocked || [];
+        const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+        doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
-            const isFollowing = myFollowing.some(i => ((typeof i === 'string') ? i : i.uid) === targetUid);
-            doIBlock = myBlocked.some(i => ((typeof i === 'string') ? i : i.uid) === targetUid);
+        document.getElementById('block-toggle').checked = doIBlock;
+        updateFollowButton(isFollowing, doIBlock);
+        removeBtnSkeletons();
 
-            document.getElementById('block-toggle').checked = doIBlock;
-            updateFollowButton(isFollowing, doIBlock);
-            removeBtnSkeletons();
-
-            if(doIBlock) {
-                document.getElementById('notes-area').style.opacity = '0.2';
-                document.getElementById('notes-area').style.pointerEvents = 'none';
-            } else {
-                document.getElementById('notes-area').style.opacity = '1';
-                document.getElementById('notes-area').style.pointerEvents = 'auto';
-            }
-
-            // Sync to local cache
-            const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
-            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
-        } catch (e) {
-            console.error("Relation sync failure", e);
+        if(doIBlock) {
+            document.getElementById('notes-area').style.opacity = '0.3';
+            document.getElementById('notes-area').style.pointerEvents = 'none';
+        } else {
+            document.getElementById('notes-area').style.opacity = '1';
+            document.getElementById('notes-area').style.pointerEvents = 'auto';
         }
+
+        const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
+        localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
 
     function updateFollowButton(isFollowing, isBlocked) {
@@ -890,7 +534,7 @@
         const txt = document.getElementById('btn-follow-text');
         
         if(isBlocked) {
-            txt.innerText = "Unblock Agent";
+            txt.innerText = "Unblock";
             btn.className = "btn btn-unblock";
             document.getElementById('btn-msg').style.display = 'none';
         } else {
@@ -905,102 +549,75 @@
         }
     }
 
-    /**
-     * HANDLE FOLLOW / UNFOLLOW (FIXED LOGIC)
-     * Uses Transaction to find and remove objects correctly by UID.
-     */
+    // --- FIXED FOLLOW LOGIC ---
     async function handleFollow() {
-        // Prevent rapid clicking and duplicate requests
-        const now = Date.now();
-        if(!targetUid || !myUid || isProcessing || (now - lastActionTime < 1000)) return;
-        
+        if(!targetUid || !myUid || isProcessing) return;
         const btn = document.getElementById('btn-follow');
         
-        // Redirect to unblock if button is in unblock state
         if(btn.classList.contains('btn-unblock')) {
+            document.getElementById('block-toggle').checked = false;
             handleBlockToggle(false);
             return;
         }
 
         isProcessing = true; 
-        lastActionTime = now;
         const isCurrentlyFollowing = btn.classList.contains('btn-following');
-        
         btn.classList.add('loading');
         if(navigator.vibrate) navigator.vibrate(15);
 
         try {
-            await db.runTransaction(async (transaction) => {
+            await db.runTransaction(async (t) => {
                 const myRef = db.collection("users").doc(myUid);
                 const theirRef = db.collection("users").doc(targetUid);
                 
-                const myDoc = await transaction.get(myRef);
-                const theirDoc = await transaction.get(theirRef);
+                const myD = await t.get(myRef);
+                const theirD = await t.get(theirRef);
 
-                if (!myDoc.exists || !theirDoc.exists) throw "Database inconsistency detected";
+                if (!myD.exists || !theirD.exists) {
+                    throw "User document not found";
+                }
 
-                const myData = myDoc.data();
-                const theirData = theirDoc.data();
+                const myData = myD.data();
+                const theirData = theirD.data();
 
-                const myFollowing = myData.following || [];
-                const theirFollowers = theirData.followers || [];
+                // Safe array access (Fixes the crash)
+                const myFing = myData.following || [];
+                const theirFing = theirData.followers || [];
+                
                 const ts = firebase.firestore.Timestamp.now();
 
                 if (!isCurrentlyFollowing) {
-                    // FOLLOW LOGIC
-                    transaction.update(myRef, { 
-                        following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) 
-                    });
-                    transaction.update(theirRef, { 
-                        followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) 
-                    });
+                    // Follow
+                    t.update(myRef, { following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) });
+                    t.update(theirRef, { followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
                     
-                    // Create Notification
+                    // Safe notification creation
                     const notifRef = db.collection("notifications").doc();
-                    transaction.set(notifRef, { 
-                        recipientId: targetUid, 
-                        senderId: myUid, 
-                        type: "follow", 
-                        timestamp: ts, 
-                        seen: false 
-                    });
+                    t.set(notifRef, { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
                 } else {
-                    // UNFOLLOW LOGIC (Fix: Manual filtering within transaction)
-                    const updatedMyFollowing = myFollowing.filter(i => {
-                        const id = (typeof i === 'string') ? i : i.uid;
-                        return id !== targetUid;
-                    });
-                    const updatedTheirFollowers = theirFollowers.filter(i => {
-                        const id = (typeof i === 'string') ? i : i.uid;
-                        return id !== myUid;
-                    });
+                    // Unfollow (Filter manually and update)
+                    const newMyFing = myFing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const newTheirFing = theirFing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
                     
-                    transaction.update(myRef, { following: updatedMyFollowing });
-                    transaction.update(theirRef, { followers: updatedTheirFollowers });
+                    t.update(myRef, { following: newMyFing });
+                    t.update(theirRef, { followers: newTheirFing });
                 }
             });
-            
             updateFollowButton(!isCurrentlyFollowing, false); 
-            // Update local counts immediately
-            const currentCount = parseInt(document.getElementById('count-followers').innerText);
-            document.getElementById('count-followers').innerText = isCurrentlyFollowing ? currentCount - 1 : currentCount + 1;
-            
         } catch (e) { 
-            console.error("Transaction failed:", e);
-            showToast("Frequency update failed."); 
-        } finally { 
+            console.error("Follow Error:", e);
+            showToast("Error updating relationship"); 
+        } 
+        finally { 
             btn.classList.remove('loading'); 
             isProcessing = false; 
         }
     }
 
-    /**
-     * HANDLE BLOCKING
-     */
+    // --- FIXED BLOCK LOGIC ---
     async function handleBlockToggle(isBlocking) {
         if(!targetUid || !myUid || isProcessing) return;
         isProcessing = true;
-        
         const btn = document.getElementById('btn-follow');
         btn.classList.add('loading');
         
@@ -1009,109 +626,86 @@
         const theirRef = db.collection("users").doc(targetUid);
 
         try {
-            // Find shared chat to delete
+            // Find shared chat to delete (Outside transaction)
             const chatSnap = await db.collection("chats")
                 .where("participants", "array-contains", myUid).get();
-            
-            let sharedChatId = null;
+            let sharedChatRef = null;
             chatSnap.forEach(doc => { 
-                const d = doc.data();
-                if(d.participants && d.participants.includes(targetUid)) sharedChatId = doc.id; 
+                const data = doc.data();
+                if(data.participants && data.participants.includes(targetUid)) {
+                    sharedChatRef = doc.ref; 
+                }
             });
 
             await db.runTransaction(async (t) => {
-                const mD = await t.get(myRef);
-                const tD = await t.get(theirRef);
+                const myD = await t.get(myRef);
+                const theirD = await t.get(theirRef);
                 
-                const myData = mD.data();
-                const theirData = tD.data();
+                if (!myD.exists || !theirD.exists) throw "User doc missing";
+
+                const myData = myD.data();
+                const theirData = theirD.data();
+
+                const myFollowing = myData.following || [];
+                const myFollowers = myData.followers || [];
+                const theirFollowing = theirData.following || [];
+                const theirFollowers = theirData.followers || [];
 
                 if(isBlocking) {
-                    // Clean up arrays on both ends
-                    const filterFn = (arr, idToRemove) => arr.filter(i => ((typeof i === 'string') ? i : i.uid) !== idToRemove);
+                    // Filter arrays safe
+                    const newMyFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const newMyFollowers = myFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const newTheirFollowing = theirFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
+                    const newTheirFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
 
                     t.update(myRef, {
                         blocked: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }),
-                        following: filterFn(myData.following || [], targetUid),
-                        followers: filterFn(myData.followers || [], targetUid)
+                        following: newMyFollowing,
+                        followers: newMyFollowers
                     });
                     t.update(theirRef, {
-                        following: filterFn(theirData.following || [], myUid),
-                        followers: filterFn(theirData.followers || [], myUid)
+                        following: newTheirFollowing,
+                        followers: newTheirFollowers
                     });
                     
-                    if(sharedChatId) t.delete(db.collection("chats").doc(sharedChatId));
+                    if(sharedChatRef) t.delete(sharedChatRef);
                 } else {
-                    const newBlocked = (myData.blocked || []).filter(i => ((typeof i === 'string') ? i : i.uid) !== targetUid);
+                    const myBlocked = myData.blocked || [];
+                    const newBlocked = myBlocked.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     t.update(myRef, { blocked: newBlocked });
                 }
             });
             
-            showToast(isBlocking ? "Agent Blocked" : "Agent Restored");
+            showToast(isBlocking ? "User Blocked & Chat Deleted" : "User Unblocked");
             if(isBlocking) toggleMenu(false);
             checkRelation(targetUserData);
         } catch (e) { 
-            console.error(e); 
-            showToast("System error"); 
-        } finally { 
+            console.error("Block Error:", e); 
+            showToast("Action failed"); 
+        }
+        finally { 
             btn.classList.remove('loading'); 
             isProcessing = false; 
         }
     }
 
-    /**
-     * UTILITIES
-     */
+    // --- UTILS ---
     function copyGooracID() {
         const txt = document.getElementById('goorac-id').innerText;
-        if(!txt || txt === "----") return;
-        
-        navigator.clipboard.writeText(txt).then(() => { 
-            if(navigator.vibrate) navigator.vibrate(40); 
-            showToast("ID Copied to Clipboard"); 
-        });
-    }
-
-    function shareProfile() {
-        if (!targetUserData) return;
-        const shareData = {
-            title: `${targetUserData.name} | Goorac`,
-            text: `Connect with agent ${targetUserData.name} on the Goorac network.`,
-            url: window.location.href
-        };
-
-        if (navigator.share) {
-            navigator.share(shareData).catch(err => console.log("Share failed", err));
-        } else {
-            copyGooracID();
-        }
-        toggleMenu(false);
+        if(txt === "N/A" || txt.includes("-")) return;
+        navigator.clipboard.writeText(txt).then(() => { if(navigator.vibrate) navigator.vibrate(50); showToast("ID Copied"); });
     }
 
     function showToast(msg) {
         const t = document.getElementById('toast');
         document.getElementById('toast-msg').innerText = msg;
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2800);
+        setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    // Navigation triggers
-    function openChat() { 
-        if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`; 
-    }
-    function viewFollowers() { 
-        if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`; 
-    }
-    function viewFollowing() { 
-        if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`; 
-    }
-
-    /**
-     * CONTEXT MENU PROTECTION
-     */
-    document.addEventListener('contextmenu', event => event.preventDefault());
-
-    loadFromCache();
+    function openChat() { if(targetUserData) window.location.href = `chat.html?user=${targetUserData.username}`; }
+    function viewFollowers() { if(targetUserData) window.location.href = `followers.html?user=${targetUserData.username}`; }
+    function viewFollowing() { if(targetUserData) window.location.href = `following.html?user=${targetUserData.username}`; }
 </script>
 </body>
 </html>
