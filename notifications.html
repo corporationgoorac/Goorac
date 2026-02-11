@@ -284,7 +284,7 @@
             currentUser = user;
             setupListeners(limitCount);
             setupScrollObserver();
-            // Clear unread badge on profile immediately
+            // Clear unread badge on profile immediately so red dot on home disappears
             db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(()=>{});
         } else {
             window.location.href = 'login.html';
@@ -388,6 +388,7 @@
             const pfp = profile.photoURL || n.senderPfp || 'https://via.placeholder.com/150';
 
             const item = document.createElement('div');
+            // Keep 'unread' class if false so CSS highlights it, even though we mark read in background
             item.className = `notif-item ${!isRead ? 'unread' : ''}`;
             
             let iconBadge = '';
@@ -460,7 +461,7 @@
 
     // --- 7. REDIRECT ---
     function handleRedirect(n, username) {
-        // Mark Read (Redundant check if auto-marked, but good for click feedback)
+        // Double check mark as read (fail-safe)
         if (n.isRead !== true && n.isSeen !== true) {
             const ref = n._collection === 'root' 
                 ? db.collection('notifications').doc(n.id)
@@ -480,12 +481,13 @@
         const batch = db.batch();
         let count = 0;
         
-        // Filter loaded notifications that are unread
+        // Filter loaded notifications that are currently unread in local state
         rawNotifications.forEach(n => {
             if (n.isRead !== true && n.isSeen !== true) {
                 const ref = n._collection === 'root' 
                     ? db.collection('notifications').doc(n.id)
                     : db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id);
+                
                 batch.update(ref, n._collection === 'root' ? {isSeen:true} : {isRead:true});
                 count++;
             }
@@ -517,9 +519,12 @@
         observer.observe(spinner);
     }
 
+    // MARK ALL READ BUTTON - ALSO RESETS PROFILE COUNT
     function markAllAsRead() {
         const batch = db.batch();
         let count = 0;
+        
+        // 1. Mark individual docs
         rawNotifications.forEach(n => {
             if (n.isRead !== true && n.isSeen !== true) {
                 const ref = n._collection === 'root' 
@@ -529,7 +534,20 @@
                 count++;
             }
         });
-        if(count > 0) batch.commit().catch(()=>showError("Failed to update"));
+
+        // 2. FORCE RESET PROFILE COUNT (Safety Net)
+        if(currentUser) {
+            batch.update(db.collection("users").doc(currentUser.uid), { unreadCount: 0 });
+        }
+
+        if(count > 0 || currentUser) {
+            batch.commit()
+                .then(() => {
+                    // Visually clear unread status instantly
+                    document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+                })
+                .catch(()=>showError("Failed to update"));
+        }
     }
 
     function timeAgo(ts) {
