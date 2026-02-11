@@ -355,6 +355,8 @@
     let isProcessing = false; 
     let amIBlocked = false;
     let doIBlock = false;
+    // NEW: Variable to hold current user's profile info for notifications
+    let currentUserProfileData = null;
     
     // --- 1. LOCAL STORAGE CACHE ---
     function loadFromCache() {
@@ -423,6 +425,10 @@
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
+            // NEW: Fetch my data so I can put my name/pfp in notifications
+            db.collection("users").doc(myUid).get().then(doc => {
+                if(doc.exists) currentUserProfileData = doc.data();
+            });
             if(targetUsername) fetchProfileFresh();
         }
     });
@@ -591,9 +597,24 @@
                     t.update(myRef, { following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) });
                     t.update(theirRef, { followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
                     
-                    // Safe notification creation
-                    const notifRef = db.collection("notifications").doc();
-                    t.set(notifRef, { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
+                    // --- ENHANCED NOTIFICATION SYSTEM ---
+                    // This creates a notification for the recipient in their personal notifications subcollection
+                    const notifRef = db.collection("users").doc(targetUid).collection("notifications").doc();
+                    t.set(notifRef, { 
+                        recipientId: targetUid, 
+                        senderId: myUid, 
+                        fromUsername: currentUserProfileData ? currentUserProfileData.username : "Someone",
+                        fromPhoto: currentUserProfileData ? (currentUserProfileData.photoURL || "") : "",
+                        type: "follow", 
+                        content: "started following you.",
+                        timestamp: ts, 
+                        isRead: false,
+                        link: currentUserProfileData ? `userProfile.html?user=${currentUserProfileData.username}` : ""
+                    });
+                    
+                    // Keep original placeholder if your other systems use the root collection
+                    const globalNotifRef = db.collection("notifications").doc();
+                    t.set(globalNotifRef, { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
                 } else {
                     // Unfollow (Filter manually and update)
                     const newMyFing = myFing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
