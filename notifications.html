@@ -158,6 +158,17 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
+    // --- 0. INSTANT HTML CACHE LOAD (0ms Latency) ---
+    // This runs immediately, before Firebase or Auth logic.
+    (function loadHTMLCache() {
+        try {
+            const cachedHTML = localStorage.getItem('goorac_notif_html');
+            if (cachedHTML && cachedHTML.trim().length > 0) {
+                document.getElementById('notif-list').innerHTML = cachedHTML;
+            }
+        } catch(e) { console.log('Cache access failed'); }
+    })();
+
     // --- 1. CONFIG & INIT ---
     if (window.initFirebaseCore) {
         window.initFirebaseCore();
@@ -172,8 +183,6 @@
     let isFollowingLoaded = false;
     
     // --- 2. DEDUPLICATION MAP ---
-    // Using a Map ensures keys are unique. We will use specific keys for Likes and Follows.
-    // Key format: "type_senderId_targetId"
     let notificationsMap = new Map(); 
     
     let displayedCount = 0;   
@@ -216,12 +225,15 @@
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
 
-            // Load cache via chatLoader first if available
+            // Load data cache if HTML was empty or outdated
             if(window.loadFromCache) {
                  const cachedData = window.loadFromCache(`notifs_${myUid}`);
                  if(cachedData) {
                      cachedData.forEach(item => notificationsMap.set(item.dedupeKey, item));
-                     renderList();
+                     // If HTML cache missed, render this now
+                     if(!document.getElementById('notif-list').hasChildNodes()) {
+                        renderList();
+                     }
                  }
             }
 
@@ -231,7 +243,6 @@
                     const data = doc.data();
                     myFollowingList = (data.following || []).map(f => typeof f === 'string' ? f : f.uid);
                     isFollowingLoaded = true;
-                    // Re-render to update buttons
                     renderList();
                 }
             });
@@ -254,13 +265,9 @@
                     const noteData = doc.data();
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
-                            // STRICT CHECK: Only process if liker has a timestamp
                             if (!liker.timestamp || liker.uid === myUid) return;
                             
-                            // Unique Key: One like per user per note
                             const dedupeKey = `like_${liker.uid}_${doc.id}`; 
-                            
-                            // If it doesn't exist, add it. If it exists, update it (e.g. user changed pic)
                             if(!notificationsMap.has(dedupeKey)) hasChanges = true;
 
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
@@ -268,7 +275,7 @@
 
                             notificationsMap.set(dedupeKey, {
                                 dedupeKey: dedupeKey,
-                                id: `${dedupeKey}_${timeMillis}`, // Unique ID for Read Status
+                                id: `${dedupeKey}_${timeMillis}`,
                                 type: 'like',
                                 senderId: liker.uid,
                                 senderName: u.name || liker.displayName || "Someone",
@@ -298,22 +305,16 @@
 
                 if (data.followers && Array.isArray(data.followers)) {
                     data.followers.forEach(f => {
-                        // STRICT CHECK: Only process if f is an object AND has a timestamp
-                        // This filters out old string-only UIDs and objects missing timestamp
                         if (typeof f !== 'object' || !f.timestamp) return;
 
                         const uid = f.uid;
                         const ts = f.timestamp; 
                         const timeMillis = ts.toMillis ? ts.toMillis() : ts;
 
-                        // Unique Key: One follow notification per user
                         const dedupeKey = `follow_${uid}`;
-                        
                         if(!notificationsMap.has(dedupeKey)) hasChanges = true;
 
                         const u = userCache[uid] || {};
-
-                        // If user info missing, fetch it
                         if(!u.name) fetchUserInfo(uid);
 
                         notificationsMap.set(dedupeKey, {
@@ -347,7 +348,6 @@
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
                 
-                // Update specific map entry and re-render
                 const dedupeKey = `follow_${uid}`;
                 if(notificationsMap.has(dedupeKey)) {
                     const item = notificationsMap.get(dedupeKey);
@@ -369,44 +369,36 @@
             const list = document.getElementById('notif-list');
             const loader = document.getElementById('loader');
             
-            // Convert Map to Array
             let allNotifs = Array.from(notificationsMap.values());
-            
-            // Sort by Time (Newest First)
             allNotifs.sort((a, b) => b.timestamp - a.timestamp);
 
-            // Filter
             const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
-            // Empty State
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="empty-state"><div style="font-size:2rem;">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
                 loader.style.display = 'none';
                 return;
             }
 
-            // We wipe the list and rebuild. 
-            // Since this is efficient DOM creation, it's fine for < 100 items.
-            // For infinite scroll, we'd append, but Map dedupe requires full array sort.
             list.innerHTML = ''; 
             
-            // Limit render for performance (Lazy Load limit)
             const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
             
             for(let i=0; i < renderLimit; i++) {
                 list.appendChild(createNotificationElement(filtered[i]));
             }
 
-            // Update displayed count tracking
             displayedCount = renderLimit;
             loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
 
-            // Save to Cache via chatLoader
-            if(window.saveToCache && currentFilter === 'all') {
-                window.saveToCache(`notifs_${myUid}`, allNotifs);
+            // SAVE BOTH FORMATS TO CACHE
+            if(currentFilter === 'all') {
+                if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, allNotifs);
+                // HTML CACHE SAVE (for next 0ms load)
+                localStorage.setItem('goorac_notif_html', list.innerHTML);
             }
 
-        }, 100); // 100ms debounce
+        }, 100); 
     }
 
     function createNotificationElement(notif) {
@@ -432,7 +424,6 @@
                 const isFollowing = myFollowingList.includes(notif.senderId);
                 const btnClass = isFollowing ? 'btn-following' : '';
                 const btnText = isFollowing ? 'Following' : 'Follow';
-                // Note: we pass 'this' to the function
                 actionHtml = `<button class="btn-follow ${btnClass}" onclick="toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
             }
         } else if (notif.type === 'like' && notif.noteData) {
@@ -469,13 +460,11 @@
 
         try {
             if (isCurrentlyFollowing) {
-                // Unfollow
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
                 await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
                 btn.innerText = "Follow"; 
                 btn.classList.remove("btn-following");
             } else {
-                // Follow
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
                 await db.collection("users").doc(targetUid).update({ 
                     followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) 
