@@ -10,16 +10,60 @@ class ChatLoader extends HTMLElement {
         
         // Configuration for limits
         this.MAX_PREFETCH_CHATS = 15; // Only keep messages fresh for top 15 active chats
+
+        // Notification Audio (Crisp 'Ding' Sound)
+        this.notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); 
     }
 
     connectedCallback() {
         this.initFirebase();
         this.initAuth();
+        this.createNotificationContainer(); // NEW: Setup popup UI
     }
 
     disconnectedCallback() {
         if (this._unsubInbox) this._unsubInbox();
         if (this._unsubUser) this._unsubUser();
+    }
+
+    // NEW: Inject Styles and Container for Native-like Notifications
+    createNotificationContainer() {
+        // Prevent duplicate containers
+        if(document.getElementById('cl-notif-container')) return;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            #cl-notif-container {
+                position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+                width: 94%; max-width: 400px; z-index: 100000;
+                display: flex; flex-direction: column; gap: 8px;
+                pointer-events: none;
+            }
+            .cl-toast {
+                background: rgba(20, 20, 20, 0.90);
+                backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+                border: 1px solid rgba(255,255,255,0.08);
+                color: #fff; padding: 12px; border-radius: 18px;
+                display: flex; align-items: center; gap: 12px;
+                box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+                opacity: 0; transform: translateY(-20px) scale(0.95);
+                transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                pointer-events: auto; cursor: pointer;
+            }
+            .cl-toast.show { opacity: 1; transform: translateY(0) scale(1); }
+            .cl-toast-pfp { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; object-fit: cover; background: #333; border: 1px solid rgba(255,255,255,0.1); }
+            .cl-toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+            .cl-toast-header { display: flex; justify-content: space-between; align-items: center; }
+            .cl-toast-name { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; color: #fff; }
+            .cl-toast-verified { width: 14px; height: 14px; }
+            .cl-toast-time { font-size: 0.75rem; color: #888; font-variant-numeric: tabular-nums; }
+            .cl-toast-msg { font-size: 0.85rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        `;
+        document.head.appendChild(style);
+
+        const container = document.createElement('div');
+        container.id = 'cl-notif-container';
+        document.body.appendChild(container);
     }
 
     initFirebase() {
@@ -99,6 +143,26 @@ class ChatLoader extends HTMLElement {
                          if (isRecent || this.pinnedChats.includes(chatId)) {
                              this.prefetchChatMessages(chatId);
                          }
+
+                         // NEW: TRIGGER NOTIFICATION POPUP
+                         // Conditions: Modified event (new msg), I am NOT the sender, It is NOT seen
+                         if (change.type === 'modified' && 
+                             chatData.lastSender !== this.myUid && 
+                             chatData.seen === false) {
+                             
+                             // Wait slightly for user cache if missing
+                             let user = this.userCache[otherUid];
+                             if(!user) {
+                                await this.fetchAndCacheUser(otherUid);
+                                user = this.userCache[otherUid];
+                             }
+                             
+                             // Don't show if already on that chat page
+                             const isChattingWithUser = window.location.href.includes(`chat.html?user=${user?.username}`);
+                             if (!isChattingWithUser) {
+                                 this.showNotification(chatData, user);
+                             }
+                         }
                     }
 
                     needsInboxUpdate = true;
@@ -111,6 +175,59 @@ class ChatLoader extends HTMLElement {
                     this.regenerateInboxCache(snapshot.docs);
                 }
             });
+    }
+
+    // NEW: Function to render and show the notification popup
+    showNotification(chat, user) {
+        if (!user) return;
+
+        // Play Sound
+        this.notifSound.currentTime = 0;
+        this.notifSound.play().catch(() => {}); // Catch autoplay blocks
+        
+        // Vibrate
+        if(navigator.vibrate) navigator.vibrate(50);
+
+        const container = document.getElementById('cl-notif-container');
+        const notif = document.createElement('div');
+        notif.className = 'cl-toast';
+        
+        const pfp = user.photoURL || 'https://via.placeholder.com/150';
+        const name = user.name || user.username || "User";
+        // Handle "Like" messages or images
+        let msgText = chat.lastMessage || "New Message";
+        if(msgText.includes('<svg') || msgText.includes('Sent a photo')) msgText = "Sent a photo 📷";
+
+        const time = "Now";
+        const verifiedBadge = user.verified ? `<img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="cl-toast-verified">` : '';
+
+        notif.innerHTML = `
+            <img src="${pfp}" class="cl-toast-pfp">
+            <div class="cl-toast-content">
+                <div class="cl-toast-header">
+                    <div class="cl-toast-name">${name} ${verifiedBadge}</div>
+                    <div class="cl-toast-time">${time}</div>
+                </div>
+                <div class="cl-toast-msg">${msgText}</div>
+            </div>
+        `;
+
+        // Click interaction
+        notif.onclick = () => {
+            if(navigator.vibrate) navigator.vibrate(10);
+            window.location.href = `chat.html?user=${user.username}`;
+        };
+
+        container.appendChild(notif);
+
+        // Animate In (Next Frame)
+        requestAnimationFrame(() => notif.classList.add('show'));
+
+        // Remove after 4 seconds
+        setTimeout(() => {
+            notif.classList.remove('show');
+            setTimeout(() => { if(notif.parentNode) notif.remove(); }, 500); // Wait for transition
+        }, 4000);
     }
 
     async fetchAndCacheUser(uid) {
