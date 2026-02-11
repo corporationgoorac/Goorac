@@ -5,7 +5,7 @@ class ChatLoader extends HTMLElement {
         // --- ⚙️ CONFIGURATION (Change Here) ---
         this.config = {
             // Professional 'Ding' Sound
-            soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2346/2346-preview.mp3', 
+            soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', 
             // Notification Background (Glassmorphism Black)
             themeColor: 'rgba(15, 15, 15, 0.92)',
             // Text Color for App Name
