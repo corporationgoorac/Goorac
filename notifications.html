@@ -161,16 +161,6 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 0. INSTANT HTML CACHE LOAD ---
-    (function loadHTMLCache() {
-        try {
-            const cachedHTML = localStorage.getItem('goorac_notif_html');
-            if (cachedHTML && cachedHTML.trim().length > 0) {
-                document.getElementById('notif-list').innerHTML = cachedHTML;
-            }
-        } catch(e) { console.log('Cache access failed'); }
-    })();
-
     if (window.initFirebaseCore) {
         window.initFirebaseCore();
     }
@@ -186,7 +176,10 @@
     let notificationsMap = new Map(); 
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
+    
+    // Dynamic Keys
     let READ_KEY = "goorac_read_notifs"; 
+    let DATA_KEY = "goorac_data_notifs";
     
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
 
@@ -217,7 +210,7 @@
         markNotificationRead(el.dataset.id);
         readObserver.unobserve(el);
         delete el.dataset.readTimer;
-        updateHTMLCache();
+        // updateHTMLCache removed - we use data cache now
     }
 
     function markNotificationRead(id) {
@@ -241,35 +234,34 @@
             markNotificationRead(el.dataset.id);
             readObserver.unobserve(el);
         });
-        updateHTMLCache();
     }
 
-    function updateHTMLCache() {
-        setTimeout(() => {
-            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
-        }, 50);
+    // Save Data to LocalStorage (The Source of Truth)
+    function persistDataCache() {
+        if(!myUid) return;
+        const allData = Array.from(notificationsMap.values());
+        // Sort before saving to ensure order
+        allData.sort((a, b) => b.timestamp - a.timestamp);
+        // Limit cache size to avoid bloat (e.g., last 100 items)
+        const toSave = allData.slice(0, 100);
+        localStorage.setItem(DATA_KEY, JSON.stringify(toSave));
     }
 
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
+            DATA_KEY = `goorac_data_${myUid}`;
 
-            if(window.loadFromCache) {
-                 const cachedData = window.loadFromCache(`notifs_${myUid}`);
-                 if(cachedData) {
-                     cachedData.forEach(item => notificationsMap.set(item.dedupeKey, item));
-                     if(!document.getElementById('notif-list').hasChildNodes()) {
-                        renderList();
-                     }
-                 }
-            }
+            // 1. INSTANT LOAD FROM LOCAL STORAGE DATA
+            loadFromDataCache();
 
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 if(doc.exists) {
                     const data = doc.data();
                     myFollowingList = (data.following || []).map(f => typeof f === 'string' ? f : f.uid);
                     isFollowingLoaded = true;
+                    // Re-render only to update button states, don't reshuffle list
                     renderList();
                 }
             });
@@ -280,27 +272,41 @@
         }
     });
 
+    function loadFromDataCache() {
+        try {
+            const cachedJson = localStorage.getItem(DATA_KEY);
+            if (cachedJson) {
+                const parsed = JSON.parse(cachedJson);
+                parsed.forEach(item => notificationsMap.set(item.dedupeKey, item));
+                renderList();
+            }
+        } catch(e) { console.log('Data cache error', e); }
+    }
+
     function initListeners() {
         // LIKES LISTENER
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
             .onSnapshot(snapshot => {
-                let hasChanges = false;
+                let hasNewData = false;
                 snapshot.forEach(doc => {
                     const noteData = doc.data();
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const dedupeKey = `like_${liker.uid}_${doc.id}`; 
-                            if(!notificationsMap.has(dedupeKey)) hasChanges = true;
+                            
+                            // CHECK LOCAL STORAGE (MAP) BEFORE UPDATING
+                            if(notificationsMap.has(dedupeKey)) return; // Skip if exists
 
+                            hasNewData = true;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const u = userCache[liker.uid] || {};
 
                             notificationsMap.set(dedupeKey, {
                                 dedupeKey: dedupeKey,
-                                id: `${dedupeKey}_${timeMillis}`,
+                                id: `${dedupeKey}_${timeMillis}`, // Stable ID
                                 type: 'like',
                                 senderId: liker.uid,
                                 senderName: u.name || liker.displayName || "Someone",
@@ -319,14 +325,17 @@
                         });
                     }
                 });
-                if(hasChanges) renderList();
+                if(hasNewData) {
+                    persistDataCache(); // Update Cache
+                    renderList();       // Update UI
+                }
             });
 
         // FOLLOWERS LISTENER
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                let hasChanges = false;
+                let hasNewData = false;
                 if (data.followers && Array.isArray(data.followers)) {
                     data.followers.forEach(f => {
                         if (typeof f !== 'object' || !f.timestamp) return;
@@ -334,9 +343,14 @@
                         const ts = f.timestamp; 
                         const timeMillis = ts.toMillis ? ts.toMillis() : ts;
                         const dedupeKey = `follow_${uid}`;
-                        if(!notificationsMap.has(dedupeKey)) hasChanges = true;
+                        
+                        // CHECK LOCAL STORAGE (MAP) BEFORE UPDATING
+                        if(notificationsMap.has(dedupeKey)) return; // Skip if exists
+
+                        hasNewData = true;
                         const u = userCache[uid] || {};
                         if(!u.name) fetchUserInfo(uid);
+                        
                         notificationsMap.set(dedupeKey, {
                             dedupeKey: dedupeKey,
                             id: `${dedupeKey}_${timeMillis}`,
@@ -351,7 +365,10 @@
                         });
                     });
                 }
-                if(hasChanges) renderList();
+                if(hasNewData) {
+                    persistDataCache();
+                    renderList();
+                }
             }
         });
     }
@@ -367,6 +384,7 @@
                     verified: uData.verified || false
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                // Only update if map has this user, to fix name/pic
                 const dedupeKey = `follow_${uid}`;
                 if(notificationsMap.has(dedupeKey)) {
                     const item = notificationsMap.get(dedupeKey);
@@ -374,6 +392,7 @@
                     item.senderUsername = userCache[uid].username; 
                     item.senderPic = userCache[uid].photoURL;
                     item.isVerified = userCache[uid].verified;
+                    persistDataCache();
                     renderList();
                 }
             }
@@ -395,15 +414,16 @@
             
             // Only show data from last 1 day
             const filteredByTime = allNotifs.filter(n => n.timestamp >= oneDayAgo);
-            filteredByTime.sort((a, b) => b.timestamp - a.timestamp);
+            filteredByTime.sort((a, b) => b.timestamp - a.timestamp); // Ensure sorted new->old
 
+            // LOAD READ STATUS FRESH
             let readIds = [];
             try {
                 const rawReads = localStorage.getItem(READ_KEY);
                 if (rawReads) readIds = JSON.parse(rawReads);
             } catch(e){}
-            
             const readSet = new Set(readIds);
+            
             const filtered = filteredByTime.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
             if (filtered.length === 0) {
@@ -412,22 +432,24 @@
                 return;
             }
 
+            // SMART RENDER (Optional Optimization: Could use DOM diffing, but innerHTML is safe for now with cache)
             list.innerHTML = '';
-            const renderLimit = Math.min(displayedCount + BATCH_SIZE, filtered.length);
             
+            const renderLimit = Math.min(displayedCount + BATCH_SIZE, filtered.length);
+            if (displayedCount === 0 && renderLimit > 0) displayedCount = BATCH_SIZE; // Init default
+
             for(let i=0; i < renderLimit; i++) {
+                // Determine read status based on ID Match
                 const isRead = readSet.has(filtered[i].id);
                 list.appendChild(createNotificationElement(filtered[i], isRead));
             }
 
-            displayedCount = renderLimit;
+            // Update displayed count var logic
+            if (renderLimit > displayedCount) displayedCount = renderLimit;
+            
             loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
 
-            if(currentFilter === 'all') {
-                if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, allNotifs);
-                localStorage.setItem('goorac_notif_html', list.innerHTML);
-            }
-        }, 100); 
+        }, 50); 
     }
 
     function createNotificationElement(notif, isRead) {
@@ -447,7 +469,7 @@
             if(dot) dot.style.display = 'none';
             
             readObserver.unobserve(this);
-            updateHTMLCache();
+            // No need to update HTML cache string, we rely on DATA cache + ReadKey
 
             if(notif.senderUsername) window.location.href = `userProfile.html?user=${notif.senderUsername}`;
         };
