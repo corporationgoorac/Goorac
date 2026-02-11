@@ -619,21 +619,42 @@ class ViewNotes extends HTMLElement {
                         });
                         
                         if (this.currentNote.uid !== user.uid) {
-                            await this.db.collection('notifications').add({
-                                recipientId: this.currentNote.uid,
+                            // --- ROBUST NOTIFICATION LOGIC START ---
+                            const notifRef = this.db.collection('notifications').doc();
+                            const batch = this.db.batch();
+
+                            // 1. Create Detailed Notification (For Read Limit Efficiency)
+                            batch.set(notifRef, {
                                 type: 'like',
-                                senderId: user.uid,
-                                senderName: userData.name || user.displayName,
-                                senderPic: userData.photoURL || user.photoURL,
-                                isVerified: userData.verified || false,
+                                toUid: this.currentNote.uid,
+                                fromUid: user.uid,
+                                
+                                // Sender Details Snapshot
+                                senderName: userData.name || user.displayName || 'User',
+                                senderPfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/65',
+                                isSenderVerified: userData.verified || false,
+
+                                // Note Details Snapshot (Colors, Text, etc.)
+                                noteId: this.currentNote.id,
+                                noteText: this.currentNote.text || '',
+                                noteBgColor: this.currentNote.bgColor || '#262626',
+                                noteTextColor: this.currentNote.textColor || '#fff',
+                                noteFont: this.currentNote.font || 'system-ui',
+                                noteTextAlign: this.currentNote.textAlign || 'center',
+                                noteSongName: this.currentNote.songName || null,
+                                
                                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                noteData: {
-                                    text: this.currentNote.text,
-                                    bgColor: this.currentNote.bgColor,
-                                    textColor: this.currentNote.textColor,
-                                    songName: this.currentNote.songName
-                                }
+                                isSeen: false
                             });
+
+                            // 2. Increment Unread Count on Receiver Profile (For Red Dot)
+                            const receiverRef = this.db.collection('users').doc(this.currentNote.uid);
+                            batch.update(receiverRef, {
+                                unreadCount: firebase.firestore.FieldValue.increment(1)
+                            });
+
+                            await batch.commit();
+                            // --- ROBUST NOTIFICATION LOGIC END ---
                         }
 
                     } else {
