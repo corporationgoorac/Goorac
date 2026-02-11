@@ -134,14 +134,19 @@ class ChatLoader extends HTMLElement {
                         needsInboxUpdate = true;
                     }
 
-                    // 2. CACHE MESSAGES: If this is a new/modified chat, fetch its latest messages
-                    // We only do this for "modified" (new msg) or "added" (new chat) events
+                    // 2. SMART CACHING (The Fix for 109k Reads)
                     if (change.type === 'added' || change.type === 'modified') {
-                         // Check if we should pre-fetch (Optimization: Don't fetch for very old stale chats)
-                         const isRecent = chatData.lastTimestamp && (Date.now() - chatData.lastTimestamp.toMillis()) < (7 * 24 * 60 * 60 * 1000); // 7 days
+                         const lastKnownTime = localStorage.getItem(`chat_time_${chatId}`);
+                         const serverTime = chatData.lastTimestamp ? chatData.lastTimestamp.toMillis() : 0;
                          
-                         if (isRecent || this.pinnedChats.includes(chatId)) {
-                             this.prefetchChatMessages(chatId);
+                         // ONLY fetch if the server has newer data than what we have locally
+                         // This prevents re-fetching 20 messages every time the page loads
+                         if (!lastKnownTime || serverTime > Number(lastKnownTime)) {
+                             const isRecent = (Date.now() - serverTime) < (7 * 24 * 60 * 60 * 1000); // 7 days
+                             
+                             if (isRecent || this.pinnedChats.includes(chatId)) {
+                                 this.prefetchChatMessages(chatId, serverTime); // Pass serverTime to save it later
+                             }
                          }
 
                          // NEW: TRIGGER NOTIFICATION POPUP
@@ -254,7 +259,8 @@ class ChatLoader extends HTMLElement {
     }
 
     // 3. Pre-fetch the actual messages for chat.html
-    async prefetchChatMessages(chatId) {
+    // UPDATED: Now saves timestamp to prevent re-fetching on next load
+    async prefetchChatMessages(chatId, timestamp) {
         try {
             const snap = await firebase.firestore().collection("chats").doc(chatId).collection("messages")
                 .orderBy("timestamp", "desc")
@@ -279,6 +285,11 @@ class ChatLoader extends HTMLElement {
                 msgsToSave.sort((a, b) => new Date(a.timestampIso) - new Date(b.timestampIso));
 
                 localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(msgsToSave));
+                
+                // CRITICAL: Save the timestamp so we don't fetch again until it changes
+                if(timestamp) {
+                    localStorage.setItem(`chat_time_${chatId}`, timestamp);
+                }
                 // console.log(`⚡ BG Loader: Updated cache for ${chatId}`);
             }
         } catch (e) {
