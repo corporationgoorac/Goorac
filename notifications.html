@@ -19,32 +19,43 @@
             --bg: #000000;
             --surface: #121212;
             --surface-elevated: #1e1e1e;
-            --accent: #0a84ff; /* iOS Blue */
+            --accent: #0095f6;
             --text-primary: #ffffff;
-            --text-secondary: #8e8e93;
-            --border: #2c2c2e;
-            --unread-tint: rgba(10, 132, 255, 0.08);
-            --danger: #ff453a;
+            --text-secondary: #a8a8a8;
+            --border: #262626;
+            --unread-tint: rgba(0, 149, 246, 0.08);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background: var(--bg); color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0; 
-            padding-top: 110px; /* Header + Tabs */
-            padding-bottom: 40px;
+            padding-top: 108px; /* Header + Tabs */
+            padding-bottom: 30px;
             overflow-x: hidden;
             overscroll-behavior-y: none;
         }
 
+        /* --- ERROR TOAST --- */
+        #error-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: #ff3b30; color: white; 
+            padding: 12px 24px; border-radius: 50px; 
+            z-index: 9999; font-size: 0.9rem; font-weight: 600;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        #error-toast.show { transform: translateX(-50%) translateY(0); }
+
         /* --- HEADER --- */
         .header {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.85); 
-            z-index: 100; padding: 0 16px; height: 56px;
-            border-bottom: 0.5px solid var(--border);
+            background: rgba(0,0,0,0.9); 
+            z-index: 100; padding: 0 16px; height: 54px;
+            border-bottom: 1px solid var(--border);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             display: flex; align-items: center; justify-content: space-between;
         }
@@ -52,162 +63,149 @@
         .header-left { display: flex; align-items: center; gap: 12px; }
 
         .back-btn {
-            background: rgba(255,255,255,0.1); border: none; color: white;
-            width: 36px; height: 36px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: background 0.2s;
+            background: none; border: none; color: white;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; padding: 0;
         }
-        .back-btn:active { background: rgba(255,255,255,0.2); }
 
         .header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
         
         .mark-read-btn {
-            font-size: 0.8rem; color: var(--accent); font-weight: 600;
+            font-size: 0.85rem; color: var(--accent); font-weight: 600;
             cursor: pointer; background: transparent; padding: 8px 4px;
         }
 
         /* --- TABS --- */
         .tabs-container {
-            position: fixed; top: 56px; left: 0; width: 100%;
+            position: fixed; top: 54px; left: 0; width: 100%;
             background: rgba(0,0,0,0.92); z-index: 99;
-            display: flex; height: 50px;
-            border-bottom: 0.5px solid var(--border);
+            display: flex; height: 54px;
+            border-bottom: 1px solid var(--border);
             backdrop-filter: blur(20px);
         }
         .tab {
             flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);
+            font-size: 0.95rem; font-weight: 600; color: var(--text-secondary);
             cursor: pointer; position: relative; transition: color 0.2s;
         }
         .tab.active { color: #fff; }
         .tab.active::after {
             content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 50%; height: 3px; background: var(--accent); border-radius: 2px 2px 0 0;
+            width: 50%; height: 2px; background: #fff; border-radius: 2px 2px 0 0;
         }
 
-        /* --- NOTIFICATION LIST --- */
+        /* --- LIST --- */
         .notif-list { width: 100%; max-width: 600px; margin: 0 auto; min-height: 60vh; }
 
         .notif-item {
-            display: flex; align-items: flex-start; gap: 14px;
-            padding: 16px; position: relative;
+            display: flex; flex-direction: row; /* Enforce row */
+            align-items: flex-start; /* Align top */
+            gap: 14px; padding: 14px 16px; position: relative;
             background: transparent; transition: background 0.2s;
-            border-bottom: 0.5px solid rgba(255,255,255,0.05);
             cursor: pointer;
         }
-        .notif-item:active { background: rgba(255,255,255,0.05); }
+        .notif-item:active { background: rgba(255,255,255,0.04); }
         .notif-item.unread { background: var(--unread-tint); }
-        
-        /* Unread Indicator Dot */
         .notif-item.unread::before {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0;
             width: 3px; background: var(--accent);
         }
 
-        /* Profile & Badges */
-        .notif-pfp-wrapper { position: relative; flex-shrink: 0; }
+        /* Profile Pic */
+        .notif-pfp-wrapper { position: relative; flex-shrink: 0; padding-top: 2px; }
         .notif-pfp {
-            width: 46px; height: 46px; border-radius: 50%; 
-            object-fit: cover; background: var(--surface-elevated);
-            border: 1px solid rgba(255,255,255,0.1);
+            width: 44px; height: 44px; border-radius: 50%; 
+            object-fit: cover; background: #222; border: 1px solid var(--border);
         }
-        .icon-badge {
+        
+        /* Mini Type Badge */
+        .type-badge {
             position: absolute; bottom: -2px; right: -2px;
-            width: 20px; height: 20px; border-radius: 50%;
+            width: 18px; height: 18px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            border: 2px solid var(--bg); color: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            border: 2px solid #000; color: #fff;
         }
-        .icon-like { background: #ff2d55; }
+        .icon-like { background: #ff3040; }
         .icon-follow { background: #5856d6; }
-        .icon-badge svg { width: 11px; height: 11px; fill: white; }
+        .type-badge svg { width: 10px; height: 10px; fill: white; }
 
-        /* Text Content */
-        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 2px; }
+        /* Content Area */
+        .notif-content { flex: 1; display: flex; flex-direction: column; min-width: 0; justify-content: center; }
         
-        .notif-text { 
-            font-size: 0.95rem; line-height: 1.4; color: var(--text-primary); 
+        .text-wrapper {
+            font-size: 0.95rem; line-height: 1.4; color: var(--text-primary);
         }
-        .username { font-weight: 700; color: #fff; margin-right: 4px; }
-        .v-badge { width: 14px; height: 14px; vertical-align: -3px; }
-        
-        .time-ago { font-size: 0.8rem; color: var(--text-secondary); display: block; margin-top: 4px; }
 
-        /* Note Preview Card */
+        /* Name Alignment Fix */
+        .name-wrapper {
+            display: inline-flex; align-items: center; gap: 4px;
+            vertical-align: top;
+        }
+        .username { font-weight: 700; color: #fff; }
+        .v-badge { width: 14px; height: 14px; display: block; }
+
+        .time-ago { font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px; }
+
+        /* Note Preview (The "Goorac Quantum" look) */
         .note-preview {
-            margin-top: 10px; 
-            padding: 12px 16px; 
-            border-radius: 14px;
-            background: var(--surface-elevated);
-            border: 1px solid rgba(255,255,255,0.08);
+            margin-top: 8px; padding: 12px 16px; border-radius: 14px;
+            background: linear-gradient(135deg, rgba(32,32,32,1) 0%, rgba(20,20,20,1) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
             width: fit-content; max-width: 100%;
             display: flex; flex-direction: column; align-items: center;
-            position: relative; overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        
         .note-text {
             font-family: system-ui; text-align: center; font-weight: 600; font-size: 0.9rem;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-            line-height: 1.35; color: rgba(255,255,255,0.95);
-            text-shadow: 0 1px 10px rgba(0,0,0,0.2);
+            line-height: 1.35; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        
         .song-badge {
             display: flex; align-items: center; gap: 5px; margin-top: 8px;
-            background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 100px;
-            font-size: 0.75rem; color: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px;
+            font-size: 0.75rem; color: rgba(255,255,255,0.9);
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* View Button */
+        /* Action Button */
+        .action-container { 
+            display: flex; align-items: center; justify-content: center; 
+            margin-left: 10px; align-self: center; 
+        }
         .view-btn {
             background: var(--surface-elevated); border: 1px solid var(--border);
             color: #fff; font-size: 0.85rem; font-weight: 600;
-            padding: 8px 18px; border-radius: 20px;
-            cursor: pointer; align-self: center; margin-left: 10px; flex-shrink: 0;
+            padding: 6px 16px; border-radius: 8px;
+            cursor: pointer; white-space: nowrap;
         }
 
-        /* States */
-        .empty-state { 
-            display: flex; flex-direction: column; align-items: center; 
-            padding: 80px 20px; color: var(--text-secondary); text-align: center; 
-        }
-        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; filter: grayscale(1); }
+        /* Skeletons */
+        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; }
+        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.08); }
+        .sk-pfp { width: 44px; height: 44px; border-radius: 50%; }
+        .sk-line { height: 12px; border-radius: 6px; width: 60%; margin-bottom: 6px; }
+        .sk-line.short { width: 40%; }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
+
+        .empty-state { text-align: center; padding: 100px 20px; color: var(--text-secondary); }
+        .empty-icon { font-size: 40px; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
         
         #scroll-spinner {
-            height: 60px; display: flex; align-items: center; justify-content: center;
+            height: 50px; display: flex; align-items: center; justify-content: center;
             opacity: 0; transition: opacity 0.3s;
         }
         #scroll-spinner.show { opacity: 1; }
         .spinner {
             width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.2);
-            border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+            border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Skeletons */
-        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; }
-        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.08); }
-        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
-
-        /* Error Toast */
-        #error-toast {
-            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px);
-            background: rgba(255, 59, 48, 0.95); color: white; 
-            padding: 12px 24px; border-radius: 30px;
-            font-weight: 600; font-size: 0.9rem; z-index: 2000;
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 8px;
-            backdrop-filter: blur(10px);
-        }
-        #error-toast.visible { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
 
 <div id="error-toast">
-    <span>⚠️</span> <span id="error-text">Something went wrong</span>
+    <span>⚠️</span> <span id="error-msg">Error</span>
 </div>
 
 <div class="header">
@@ -217,7 +215,7 @@
         </button>
         <h1>Activity</h1>
     </div>
-    <div class="mark-read-btn" onclick="markAllAsRead()">Mark read</div>
+    <div class="mark-read-btn" onclick="markAllAsRead()">Mark all read</div>
 </div>
 
 <div class="tabs-container">
@@ -228,17 +226,17 @@
 
 <div class="notif-list" id="notif-list">
     <div class="skeleton-wrapper">
-        <div class="skeleton" style="width:46px; height:46px; border-radius:50%;"></div>
-        <div style="flex:1;">
-            <div class="skeleton" style="width:60%; height:14px; border-radius:6px; margin-bottom:8px;"></div>
-            <div class="skeleton" style="width:40%; height:12px; border-radius:6px;"></div>
+        <div class="skeleton sk-pfp"></div>
+        <div style="flex:1">
+            <div class="skeleton sk-line"></div>
+            <div class="skeleton sk-line short"></div>
         </div>
     </div>
     <div class="skeleton-wrapper">
-        <div class="skeleton" style="width:46px; height:46px; border-radius:50%;"></div>
-        <div style="flex:1;">
-            <div class="skeleton" style="width:50%; height:14px; border-radius:6px; margin-bottom:8px;"></div>
-            <div class="skeleton" style="width:30%; height:12px; border-radius:6px;"></div>
+        <div class="skeleton sk-pfp"></div>
+        <div style="flex:1">
+            <div class="skeleton sk-line" style="width:50%"></div>
+            <div class="skeleton sk-line short"></div>
         </div>
     </div>
 </div>
@@ -248,23 +246,22 @@
 </div>
 
 <script>
-    // --- UTILITIES ---
+    // --- 1. CONFIG & UTILS ---
     function showError(msg) {
         const t = document.getElementById('error-toast');
-        document.getElementById('error-text').innerText = msg;
-        t.classList.add('visible');
-        setTimeout(() => t.classList.remove('visible'), 4000);
+        document.getElementById('error-msg').innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 4000);
     }
 
-    // --- FIREBASE INIT ---
     if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- STATE ---
+    // --- 2. STATE ---
     let currentUser = null;
-    let rawNotifications = []; // Stores combined raw data
-    let userCache = {}; // Local cache for user profiles { uid: {username, pfp, verified...} }
+    let rawNotifications = [];
+    let userCache = {}; // { uid: { name, username, verified, pfp } }
     let currentTab = 'all';
     let limitCount = 10;
     let isLoading = false;
@@ -277,7 +274,7 @@
         user: `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`
     };
 
-    // --- AUTH ---
+    // --- 3. AUTH & INIT ---
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
@@ -289,7 +286,7 @@
         }
     });
 
-    // --- 1. LISTENERS ---
+    // --- 4. LISTENERS ---
     function setupListeners(limit) {
         if (!currentUser) return;
         isLoading = true;
@@ -300,60 +297,52 @@
         let followsTemp = [];
         let likesTemp = [];
 
-        // Listener A: Follows
+        // Follows
         followsUnsub = db.collection("users").doc(currentUser.uid).collection("notifications")
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 followsTemp = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'sub' }));
-                mergeAndEnrich(followsTemp, likesTemp);
+                mergeAndFetchProfiles(followsTemp, likesTemp);
             });
 
-        // Listener B: Likes
+        // Likes
         likesUnsub = db.collection("notifications")
             .where("toUid", "==", currentUser.uid)
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 likesTemp = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'root' }));
-                mergeAndEnrich(followsTemp, likesTemp);
+                mergeAndFetchProfiles(followsTemp, likesTemp);
             });
     }
 
-    // --- 2. DATA PROCESSING (The Core Logic) ---
-    async function mergeAndEnrich(follows, likes) {
-        // A. Merge & Sort
-        rawNotifications = [...follows, ...likes].sort((a,b) => {
-            return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
-        });
+    // --- 5. DATA FETCHING (REALTIME PROFILE SYNC) ---
+    async function mergeAndFetchProfiles(follows, likes) {
+        // 1. Merge & Sort
+        rawNotifications = [...follows, ...likes].sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-        // B. Identify Missing Users
+        // 2. Identify UIDs needing fetch
         const uidsToFetch = new Set();
         rawNotifications.forEach(n => {
-            // Determine the "Sender UID"
-            const uid = n.fromUid || n.uid || n.senderUid; 
-            if (uid && !userCache[uid]) {
-                uidsToFetch.add(uid);
-            }
+            const uid = n.fromUid || n.uid || n.senderUid;
+            if (uid && !userCache[uid]) uidsToFetch.add(uid);
         });
 
-        // C. Bulk Fetch Profiles
+        // 3. Fetch Missing Profiles
         if (uidsToFetch.size > 0) {
             const promises = Array.from(uidsToFetch).map(uid => 
                 db.collection('users').doc(uid).get().then(doc => {
                     if (doc.exists) userCache[uid] = doc.data();
-                    else userCache[uid] = { username: 'Unknown', name: 'User' }; // Fallback
-                }).catch(() => {
-                    userCache[uid] = { username: 'Unknown' }; 
-                })
+                    else userCache[uid] = { name: 'User', username: 'unknown' };
+                }).catch(() => userCache[uid] = { name: 'User' })
             );
             await Promise.all(promises);
         }
 
-        // D. Render Final UI
         isLoading = false;
         render();
     }
 
-    // --- 3. RENDER UI ---
+    // --- 6. RENDER LOGIC ---
     function render() {
         const list = document.getElementById('notif-list');
         
@@ -362,12 +351,7 @@
         else if (currentTab === 'follows') filtered = rawNotifications.filter(n => n.type === 'follow');
 
         if (filtered.length === 0) {
-            list.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">🔔</div>
-                    <h3>No new activity</h3>
-                    <p>When people interact with you, it will show up here.</p>
-                </div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">💤</div><h3>No activity</h3><p>It's quiet in here.</p></div>`;
             return;
         }
 
@@ -378,12 +362,15 @@
             const type = n.type || 'unknown';
             const uid = n.fromUid || n.uid || n.senderUid;
             
-            // --- DATA SOURCE: PREFER CACHE, FALLBACK TO NOTIF DATA ---
+            // --- PROFILE DATA SOURCE (Realtime > Notification Data) ---
             const profile = userCache[uid] || {};
             
-            const username = profile.username || n.fromUsername || n.senderName || 'User';
-            const pfp = profile.photoURL || n.senderPfp || n.fromPhoto || 'https://via.placeholder.com/150';
-            const isVerified = profile.verified === true || n.isSenderVerified === true;
+            // Priority: Realtime Name > Notification Sender Name > Username
+            const displayName = profile.name || profile.displayName || n.senderName || profile.username || 'User';
+            // Username for URL (no spaces)
+            const handle = profile.username || n.fromUsername || 'user'; 
+            const pfp = profile.photoURL || n.senderPfp || 'https://via.placeholder.com/150';
+            const isVerified = profile.verified === true; 
 
             const item = document.createElement('div');
             item.className = `notif-item ${!isRead ? 'unread' : ''}`;
@@ -392,13 +379,17 @@
             let contentHtml = '';
             let actionHtml = '';
 
-            // --- LIKE LAYOUT ---
+            // --- LIKE NOTIFICATION ---
             if (type === 'like') {
-                iconBadge = `<div class="icon-badge icon-like">${ICONS.heart}</div>`;
+                iconBadge = `<div class="type-badge icon-like">${ICONS.heart}</div>`;
+                
                 contentHtml = `
-                    <div class="notif-text">
-                        <span class="username">${escapeHtml(username)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
-                        liked your note.
+                    <div class="text-wrapper">
+                        <div class="name-wrapper">
+                            <span class="username">${escapeHtml(displayName)}</span>
+                            ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}
+                        </div>
+                        <span style="color:var(--text-secondary);">liked your note.</span>
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
                     ${n.noteText ? `
@@ -409,17 +400,22 @@
                     ` : ''}
                 `;
             } 
-            // --- FOLLOW LAYOUT ---
+            // --- FOLLOW NOTIFICATION ---
             else if (type === 'follow') {
-                iconBadge = `<div class="icon-badge icon-follow">${ICONS.user}</div>`;
+                iconBadge = `<div class="type-badge icon-follow">${ICONS.user}</div>`;
+                
                 contentHtml = `
-                    <div class="notif-text">
-                        <span class="username">${escapeHtml(username)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
-                        started following you.
+                    <div class="text-wrapper">
+                        <div class="name-wrapper">
+                            <span class="username">${escapeHtml(displayName)}</span>
+                            ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}
+                        </div>
+                        <span style="color:var(--text-secondary);">started following you.</span>
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
                 `;
-                actionHtml = `<button class="view-btn">View</button>`;
+                
+                actionHtml = `<div class="action-container"><button class="view-btn">View</button></div>`;
             }
 
             item.innerHTML = `
@@ -431,22 +427,24 @@
                 ${actionHtml}
             `;
 
-            // CLICK HANDLER - Redirect using verified cached username
+            // Click Handler
             item.onclick = (e) => {
                 if (e.target.classList.contains('view-btn')) e.stopPropagation();
-                handleRedirect(n, profile.username);
+                handleRedirect(n, handle);
             };
-            if(actionHtml) {
-                const btn = item.querySelector('.view-btn');
-                btn.onclick = (e) => { e.stopPropagation(); handleRedirect(n, profile.username); };
+            if (actionHtml) {
+                item.querySelector('.view-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    handleRedirect(n, handle);
+                };
             }
 
             list.appendChild(item);
         });
     }
 
-    // --- 4. REDIRECT LOGIC ---
-    function handleRedirect(n, cachedUsername) {
+    // --- 7. REDIRECT ---
+    function handleRedirect(n, username) {
         // Mark Read
         if (n.isRead !== true && n.isSeen !== true) {
             const ref = n._collection === 'root' 
@@ -455,24 +453,15 @@
             ref.update(n._collection === 'root' ? {isSeen:true} : {isRead:true}).catch(()=>{});
         }
 
-        // Determine Redirect Target
-        // 1. Cached Real-Time Username (Best)
-        let target = cachedUsername;
-
-        // 2. Notification Data Fallback
-        if (!target) target = n.username || n.fromUsername || n.senderUsername;
-        
-        // 3. UID Fallback (Last Resort)
-        if (!target) target = n.fromUid || n.uid;
-
-        if (target) {
-            window.location.href = `userProfile.html?user=${target}`;
+        // Navigate using verified username
+        if (username) {
+            window.location.href = `userProfile.html?user=${username}`;
         } else {
             showError("Profile not found");
         }
     }
 
-    // --- 5. HELPERS ---
+    // --- 8. HELPERS ---
     function switchTab(t) {
         currentTab = t;
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
