@@ -555,7 +555,7 @@
         }
     }
 
-    // --- FIXED FOLLOW LOGIC ---
+    // --- FIXED FOLLOW LOGIC (UPDATED WITH ADVANCED LOGIC) ---
     async function handleFollow() {
         if(!targetUid || !myUid || isProcessing) return;
         const btn = document.getElementById('btn-follow');
@@ -572,58 +572,91 @@
         if(navigator.vibrate) navigator.vibrate(15);
 
         try {
-            await db.runTransaction(async (t) => {
-                const myRef = db.collection("users").doc(myUid);
-                const theirRef = db.collection("users").doc(targetUid);
+            if (isCurrentlyFollowing) {
+                // --- UNFOLLOW ACTION (Advanced) ---
                 
-                const myD = await t.get(myRef);
-                const theirD = await t.get(theirRef);
-
-                if (!myD.exists || !theirD.exists) {
-                    throw "User document not found";
-                }
-
-                const myData = myD.data();
-                const theirData = theirD.data();
-
-                // Safe array access (Fixes the crash)
-                const myFing = myData.following || [];
-                const theirFing = theirData.followers || [];
-                
-                const ts = firebase.firestore.Timestamp.now();
-
-                if (!isCurrentlyFollowing) {
-                    // Follow
-                    t.update(myRef, { following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) });
-                    t.update(theirRef, { followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
+                // 1. Transaction to update counts and arrays
+                await db.runTransaction(async (t) => {
+                    const myRef = db.collection("users").doc(myUid);
+                    const theirRef = db.collection("users").doc(targetUid);
                     
-                    // --- ENHANCED NOTIFICATION SYSTEM ---
-                    // This creates a notification for the recipient in their personal notifications subcollection
+                    const myD = await t.get(myRef);
+                    const theirD = await t.get(theirRef);
+                    if (!myD.exists || !theirD.exists) throw "User doc missing";
+
+                    const myData = myD.data();
+                    const theirData = theirD.data();
+
+                    const newMyFing = (myData.following || []).filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const newTheirFing = (theirData.followers || []).filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
+                    
+                    t.update(myRef, { 
+                        following: newMyFing,
+                        followingCount: firebase.firestore.FieldValue.increment(-1)
+                    });
+                    t.update(theirRef, { 
+                        followers: newTheirFing,
+                        followerCount: firebase.firestore.FieldValue.increment(-1)
+                    });
+                });
+
+                // 2. Notification Cleanup (Outside Transaction)
+                try {
+                     const notifQuery = await db.collection("users").doc(targetUid)
+                         .collection("notifications")
+                         .where("fromUid", "==", myUid)
+                         .where("type", "==", "follow")
+                         .limit(1)
+                         .get();
+
+                     if (!notifQuery.empty) {
+                         const notifDoc = notifQuery.docs[0];
+                         const notifData = notifDoc.data();
+                         await notifDoc.ref.delete();
+                         
+                         if (notifData.isRead === false) {
+                             await db.collection("users").doc(targetUid).update({
+                                 unreadCount: firebase.firestore.FieldValue.increment(-1)
+                             });
+                         }
+                     }
+                } catch(err) { console.error("Cleanup notification failed:", err); }
+
+            } else {
+                // --- FOLLOW ACTION (Advanced) ---
+                
+                await db.runTransaction(async (t) => {
+                    const myRef = db.collection("users").doc(myUid);
+                    const theirRef = db.collection("users").doc(targetUid);
+                    const ts = firebase.firestore.Timestamp.now();
+                    const dateStr = new Date().toISOString();
+
+                    t.update(myRef, { 
+                        following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts, date: dateStr }),
+                        followingCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    
+                    t.update(theirRef, { 
+                        followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts, date: dateStr }),
+                        followerCount: firebase.firestore.FieldValue.increment(1),
+                        unreadCount: firebase.firestore.FieldValue.increment(1) // Increment Badge
+                    });
+                    
+                    // 3. Create Detailed Notification
                     const notifRef = db.collection("users").doc(targetUid).collection("notifications").doc();
                     t.set(notifRef, { 
-                        recipientId: targetUid, 
-                        senderId: myUid, 
+                        type: 'follow',
+                        fromUid: myUid,
                         fromUsername: currentUserProfileData ? currentUserProfileData.username : "Someone",
-                        fromPhoto: currentUserProfileData ? (currentUserProfileData.photoURL || "") : "",
-                        type: "follow", 
-                        content: "started following you.",
+                        fromName: currentUserProfileData ? (currentUserProfileData.name || currentUserProfileData.username) : "Someone",
+                        fromPhoto: currentUserProfileData ? (currentUserProfileData.photoURL || 'https://via.placeholder.com/150') : 'https://via.placeholder.com/150',
+                        content: `started following you.`,
                         timestamp: ts, 
                         isRead: false,
                         link: currentUserProfileData ? `userProfile.html?user=${currentUserProfileData.username}` : ""
                     });
-                    
-                    // Keep original placeholder if your other systems use the root collection
-                    const globalNotifRef = db.collection("notifications").doc();
-                    t.set(globalNotifRef, { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
-                } else {
-                    // Unfollow (Filter manually and update)
-                    const newMyFing = myFing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
-                    const newTheirFing = theirFing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
-                    
-                    t.update(myRef, { following: newMyFing });
-                    t.update(theirRef, { followers: newTheirFing });
-                }
-            });
+                });
+            }
             updateFollowButton(!isCurrentlyFollowing, false); 
         } catch (e) { 
             console.error("Follow Error:", e);
