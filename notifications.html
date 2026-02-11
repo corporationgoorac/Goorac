@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Notifications | Goorac</title>
+    <title>Activity | Goorac</title>
     
     <script src="config.js"></script>
     <link rel="manifest" href="/manifest.json">
@@ -18,213 +18,205 @@
         :root {
             --bg: #000000;
             --surface: #121212;
-            --surface-light: #1c1c1e;
-            --accent: #00d2ff;
-            --text: #ffffff;
-            --dim: #8e8e93;
+            --surface-elevated: #1e1e1e;
+            --accent: #0a84ff; /* iOS Blue */
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
             --border: #2c2c2e;
-            --unread-bg: rgba(0, 210, 255, 0.08);
+            --unread-tint: rgba(10, 132, 255, 0.08);
             --danger: #ff453a;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
-            background: var(--bg); color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            background: var(--bg); color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
             margin: 0; 
-            padding-top: 106px; /* Header (54) + Tabs (52) */
-            padding-bottom: 20px;
+            padding-top: 110px; /* Header + Tabs */
+            padding-bottom: 40px;
             overflow-x: hidden;
             overscroll-behavior-y: none;
         }
 
-        /* --- ERROR TOAST --- */
-        #error-toast {
-            position: fixed; top: 10px; left: 50%; transform: translateX(-50%) translateY(-100px);
-            background: rgba(255, 59, 48, 0.95); color: white; 
-            padding: 10px 20px; border-radius: 50px; 
-            z-index: 9999; font-size: 0.85rem; font-weight: 500;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            backdrop-filter: blur(10px);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: flex; align-items: center; gap: 8px; white-space: nowrap;
-        }
-        #error-toast.show { transform: translateX(-50%) translateY(0); }
-
         /* --- HEADER --- */
         .header {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.92); 
-            z-index: 100; padding: 0 12px; height: 54px;
-            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.85); 
+            z-index: 100; padding: 0 16px; height: 56px;
+            border-bottom: 0.5px solid var(--border);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+
         .back-btn {
-            background: none; border: none; color: white;
-            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: none; color: white;
+            width: 36px; height: 36px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: background 0.2s;
         }
-        .back-btn:active { background: rgba(255,255,255,0.1); }
+        .back-btn:active { background: rgba(255,255,255,0.2); }
 
-        .header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; flex: 1; letter-spacing: 0.3px; }
+        .header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
         
         .mark-read-btn {
             font-size: 0.8rem; color: var(--accent); font-weight: 600;
-            cursor: pointer; padding: 6px 12px; 
-            background: rgba(0, 210, 255, 0.1); border-radius: 16px;
-            transition: opacity 0.2s;
+            cursor: pointer; background: transparent; padding: 8px 4px;
         }
-        .mark-read-btn:active { opacity: 0.6; }
 
         /* --- TABS --- */
         .tabs-container {
-            position: fixed; top: 54px; left: 0; width: 100%;
+            position: fixed; top: 56px; left: 0; width: 100%;
             background: rgba(0,0,0,0.92); z-index: 99;
-            display: flex; border-bottom: 1px solid var(--border);
-            height: 52px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; height: 50px;
+            border-bottom: 0.5px solid var(--border);
+            backdrop-filter: blur(20px);
         }
         .tab {
             flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: 0.95rem; font-weight: 500; color: var(--dim);
+            font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);
             cursor: pointer; position: relative; transition: color 0.2s;
         }
-        .tab.active { color: #fff; font-weight: 600; }
+        .tab.active { color: #fff; }
         .tab.active::after {
             content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 40px; height: 3px; background: var(--accent); border-radius: 2px 2px 0 0;
+            width: 50%; height: 3px; background: var(--accent); border-radius: 2px 2px 0 0;
         }
 
-        /* --- LIST CONTAINER --- */
-        .notif-list { 
-            display: flex; flex-direction: column; width: 100%; 
-            max-width: 600px; margin: 0 auto; min-height: 60vh; 
-        }
+        /* --- NOTIFICATION LIST --- */
+        .notif-list { width: 100%; max-width: 600px; margin: 0 auto; min-height: 60vh; }
 
         .notif-item {
             display: flex; align-items: flex-start; gap: 14px;
             padding: 16px; position: relative;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
             background: transparent; transition: background 0.2s;
+            border-bottom: 0.5px solid rgba(255,255,255,0.05);
             cursor: pointer;
         }
+        .notif-item:active { background: rgba(255,255,255,0.05); }
+        .notif-item.unread { background: var(--unread-tint); }
         
-        .notif-item.unread { 
-            background: var(--unread-bg); 
-            border-left: 2px solid var(--accent);
+        /* Unread Indicator Dot */
+        .notif-item.unread::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+            width: 3px; background: var(--accent);
         }
-        .notif-item:active { background: rgba(255,255,255,0.03); }
 
-        .notif-pfp-wrapper { position: relative; flex-shrink: 0; margin-top: 2px; }
+        /* Profile & Badges */
+        .notif-pfp-wrapper { position: relative; flex-shrink: 0; }
         .notif-pfp {
-            width: 44px; height: 44px; border-radius: 50%; 
-            object-fit: cover; background: #1c1c1e; border: 1px solid rgba(255,255,255,0.1);
+            width: 46px; height: 46px; border-radius: 50%; 
+            object-fit: cover; background: var(--surface-elevated);
+            border: 1px solid rgba(255,255,255,0.1);
         }
-        .notif-icon-badge {
+        .icon-badge {
             position: absolute; bottom: -2px; right: -2px;
             width: 20px; height: 20px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            border: 2px solid #000; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            border: 2px solid var(--bg); color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
-        .notif-icon-badge svg { width: 11px; height: 11px; }
-        .icon-like { background: #ff3b30; }
-        .icon-follow { background: #00d2ff; }
+        .icon-like { background: #ff2d55; }
+        .icon-follow { background: #5856d6; }
+        .icon-badge svg { width: 11px; height: 11px; fill: white; }
 
-        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        /* Text Content */
+        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 2px; }
         
-        .notif-text { font-size: 0.95rem; line-height: 1.45; color: #e0e0e0; }
-        .notif-username { font-weight: 700; color: #fff; margin-right: 2px; }
-        
-        /* Verified Badge */
-        .v-badge { 
-            width: 14px; height: 14px; vertical-align: middle; 
-            margin-left: 3px; transform: translateY(-1px); 
+        .notif-text { 
+            font-size: 0.95rem; line-height: 1.4; color: var(--text-primary); 
         }
+        .username { font-weight: 700; color: #fff; margin-right: 4px; }
+        .v-badge { width: 14px; height: 14px; vertical-align: -3px; }
         
-        .notif-meta { font-size: 0.8rem; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+        .time-ago { font-size: 0.8rem; color: var(--text-secondary); display: block; margin-top: 4px; }
 
-        /* --- NOTE PREVIEW BUBBLE --- */
-        .notif-preview-box {
-            margin-top: 6px; padding: 12px 16px; border-radius: 16px;
-            font-size: 0.9rem; position: relative; overflow: hidden;
-            display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-            width: 100%; max-width: 320px; align-self: flex-start;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
+        /* Note Preview Card */
+        .note-preview {
+            margin-top: 10px; 
+            padding: 12px 16px; 
+            border-radius: 14px;
+            background: var(--surface-elevated);
             border: 1px solid rgba(255,255,255,0.08);
-            background-size: cover; background-position: center;
+            width: fit-content; max-width: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            position: relative; overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
-        .preview-note-text {
-            font-family: system-ui; text-align: center; font-weight: 600;
-            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-            line-height: 1.35; width: 100%;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        
+        .note-text {
+            font-family: system-ui; text-align: center; font-weight: 600; font-size: 0.9rem;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            line-height: 1.35; color: rgba(255,255,255,0.95);
+            text-shadow: 0 1px 10px rgba(0,0,0,0.2);
         }
-        .preview-song-tag {
-            display: flex; align-items: center; gap: 5px; margin-top: 10px;
-            font-size: 0.75rem; opacity: 0.95; background: rgba(0,0,0,0.3);
-            padding: 4px 10px; border-radius: 20px; color: rgba(255,255,255,1);
-            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* --- VIEW PROFILE BUTTON --- */
-        .view-profile-btn {
-            background: var(--surface-light); color: var(--text); 
-            border: 1px solid var(--border);
-            padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; margin-left: 10px; flex-shrink: 0; 
-            align-self: center; white-space: nowrap;
-            transition: all 0.2s;
-        }
-        .view-profile-btn:active { background: #333; transform: scale(0.95); }
-
-        .unread-dot {
-            width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            margin-top: 8px; flex-shrink: 0; box-shadow: 0 0 10px var(--accent);
+        
+        .song-badge {
+            display: flex; align-items: center; gap: 5px; margin-top: 8px;
+            background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 100px;
+            font-size: 0.75rem; color: rgba(255,255,255,0.85);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* LOAD MORE SPINNER */
-        #scroll-sentinel {
+        /* View Button */
+        .view-btn {
+            background: var(--surface-elevated); border: 1px solid var(--border);
+            color: #fff; font-size: 0.85rem; font-weight: 600;
+            padding: 8px 18px; border-radius: 20px;
+            cursor: pointer; align-self: center; margin-left: 10px; flex-shrink: 0;
+        }
+
+        /* States */
+        .empty-state { 
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 80px 20px; color: var(--text-secondary); text-align: center; 
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; filter: grayscale(1); }
+        
+        #scroll-spinner {
             height: 60px; display: flex; align-items: center; justify-content: center;
-            width: 100%; opacity: 0; transition: opacity 0.3s;
+            opacity: 0; transition: opacity 0.3s;
         }
-        #scroll-sentinel.visible { opacity: 1; }
+        #scroll-spinner.show { opacity: 1; }
         .spinner {
-            width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid var(--accent); border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.2);
+            border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
         }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* SKELETONS */
-        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; border-bottom: 1px solid var(--border); }
-        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.06); }
-        .sk-pfp { width: 44px; height: 44px; border-radius: 50%; }
-        .sk-content { flex: 1; }
-        .sk-line { height: 12px; border-radius: 6px; margin-bottom: 8px; width: 60%; }
-        .sk-line.short { width: 30%; }
+        /* Skeletons */
+        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; }
+        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.08); }
         @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
 
-        .empty-state { 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 80px 20px; color: var(--dim); text-align: center; 
+        /* Error Toast */
+        #error-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: rgba(255, 59, 48, 0.95); color: white; 
+            padding: 12px 24px; border-radius: 30px;
+            font-weight: 600; font-size: 0.9rem; z-index: 2000;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 8px;
+            backdrop-filter: blur(10px);
         }
-        .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
+        #error-toast.visible { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
 
 <div id="error-toast">
-    <span>⚠️</span> <span id="error-msg">Error occurred</span>
+    <span>⚠️</span> <span id="error-text">Something went wrong</span>
 </div>
 
 <div class="header">
-    <button class="back-btn" onclick="window.history.back()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-    </button>
-    <h1>Notifications</h1>
+    <div class="header-left">
+        <button class="back-btn" onclick="window.history.back()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1>Activity</h1>
+    </div>
     <div class="mark-read-btn" onclick="markAllAsRead()">Mark read</div>
 </div>
 
@@ -236,298 +228,298 @@
 
 <div class="notif-list" id="notif-list">
     <div class="skeleton-wrapper">
-        <div class="skeleton sk-pfp"></div>
-        <div class="sk-content">
-            <div class="skeleton sk-line"></div>
-            <div class="skeleton sk-line short"></div>
+        <div class="skeleton" style="width:46px; height:46px; border-radius:50%;"></div>
+        <div style="flex:1;">
+            <div class="skeleton" style="width:60%; height:14px; border-radius:6px; margin-bottom:8px;"></div>
+            <div class="skeleton" style="width:40%; height:12px; border-radius:6px;"></div>
         </div>
     </div>
     <div class="skeleton-wrapper">
-        <div class="skeleton sk-pfp"></div>
-        <div class="sk-content">
-            <div class="skeleton sk-line" style="width:50%"></div>
-            <div class="skeleton sk-line short"></div>
+        <div class="skeleton" style="width:46px; height:46px; border-radius:50%;"></div>
+        <div style="flex:1;">
+            <div class="skeleton" style="width:50%; height:14px; border-radius:6px; margin-bottom:8px;"></div>
+            <div class="skeleton" style="width:30%; height:12px; border-radius:6px;"></div>
         </div>
     </div>
 </div>
 
-<div id="scroll-sentinel">
+<div id="scroll-spinner">
     <div class="spinner"></div>
 </div>
 
 <script>
-    // --- 1. UTILS & ERROR HANDLING ---
+    // --- UTILITIES ---
     function showError(msg) {
-        const toast = document.getElementById('error-toast');
-        document.getElementById('error-msg').innerText = msg;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 4000);
+        const t = document.getElementById('error-toast');
+        document.getElementById('error-text').innerText = msg;
+        t.classList.add('visible');
+        setTimeout(() => t.classList.remove('visible'), 4000);
     }
 
-    // --- 2. FIREBASE SETUP ---
-    if (typeof firebase === 'undefined') {
-        showError("Firebase SDK Error");
-    } else {
-        if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
-    }
+    // --- FIREBASE INIT ---
+    if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
 
-    // --- 3. STATE ---
+    // --- STATE ---
     let currentUser = null;
-    let followsData = [];
-    let likesData = [];
+    let rawNotifications = []; // Stores combined raw data
+    let userCache = {}; // Local cache for user profiles { uid: {username, pfp, verified...} }
     let currentTab = 'all';
-    
-    // PAGINATION
-    let limitCount = 10; 
-    let followsUnsubscribe = null;
-    let likesUnsubscribe = null;
+    let limitCount = 10;
     let isLoading = false;
+    let followsUnsub, likesUnsub;
 
-    // ASSETS
     const ICONS = {
-        heart: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
-        user: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
         verified: `https://img.icons8.com/color/48/verified-badge.png`,
-        music: `<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`
+        music: `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`,
+        heart: `<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+        user: `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`
     };
 
-    // --- 4. INIT ---
+    // --- AUTH ---
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
             setupListeners(limitCount);
-            setupInfiniteScroll();
-            // Clear unread badge
-            db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(() => {});
+            setupScrollObserver();
+            db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(()=>{});
         } else {
             window.location.href = 'login.html';
         }
     });
 
-    // --- 5. DATA FETCHING (Cost Optimized) ---
+    // --- 1. LISTENERS ---
     function setupListeners(limit) {
-        if(!currentUser) return;
-        const myUid = currentUser.uid;
+        if (!currentUser) return;
         isLoading = true;
 
-        // Clean up old listeners
-        if(followsUnsubscribe) followsUnsubscribe();
-        if(likesUnsubscribe) likesUnsubscribe();
+        if (followsUnsub) followsUnsub();
+        if (likesUnsub) likesUnsub();
 
-        // 1. Follows Listener
-        followsUnsubscribe = db.collection("users").doc(myUid).collection("notifications")
+        let followsTemp = [];
+        let likesTemp = [];
+
+        // Listener A: Follows
+        followsUnsub = db.collection("users").doc(currentUser.uid).collection("notifications")
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
-                followsData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'sub' }));
-                renderNotifications();
-                isLoading = false;
-            }, err => console.log(err));
+                followsTemp = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'sub' }));
+                mergeAndEnrich(followsTemp, likesTemp);
+            });
 
-        // 2. Likes Listener
-        likesUnsubscribe = db.collection("notifications")
-            .where("toUid", "==", myUid)
+        // Listener B: Likes
+        likesUnsub = db.collection("notifications")
+            .where("toUid", "==", currentUser.uid)
             .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
-                likesData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'root' }));
-                renderNotifications();
-                isLoading = false;
-            }, err => console.log(err));
+                likesTemp = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'root' }));
+                mergeAndEnrich(followsTemp, likesTemp);
+            });
     }
 
-    // --- 6. INFINITE SCROLL ---
-    function setupInfiniteScroll() {
-        const sentinel = document.getElementById('scroll-sentinel');
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && !isLoading) {
-                // User hit bottom, load 10 more
-                document.getElementById('scroll-sentinel').classList.add('visible');
-                limitCount += 10;
-                setupListeners(limitCount);
-                // Hide spinner after small delay
-                setTimeout(() => {
-                    document.getElementById('scroll-sentinel').classList.remove('visible');
-                }, 1000);
-            }
-        }, { threshold: 0.5 });
-        
-        observer.observe(sentinel);
-    }
-
-    function switchTab(tabName) {
-        currentTab = tabName;
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById(`tab-${tabName}`).classList.add('active');
-        renderNotifications();
-    }
-
-    // --- 7. RENDERING ---
-    function renderNotifications() {
-        const list = document.getElementById('notif-list');
-        
-        // Merge & Sort both streams
-        let all = [...followsData, ...likesData].sort((a, b) => {
-            const tA = a.timestamp ? a.timestamp.seconds : 0;
-            const tB = b.timestamp ? b.timestamp.seconds : 0;
-            return tB - tA; 
+    // --- 2. DATA PROCESSING (The Core Logic) ---
+    async function mergeAndEnrich(follows, likes) {
+        // A. Merge & Sort
+        rawNotifications = [...follows, ...likes].sort((a,b) => {
+            return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
         });
 
-        // Client-side Filter
-        if (currentTab === 'likes') all = all.filter(n => n.type === 'like');
-        else if (currentTab === 'follows') all = all.filter(n => n.type === 'follow');
+        // B. Identify Missing Users
+        const uidsToFetch = new Set();
+        rawNotifications.forEach(n => {
+            // Determine the "Sender UID"
+            const uid = n.fromUid || n.uid || n.senderUid; 
+            if (uid && !userCache[uid]) {
+                uidsToFetch.add(uid);
+            }
+        });
 
-        if (all.length === 0) {
+        // C. Bulk Fetch Profiles
+        if (uidsToFetch.size > 0) {
+            const promises = Array.from(uidsToFetch).map(uid => 
+                db.collection('users').doc(uid).get().then(doc => {
+                    if (doc.exists) userCache[uid] = doc.data();
+                    else userCache[uid] = { username: 'Unknown', name: 'User' }; // Fallback
+                }).catch(() => {
+                    userCache[uid] = { username: 'Unknown' }; 
+                })
+            );
+            await Promise.all(promises);
+        }
+
+        // D. Render Final UI
+        isLoading = false;
+        render();
+    }
+
+    // --- 3. RENDER UI ---
+    function render() {
+        const list = document.getElementById('notif-list');
+        
+        let filtered = rawNotifications;
+        if (currentTab === 'likes') filtered = rawNotifications.filter(n => n.type === 'like');
+        else if (currentTab === 'follows') filtered = rawNotifications.filter(n => n.type === 'follow');
+
+        if (filtered.length === 0) {
             list.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">🔔</div>
                     <h3>No new activity</h3>
-                    <p>Interactions will appear here.</p>
+                    <p>When people interact with you, it will show up here.</p>
                 </div>`;
             return;
         }
 
         list.innerHTML = '';
-        
-        all.forEach(n => {
+
+        filtered.forEach(n => {
             const isRead = n.isRead === true || n.isSeen === true;
             const type = n.type || 'unknown';
+            const uid = n.fromUid || n.uid || n.senderUid;
             
-            // --- SMART DATA EXTRACTION ---
-            // Prioritize 'username' for logic, 'senderName' for display
-            const displayName = n.senderName || n.fromUsername || 'Someone';
-            // Fallback: If verification info missing, assume false
-            const isVerified = n.isSenderVerified === true || n.isVerified === true; 
-            const pfpUrl = n.senderPfp || n.fromPhoto || 'https://via.placeholder.com/150';
+            // --- DATA SOURCE: PREFER CACHE, FALLBACK TO NOTIF DATA ---
+            const profile = userCache[uid] || {};
+            
+            const username = profile.username || n.fromUsername || n.senderName || 'User';
+            const pfp = profile.photoURL || n.senderPfp || n.fromPhoto || 'https://via.placeholder.com/150';
+            const isVerified = profile.verified === true || n.isSenderVerified === true;
 
             const item = document.createElement('div');
             item.className = `notif-item ${!isRead ? 'unread' : ''}`;
             
-            let iconClass = '', iconHtml = '', bodyHtml = '', actionHtml = '';
+            let iconBadge = '';
+            let contentHtml = '';
+            let actionHtml = '';
 
-            // --- LIKE UI ---
+            // --- LIKE LAYOUT ---
             if (type === 'like') {
-                iconClass = 'icon-like'; iconHtml = ICONS.heart;
-                bodyHtml = `
-                    <span class="notif-text">
-                        <span class="notif-username">${escapeHtml(displayName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
+                iconBadge = `<div class="icon-badge icon-like">${ICONS.heart}</div>`;
+                contentHtml = `
+                    <div class="notif-text">
+                        <span class="username">${escapeHtml(username)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
                         liked your note.
-                    </span>
+                        <span class="time-ago">${timeAgo(n.timestamp)}</span>
+                    </div>
                     ${n.noteText ? `
-                        <div class="notif-preview-box" style="background:${n.noteBgColor || '#1c1c1e'}; color:${n.noteTextColor || '#fff'}">
-                            <div class="preview-note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>
-                            ${n.noteSongName ? `
-                                <div class="preview-song-tag">
-                                    ${ICONS.music} ${escapeHtml(n.noteSongName)}
-                                </div>
-                            ` : ''}
+                        <div class="note-preview" style="background:${n.noteBgColor || '#1c1c1e'}; color:${n.noteTextColor || '#fff'}">
+                            <div class="note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>
+                            ${n.noteSongName ? `<div class="song-badge">${ICONS.music} ${escapeHtml(n.noteSongName)}</div>` : ''}
                         </div>
                     ` : ''}
                 `;
             } 
-            // --- FOLLOW UI ---
+            // --- FOLLOW LAYOUT ---
             else if (type === 'follow') {
-                iconClass = 'icon-follow'; iconHtml = ICONS.user;
-                bodyHtml = `
-                    <span class="notif-text">
-                        <span class="notif-username">${escapeHtml(displayName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
+                iconBadge = `<div class="icon-badge icon-follow">${ICONS.user}</div>`;
+                contentHtml = `
+                    <div class="notif-text">
+                        <span class="username">${escapeHtml(username)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
                         started following you.
-                    </span>
+                        <span class="time-ago">${timeAgo(n.timestamp)}</span>
+                    </div>
                 `;
-                actionHtml = `<button class="view-profile-btn">View Profile</button>`;
+                actionHtml = `<button class="view-btn">View</button>`;
             }
 
             item.innerHTML = `
                 <div class="notif-pfp-wrapper">
-                    <img src="${pfpUrl}" class="notif-pfp" loading="lazy">
-                    <div class="notif-icon-badge ${iconClass}">${iconHtml}</div>
+                    <img src="${pfp}" class="notif-pfp">
+                    ${iconBadge}
                 </div>
-                <div class="notif-content">
-                    ${bodyHtml}
-                    <div class="notif-meta">${timeAgo(n.timestamp)}</div>
-                </div>
+                <div class="notif-content">${contentHtml}</div>
                 ${actionHtml}
-                ${!isRead ? `<div class="unread-dot"></div>` : ''}
             `;
 
-            // Redirect Handler
+            // CLICK HANDLER - Redirect using verified cached username
             item.onclick = (e) => {
-                // Don't fire twice if button clicked
-                if(e.target.classList.contains('view-profile-btn')) return handleRedirect(n);
-                handleRedirect(n);
+                if (e.target.classList.contains('view-btn')) e.stopPropagation();
+                handleRedirect(n, profile.username);
             };
-
-            const btn = item.querySelector('.view-profile-btn');
-            if(btn) btn.onclick = (e) => { e.stopPropagation(); handleRedirect(n); };
+            if(actionHtml) {
+                const btn = item.querySelector('.view-btn');
+                btn.onclick = (e) => { e.stopPropagation(); handleRedirect(n, profile.username); };
+            }
 
             list.appendChild(item);
         });
     }
 
-    // --- 8. SMART REDIRECT ---
-    async function handleRedirect(notif) {
-        // 1. Background Mark as Read
-        const isRead = notif.isSeen === true || notif.isRead === true;
-        if(!isRead) {
-            try {
-                if(notif._collection === 'root') db.collection('notifications').doc(notif.id).update({ isSeen: true });
-                else db.collection('users').doc(currentUser.uid).collection('notifications').doc(notif.id).update({ isRead: true });
-            } catch(e) {}
+    // --- 4. REDIRECT LOGIC ---
+    function handleRedirect(n, cachedUsername) {
+        // Mark Read
+        if (n.isRead !== true && n.isSeen !== true) {
+            const ref = n._collection === 'root' 
+                ? db.collection('notifications').doc(n.id)
+                : db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id);
+            ref.update(n._collection === 'root' ? {isSeen:true} : {isRead:true}).catch(()=>{});
         }
 
-        // 2. Determine Target User (Prioritize Username)
-        let targetUser = null;
+        // Determine Redirect Target
+        // 1. Cached Real-Time Username (Best)
+        let target = cachedUsername;
 
-        // A. Direct Username (Best)
-        if (notif.username) targetUser = notif.username;
-        else if (notif.fromUsername) targetUser = notif.fromUsername;
+        // 2. Notification Data Fallback
+        if (!target) target = n.username || n.fromUsername || n.senderUsername;
         
-        // B. Heuristic: SenderName (Only if it looks like a username, no spaces)
-        else if (notif.senderName && !notif.senderName.includes(" ")) targetUser = notif.senderName;
-        
-        // C. Fallback: UID (Works if your profile page handles ?user=UID)
-        else if (notif.fromUid) targetUser = notif.fromUid;
-        else if (notif.uid) targetUser = notif.uid;
+        // 3. UID Fallback (Last Resort)
+        if (!target) target = n.fromUid || n.uid;
 
-        if (targetUser) {
-            window.location.href = `userProfile.html?user=${targetUser}`;
+        if (target) {
+            window.location.href = `userProfile.html?user=${target}`;
         } else {
-            showError("User profile not found");
+            showError("Profile not found");
         }
     }
 
-    async function markAllAsRead() {
+    // --- 5. HELPERS ---
+    function switchTab(t) {
+        currentTab = t;
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-${t}`).classList.add('active');
+        render();
+    }
+
+    function setupScrollObserver() {
+        const spinner = document.getElementById('scroll-spinner');
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !isLoading) {
+                spinner.classList.add('show');
+                limitCount += 10;
+                setupListeners(limitCount);
+                setTimeout(() => spinner.classList.remove('show'), 800);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(spinner);
+    }
+
+    function markAllAsRead() {
         const batch = db.batch();
         let count = 0;
-        
-        // Only mark loaded items to save reads/writes
-        const all = [...followsData, ...likesData];
-        all.forEach(n => {
-            const isRead = n.isRead === true || n.isSeen === true;
-            if(!isRead) {
-                if(n._collection === 'root') batch.update(db.collection('notifications').doc(n.id), { isSeen: true });
-                else batch.update(db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id), { isRead: true });
+        rawNotifications.forEach(n => {
+            if (n.isRead !== true && n.isSeen !== true) {
+                const ref = n._collection === 'root' 
+                    ? db.collection('notifications').doc(n.id)
+                    : db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id);
+                batch.update(ref, n._collection === 'root' ? {isSeen:true} : {isRead:true});
                 count++;
             }
         });
-
-        if (count > 0) {
-            try { await batch.commit(); } catch(e) { showError("Mark read failed"); }
-        }
+        if(count > 0) batch.commit().catch(()=>showError("Failed to update"));
     }
 
-    function timeAgo(timestamp) {
-        if (!timestamp) return '';
-        const seconds = Math.floor((new Date() - timestamp.toDate()) / 1000);
-        if (seconds < 60) return 'Just now';
-        const m = Math.floor(seconds / 60); if (m < 60) return `${m}m`;
-        const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
-        const d = Math.floor(h / 24); if (d < 7) return `${d}d`;
-        return timestamp.toDate().toLocaleDateString();
+    function timeAgo(ts) {
+        if (!ts) return '';
+        const s = Math.floor((new Date() - ts.toDate())/1000);
+        if(s<60) return 'Just now';
+        const m=Math.floor(s/60); if(m<60) return `${m}m`;
+        const h=Math.floor(m/60); if(h<24) return `${h}h`;
+        const d=Math.floor(h/24); if(d<7) return `${d}d`;
+        return `${Math.floor(d/7)}w`;
     }
-    
+
     function escapeHtml(text) {
-        if(!text) return '';
+        if (!text) return '';
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 </script>
