@@ -981,24 +981,21 @@
                 lastStatusData = data;
             } else {
                 clearTimeout(offlineCutoffTimer);
-                
-                // CRITICAL FIX: If this is the FIRST load, update immediately. 
-                // Do NOT wait 15 seconds.
-                if (isFirstStatusLoad) {
+                offlineCutoffTimer = setTimeout(() => {
                     lastStatusData = data;
-                } else {
-                    // Normal behavior: wait 15s before showing offline to prevent flicker
-                    offlineCutoffTimer = setTimeout(() => {
-                        lastStatusData = data;
-                        updateHeaderStatus();
-                    }, 15000);
-                    return; // Stop execution here for normal updates
-                }
+                    updateHeaderStatus();
+                }, 15000);
+                return; 
             }
 
             if (isFirstStatusLoad) {
-                isFirstStatusLoad = false;
-                updateHeaderStatus(); // Render INSTANTLY
+                headerSubLabel.innerText = `@${chatTargetData.username}`;
+                headerSubLabel.style.color = "var(--text-secondary)";
+                onlineDot.style.display = 'none';
+                statusTimeout = setTimeout(() => {
+                    isFirstStatusLoad = false;
+                    updateHeaderStatus(); 
+                }, 3000);
             } else {
                 statusTimeout = setTimeout(() => updateHeaderStatus(), 500); 
             }
