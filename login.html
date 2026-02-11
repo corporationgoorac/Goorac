@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <title>Goorac | Happening now</title>
+    <title>Goorac | Messaging Easy</title>
 
     <script src="config.js"></script>
 
@@ -298,6 +298,18 @@
             box-shadow: 0 0 0 1px var(--accent);
         }
 
+        .input-wrapper.error-shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: var(--error);
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
         .text-input {
             background: transparent; border: none;
             color: var(--text); font-size: 17px;
@@ -318,6 +330,17 @@
         .text-input:not(:placeholder-shown) + .floating-label {
             top: 6px; font-size: 13px; color: var(--accent);
         }
+
+        /* Toggle Password Eye */
+        .password-toggle {
+            background: none; border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 10px;
+            display: flex; align-items: center;
+            margin-right: 4px;
+        }
+        .password-toggle svg { width: 20px; height: 20px; fill: currentColor; }
 
         /* --- NEXT BUTTON --- */
         .next-btn {
@@ -370,9 +393,42 @@
             color: var(--error); margin-top: 10px; min-height: 20px; font-size: 13px; text-align: center;
         }
 
+        /* Toast Notification */
+        .toast-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            width: 90%;
+            max-width: 400px;
+            pointer-events: none;
+        }
+        
+        .toast {
+            background: var(--accent);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: var(--error); }
+
     </style>
 </head>
 <body oncontextmenu="return false;"> 
+
+<div class="toast-container">
+    <div id="toast-msg" class="toast"></div>
+</div>
 
 <div class="login-card">
     
@@ -381,7 +437,7 @@
     </div>
 
     <div class="desktop-right">
-        <h1>Happening now</h1>
+        <h1>Messaging Easy</h1>
         <h2>Join Goorac today.</h2>
         
         <div class="btn-group">
@@ -431,14 +487,17 @@
                 <div id="step-auth" style="width:100%; display:flex; flex-direction:column;">
                     <div class="modal-title" id="auth-title">Sign in to Goorac</div>
                     
-                    <div class="input-wrapper">
+                    <div class="input-wrapper" id="email-wrapper">
                         <input type="email" id="email-input" class="text-input" placeholder=" " autocomplete="email">
                         <label class="floating-label">Email</label>
                     </div>
 
-                    <div class="input-wrapper">
+                    <div class="input-wrapper" id="pass-wrapper">
                         <input type="password" id="password-input" class="text-input" placeholder=" ">
                         <label class="floating-label">Password</label>
+                        <button type="button" class="password-toggle" id="toggle-pass-btn">
+                            <svg id="eye-icon" viewBox="0 0 24 24"><g><path d="M10.5 13.5c-.828 0-1.5.672-1.5 1.5s.672 1.5 1.5 1.5 1.5-.672 1.5-1.5-.672-1.5-1.5-1.5zm-5.22-3.72l1.41-1.42L21.53 23.23 20.11 24.65 17.48 22.02C15.93 22.65 14.26 23 12.5 23 6.64 23 2 18.5 2 13.5c0-1.39.29-2.73.83-3.98l-2.61-2.6 1.42-1.42 3.64 3.64zM12.5 21c1.33 0 2.59-.28 3.74-.78L8.68 12.66c-.16.48-.26 1-.26 1.54 0 2.21 1.79 4 4 4 .19 0 .38-.02.56-.05L11.53 19.59c-.32.05-.65.09-1.03.09zm0-17c-5.86 0-10.5 4.5-10.5 9.5 0 .23.01.46.03.68l2.5-2.5C5.1 9.87 6.46 8.5 8.1 7.6L9.5 6.2c.98-.13 1.99-.2 3-.2 5.86 0 10.5 4.5 10.5 9.5 0 1.51-.43 2.92-1.18 4.18l1.52 1.52c1.11-1.63 1.66-3.48 1.66-5.42 0-5.87-5.51-11.5-12.5-11.5z"></path></g></svg>
+                        </button>
                     </div>
 
                     <button id="auth-btn" class="next-btn">
@@ -497,15 +556,22 @@
     const modal = document.getElementById('email-modal');
     const backBtn = document.getElementById('modal-back-btn');
     const statusMsg = document.getElementById('status-msg');
+    const toastMsg = document.getElementById('toast-msg');
 
     // Auth Views
     const stepAuth = document.getElementById('step-auth');
     const stepForgot = document.getElementById('step-forgot');
     
-    // Inputs
+    // Inputs & Wrappers
     const emailInput = document.getElementById('email-input');
+    const emailWrapper = document.getElementById('email-wrapper');
     const passInput = document.getElementById('password-input');
+    const passWrapper = document.getElementById('pass-wrapper');
     const resetEmailInput = document.getElementById('reset-email-input');
+    
+    // Password Toggle
+    const togglePassBtn = document.getElementById('toggle-pass-btn');
+    const eyeIcon = document.getElementById('eye-icon');
     
     // Buttons & Labels
     const authBtn = document.getElementById('auth-btn');
@@ -522,6 +588,15 @@
     // --- HELPER FUNCTIONS ---
     function vibrate() { if(navigator.vibrate) navigator.vibrate(10); }
 
+    function showToast(message, isError = true) {
+        toastMsg.innerText = message;
+        if(isError) toastMsg.classList.add('error');
+        else toastMsg.classList.remove('error');
+        
+        toastMsg.classList.add('show');
+        setTimeout(() => toastMsg.classList.remove('show'), 3000);
+    }
+
     function setBtnLoading(btn, isLoading) {
         const span = btn.querySelector('span');
         const loader = btn.querySelector('.btn-loader');
@@ -536,6 +611,23 @@
         }
     }
 
+    // --- PASSWORD VISIBILITY TOGGLE ---
+    togglePassBtn.addEventListener('click', () => {
+        const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passInput.setAttribute('type', type);
+        
+        // Simple icon switch (using SVG paths for robustness would be better but keeping simple)
+        if (type === 'text') {
+            // Show Open Eye
+            eyeIcon.innerHTML = '<g><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></g>';
+            eyeIcon.style.fill = 'var(--accent)';
+        } else {
+            // Show Slashed Eye
+            eyeIcon.innerHTML = '<g><path d="M10.5 13.5c-.828 0-1.5.672-1.5 1.5s.672 1.5 1.5 1.5 1.5-.672 1.5-1.5-.672-1.5-1.5-1.5zm-5.22-3.72l1.41-1.42L21.53 23.23 20.11 24.65 17.48 22.02C15.93 22.65 14.26 23 12.5 23 6.64 23 2 18.5 2 13.5c0-1.39.29-2.73.83-3.98l-2.61-2.6 1.42-1.42 3.64 3.64zM12.5 21c1.33 0 2.59-.28 3.74-.78L8.68 12.66c-.16.48-.26 1-.26 1.54 0 2.21 1.79 4 4 4 .19 0 .38-.02.56-.05L11.53 19.59c-.32.05-.65.09-1.03.09zm0-17c-5.86 0-10.5 4.5-10.5 9.5 0 .23.01.46.03.68l2.5-2.5C5.1 9.87 6.46 8.5 8.1 7.6L9.5 6.2c.98-.13 1.99-.2 3-.2 5.86 0 10.5 4.5 10.5 9.5 0 1.51-.43 2.92-1.18 4.18l1.52 1.52c1.11-1.63 1.66-3.48 1.66-5.42 0-5.87-5.51-11.5-12.5-11.5z"></path></g>';
+            eyeIcon.style.fill = 'currentColor';
+        }
+    });
+
     // --- NAVIGATION & HISTORY (Model Traction) ---
     
     function openModal(mode = 'login') {
@@ -543,7 +635,10 @@
         // Reset inputs
         emailInput.value = '';
         passInput.value = '';
-        statusMsg.innerText = '';
+        
+        // Remove error states
+        emailWrapper.classList.remove('error-shake');
+        passWrapper.classList.remove('error-shake');
         
         if (mode === 'signup') {
             isSignUpMode = true;
@@ -574,7 +669,7 @@
     // Back Button (Top Left Arrow)
     backBtn.addEventListener('click', () => {
         vibrate();
-        window.history.back(); // Pops state, triggering 'popstate' event
+        window.history.back(); 
     });
 
     // Handle History Changes (Back/Forward)
@@ -600,7 +695,6 @@
             renderRecoveryUI();
         } 
         else {
-            // No hash (Landing Page)
             modal.style.display = 'none';
         }
     });
@@ -628,7 +722,7 @@
         resetEmailInput.focus();
     }
 
-    // Toggle Mode internally (updates history to keep flow clean)
+    // Toggle Mode internally
     window.toggleAuthMode = function() {
         vibrate();
         isSignUpMode = !isSignUpMode;
@@ -647,7 +741,7 @@
             const result = await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
             handleSuccess(result.user);
         } catch (e) {
-            statusMsg.innerText = e.message;
+            showToast(e.message);
         }
     });
 
@@ -656,7 +750,21 @@
         vibrate();
         const email = emailInput.value.trim();
         const pass = passInput.value;
-        if (!email || !pass) return;
+
+        // Validation features
+        let isValid = true;
+        if (!email) {
+            emailWrapper.classList.add('error-shake');
+            setTimeout(() => emailWrapper.classList.remove('error-shake'), 400);
+            isValid = false;
+        }
+        if (!pass) {
+            passWrapper.classList.add('error-shake');
+            setTimeout(() => passWrapper.classList.remove('error-shake'), 400);
+            isValid = false;
+        }
+
+        if (!isValid) return;
 
         setBtnLoading(authBtn, true);
 
@@ -670,7 +778,7 @@
             handleSuccess(cred.user);
         } catch (e) {
             setBtnLoading(authBtn, false);
-            alert(e.message);
+            showToast(e.message);
         }
     });
 
@@ -678,7 +786,10 @@
     resetBtn.addEventListener('click', async () => {
         vibrate();
         const email = resetEmailInput.value.trim();
-        if (!email) return;
+        if (!email) {
+            showToast("Please enter email", true);
+            return;
+        }
 
         setBtnLoading(resetBtn, true);
         try {
@@ -687,13 +798,12 @@
             forgotMsg.style.opacity = '1';
         } catch (e) {
             setBtnLoading(resetBtn, false);
-            alert(e.message);
+            showToast(e.message);
         }
     });
 
     // Success Handler
     async function handleSuccess(user) {
-        // Aesthetic Success State
         if (modal.style.display === 'flex') {
             authBtn.style.background = "#00ba7c";
             authBtn.style.color = "#fff";
