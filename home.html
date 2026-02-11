@@ -535,19 +535,19 @@
     }
 
     function listenNotifications(uid) {
-        let likeMap = new Map();
-        let followMap = new Map();
+        let notifMap = new Map(); // Use unified map to match ChatLoader
         let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
         let followingList = [];
         let isFirstLoad = true;
+        const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
 
         const updateBadgeUI = () => {
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
-            let combinedNotifs = [];
+            let combinedNotifs = Array.from(notifMap.values());
 
-            likeMap.forEach(v => combinedNotifs.push(v));
-            followMap.forEach(v => combinedNotifs.push(v));
+            // Only show/count today's notifications
+            combinedNotifs = combinedNotifs.filter(n => n.timestamp >= oneDayAgo);
             combinedNotifs.sort((a,b) => b.timestamp - a.timestamp);
 
             combinedNotifs.forEach(n => { if(!readList.includes(n.id)) count++; });
@@ -560,7 +560,8 @@
             } else { badge.classList.remove('visible'); }
 
             if (combinedNotifs.length > 0) {
-                const DATA_CACHE_KEY = `goorac_notif_data_${uid}`;
+                // Sync with common data key used by background loader and notifications.html
+                const DATA_CACHE_KEY = `goorac_data_${uid}`; 
                 localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(combinedNotifs));
                 
                 let htmlStr = combinedNotifs.slice(0, 30).map(n => {
@@ -612,17 +613,19 @@
                     for (const liker of data.likes) {
                         if (liker.uid !== uid && liker.timestamp) {
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                            const nid = `like_${liker.uid}_${timeMillis}`;
+                            if (timeMillis < oneDayAgo) continue; // Only process today's notifications
+
                             const mid = `like_${liker.uid}_${doc.id}`;
+                            const nid = `${mid}_${timeMillis}`;
                             
                             // Check for newness
-                            if (!likeMap.has(mid) && !isFirstLoad) {
+                            if (!notifMap.has(mid) && !isFirstLoad) {
                                 const u = await fetchUserIfNeeded(liker.uid);
                                 showNotificationToast('like', u.name, u.photoURL);
                             }
 
                             const u = await fetchUserIfNeeded(liker.uid);
-                            likeMap.set(mid, { id: nid, type: 'like', senderId: liker.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "liked your note.", noteData: { text: data.text, songName: data.songName, bgColor: data.bgColor, textColor: data.textColor } });
+                            notifMap.set(mid, { id: nid, type: 'like', senderId: liker.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "liked your note.", noteData: { text: data.text, songName: data.songName, bgColor: data.bgColor, textColor: data.textColor } });
                         }
                     }
                 }
@@ -638,16 +641,18 @@
                     for (const f of data.followers) {
                         if (f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            const nid = `follow_${f.uid}_${timeMillis}`;
+                            if (timeMillis < oneDayAgo) continue;
+
                             const mid = `follow_${f.uid}`;
+                            const nid = `${mid}_${timeMillis}`;
                             
-                            if (!followMap.has(mid) && !isFirstLoad) {
+                            if (!notifMap.has(mid) && !isFirstLoad) {
                                 const u = await fetchUserIfNeeded(f.uid);
                                 showNotificationToast('follow', u.name, u.photoURL);
                             }
 
                             const u = await fetchUserIfNeeded(f.uid);
-                            followMap.set(mid, { id: nid, type: 'follow', senderId: f.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "started following you." });
+                            notifMap.set(mid, { id: nid, type: 'follow', senderId: f.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "started following you." });
                         }
                     }
                 }
