@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+l<!DOCTYPE html>
 <html lang="en">
 <head>
     <link rel="manifest" href="/manifest.json">
@@ -159,7 +159,6 @@
 
 <script>
     // --- 0. INSTANT HTML CACHE LOAD (0ms Latency) ---
-    // This runs immediately, before Firebase or Auth logic.
     (function loadHTMLCache() {
         try {
             const cachedHTML = localStorage.getItem('goorac_notif_html');
@@ -217,6 +216,10 @@
             markNotificationRead(el.dataset.id);
             el.classList.remove('unread');
         });
+        // Update HTML Cache immediately so it sticks on reload
+        setTimeout(() => {
+            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
+        }, 100);
     }
 
     // --- 4. AUTH & LISTENERS ---
@@ -225,19 +228,18 @@
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
 
-            // Load data cache if HTML was empty or outdated
+            // Load data cache
             if(window.loadFromCache) {
                  const cachedData = window.loadFromCache(`notifs_${myUid}`);
                  if(cachedData) {
                      cachedData.forEach(item => notificationsMap.set(item.dedupeKey, item));
-                     // If HTML cache missed, render this now
                      if(!document.getElementById('notif-list').hasChildNodes()) {
                         renderList();
                      }
                  }
             }
 
-            // Fetch My Following (for buttons)
+            // Fetch My Following
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 if(doc.exists) {
                     const data = doc.data();
@@ -260,13 +262,11 @@
             .limit(30)
             .onSnapshot(snapshot => {
                 let hasChanges = false;
-                
                 snapshot.forEach(doc => {
                     const noteData = doc.data();
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
-                            
                             const dedupeKey = `like_${liker.uid}_${doc.id}`; 
                             if(!notificationsMap.has(dedupeKey)) hasChanges = true;
 
@@ -310,8 +310,8 @@
                         const uid = f.uid;
                         const ts = f.timestamp; 
                         const timeMillis = ts.toMillis ? ts.toMillis() : ts;
-
                         const dedupeKey = `follow_${uid}`;
+                        
                         if(!notificationsMap.has(dedupeKey)) hasChanges = true;
 
                         const u = userCache[uid] || {};
@@ -347,7 +347,6 @@
                     verified: uData.verified || false
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                
                 const dedupeKey = `follow_${uid}`;
                 if(notificationsMap.has(dedupeKey)) {
                     const item = notificationsMap.get(dedupeKey);
@@ -372,6 +371,15 @@
             let allNotifs = Array.from(notificationsMap.values());
             allNotifs.sort((a, b) => b.timestamp - a.timestamp);
 
+            // --- AUTO MARK READ (FIRST TIME LOGIN) ---
+            // If the user has NEVER saved a read-list before (null), assume they are logging in fresh
+            // and don't want to see 100 old unread notifications.
+            if (localStorage.getItem(READ_KEY) === null && allNotifs.length > 0) {
+                const allIds = allNotifs.map(n => n.id);
+                localStorage.setItem(READ_KEY, JSON.stringify(allIds));
+                // We don't need to re-render, the next check below will simply see them as read.
+            }
+
             const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
             if (filtered.length === 0) {
@@ -381,7 +389,6 @@
             }
 
             list.innerHTML = ''; 
-            
             const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
             
             for(let i=0; i < renderLimit; i++) {
@@ -391,10 +398,9 @@
             displayedCount = renderLimit;
             loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
 
-            // SAVE BOTH FORMATS TO CACHE
+            // SAVE TO CACHE
             if(currentFilter === 'all') {
                 if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, allNotifs);
-                // HTML CACHE SAVE (for next 0ms load)
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
             }
 
@@ -409,8 +415,18 @@
         
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
+            
+            // 1. Mark in Logic
             markNotificationRead(this.dataset.id);
+            
+            // 2. Update Visuals
             this.classList.remove('unread');
+            this.classList.add('read');
+            
+            // 3. FORCE SAVE HTML CACHE (Prevents flash of unread on next reload)
+            // We update the cache immediately with the new 'read' class applied
+            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
+
             if(notif.senderUsername) window.location.href = `userProfile.html?user=${notif.senderUsername}`;
         };
 
