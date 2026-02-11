@@ -3,6 +3,8 @@ class ChatLoader extends HTMLElement {
         super();
         this._unsubInbox = null;
         this._unsubUser = null;
+        this._unsubLikes = null;
+        this._unsubFollowers = null;
         this.myUid = null;
         this.userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
         this.pinnedChats = [];
@@ -10,6 +12,10 @@ class ChatLoader extends HTMLElement {
         
         // Configuration for limits
         this.MAX_PREFETCH_CHATS = 15; // Only keep messages fresh for top 15 active chats
+
+        // Notification Sync Maps
+        this.likeMap = new Map();
+        this.followMap = new Map();
     }
 
     connectedCallback() {
@@ -20,6 +26,8 @@ class ChatLoader extends HTMLElement {
     disconnectedCallback() {
         if (this._unsubInbox) this._unsubInbox();
         if (this._unsubUser) this._unsubUser();
+        if (this._unsubLikes) this._unsubLikes();
+        if (this._unsubFollowers) this._unsubFollowers();
     }
 
     initFirebase() {
@@ -47,9 +55,12 @@ class ChatLoader extends HTMLElement {
                 this.myUid = user.uid;
                 this.loadUserData(); // Get pinned chats/following
                 this.startInboxListener(); // Start the heavy lifting
+                this.startNotificationListener(); // Sync Notifications in background
             } else {
                 this.myUid = null;
                 if(this._unsubInbox) this._unsubInbox();
+                if(this._unsubLikes) this._unsubLikes();
+                if(this._unsubFollowers) this._unsubFollowers();
             }
         });
     }
@@ -68,32 +79,26 @@ class ChatLoader extends HTMLElement {
             });
     }
 
-    // 2. The Master Listener
+    // 2. The Master Listener for Chats
     startInboxListener() {
         const db = firebase.firestore();
         
-        // Listen to ALL chats where I am a participant
         this._unsubInbox = db.collection("chats")
             .where("participants", "array-contains", this.myUid)
             .onSnapshot(async snapshot => {
                 let needsInboxUpdate = false;
 
-                // A. Handle individual chat updates
                 const updates = snapshot.docChanges().map(async change => {
                     const chatData = change.doc.data();
                     const chatId = change.doc.id;
                     const otherUid = chatData.participants.find(id => id !== this.myUid);
 
-                    // 1. Ensure we have the Opponent's Profile Data Cached
                     if (!this.userCache[otherUid]) {
                         await this.fetchAndCacheUser(otherUid);
                         needsInboxUpdate = true;
                     }
 
-                    // 2. CACHE MESSAGES: If this is a new/modified chat, fetch its latest messages
-                    // We only do this for "modified" (new msg) or "added" (new chat) events
                     if (change.type === 'added' || change.type === 'modified') {
-                         // Check if we should pre-fetch (Optimization: Don't fetch for very old stale chats)
                          const isRecent = chatData.lastTimestamp && (Date.now() - chatData.lastTimestamp.toMillis()) < (7 * 24 * 60 * 60 * 1000); // 7 days
                          
                          if (isRecent || this.pinnedChats.includes(chatId)) {
@@ -106,11 +111,81 @@ class ChatLoader extends HTMLElement {
 
                 await Promise.all(updates);
 
-                // B. Regenerate the full Inbox HTML for messages.html
                 if (needsInboxUpdate || snapshot.size > 0) {
                     this.regenerateInboxCache(snapshot.docs);
                 }
             });
+    }
+
+    // --- 💎 Master Listener for Notifications (Background HTML Sync) ---
+    startNotificationListener() {
+        const db = firebase.firestore();
+        const uid = this.myUid;
+
+        // A. Listen for LIKES on my notes
+        this._unsubLikes = db.collection("notes").where("uid", "==", uid)
+            .onSnapshot(async snapshot => {
+                for (const doc of snapshot.docs) {
+                    const data = doc.data();
+                    if (data.likes) {
+                        for (const liker of data.likes) {
+                            if (liker.uid !== uid && liker.timestamp) {
+                                const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                                const notifId = `like_${liker.uid}_${timeMillis}`;
+                                const mapKey = `like_${liker.uid}_${doc.id}`; // Deduplicate by note
+                                
+                                const u = await this.getFastUser(liker.uid);
+                                this.likeMap.set(mapKey, {
+                                    id: notifId, type: 'like', senderId: liker.uid,
+                                    senderName: u.name, senderUsername: u.username,
+                                    senderPic: u.photoURL, isVerified: u.verified,
+                                    timestamp: timeMillis, text: "liked your note.",
+                                    noteData: { text: data.text, songName: data.songName, bgColor: data.bgColor, textColor: data.textColor }
+                                });
+                            }
+                        }
+                    }
+                }
+                this.regenerateNotificationCache();
+            });
+
+        // B. Listen for new FOLLOWERS
+        this._unsubFollowers = db.collection("users").doc(uid)
+            .onSnapshot(async doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.followers) {
+                        for (const f of data.followers) {
+                            if (f.timestamp) {
+                                const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                                const notifId = `follow_${f.uid}_${timeMillis}`;
+                                const mapKey = `follow_${f.uid}`; // Deduplicate by user
+                                
+                                const u = await this.getFastUser(f.uid);
+                                this.followMap.set(mapKey, {
+                                    id: notifId, type: 'follow', senderId: f.uid,
+                                    senderName: u.name, senderUsername: u.username,
+                                    senderPic: u.photoURL, isVerified: u.verified,
+                                    timestamp: timeMillis, text: "started following you."
+                                });
+                            }
+                        }
+                    }
+                }
+                this.regenerateNotificationCache();
+            });
+    }
+
+    async getFastUser(uid) {
+        if (this.userCache[uid]) return this.userCache[uid];
+        const doc = await firebase.firestore().collection("users").doc(uid).get();
+        if (doc.exists) {
+            const d = doc.data();
+            this.userCache[uid] = { name: d.name || d.username, username: d.username, photoURL: d.photoURL, verified: d.verified };
+            localStorage.setItem('goorac_u_cache', JSON.stringify(this.userCache));
+            return this.userCache[uid];
+        }
+        return { name: "Someone", username: "", photoURL: "", verified: false };
     }
 
     async fetchAndCacheUser(uid) {
@@ -121,13 +196,11 @@ class ChatLoader extends HTMLElement {
                 this.userCache[uid] = doc.data();
                 localStorage.setItem('goorac_u_cache', JSON.stringify(this.userCache));
                 
-                // Also cache for chat.html specific key (chat_user_username)
-                // This ensures instant load when entering chat via URL
                 const userData = doc.data();
                 if(userData.username) {
                     localStorage.setItem(`chat_user_${userData.username}`, JSON.stringify({
                         ...userData,
-                        uid: uid // Ensure UID is attached
+                        uid: uid 
                     }));
                 }
             }
@@ -136,53 +209,83 @@ class ChatLoader extends HTMLElement {
         }
     }
 
-    // 3. Pre-fetch the actual messages for chat.html
     async prefetchChatMessages(chatId) {
         try {
             const snap = await firebase.firestore().collection("chats").doc(chatId).collection("messages")
                 .orderBy("timestamp", "desc")
-                .limit(20) // Only grab the last 20 to render the first screen instantly
+                .limit(20) 
                 .get();
 
             if (!snap.empty) {
                 const msgsToSave = snap.docs.map(doc => {
                     let m = doc.data();
                     m.id = doc.id;
-                    // Convert timestamps to ISO Strings so JSON.stringify works
                     if (m.timestamp && m.timestamp.toDate) m.timestampIso = m.timestamp.toDate().toISOString();
                     if (m.seenAt && m.seenAt.toDate) m.seenAtIso = m.seenAt.toDate().toISOString();
-                    
-                    // Remove complex objects
                     delete m.timestamp;
                     delete m.seenAt;
                     return m;
                 });
                 
-                // Reverse to match time order if needed, but chat.html handles sorting
                 msgsToSave.sort((a, b) => new Date(a.timestampIso) - new Date(b.timestampIso));
-
                 localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(msgsToSave));
-                // console.log(`⚡ BG Loader: Updated cache for ${chatId}`);
             }
         } catch (e) {
             console.error("BG Loader: Message fetch error", e);
         }
     }
 
-    // 4. Generate the HTML string for messages.html
-    // This replicates the render logic in messages.html so it's ready to go.
+    // 4. Regenerate Notification HTML and Data Objects
+    regenerateNotificationCache() {
+        if (!this.myUid) return;
+        const READ_KEY = `goorac_read_${this.myUid}`;
+        const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+        
+        let combined = [];
+        this.likeMap.forEach(v => combined.push(v));
+        this.followMap.forEach(v => combined.push(v));
+        combined.sort((a,b) => b.timestamp - a.timestamp);
+
+        // Store pure data for notifications.html logic
+        localStorage.setItem(`goorac_notif_data_${this.myUid}`, JSON.stringify(combined));
+
+        // Pre-render HTML for 0ms loading
+        let htmlStr = combined.slice(0, 30).map(n => {
+            const isRead = readList.includes(n.id);
+            const verifyIcon = n.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge" style="width:13px;height:13px;vertical-align:-2px;margin-left:2px;">` : '';
+            let actionHtml = '';
+
+            if (n.type === 'follow') {
+                const isFing = this.following.some(f => (typeof f === 'string' ? f : f.uid) === n.senderId);
+                actionHtml = `<button class="btn-follow ${isFing?'btn-following':''}" style="background:${isFing?'transparent':'#0095f6'}; color:#fff; border:${isFing?'1px solid #262626':'none'}; padding:7px 18px; border-radius:8px; font-weight:600; font-size:0.85rem; min-width:90px;">${isFing?'Following':'Follow'}</button>`;
+            } else if (n.type === 'like' && n.noteData) {
+                let bg = n.noteData.bgColor.includes('gradient') ? `background:${n.noteData.bgColor}` : `background-color:${n.noteData.bgColor}`;
+                actionHtml = `<div class="mini-note" style="${bg}; width:44px; height:44px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.1); color:${n.noteData.textColor}; font-size:1.2rem;">${n.noteData.text ? '<span style="font-size:0.5rem;">📄</span>' : '🎵'}</div>`;
+            }
+
+            return `
+                <div class="notif-item ${isRead?'read':'unread'}" data-id="${n.id}" style="display:flex; align-items:center; gap:14px; padding:14px 16px; border-bottom:1px solid #1a1a1a; cursor:pointer; position:relative; ${!isRead?'background:rgba(0,149,246,0.08); border-left:3px solid #0095f6;':''}">
+                    <img src="${n.senderPic || 'https://via.placeholder.com/50'}" class="n-avatar" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:1px solid #333; background:#222; flex-shrink:0;">
+                    <div class="n-content" style="flex:1; font-size:0.9rem; line-height:1.4; color:#fff; padding-right:10px;">
+                        <span class="n-username" style="font-weight:700; color:${!isRead?'#0095f6':'#fff'}">${n.senderName} ${verifyIcon}</span>
+                        <span class="n-text" style="color:#ccc; font-weight:${!isRead?'600':'400'}">${n.text}</span>
+                        <span class="n-time" style="font-size:0.75rem; color:#a8a8a8; display:block; margin-top:2px;">${this.formatTime(new Date(n.timestamp))}</span>
+                    </div>
+                    <div class="unread-dot" style="width:8px; height:8px; background:#0095f6; border-radius:50%; margin-left:auto; flex-shrink:0; box-shadow:0 0 8px #0095f6; display:${isRead?'none':'block'};"></div>
+                    <div class="n-action" style="flex-shrink:0; margin-left:4px;">${actionHtml}</div>
+                </div>
+            `;
+        }).join('');
+        
+        if (htmlStr) localStorage.setItem('goorac_notif_html', htmlStr);
+    }
+
     regenerateInboxCache(docs) {
-        if (!docs) {
-            // If docs not provided (called from loadUserData), we might need to rely on what we have
-            // But since this is a background loader, we rely on the listener to provide docs usually.
-            // If strictly needed, we could store 'lastDocs' in memory.
-            return; 
-        }
+        if (!docs) return; 
 
         const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
         const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
 
-        // Map and Sort
         const chatItems = docs.map(doc => {
             const chat = doc.data();
             const otherUid = chat.participants.find(id => id !== this.myUid);
@@ -191,7 +294,6 @@ class ChatLoader extends HTMLElement {
             return { id: doc.id, chat, u, otherUid, isPinned };
         });
 
-        // Sort: Pinned first, then by timestamp
         chatItems.sort((a,b) => {
             if (a.isPinned && !b.isPinned) return -1;
             if (!a.isPinned && b.isPinned) return 1;
@@ -201,9 +303,8 @@ class ChatLoader extends HTMLElement {
         let htmlAccumulator = "";
 
         chatItems.forEach(({id, chat, u, otherUid, isPinned}) => {
-            if (!u) return; // Skip if user data missing (will be caught next update)
+            if (!u) return;
 
-            // Unread Logic
             let isUnread = false;
             let count = 0;
             if (chat.unreadCount && chat.unreadCount[this.myUid] !== undefined) {
@@ -219,7 +320,6 @@ class ChatLoader extends HTMLElement {
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
             const timeStr = chat.lastTimestamp ? this.formatTime(chat.lastTimestamp.toDate()) : '';
 
-            // Safe User String for Long Press
             const safeUserStr = encodeURIComponent(JSON.stringify({
                 name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified
             }));
@@ -257,10 +357,8 @@ class ChatLoader extends HTMLElement {
             `;
         });
 
-        // SAVE TO LOCAL STORAGE
         if (htmlAccumulator) {
             localStorage.setItem('goorac_inbox_html', htmlAccumulator);
-            // console.log("⚡ BG Loader: Inbox HTML updated in cache");
         }
     }
 
