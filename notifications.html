@@ -134,6 +134,15 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
+    // --- 0ms CACHE LOAD ---
+    (function loadInitialCache() {
+        const cachedHTML = localStorage.getItem('goorac_notif_html');
+        if (cachedHTML && cachedHTML.trim() !== "") {
+            document.getElementById('notif-list').innerHTML = cachedHTML;
+            console.log("⚡ Loaded notifications from cache");
+        }
+    })();
+
     if (window.initFirebaseCore) {
         window.initFirebaseCore();
     }
@@ -151,15 +160,7 @@
     let READ_KEY = "goorac_read_notifs"; 
     let CACHE_KEY = "goorac_notif_cache";
     let loadedMap = new Map();
-
-    // --- 0ms CACHE LOADING ---
-    (function loadCache() {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-            rawNotifications = JSON.parse(cached);
-            processAndRender(true); // Immediate render
-        }
-    })();
+    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
 
     function isNotificationRead(id) {
         if(!myUid) return false;
@@ -177,7 +178,7 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                // Immediately remove UI unread state
+                // Visual feedback
                 const el = document.querySelector(`[data-id="${id}"]`);
                 if(el) el.classList.remove('unread');
             }
@@ -210,6 +211,7 @@
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
             CACHE_KEY = `goorac_notif_cache_${myUid}`;
+
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -223,7 +225,6 @@
 
     function initListeners() {
         const list = document.getElementById('notif-list');
-        // No longer clearing innerHTML here to prevent flicker from cache
         loadedMap = new Map();
 
         db.collection("notes")
@@ -237,14 +238,18 @@
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const notifId = `like_${liker.uid}_${doc.id}`;
+                            
+                            // Use cached profile if exists
+                            const cached = userCache[liker.uid] || {};
+
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'like',
                                 senderId: liker.uid,
-                                senderName: liker.displayName || "Someone",
-                                senderUsername: liker.username,
-                                senderPic: liker.photoURL,
-                                isVerified: liker.verified || false,
+                                senderName: cached.name || liker.displayName || "Someone",
+                                senderUsername: cached.username || liker.username,
+                                senderPic: cached.photoURL || liker.photoURL,
+                                isVerified: cached.verified || liker.verified || false,
                                 timestamp: timeMillis, 
                                 text: "liked your note.",
                                 noteData: { 
@@ -268,19 +273,22 @@
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}`;
+                            
+                            const cached = userCache[f.uid] || {};
+
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
                                 senderId: f.uid,
-                                senderName: "User", 
-                                senderUsername: "",
-                                senderPic: "https://via.placeholder.com/50",
-                                isVerified: false,
+                                senderName: cached.name || "User", 
+                                senderUsername: cached.username || "",
+                                senderPic: cached.photoURL || "",
+                                isVerified: cached.verified || false,
                                 timestamp: timeMillis,
                                 text: "started following you.",
-                                needsFetch: true 
+                                needsFetch: !cached.name 
                             });
-                            fetchUserInfo(f.uid, notifId);
+                            if(!cached.name) fetchUserInfo(f.uid, notifId);
                         }
                     });
                     processAndRender();
@@ -299,12 +307,22 @@
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
                 const uData = uDoc.data();
+                
+                // Update User Cache
+                userCache[uid] = {
+                    name: uData.name || uData.username,
+                    username: uData.username,
+                    photoURL: uData.photoURL,
+                    verified: uData.verified || false
+                };
+                localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+
                 const item = loadedMap.get(notifId);
                 if(item) {
-                    item.senderName = uData.name || uData.username || "User";
-                    item.senderUsername = uData.username || uData.name; 
-                    item.senderPic = uData.photoURL;
-                    item.isVerified = uData.verified || false;
+                    item.senderName = userCache[uid].name;
+                    item.senderUsername = userCache[uid].username; 
+                    item.senderPic = userCache[uid].photoURL;
+                    item.isVerified = userCache[uid].verified;
                     item.needsFetch = false;
                     
                     const nameEl = document.getElementById(`name-${notifId}`);
@@ -319,20 +337,24 @@
         });
     }
 
-    function processAndRender(isFromCache = false) {
+    function processAndRender(fromCache = false) {
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
-            if (!isFromCache) {
+            if (!fromCache) {
                 rawNotifications = Array.from(loadedMap.values());
                 rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
-                // Save to cache for next load
-                localStorage.setItem(CACHE_KEY, JSON.stringify(rawNotifications));
             }
             
             displayedCount = 0;
-            document.getElementById('notif-list').innerHTML = '';
+            const list = document.getElementById('notif-list');
+            list.innerHTML = '';
             renderNextBatch();
-        }, isFromCache ? 0 : 150);
+            
+            // SAVE HTML TO CACHE
+            if(!fromCache && currentFilter === 'all') {
+                localStorage.setItem('goorac_notif_html', list.innerHTML);
+            }
+        }, fromCache ? 0 : 150);
     }
 
     function renderNextBatch() {
@@ -411,12 +433,11 @@
         currentFilter = type;
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-        displayedCount = 0;
-        document.getElementById('notif-list').innerHTML = '';
-        renderNextBatch();
+        processAndRender(true);
     }
 
     function timeAgo(millis) {
+        if(!millis) return "...";
         const seconds = Math.floor((Date.now() - millis) / 1000);
         if (seconds < 60) return `${Math.max(0, seconds)}s`;
         const minutes = Math.floor(seconds / 60);
