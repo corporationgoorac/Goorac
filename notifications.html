@@ -134,12 +134,13 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 0ms CACHE LOAD ---
-    (function loadInitialCache() {
+    // --- 1. 0ms HTML RESTORE ---
+    // Instantly inject the cached HTML into the list container.
+    (function restoreImmediate() {
         const cachedHTML = localStorage.getItem('goorac_notif_html');
         if (cachedHTML && cachedHTML.trim() !== "") {
             document.getElementById('notif-list').innerHTML = cachedHTML;
-            console.log("⚡ Loaded notifications from cache");
+            console.log("⚡ 0ms Restore: HTML injected from cache");
         }
     })();
 
@@ -158,9 +159,20 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    let CACHE_KEY = "goorac_notif_cache";
+    let DATA_CACHE_KEY = "goorac_notif_data";
     let loadedMap = new Map();
+    // User profile cache for name/pfp consistency
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
+
+    // Restore data objects to prevent flickering during Firebase sync
+    function hydrateDataCache(uid) {
+        const cached = localStorage.getItem(`${DATA_CACHE_KEY}_${uid}`);
+        if(cached) {
+            const arr = JSON.parse(cached);
+            arr.forEach(item => loadedMap.set(item.id, item));
+            rawNotifications = arr;
+        }
+    }
 
     function isNotificationRead(id) {
         if(!myUid) return false;
@@ -178,7 +190,7 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                // Visual feedback
+                // Instant Visual Update: Remove unread state
                 const el = document.querySelector(`[data-id="${id}"]`);
                 if(el) el.classList.remove('unread');
             }
@@ -210,7 +222,9 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
-            CACHE_KEY = `goorac_notif_cache_${myUid}`;
+            
+            // Sync current data objects from storage for incremental updates
+            hydrateDataCache(myUid);
 
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
@@ -224,9 +238,9 @@
     });
 
     function initListeners() {
-        const list = document.getElementById('notif-list');
-        loadedMap = new Map();
+        // We do not clear loadedMap or list.innerHTML here to prevent flickering.
 
+        // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -239,17 +253,17 @@
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const notifId = `like_${liker.uid}_${doc.id}`;
                             
-                            // Use cached profile if exists
-                            const cached = userCache[liker.uid] || {};
+                            // PROFILE CACHE SYNC
+                            const u = userCache[liker.uid] || {};
 
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'like',
                                 senderId: liker.uid,
-                                senderName: cached.name || liker.displayName || "Someone",
-                                senderUsername: cached.username || liker.username,
-                                senderPic: cached.photoURL || liker.photoURL,
-                                isVerified: cached.verified || liker.verified || false,
+                                senderName: u.name || liker.displayName || "Someone",
+                                senderUsername: u.username || liker.username,
+                                senderPic: u.photoURL || liker.photoURL,
+                                isVerified: u.verified || liker.verified || false,
                                 timestamp: timeMillis, 
                                 text: "liked your note.",
                                 noteData: { 
@@ -265,6 +279,7 @@
                 processAndRender();
             });
 
+        // 2. FOLLOWERS FROM 'USERS' COLLECTION
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -274,21 +289,21 @@
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const notifId = `follow_${f.uid}`;
                             
-                            const cached = userCache[f.uid] || {};
+                            const u = userCache[f.uid] || {};
 
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
                                 senderId: f.uid,
-                                senderName: cached.name || "User", 
-                                senderUsername: cached.username || "",
-                                senderPic: cached.photoURL || "",
-                                isVerified: cached.verified || false,
+                                senderName: u.name || "User", 
+                                senderUsername: u.username || "",
+                                senderPic: u.photoURL || "",
+                                isVerified: u.verified || false,
                                 timestamp: timeMillis,
                                 text: "started following you.",
-                                needsFetch: !cached.name 
+                                needsFetch: !u.name 
                             });
-                            if(!cached.name) fetchUserInfo(f.uid, notifId);
+                            if(!u.name) fetchUserInfo(f.uid, notifId);
                         }
                     });
                     processAndRender();
@@ -308,7 +323,7 @@
             if(uDoc.exists) {
                 const uData = uDoc.data();
                 
-                // Update User Cache
+                // SAVE TO PERMANENT USER CACHE (localStorage)
                 userCache[uid] = {
                     name: uData.name || uData.username,
                     username: uData.username,
@@ -340,19 +355,28 @@
     function processAndRender(fromCache = false) {
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
+            const list = document.getElementById('notif-list');
+            
+            // Incremental sync logic: Compare fresh data to current list
+            let nextData = fromCache ? rawNotifications : Array.from(loadedMap.values());
+            
             if (!fromCache) {
-                rawNotifications = Array.from(loadedMap.values());
+                // Prevent wiping if live result is empty but cache has data
+                if(nextData.length === 0 && rawNotifications.length > 0) return;
+                
+                rawNotifications = nextData;
                 rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             }
             
             displayedCount = 0;
-            const list = document.getElementById('notif-list');
+            // Clear only when fresh data is sorted and ready to avoid flicker
             list.innerHTML = '';
             renderNextBatch();
             
-            // SAVE HTML TO CACHE
+            // Persist for 0ms loading on next session
             if(!fromCache && currentFilter === 'all') {
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
+                localStorage.setItem(`${DATA_CACHE_KEY}_${myUid}`, JSON.stringify(rawNotifications));
             }
         }, fromCache ? 0 : 150);
     }
