@@ -166,52 +166,11 @@
     let displayedCount = 0;   
     const BATCH_SIZE = 20;     
     let READ_KEY = "goorac_read_notifs"; 
-    let CACHE_KEY = "goorac_notif_cache"; 
     
-    // The Master Map holds all raw data
+    // Memory map for live deduplication
     let loadedMap = new Map();
 
-    // --- 2. INSTANT LOAD (SYNC) ---
-    // Reads cache and renders immediately before Firebase connects
-    try {
-        const lastUid = localStorage.getItem("goorac_last_uid");
-        if(lastUid) {
-            const cachedData = localStorage.getItem(CACHE_KEY + "_" + lastUid);
-            if(cachedData) {
-                const parsed = JSON.parse(cachedData);
-                // Populate map instantly
-                parsed.forEach(n => loadedMap.set(n.id, n));
-                
-                // Prepare initial render list
-                rawNotifications = Array.from(loadedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-                
-                // Deduplicate for display
-                const deduped = deduplicateNotifications(rawNotifications);
-                
-                // Render
-                const list = document.getElementById('notif-list');
-                deduped.slice(0, BATCH_SIZE).forEach(n => {
-                    list.appendChild(createNotificationElement(n));
-                });
-                displayedCount = deduped.length;
-            }
-        }
-    } catch(e) { console.warn("Cache load error", e); }
-
-    // --- 3. HELPER FUNCTIONS ---
-
-    // Deduplicate: Keep only the latest event per user per type
-    function deduplicateNotifications(items) {
-        const seen = new Set();
-        return items.filter(item => {
-            // Key: type + senderId. e.g. "like_user123"
-            const key = `${item.type}_${item.senderId}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
-    }
-
+    // --- 2. LOCAL STORAGE READ LOGIC (Only for Read State) ---
     function isNotificationRead(id) {
         if(!myUid) return false;
         try {
@@ -255,12 +214,11 @@
         });
     }, { threshold: 0.6 });
 
-    // --- 4. AUTH & LIVE DATA ---
+    // --- 3. AUTH & LIVE DATA ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`;
-            localStorage.setItem("goorac_last_uid", myUid);
 
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
@@ -274,7 +232,9 @@
     });
 
     function initListeners() {
-        // We do NOT clear loadedMap. New data merges into it to prevent flash.
+        // Clear everything for a fresh load from Firebase
+        loadedMap.clear();
+        document.getElementById('notif-list').innerHTML = '';
         
         // A. LIKES (From Notes)
         db.collection("notes").where("uid", "==", myUid).limit(30)
@@ -287,7 +247,6 @@
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             
                             // DEDUPLICATION KEY: 'like_USERID'
-                            // This ensures we only keep the latest like per user
                             const notifId = `like_${liker.uid}`; 
 
                             loadedMap.set(notifId, {
@@ -399,16 +358,16 @@
                     item.senderPic = uData.photoURL;
                     item.isVerified = uData.verified || false;
                     item.needsFetch = false;
-                    saveCache();
                     
-                    // Light DOM update
+                    // Light DOM update if element exists (avoids re-rendering whole list)
                     const el = document.querySelector(`div[data-id="${notifId}"]`);
                     if(el) {
                         const nameEl = el.querySelector('.n-username');
                         const imgEl = el.querySelector('.n-avatar');
                         if(nameEl) nameEl.innerHTML = item.senderName + (item.isVerified ? ' <img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">' : '');
                         if(imgEl) imgEl.src = item.senderPic;
-                        // Also update redirect logic now that we have username
+                        
+                        // Update redirect with username
                         if(item.senderUsername) {
                             const newUrl = `userProfile.html?user=${item.senderUsername}`;
                             el.onclick = function(e) {
@@ -433,23 +392,26 @@
             // 2. Sort by newest first
             allItems.sort((a, b) => b.timestamp - a.timestamp);
             
-            // 3. Deduplicate: Remove multiple events from same user of same type
+            // 3. Deduplicate
             rawNotifications = deduplicateNotifications(allItems);
 
-            // 4. Save clean list to cache
-            saveCache();
-
-            // 5. Render fresh
+            // 4. Render fresh
             document.getElementById('notif-list').innerHTML = '';
             displayedCount = 0;
             renderNextBatch();
         }, 150);
     }
 
-    function saveCache() {
-        if(myUid) {
-            localStorage.setItem(CACHE_KEY + "_" + myUid, JSON.stringify(Array.from(loadedMap.values())));
-        }
+    // Deduplicate: Keep only the latest event per user per type
+    function deduplicateNotifications(items) {
+        const seen = new Set();
+        return items.filter(item => {
+            // Key: type + senderId. e.g. "like_user123"
+            const key = `${item.type}_${item.senderId}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     }
 
     function renderNextBatch() {
