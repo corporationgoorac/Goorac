@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Activity | Goorac</title>
+    <title>Notifications | Goorac</title>
     
     <script src="config.js"></script>
     <link rel="manifest" href="/manifest.json">
@@ -19,7 +19,7 @@
             --bg: #000000;
             --surface: #121212;
             --surface-elevated: #1e1e1e;
-            --accent: #0a84ff;
+            --accent: #0a84ff; /* iOS Blue */
             --text-primary: #ffffff;
             --text-secondary: #8e8e93;
             --border: #2c2c2e;
@@ -36,6 +36,8 @@
             padding-bottom: 40px;
             overflow-x: hidden;
             overscroll-behavior-y: none;
+            user-select: none; /* Disable Copy */
+            -webkit-user-select: none;
         }
 
         /* --- HEADER --- */
@@ -65,14 +67,14 @@
             cursor: pointer; background: transparent; padding: 8px 4px;
         }
 
-        /* --- FILTER CHIPS --- */
+        /* --- FILTER CHIPS (New Tab Design) --- */
         .filters-container {
             position: fixed; top: 54px; left: 0; width: 100%;
             background: var(--bg); z-index: 99;
             display: flex; align-items: center; gap: 10px;
             padding: 10px 16px; overflow-x: auto;
             border-bottom: 0.5px solid var(--border);
-            scrollbar-width: none;
+            scrollbar-width: none; /* Hide scrollbar */
         }
         .filters-container::-webkit-scrollbar { display: none; }
 
@@ -98,7 +100,7 @@
             align-items: flex-start; 
             gap: 14px; padding: 16px; position: relative;
             background: transparent; transition: background 0.2s;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border); /* Distinct Border */
             cursor: pointer;
         }
         .notif-item:active { background: rgba(255,255,255,0.03); }
@@ -142,7 +144,7 @@
 
         .time-ago { font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px; }
 
-        /* NOTE PREVIEW */
+        /* NOTE PREVIEW (Goorac Style) */
         .note-preview {
             margin-top: 10px; padding: 12px 16px; border-radius: 14px;
             background: linear-gradient(145deg, #1c1c1e, #121212);
@@ -207,7 +209,7 @@
         #error-toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
 <div id="error-toast">Error fetching data</div>
 
@@ -216,7 +218,7 @@
         <button class="back-btn" onclick="window.history.back()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h1>Activity</h1>
+        <h1>Notifications</h1>
     </div>
     <div class="mark-read-btn" onclick="markAllAsRead()">Mark all read</div>
 </div>
@@ -282,6 +284,7 @@
             currentUser = user;
             setupListeners(limitCount);
             setupScrollObserver();
+            // Clear unread badge on profile immediately
             db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(()=>{});
         } else {
             window.location.href = 'login.html';
@@ -343,6 +346,8 @@
 
         isLoading = false;
         render();
+        // AUTO-MARK LOADED ITEMS AS READ
+        autoMarkLoadedAsRead();
     }
 
     // --- 6. RENDER LOGIC ---
@@ -455,7 +460,7 @@
 
     // --- 7. REDIRECT ---
     function handleRedirect(n, username) {
-        // Mark Read
+        // Mark Read (Redundant check if auto-marked, but good for click feedback)
         if (n.isRead !== true && n.isSeen !== true) {
             const ref = n._collection === 'root' 
                 ? db.collection('notifications').doc(n.id)
@@ -470,7 +475,28 @@
         }
     }
 
-    // --- 8. HELPERS ---
+    // --- 8. HELPERS & AUTO-READ ---
+    function autoMarkLoadedAsRead() {
+        const batch = db.batch();
+        let count = 0;
+        
+        // Filter loaded notifications that are unread
+        rawNotifications.forEach(n => {
+            if (n.isRead !== true && n.isSeen !== true) {
+                const ref = n._collection === 'root' 
+                    ? db.collection('notifications').doc(n.id)
+                    : db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id);
+                batch.update(ref, n._collection === 'root' ? {isSeen:true} : {isRead:true});
+                count++;
+            }
+        });
+
+        if(count > 0) {
+            // Commit batch without waiting to keep UI snappy
+            batch.commit().catch(e => console.log("Auto-read sync failed", e));
+        }
+    }
+
     function switchTab(t) {
         currentTab = t;
         document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
