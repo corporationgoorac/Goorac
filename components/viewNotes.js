@@ -591,23 +591,37 @@ class ViewNotes extends HTMLElement {
             };
         }
 
+        // ==========================================
+        // FIXED: UNIQUE NOTIFICATION ID LOGIC
+        // ==========================================
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30');
                 
+                // 1. Optimistic UI Toggle
+                const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30');
                 likeBtn.innerHTML = isCurrentlyLiked ? icons.heartEmpty : icons.heartFilled;
                 likeBtn.style.transform = "scale(1.3)";
                 setTimeout(() => likeBtn.style.transform = "scale(1)", 150);
 
+                const batch = this.db.batch();
                 const noteRef = this.db.collection("notes").doc(this.currentNote.id);
+                
+                // Create Deterministic ID: like_USERID_NOTEID
+                const notifId = `like_${user.uid}_${this.currentNote.id}`;
+                const notifRef = this.db.collection('notifications').doc(notifId);
+                const receiverRef = this.db.collection('users').doc(this.currentNote.uid);
+
                 try {
                     if (!isCurrentlyLiked) {
+                        // --- LIKE ACTION ---
+                        
+                        // 1. Add to Note Likes
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
-                        await noteRef.update({
+                        batch.update(noteRef, {
                             likes: firebase.firestore.FieldValue.arrayUnion({ 
                                 uid: user.uid, 
                                 displayName: userData.name || user.displayName,
@@ -618,52 +632,63 @@ class ViewNotes extends HTMLElement {
                             })
                         });
                         
+                        // 2. Create Notification (If not self-like)
                         if (this.currentNote.uid !== user.uid) {
-                            // --- ROBUST NOTIFICATION LOGIC START ---
-                            const notifRef = this.db.collection('notifications').doc();
-                            const batch = this.db.batch();
+                            // Check if it already exists to avoid spamming
+                            const docSnap = await notifRef.get();
+                            
+                            if (!docSnap.exists) {
+                                batch.set(notifRef, {
+                                    type: 'like',
+                                    toUid: this.currentNote.uid,
+                                    fromUid: user.uid,
+                                    senderName: userData.name || user.displayName || 'User',
+                                    senderPfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/65',
+                                    isSenderVerified: userData.verified || false,
+                                    noteId: this.currentNote.id,
+                                    noteText: this.currentNote.text || '',
+                                    noteBgColor: this.currentNote.bgColor || '#262626',
+                                    noteTextColor: this.currentNote.textColor || '#fff',
+                                    noteFont: this.currentNote.font || 'system-ui',
+                                    noteTextAlign: this.currentNote.textAlign || 'center',
+                                    noteSongName: this.currentNote.songName || null,
+                                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                                    isSeen: false
+                                });
 
-                            // 1. Create Detailed Notification (For Read Limit Efficiency)
-                            batch.set(notifRef, {
-                                type: 'like',
-                                toUid: this.currentNote.uid,
-                                fromUid: user.uid,
-                                
-                                // Sender Details Snapshot
-                                senderName: userData.name || user.displayName || 'User',
-                                senderPfp: userData.photoURL || user.photoURL || 'https://via.placeholder.com/65',
-                                isSenderVerified: userData.verified || false,
-
-                                // Note Details Snapshot (Colors, Text, etc.)
-                                noteId: this.currentNote.id,
-                                noteText: this.currentNote.text || '',
-                                noteBgColor: this.currentNote.bgColor || '#262626',
-                                noteTextColor: this.currentNote.textColor || '#fff',
-                                noteFont: this.currentNote.font || 'system-ui',
-                                noteTextAlign: this.currentNote.textAlign || 'center',
-                                noteSongName: this.currentNote.songName || null,
-                                
-                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                isSeen: false
-                            });
-
-                            // 2. Increment Unread Count on Receiver Profile (For Red Dot)
-                            const receiverRef = this.db.collection('users').doc(this.currentNote.uid);
-                            batch.update(receiverRef, {
-                                unreadCount: firebase.firestore.FieldValue.increment(1)
-                            });
-
-                            await batch.commit();
-                            // --- ROBUST NOTIFICATION LOGIC END ---
+                                // 3. Increment Counter
+                                batch.update(receiverRef, {
+                                    unreadCount: firebase.firestore.FieldValue.increment(1)
+                                });
+                            }
                         }
 
                     } else {
+                        // --- UNLIKE ACTION ---
+                        
+                        // 1. Remove from Note Likes
                         const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
                         if (likerObj) {
-                            await noteRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
+                            batch.update(noteRef, { 
+                                likes: firebase.firestore.FieldValue.arrayRemove(likerObj) 
+                            });
+                        }
+                        
+                        // 2. Delete Notification (Cleanup)
+                        if (this.currentNote.uid !== user.uid) {
+                            batch.delete(notifRef);
+                            // We do NOT decrement unreadCount here to prevent negative numbers
+                            // or sync issues if they already read it.
                         }
                     }
-                } catch (e) { console.error("Like toggle failed", e); }
+                    
+                    await batch.commit();
+
+                } catch (e) { 
+                    console.error("Like toggle failed", e);
+                    // Revert UI on error
+                    likeBtn.innerHTML = isCurrentlyLiked ? icons.heartFilled : icons.heartEmpty; 
+                }
             };
         }
 
