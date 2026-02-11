@@ -17,14 +17,13 @@
     <style>
         :root {
             --bg: #000;
-            --surface: #0a0a0a;
-            --surface-light: #161618;
+            --surface: #121212;
+            --surface-light: #1e1e1e;
             --accent: #00d2ff;
             --text: #ffffff;
-            --dim: #888;
-            --border: #1f1f22;
-            --unread-bg: rgba(0, 210, 255, 0.08);
-            --danger: #ff3b30;
+            --dim: #a0a0a0;
+            --border: #2a2a2a;
+            --unread-bg: rgba(0, 210, 255, 0.05);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -32,138 +31,142 @@
         body {
             background: var(--bg); color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-            margin: 0; 
-            padding-top: 110px; /* Header + Tabs height */
-            padding-bottom: 90px;
+            margin: 0; padding-top: 112px; padding-bottom: 40px;
             overflow-x: hidden;
         }
+
+        /* --- ERROR TOAST --- */
+        #error-toast {
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: rgba(255, 59, 48, 0.95); color: white; 
+            padding: 12px 24px; border-radius: 50px; 
+            z-index: 9999; font-size: 0.85rem; font-weight: 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        #error-toast.show { transform: translateX(-50%) translateY(0); }
 
         /* --- HEADER --- */
         .header {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.95); 
-            z-index: 100; padding: 0 16px; height: 60px;
+            background: rgba(0,0,0,0.9); z-index: 100; padding: 0 16px; height: 54px;
             border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             display: flex; align-items: center; gap: 15px;
         }
         
         .back-btn {
             background: none; border: none; color: white;
-            font-size: 1.5rem; cursor: pointer; padding: 0;
-            display: flex; align-items: center;
+            font-size: 1.5rem; cursor: pointer; padding: 5px; margin-left: -5px;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        .header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; letter-spacing: -0.5px; flex: 1; }
+        .header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; flex: 1; }
         
         .mark-read-btn {
-            font-size: 0.8rem; color: var(--accent); font-weight: 600;
-            cursor: pointer; padding: 6px 10px; background: rgba(0, 210, 255, 0.1);
-            border-radius: 14px;
+            font-size: 0.75rem; color: var(--accent); font-weight: 600;
+            cursor: pointer; padding: 6px 12px; background: rgba(0, 210, 255, 0.1);
+            border-radius: 20px;
         }
 
         /* --- TABS --- */
         .tabs-container {
-            position: fixed; top: 60px; left: 0; width: 100%;
+            position: fixed; top: 54px; left: 0; width: 100%;
             background: rgba(0,0,0,0.95); z-index: 99;
             display: flex; border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(10px);
+            height: 48px;
         }
         .tab {
-            flex: 1; text-align: center; padding: 12px 0;
-            font-size: 0.9rem; font-weight: 600; color: var(--dim);
-            cursor: pointer; position: relative;
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; font-weight: 500; color: var(--dim);
+            cursor: pointer; position: relative; transition: color 0.2s;
         }
-        .tab.active { color: #fff; }
+        .tab.active { color: #fff; font-weight: 600; }
         .tab.active::after {
             content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 40px; height: 3px; background: var(--accent); border-radius: 2px 2px 0 0;
+            width: 40px; height: 2px; background: var(--accent);
         }
 
-        /* --- LIST CONTAINER --- */
-        .notif-list { display: flex; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; }
+        /* --- LIST --- */
+        .notif-list { display: flex; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; min-height: 50vh; }
 
         .notif-item {
-            display: flex; align-items: flex-start; gap: 14px;
-            padding: 16px 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            background: transparent;
-            transition: background 0.2s;
-            position: relative;
-            cursor: pointer;
+            display: flex; align-items: flex-start; gap: 14px; padding: 16px; position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            background: transparent; transition: background 0.2s; cursor: pointer;
         }
-        
-        .notif-item.unread { 
-            background: var(--unread-bg); 
-            border-left: 3px solid var(--accent);
-        }
+        .notif-item.unread { background: var(--unread-bg); }
         .notif-item:active { background: rgba(255,255,255,0.03); }
 
-        .notif-pfp-wrapper { position: relative; flex-shrink: 0; }
+        .notif-pfp-wrapper { position: relative; flex-shrink: 0; margin-top: 2px; }
         .notif-pfp {
-            width: 44px; height: 44px; border-radius: 50%; 
+            width: 42px; height: 42px; border-radius: 50%; 
             object-fit: cover; background: #222; border: 1px solid var(--border);
         }
         .notif-icon-badge {
-            position: absolute; bottom: -2px; right: -2px;
-            width: 18px; height: 18px; border-radius: 50%;
+            position: absolute; bottom: -4px; right: -4px;
+            width: 20px; height: 20px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            border: 2px solid #000; color: #fff; 
+            border: 2px solid #000; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-        .notif-icon-badge svg { width: 10px; height: 10px; }
+        .notif-icon-badge svg { width: 11px; height: 11px; }
         .icon-like { background: #ff3b30; }
         .icon-follow { background: #00d2ff; }
 
-        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-        
-        .notif-text { font-size: 0.95rem; line-height: 1.4; color: #ccc; }
+        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .notif-text { font-size: 0.95rem; line-height: 1.4; color: #e0e0e0; }
         .notif-username { font-weight: 700; color: #fff; margin-right: 4px; }
         .v-badge { width: 14px; height: 14px; vertical-align: -2px; margin-left: 2px; }
-        
-        .notif-meta { font-size: 0.75rem; color: var(--dim); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+        .notif-meta { font-size: 0.75rem; color: var(--dim); display: flex; align-items: center; gap: 6px; }
 
-        /* --- NOTE PREVIEW BUBBLE --- */
+        /* PREVIEW */
         .notif-preview-box {
-            margin-top: 8px; padding: 10px 14px; border-radius: 14px;
-            font-size: 0.85rem; position: relative; overflow: hidden;
+            margin-top: 8px; padding: 12px 16px; border-radius: 16px;
+            font-size: 0.9rem; position: relative; overflow: hidden;
             display: inline-flex; flex-direction: column; align-items: center;
-            max-width: 100%; align-self: flex-start;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
+            width: fit-content; max-width: 100%; align-self: flex-start;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.08);
         }
         .preview-note-text {
             font-family: system-ui; text-align: center; font-weight: 500;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
         .preview-song-tag {
-            display: flex; align-items: center; gap: 4px; margin-top: 6px;
-            font-size: 0.7rem; opacity: 0.8; background: rgba(0,0,0,0.2);
-            padding: 2px 8px; border-radius: 10px;
+            display: flex; align-items: center; gap: 5px; margin-top: 8px;
+            font-size: 0.75rem; opacity: 0.9; background: rgba(0,0,0,0.2);
+            padding: 4px 10px; border-radius: 20px; color: rgba(255,255,255,0.9);
         }
 
-        /* --- VIEW PROFILE BUTTON --- */
         .view-profile-btn {
-            background: transparent; color: var(--text); 
-            border: 1px solid var(--border);
-            padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; margin-left: 8px; flex-shrink: 0; white-space: nowrap;
+            background: var(--surface-light); color: var(--text); 
+            border: 1px solid var(--border); padding: 8px 14px; border-radius: 10px; 
+            font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-left: 10px; 
+            flex-shrink: 0; align-self: center; white-space: nowrap;
         }
-        .view-profile-btn:active { background: rgba(255,255,255,0.1); }
-
         .unread-dot {
             width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
-            margin-top: 6px; flex-shrink: 0; box-shadow: 0 0 10px var(--accent);
+            margin-top: 8px; flex-shrink: 0; box-shadow: 0 0 8px var(--accent);
         }
 
-        /* SKELETONS */
-        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.05); }
-        .sk-pfp { width: 44px; height: 44px; border-radius: 50%; }
-        .sk-line { height: 12px; border-radius: 6px; margin-bottom: 6px; width: 60%; }
-        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
+        /* LOAD MORE */
+        .load-more-container { padding: 20px; text-align: center; }
+        .load-more-btn {
+            background: transparent; color: var(--accent); border: 1px solid var(--accent);
+            padding: 10px 24px; border-radius: 20px; font-weight: 600; cursor: pointer;
+        }
+        .load-more-btn:active { background: rgba(0, 210, 255, 0.1); }
 
-        .empty-state { text-align: center; padding: 80px 20px; color: var(--dim); }
-        .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; filter: grayscale(1); }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--dim); }
+        .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
+        
+        .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.06); }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
     </style>
 </head>
 <body>
+
+<div id="error-toast"><span>⚠️</span> <span id="error-msg">Error</span></div>
 
 <div class="header">
     <button class="back-btn" onclick="window.history.back()">
@@ -180,80 +183,99 @@
 </div>
 
 <div class="notif-list" id="notif-list">
-    <div class="notif-item">
-        <div class="skeleton sk-pfp"></div>
-        <div style="flex:1">
-            <div class="skeleton sk-line" style="width:40%"></div>
-            <div class="skeleton sk-line"></div>
-        </div>
-    </div>
-    <div class="notif-item">
-        <div class="skeleton sk-pfp"></div>
-        <div style="flex:1">
-            <div class="skeleton sk-line" style="width:50%"></div>
-            <div class="skeleton sk-line" style="width:30%"></div>
-        </div>
+    <div style="padding:16px; display:flex; gap:14px; align-items:center;">
+        <div class="skeleton" style="width:42px; height:42px; border-radius:50%;"></div>
+        <div style="flex:1"><div class="skeleton" style="height:12px; width:60%; margin-bottom:8px; border-radius:6px;"></div><div class="skeleton" style="height:12px; width:40%; border-radius:6px;"></div></div>
     </div>
 </div>
 
+<div class="load-more-container">
+    <button id="load-more-btn" class="load-more-btn" onclick="loadMore()" style="display:none;">Load More</button>
+</div>
+
 <script>
-    // --- FIREBASE INIT ---
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } else if (!firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
+    // --- 1. UTILS ---
+    function showError(msg) {
+        const toast = document.getElementById('error-toast');
+        document.getElementById('error-msg').innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 4000);
     }
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-    
+
+    // --- 2. FIREBASE INIT ---
+    if (typeof firebase === 'undefined') showError("Firebase SDK missing");
+    else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
+
+    let db, auth;
+    try { db = firebase.firestore(); auth = firebase.auth(); } catch(e) { showError(e.message); }
+
+    // --- 3. STATE ---
     let currentUser = null;
     let followsData = [];
     let likesData = [];
     let currentTab = 'all';
+    
+    // LIMITS FOR COST SAVING
+    let limitCount = 10; // 10 follows + 10 likes = 20 reads on load. Very safe.
+    let followsUnsubscribe = null;
+    let likesUnsubscribe = null;
 
     const ICONS = {
         heart: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
         user: `<svg viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
         verified: `https://img.icons8.com/color/48/verified-badge.png`,
-        music: `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`
+        music: `<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`
     };
 
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            currentUser = user;
-            loadNotifications();
-            
-            // Clear Badge on Load
-            db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(e => {});
-        } else {
-            window.location.href = 'login.html';
-        }
-    });
+    if(auth) {
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                setupListeners(limitCount);
+                // Clear badge safely
+                db.collection("users").doc(user.uid).update({ unreadCount: 0 }).catch(() => {});
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+    }
 
-    function loadNotifications() {
+    function setupListeners(limit) {
+        if(!currentUser) return;
         const myUid = currentUser.uid;
 
-        // Listen for Follows
-        db.collection("users").doc(myUid).collection("notifications")
-            .orderBy("timestamp", "desc").limit(40)
+        // Detach old listeners if any (important for load more)
+        if(followsUnsubscribe) followsUnsubscribe();
+        if(likesUnsubscribe) likesUnsubscribe();
+
+        // Listener A: Follows (Limit protected)
+        followsUnsubscribe = db.collection("users").doc(myUid).collection("notifications")
+            .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 followsData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'sub' }));
                 renderNotifications();
-            });
+            }, err => showError("Follows error: " + err.message));
 
-        // Listen for Likes
-        db.collection("notifications")
+        // Listener B: Likes (Limit protected)
+        likesUnsubscribe = db.collection("notifications")
             .where("toUid", "==", myUid)
-            .orderBy("timestamp", "desc").limit(40)
+            .orderBy("timestamp", "desc").limit(limit)
             .onSnapshot(snap => {
                 likesData = snap.docs.map(d => ({ ...d.data(), id: d.id, _collection: 'root' }));
                 renderNotifications();
-            });
+            }, err => showError("Likes error: " + err.message));
+        
+        // Show Load More button if we have data
+        document.getElementById('load-more-btn').style.display = 'inline-block';
+    }
+
+    function loadMore() {
+        limitCount += 15; // Increase limit
+        setupListeners(limitCount); // Re-attach with higher limit
     }
 
     function switchTab(tabName) {
         currentTab = tabName;
-        // Update UI Tabs
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById(`tab-${tabName}`).classList.add('active');
         renderNotifications();
@@ -262,26 +284,17 @@
     function renderNotifications() {
         const list = document.getElementById('notif-list');
         
-        // 1. Merge & Filter
         let all = [...followsData, ...likesData].sort((a, b) => {
             const tA = a.timestamp ? a.timestamp.seconds : 0;
             const tB = b.timestamp ? b.timestamp.seconds : 0;
             return tB - tA; 
         });
 
-        if (currentTab === 'likes') {
-            all = all.filter(n => n.type === 'like');
-        } else if (currentTab === 'follows') {
-            all = all.filter(n => n.type === 'follow');
-        }
+        if (currentTab === 'likes') all = all.filter(n => n.type === 'like');
+        else if (currentTab === 'follows') all = all.filter(n => n.type === 'follow');
 
         if (all.length === 0) {
-            list.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">🔔</div>
-                    <h3>No activity</h3>
-                    <p>Nothing to see in this tab yet.</p>
-                </div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><h3>No activity</h3><p>Nothing here yet.</p></div>`;
             return;
         }
 
@@ -289,58 +302,26 @@
         
         all.forEach(n => {
             const isRead = n.isRead === true || n.isSeen === true;
-            const type = n.type;
-            
+            const type = n.type || 'unknown';
             const rawName = n.senderName || n.fromUsername || 'Someone';
-            // Verification check (adjust logic based on your DB)
             const isVerified = n.isSenderVerified === true || n.isVerified === true; 
             const pfpUrl = n.senderPfp || n.fromPhoto || 'https://via.placeholder.com/150';
 
             const item = document.createElement('div');
             item.className = `notif-item ${!isRead ? 'unread' : ''}`;
             
-            let iconHtml = '';
-            let iconClass = '';
-            let bodyHtml = '';
-            let actionHtml = '';
+            let iconClass = '', iconHtml = '', bodyHtml = '', actionHtml = '';
 
-            // --- LIKE NOTIFICATION ---
             if (type === 'like') {
-                iconClass = 'icon-like'; 
-                iconHtml = ICONS.heart;
-                
+                iconClass = 'icon-like'; iconHtml = ICONS.heart;
                 bodyHtml = `
-                    <span class="notif-text">
-                        <span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
-                        liked your note.
-                    </span>
-                    ${n.noteText ? `
-                        <div class="notif-preview-box" style="background:${n.noteBgColor || '#222'}; color:${n.noteTextColor || '#fff'}">
-                            <div class="preview-note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>
-                            ${n.noteSongName ? `
-                                <div class="preview-song-tag">
-                                    ${ICONS.music} ${escapeHtml(n.noteSongName)}
-                                </div>
-                            ` : ''}
-                        </div>
-                    ` : ''}
+                    <span class="notif-text"><span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span> liked your note.</span>
+                    ${n.noteText ? `<div class="notif-preview-box" style="background:${n.noteBgColor || '#222'}; color:${n.noteTextColor || '#fff'}"><div class="preview-note-text" style="font-family:${n.noteFont || 'system-ui'}">${escapeHtml(n.noteText)}</div>${n.noteSongName ? `<div class="preview-song-tag">${ICONS.music} ${escapeHtml(n.noteSongName)}</div>` : ''}</div>` : ''}
                 `;
-            } 
-            // --- FOLLOW NOTIFICATION ---
-            else if (type === 'follow') {
-                iconClass = 'icon-follow'; 
-                iconHtml = ICONS.user;
-                
-                bodyHtml = `
-                    <span class="notif-text">
-                        <span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span>
-                        started following you.
-                    </span>
-                `;
-                
-                actionHtml = `
-                    <button class="view-profile-btn">View Profile</button>
-                `;
+            } else if (type === 'follow') {
+                iconClass = 'icon-follow'; iconHtml = ICONS.user;
+                bodyHtml = `<span class="notif-text"><span class="notif-username">${escapeHtml(rawName)} ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}</span> started following you.</span>`;
+                actionHtml = `<button class="view-profile-btn">View Profile</button>`;
             }
 
             item.innerHTML = `
@@ -348,90 +329,72 @@
                     <img src="${pfpUrl}" class="notif-pfp" loading="lazy">
                     <div class="notif-icon-badge ${iconClass}">${iconHtml}</div>
                 </div>
-                <div class="notif-content">
-                    ${bodyHtml}
-                    <div class="notif-meta">${timeAgo(n.timestamp)}</div>
-                </div>
+                <div class="notif-content">${bodyHtml}<div class="notif-meta">${timeAgo(n.timestamp)}</div></div>
                 ${actionHtml}
                 ${!isRead ? `<div class="unread-dot"></div>` : ''}
             `;
 
-            // Redirect Logic
-            item.onclick = (e) => handleNotifClick(n);
+            item.onclick = (e) => {
+                if(e.target.classList.contains('view-profile-btn')) return handleNotifClick(n);
+                handleNotifClick(n);
+            };
+            const btn = item.querySelector('.view-profile-btn');
+            if(btn) btn.onclick = (e) => { e.stopPropagation(); handleNotifClick(n); };
 
             list.appendChild(item);
         });
     }
 
     async function handleNotifClick(notif) {
-        // 1. Mark as Read
+        // Mark Read
         const isRead = notif.isSeen === true || notif.isRead === true;
         if(!isRead) {
             try {
-                if(notif._collection === 'root') {
-                    db.collection('notifications').doc(notif.id).update({ isSeen: true });
-                } else {
-                    db.collection('users').doc(currentUser.uid).collection('notifications').doc(notif.id).update({ isRead: true });
-                }
-            } catch(e) { console.log("Mark read silent fail"); }
+                if(notif._collection === 'root') db.collection('notifications').doc(notif.id).update({ isSeen: true });
+                else db.collection('users').doc(currentUser.uid).collection('notifications').doc(notif.id).update({ isRead: true });
+            } catch(e) {}
         }
 
-        // 2. Redirect
-        // For both Likes and Follows, we go to User Profile now (as requested)
-        // If it was a like, we try to use the 'senderName' or 'fromUsername' to build link
-        // Fallback to UID if username is missing
+        // REDIRECT - USERNAME PRIORITY
+        let targetUser = notif.username || notif.fromUsername; // Priority 1: Direct Username field
         
-        let targetUser = notif.senderName || notif.fromUsername || notif.fromUid;
+        if (!targetUser && notif.senderName && !notif.senderName.includes(" ")) {
+            targetUser = notif.senderName; // Priority 2: SenderName if it looks like a username
+        }
         
-        // Usually usernames are better for URL, but if you only stored Display Name in senderName,
-        // you might want to prefer UID or fetch username. 
-        // Assuming your app handles ?user=UID or ?user=USERNAME:
-        if(notif.fromUid) targetUser = notif.fromUid; 
+        if (!targetUser) targetUser = notif.fromUid || notif.uid; // Priority 3: UID
 
-        // Specific handling: If you store actual username in notification, use it
-        if(notif.fromUsername) targetUser = notif.fromUsername;
-
-        window.location.href = `userProfile.html?user=${targetUser}`;
+        if (targetUser) window.location.href = `userProfile.html?user=${targetUser}`;
+        else showError("User not found");
     }
 
     async function markAllAsRead() {
-        const list = document.getElementById('notif-list');
-        list.style.opacity = '0.5';
         const batch = db.batch();
+        let count = 0;
         
-        // Mark loaded ones as read to avoid reading DB again
-        const unreadFollows = followsData.filter(n => !n.isRead);
-        const unreadLikes = likesData.filter(n => !n.isSeen);
-
-        unreadFollows.forEach(n => {
-            const ref = db.collection("users").doc(currentUser.uid).collection("notifications").doc(n.id);
-            batch.update(ref, { isRead: true });
+        [...followsData, ...likesData].forEach(n => {
+            const isRead = n.isRead === true || n.isSeen === true;
+            if(!isRead) {
+                if(n._collection === 'root') batch.update(db.collection('notifications').doc(n.id), { isSeen: true });
+                else batch.update(db.collection('users').doc(currentUser.uid).collection('notifications').doc(n.id), { isRead: true });
+                count++;
+            }
         });
 
-        unreadLikes.forEach(n => {
-            const ref = db.collection("notifications").doc(n.id);
-            batch.update(ref, { isSeen: true });
-        });
-
-        if (unreadFollows.length > 0 || unreadLikes.length > 0) {
-            await batch.commit();
+        if(count > 0) {
+            try { await batch.commit(); } catch(e) { showError("Mark read failed"); }
         }
-        list.style.opacity = '1';
     }
 
     function timeAgo(timestamp) {
         if (!timestamp) return '';
-        const date = timestamp.toDate();
-        const seconds = Math.floor((new Date() - date) / 1000);
+        const seconds = Math.floor((new Date() - timestamp.toDate()) / 1000);
         if (seconds < 60) return 'Just now';
-        const m = Math.floor(seconds / 60);
-        if (m < 60) return `${m}m`;
-        const h = Math.floor(m / 60);
-        if (h < 24) return `${h}h`;
-        const d = Math.floor(h / 24);
-        return `${d}d`;
+        const m = Math.floor(seconds / 60); if (m < 60) return `${m}m`;
+        const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
+        return timestamp.toDate().toLocaleDateString();
     }
-
+    
     function escapeHtml(text) {
         if(!text) return '';
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
