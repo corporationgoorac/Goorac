@@ -1,4 +1,4 @@
-l<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <link rel="manifest" href="/manifest.json">
@@ -58,12 +58,11 @@ l<!DOCTYPE html>
         .notif-item {
             display: flex; align-items: center; gap: 14px;
             padding: 14px 16px; border-bottom: 1px solid #1a1a1a;
-            transition: background 0.2s ease; position: relative;
+            transition: background 0.2s ease, border-left 0.3s ease; position: relative;
             cursor: pointer; border-left: 0px solid transparent;
         }
         .notif-item:active { background: var(--item-hover); }
         
-        /* UNREAD HIGHLIGHTING */
         .notif-item.unread { 
             background: var(--unread-bg); 
             border-left: 3px solid var(--accent);
@@ -100,7 +99,6 @@ l<!DOCTYPE html>
             overflow: hidden;
         }
 
-        /* FOLLOW BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
             padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
@@ -108,31 +106,6 @@ l<!DOCTYPE html>
             min-width: 90px; height: 32px; display: flex; align-items: center; justify-content: center;
         }
         .btn-following { background: transparent; color: var(--text); border: 1px solid var(--border); }
-        .btn-follow:active { transform: scale(0.95); opacity: 0.8; }
-
-        /* CIRCLE LOADER FOR BUTTON */
-        .btn-follow.loading { pointer-events: none; color: transparent !important; }
-        .btn-follow.loading::after {
-            content: ""; position: absolute; width: 14px; height: 14px;
-            border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff;
-            border-radius: 50%; animation: spin 0.6s linear infinite;
-        }
-        .btn-following.loading::after { border-top-color: var(--accent); }
-
-        /* SKELETON ANIMATION */
-        .btn-skeleton {
-            width: 90px; height: 32px; border-radius: 8px;
-            background: #1a1a1a; animation: pulse 1.5s infinite ease-in-out;
-        }
-        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 0.7; } 100% { opacity: 0.4; } }
-
-        .v-badge { width: 13px; height: 13px; vertical-align: -2px; margin-left: 2px; }
-
-        .empty-state {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 60vh; color: var(--text-secondary); text-align: center; gap: 15px;
-        }
-        #loader { display: none; justify-content: center; padding: 20px; }
         .spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: var(--text); border-radius: 50%; animation: spin 0.8s infinite linear; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -155,24 +128,21 @@ l<!DOCTYPE html>
     </header>
 
     <div id="notif-list"></div>
-    <div id="loader"><div class="spinner"></div></div>
+    <div id="loader" style="display:none; justify-content:center; padding:20px;"><div class="spinner"></div></div>
 
 <script>
-    // --- 0. INSTANT HTML CACHE LOAD (0ms Latency) ---
+    // --- 0. 0ms INSTANT HTML LOAD ---
     (function loadHTMLCache() {
         try {
             const cachedHTML = localStorage.getItem('goorac_notif_html');
             if (cachedHTML && cachedHTML.trim().length > 0) {
                 document.getElementById('notif-list').innerHTML = cachedHTML;
             }
-        } catch(e) { console.log('Cache access failed'); }
+        } catch(e) {}
     })();
 
     // --- 1. CONFIG & INIT ---
-    if (window.initFirebaseCore) {
-        window.initFirebaseCore();
-    }
-
+    if (window.initFirebaseCore) window.initFirebaseCore();
     const db = window.db;
     const auth = window.auth;
     
@@ -180,17 +150,49 @@ l<!DOCTYPE html>
     let myFollowingList = []; 
     let currentFilter = 'all';
     let isFollowingLoaded = false;
-    
-    // --- 2. DEDUPLICATION MAP ---
     let notificationsMap = new Map(); 
-    
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
 
-    // --- 3. READ STATUS LOGIC ---
+    // --- 2. GAZE DETECTION (2.5s SEEN) ---
+    const seenTimers = new Map();
+    const seenObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const id = entry.target.dataset.id;
+            // If item is 90% visible and unread
+            if (entry.isIntersecting && entry.intersectionRatio > 0.9) {
+                if(id && entry.target.classList.contains('unread') && !seenTimers.has(id)) {
+                    const timer = setTimeout(() => {
+                        if (entry.target.classList.contains('unread')) {
+                            applyVisualRead(entry.target, id);
+                        }
+                    }, 2500); 
+                    seenTimers.set(id, timer);
+                }
+            } else {
+                // Clear timer if user scrolls away
+                if(seenTimers.has(id)) {
+                    clearTimeout(seenTimers.get(id));
+                    seenTimers.delete(id);
+                }
+            }
+        });
+    }, { threshold: [0, 0.95] });
+
+    function applyVisualRead(element, id) {
+        markNotificationRead(id);
+        element.classList.remove('unread');
+        element.classList.add('read');
+        // Update the 0ms HTML cache so it persists on reload
+        localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
+        seenObserver.unobserve(element);
+        // Trigger a custom event for home.html badges to update
+        window.dispatchEvent(new Event('storage'));
+    }
+
+    // --- 3. STORAGE LOGIC ---
     function isNotificationRead(id) {
         if(!myUid) return false;
         try {
@@ -207,43 +209,31 @@ l<!DOCTYPE html>
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
             }
-        } catch(e) { console.error("LS Error", e); }
+        } catch(e) {}
     }
 
     function markAllRead() {
         const unreadItems = document.querySelectorAll('.notif-item.unread');
-        unreadItems.forEach(el => {
-            markNotificationRead(el.dataset.id);
-            el.classList.remove('unread');
-        });
-        // Update HTML Cache immediately so it sticks on reload
-        setTimeout(() => {
-            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
-        }, 100);
+        unreadItems.forEach(el => applyVisualRead(el, el.dataset.id));
     }
 
-    // --- 4. AUTH & LISTENERS ---
+    // --- 4. FIREBASE AUTH & SNAPSHOTS ---
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
 
-            // Load data cache
             if(window.loadFromCache) {
                  const cachedData = window.loadFromCache(`notifs_${myUid}`);
                  if(cachedData) {
                      cachedData.forEach(item => notificationsMap.set(item.dedupeKey, item));
-                     if(!document.getElementById('notif-list').hasChildNodes()) {
-                        renderList();
-                     }
+                     if(!document.getElementById('notif-list').hasChildNodes()) renderList();
                  }
             }
 
-            // Fetch My Following
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 if(doc.exists) {
-                    const data = doc.data();
-                    myFollowingList = (data.following || []).map(f => typeof f === 'string' ? f : f.uid);
+                    myFollowingList = (doc.data().following || []).map(f => typeof f === 'string' ? f : f.uid);
                     isFollowingLoaded = true;
                     renderList();
                 }
@@ -256,82 +246,53 @@ l<!DOCTYPE html>
     });
 
     function initListeners() {
-        // --- LISTENER 1: LIKES ---
-        db.collection("notes")
-            .where("uid", "==", myUid)
-            .limit(30)
-            .onSnapshot(snapshot => {
-                let hasChanges = false;
-                snapshot.forEach(doc => {
-                    const noteData = doc.data();
-                    if (noteData.likes && Array.isArray(noteData.likes)) {
-                        noteData.likes.forEach((liker) => {
-                            if (!liker.timestamp || liker.uid === myUid) return;
-                            const dedupeKey = `like_${liker.uid}_${doc.id}`; 
-                            if(!notificationsMap.has(dedupeKey)) hasChanges = true;
-
-                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                            const u = userCache[liker.uid] || {};
-
-                            notificationsMap.set(dedupeKey, {
-                                dedupeKey: dedupeKey,
-                                id: `${dedupeKey}_${timeMillis}`,
-                                type: 'like',
-                                senderId: liker.uid,
-                                senderName: u.name || liker.displayName || "Someone",
-                                senderUsername: u.username || liker.username,
-                                senderPic: u.photoURL || liker.photoURL,
-                                isVerified: u.verified || liker.verified || false,
-                                timestamp: timeMillis,
-                                text: "liked your note.",
-                                noteData: { 
-                                    text: noteData.text, 
-                                    songName: noteData.songName, 
-                                    bgColor: noteData.bgColor, 
-                                    textColor: noteData.textColor 
-                                }
-                            });
-                        });
-                    }
-                });
-                if(hasChanges) renderList();
-            });
-
-        // --- LISTENER 2: FOLLOWERS ---
-        db.collection("users").doc(myUid).onSnapshot(doc => {
-            if (doc.exists) {
+        // LIKES LISTENER
+        db.collection("notes").where("uid", "==", myUid).limit(30).onSnapshot(snapshot => {
+            let changed = false;
+            snapshot.forEach(doc => {
                 const data = doc.data();
-                let hasChanges = false;
-
-                if (data.followers && Array.isArray(data.followers)) {
-                    data.followers.forEach(f => {
-                        if (typeof f !== 'object' || !f.timestamp) return;
-
-                        const uid = f.uid;
-                        const ts = f.timestamp; 
-                        const timeMillis = ts.toMillis ? ts.toMillis() : ts;
-                        const dedupeKey = `follow_${uid}`;
-                        
-                        if(!notificationsMap.has(dedupeKey)) hasChanges = true;
-
-                        const u = userCache[uid] || {};
-                        if(!u.name) fetchUserInfo(uid);
-
-                        notificationsMap.set(dedupeKey, {
-                            dedupeKey: dedupeKey,
-                            id: `${dedupeKey}_${timeMillis}`,
-                            type: 'follow',
-                            senderId: uid,
-                            senderName: u.name || "User", 
-                            senderUsername: u.username || "",
-                            senderPic: u.photoURL || "", 
-                            isVerified: u.verified || false,
-                            timestamp: timeMillis, 
-                            text: "started following you."
+                if (data.likes && Array.isArray(data.likes)) {
+                    data.likes.forEach(liker => {
+                        if (!liker.timestamp || liker.uid === myUid) return;
+                        const key = `like_${liker.uid}_${doc.id}`;
+                        if(!notificationsMap.has(key)) changed = true;
+                        const time = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                        const u = userCache[liker.uid] || {};
+                        notificationsMap.set(key, {
+                            dedupeKey: key, id: `${key}_${time}`, type: 'like',
+                            senderId: liker.uid, senderName: u.name || liker.displayName || "Someone",
+                            senderUsername: u.username || liker.username, senderPic: u.photoURL || liker.photoURL,
+                            isVerified: u.verified || false, timestamp: time, text: "liked your note.",
+                            noteData: { text: data.text, bgColor: data.bgColor, textColor: data.textColor }
                         });
                     });
                 }
-                if(hasChanges) renderList();
+            });
+            if(changed) renderList();
+        });
+
+        // FOLLOWS LISTENER
+        db.collection("users").doc(myUid).onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                let changed = false;
+                if (data.followers && Array.isArray(data.followers)) {
+                    data.followers.forEach(f => {
+                        if (typeof f !== 'object' || !f.timestamp) return;
+                        const key = `follow_${f.uid}`;
+                        if(!notificationsMap.has(key)) changed = true;
+                        const time = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                        const u = userCache[f.uid] || {};
+                        if(!u.name) fetchUserInfo(f.uid);
+                        notificationsMap.set(key, {
+                            dedupeKey: key, id: `${key}_${time}`, type: 'follow',
+                            senderId: f.uid, senderName: u.name || "User", 
+                            senderUsername: u.username || "", senderPic: u.photoURL || "", 
+                            isVerified: u.verified || false, timestamp: time, text: "started following you."
+                        });
+                    });
+                }
+                if(changed) renderList();
             }
         });
     }
@@ -339,189 +300,127 @@ l<!DOCTYPE html>
     function fetchUserInfo(uid) {
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
-                const uData = uDoc.data();
-                userCache[uid] = {
-                    name: uData.name || uData.username,
-                    username: uData.username,
-                    photoURL: uData.photoURL,
-                    verified: uData.verified || false
-                };
+                const d = uDoc.data();
+                userCache[uid] = { name: d.name || d.username, username: d.username, photoURL: d.photoURL, verified: d.verified || false };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                const dedupeKey = `follow_${uid}`;
-                if(notificationsMap.has(dedupeKey)) {
-                    const item = notificationsMap.get(dedupeKey);
-                    item.senderName = userCache[uid].name;
-                    item.senderUsername = userCache[uid].username; 
-                    item.senderPic = userCache[uid].photoURL;
-                    item.isVerified = userCache[uid].verified;
-                    renderList();
-                }
+                renderList();
             }
         });
     }
 
-    // --- 5. RENDERING ---
-    let renderTimeout;
+    // --- 5. RENDER CORE ---
+    let renderDebounce;
     function renderList() {
-        if (renderTimeout) clearTimeout(renderTimeout);
-        renderTimeout = setTimeout(() => {
+        if (renderDebounce) clearTimeout(renderDebounce);
+        renderDebounce = setTimeout(() => {
             const list = document.getElementById('notif-list');
-            const loader = document.getElementById('loader');
-            
-            let allNotifs = Array.from(notificationsMap.values());
-            allNotifs.sort((a, b) => b.timestamp - a.timestamp);
+            let all = Array.from(notificationsMap.values()).sort((a,b) => b.timestamp - a.timestamp);
 
-            // --- AUTO MARK READ (FIRST TIME LOGIN) ---
-            // If the user has NEVER saved a read-list before (null), assume they are logging in fresh
-            // and don't want to see 100 old unread notifications.
-            if (localStorage.getItem(READ_KEY) === null && allNotifs.length > 0) {
-                const allIds = allNotifs.map(n => n.id);
-                localStorage.setItem(READ_KEY, JSON.stringify(allIds));
-                // We don't need to re-render, the next check below will simply see them as read.
+            // LOGIC: FIRST TIME LOGIN LOAD (Mark all history as read)
+            if (localStorage.getItem(READ_KEY) === null && all.length > 0) {
+                localStorage.setItem(READ_KEY, JSON.stringify(all.map(n => n.id)));
+                // We update storage, then continue rendering items as "read"
             }
 
-            const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
-
+            const filtered = all.filter(n => (currentFilter === 'all' || n.type === currentFilter));
             if (filtered.length === 0) {
-                list.innerHTML = `<div class="empty-state"><div style="font-size:2rem;">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
-                loader.style.display = 'none';
+                list.innerHTML = `<div class="empty-state">🔔<br><div style="font-size:0.9rem; color:#666; margin-top:10px;">No notifications yet</div></div>`;
                 return;
             }
 
             list.innerHTML = ''; 
-            const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
-            
-            for(let i=0; i < renderLimit; i++) {
-                list.appendChild(createNotificationElement(filtered[i]));
+            const limit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
+            for(let i=0; i < limit; i++) {
+                list.appendChild(createNotifItem(filtered[i]));
             }
+            displayedCount = limit;
+            document.getElementById('loader').style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
 
-            displayedCount = renderLimit;
-            loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
-
-            // SAVE TO CACHE
             if(currentFilter === 'all') {
-                if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, allNotifs);
+                if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, all);
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
             }
-
         }, 100); 
     }
 
-    function createNotificationElement(notif) {
-        const isRead = isNotificationRead(notif.id);
+    function createNotifItem(notif) {
+        const read = isNotificationRead(notif.id);
         const div = document.createElement('div');
-        div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
+        div.className = `notif-item ${read ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         
+        // Gaze Detection Observer
+        if(!read) seenObserver.observe(div);
+
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
-            
-            // 1. Mark in Logic
-            markNotificationRead(this.dataset.id);
-            
-            // 2. Update Visuals
-            this.classList.remove('unread');
-            this.classList.add('read');
-            
-            // 3. FORCE SAVE HTML CACHE (Prevents flash of unread on next reload)
-            // We update the cache immediately with the new 'read' class applied
-            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
-
+            applyVisualRead(this, notif.id);
             if(notif.senderUsername) window.location.href = `userProfile.html?user=${notif.senderUsername}`;
         };
 
-        let actionHtml = '';
-        const verifyIcon = notif.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge">` : '';
-
+        const verify = notif.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" style="width:13px; margin-left:2px; vertical-align:-2px;">` : '';
+        let action = '';
         if (notif.type === 'follow') {
-            if (!isFollowingLoaded) {
-                actionHtml = `<div class="btn-skeleton"></div>`;
-            } else {
-                const isFollowing = myFollowingList.includes(notif.senderId);
-                const btnClass = isFollowing ? 'btn-following' : '';
-                const btnText = isFollowing ? 'Following' : 'Follow';
-                actionHtml = `<button class="btn-follow ${btnClass}" onclick="toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
-            }
+            const isF = myFollowingList.includes(notif.senderId);
+            action = `<button class="btn-follow ${isF?'btn-following':''}" onclick="toggleF(this,'${notif.senderId}')">${isF?'Following':'Follow'}</button>`;
         } else if (notif.type === 'like' && notif.noteData) {
-            let bgStyle = notif.noteData.bgColor && notif.noteData.bgColor.includes('gradient') ? `background: ${notif.noteData.bgColor}` : `background-color: ${notif.noteData.bgColor || '#333'}`;
-            let content = notif.noteData.text ? `<span style="font-size:0.5rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40px;">${notif.noteData.text}</span>` : `<span style="font-size:1rem;">🎵</span>`;
-            actionHtml = `<div class="mini-note" style="${bgStyle}; color:${notif.noteData.textColor || '#fff'}">${content}</div>`;
+            const bg = notif.noteData.bgColor.includes('gradient') ? `background:${notif.noteData.bgColor}` : `background-color:${notif.noteData.bgColor}`;
+            const txt = notif.noteData.text ? `<span style="font-size:0.5rem; display:block; max-height:30px; overflow:hidden;">${notif.noteData.text}</span>` : '🎵';
+            action = `<div class="mini-note" style="${bg}; color:${notif.noteData.textColor}">${txt}</div>`;
         }
 
-        const pic = notif.senderPic || 'https://via.placeholder.com/50';
-
         div.innerHTML = `
-            <img src="${pic}" class="n-avatar" onerror="this.src='https://via.placeholder.com/50'">
+            <img src="${notif.senderPic||'https://via.placeholder.com/50'}" class="n-avatar" onerror="this.src='https://via.placeholder.com/50'">
             <div class="n-content">
-                <span class="n-username">${notif.senderName} ${verifyIcon}</span>
+                <span class="n-username">${notif.senderName}${verify}</span>
                 <span class="n-text">${notif.text}</span>
                 <span class="n-time">${timeAgo(notif.timestamp)}</span>
             </div>
             <div class="unread-dot"></div>
-            <div class="n-action">${actionHtml}</div>
+            <div class="n-action">${action}</div>
         `;
         return div;
     }
 
-    // --- 6. ACTIONS ---
-    async function toggleFollow(btn, targetUid) {
+    async function toggleF(btn, tid) {
         event.stopPropagation();
-        if (btn.classList.contains('loading')) return; 
-
-        btn.classList.add('loading'); 
-        if(navigator.vibrate) navigator.vibrate(15);
-
-        const isCurrentlyFollowing = btn.innerText === "Following";
-        const ts = firebase.firestore.Timestamp.now();
-
+        if (btn.classList.contains('loading')) return;
+        btn.classList.add('loading');
+        if(navigator.vibrate) navigator.vibrate(10);
+        const isF = btn.innerText === "Following";
         try {
-            if (isCurrentlyFollowing) {
-                await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
-                await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
-                btn.innerText = "Follow"; 
-                btn.classList.remove("btn-following");
+            if (isF) {
+                await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(tid) });
+                await db.collection("users").doc(tid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
+                btn.innerText="Follow"; btn.classList.remove("btn-following");
             } else {
-                await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
-                await db.collection("users").doc(targetUid).update({ 
-                    followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) 
-                });
-                btn.innerText = "Following"; 
-                btn.classList.add("btn-following");
+                await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(tid) });
+                await db.collection("users").doc(tid).update({ followers: firebase.firestore.FieldValue.arrayUnion({uid:myUid, timestamp:firebase.firestore.Timestamp.now()}) });
+                btn.innerText="Following"; btn.classList.add("btn-following");
             }
-        } catch (e) {
-            console.error("Action Failed", e);
-        } finally {
-            btn.classList.remove('loading'); 
-        }
+        } catch(e) {} finally { btn.classList.remove('loading'); }
     }
 
-    function filterType(type, element) {
-        currentFilter = type;
-        document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
-        element.classList.add('active');
-        displayedCount = 0; // Reset scroll
+    function filterType(t, el) {
+        currentFilter = t;
+        document.querySelectorAll('.tab-pill').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        displayedCount = 0;
         renderList();
     }
 
-    function timeAgo(millis) {
-        if(!millis) return "...";
-        const seconds = Math.floor((Date.now() - millis) / 1000);
-        if (seconds < 60) return `${Math.max(0, seconds)}s`;
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h`;
-        return `${Math.floor(hours / 24)}d`;
+    function timeAgo(m) {
+        const s = Math.floor((Date.now() - m) / 1000);
+        if (s < 60) return `${Math.max(0, s)}s`;
+        const min = Math.floor(s/60); if (min < 60) return `${min}m`;
+        const h = Math.floor(min/60); if (h < 24) return `${h}h`;
+        return `${Math.floor(h/24)}d`;
     }
 
-    // Infinite Scroll
-    const scrollObserver = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-            displayedCount += BATCH_SIZE;
-            renderList();
-        }
-    }, { root: null, threshold: 0.1 });
-    scrollObserver.observe(document.getElementById('loader'));
+    const scrollObs = new IntersectionObserver((es) => {
+        if (es[0].isIntersecting) { displayedCount += BATCH_SIZE; renderList(); }
+    }, { threshold: 0.1 });
+    scrollObs.observe(document.getElementById('loader'));
 </script>
 </body>
 </html>
