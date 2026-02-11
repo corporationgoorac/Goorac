@@ -11,6 +11,7 @@
     <title>Notifications | Goorac</title>
 
     <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -127,7 +128,6 @@
     </style>
 </head>
 <body>
-
     <chat-loader></chat-loader>
 
     <header>
@@ -147,17 +147,19 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- CONFIG FIXED ---
-    // According to your console, config.js is already running initialization.
-    // We safely check if an app is initialized, otherwise we use window.CONFIG.
-    if (!firebase.apps.length) { 
-        if (window.CONFIG && window.CONFIG.firebase) {
-            firebase.initializeApp(window.CONFIG.firebase); 
+    /**
+     * FIREBASE INITIALIZATION FIX
+     * Your console logs show config.js is already initializing the app.
+     * We check if an app exists before trying to initialize ourselves.
+     */
+    if (!firebase.apps.length) {
+        if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
+            firebase.initializeApp(window.CONFIG.firebase);
         } else {
-            console.error("Firebase Configuration missing! Check config.js");
+            console.error("Firebase Configuration missing! Ensure config.js defines window.CONFIG.firebase");
         }
     }
-    
+
     const db = firebase.firestore();
     const auth = firebase.auth();
     
@@ -244,7 +246,7 @@
         // 1. LIKES FROM 'NOTES' COLLECTION (FIXED)
         db.collection("notes")
             .where("uid", "==", myUid)
-            .limit(30) 
+            .limit(30)
             .onSnapshot(snapshot => {
                 snapshot.forEach(doc => {
                     const noteData = doc.data();
