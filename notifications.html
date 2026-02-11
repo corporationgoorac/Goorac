@@ -59,7 +59,7 @@
             display: flex; align-items: center; gap: 14px;
             padding: 14px 16px; border-bottom: 1px solid #1a1a1a;
             transition: background 0.3s ease; position: relative;
-            cursor: pointer; border-left: 3px solid transparent; /* Always present to prevent layout shift */
+            cursor: pointer; border-left: 3px solid transparent; 
         }
         .notif-item:active { background: var(--item-hover); }
         
@@ -198,60 +198,50 @@
     
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
 
-    // --- 3. AUTO-READ OBSERVER (The new 2.5s logic) ---
-    // Observer options: Trigger when 50% of the item is visible
+    // --- 3. AUTO-READ OBSERVER (2.5 Second Logic) ---
     const readObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const el = entry.target;
             
-            // If element is visible and still unread
+            // Logic: If element is visible and still marked unread
             if (entry.isIntersecting && el.classList.contains('unread')) {
-                // Start a 2.5s timer if not already started
+                // Start a timer if not already running
                 if (!el.dataset.readTimer) {
                     el.dataset.readTimer = setTimeout(() => {
                         handleAutoRead(el);
-                    }, 2500);
+                    }, 2500); // 2.5 seconds
                 }
             } else {
-                // If scrolled away/hidden, clear the timer
+                // If scrolled away before 2.5s, cancel the timer
                 if (el.dataset.readTimer) {
                     clearTimeout(parseInt(el.dataset.readTimer));
                     delete el.dataset.readTimer;
                 }
             }
         });
-    }, { threshold: 0.5 });
+    }, { threshold: 0.5 }); // Trigger when 50% visible
 
     function handleAutoRead(el) {
-        // Visual Update
+        // 1. Visual Update
         el.classList.remove('unread');
         el.classList.add('read');
         
-        // Remove red dot
         const dot = el.querySelector('.unread-dot');
         if(dot) dot.style.display = 'none';
 
-        // Logic Update
+        // 2. Logic Update (Save to LocalStorage)
         const id = el.dataset.id;
         markNotificationRead(id);
         
-        // Cleanup Observer
+        // 3. Cleanup
         readObserver.unobserve(el);
         delete el.dataset.readTimer;
         
-        // Save state to cache so it persists on reload
+        // 4. Update Cache for next reload
         localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
     }
 
     // --- 4. READ STATUS LOGIC ---
-    function isNotificationRead(id) {
-        if(!myUid) return false;
-        try {
-            const readList = JSON.parse(localStorage.getItem(READ_KEY)) || [];
-            return readList.includes(id);
-        } catch(e) { return false; }
-    }
-
     function markNotificationRead(id) {
         if(!myUid || !id) return;
         try {
@@ -266,15 +256,11 @@
     function markAllRead() {
         const unreadItems = document.querySelectorAll('.notif-item.unread');
         unreadItems.forEach(el => {
-            // Visual
             el.classList.remove('unread');
             el.classList.add('read');
-            // Logic
             markNotificationRead(el.dataset.id);
-            // Cleanup Observer
             readObserver.unobserve(el);
         });
-        // Update HTML Cache immediately
         setTimeout(() => {
             localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
         }, 100);
@@ -314,7 +300,7 @@
     });
 
     function initListeners() {
-        // --- LISTENER 1: LIKES ---
+        // LISTENER 1: LIKES
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -355,7 +341,7 @@
                 if(hasChanges) renderList();
             });
 
-        // --- LISTENER 2: FOLLOWERS ---
+        // LISTENER 2: FOLLOWERS
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -429,17 +415,26 @@
             let allNotifs = Array.from(notificationsMap.values());
             allNotifs.sort((a, b) => b.timestamp - a.timestamp);
 
-            // --- AUTO MARK READ (FIRST TIME LOAD FIX) ---
-            // If the user's read list is null (First time on this device/browser),
-            // we assume all currently loaded notifications are "Old" and mark them read
-            // to prevent notification spam.
-            const storedReads = localStorage.getItem(READ_KEY);
-            if (storedReads === null && allNotifs.length > 0) {
-                const allIds = allNotifs.map(n => n.id);
-                localStorage.setItem(READ_KEY, JSON.stringify(allIds));
-                // We don't return here, we let the loop below render them.
-                // Since we just set localstorage, isNotificationRead(id) below will return true.
+            // --- FIXED: FIRST TIME LOAD CHECK ---
+            // If LocalStorage key is null (fresh login/cleared data), 
+            // we grab ALL current IDs, save them as read immediately, 
+            // and use them for this render.
+            let readIds = [];
+            const rawReads = localStorage.getItem(READ_KEY);
+            
+            if (rawReads === null) {
+                // First time: Mark all current as read
+                if (allNotifs.length > 0) {
+                    readIds = allNotifs.map(n => n.id);
+                    localStorage.setItem(READ_KEY, JSON.stringify(readIds));
+                }
+            } else {
+                // Existing user: Parse what we have
+                try { readIds = JSON.parse(rawReads); } catch(e){}
             }
+            
+            // Create a Set for O(1) lookup during loop (Performance)
+            const readSet = new Set(readIds);
 
             const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
@@ -449,20 +444,16 @@
                 return;
             }
 
-            // If we are appending or refreshing, we handle DOM carefully
-            // But here we are rebuilding the list for simplicity on updates
-            // (Note: In a full prod app, we might diff, but rebuilding is safer for preventing duplicate bugs)
+            // Rebuild List
             if(displayedCount === 0) list.innerHTML = ''; 
-            
-            const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
-            
-            // Only append new items if we are scrolling, but if refreshing (renderList called by listener), we might need to clear or diff
-            // For safety and bug clearing: we clear list if displayedCount is small, otherwise we might duplicate.
-            // A simple approach: Clear and re-render up to renderLimit.
             list.innerHTML = '';
 
+            const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
+            
             for(let i=0; i < renderLimit; i++) {
-                list.appendChild(createNotificationElement(filtered[i]));
+                // Pass the read status directly to avoid re-parsing JSON
+                const isRead = readSet.has(filtered[i].id);
+                list.appendChild(createNotificationElement(filtered[i], isRead));
             }
 
             displayedCount = renderLimit;
@@ -477,13 +468,12 @@
         }, 100); 
     }
 
-    function createNotificationElement(notif) {
-        const isRead = isNotificationRead(notif.id);
+    function createNotificationElement(notif, isRead) {
         const div = document.createElement('div');
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         
-        // If unread, attach the auto-read observer
+        // Attach auto-read observer only if unread
         if (!isRead) {
             readObserver.observe(div);
         }
@@ -520,7 +510,6 @@
                 const isFollowing = myFollowingList.includes(notif.senderId);
                 const btnClass = isFollowing ? 'btn-following' : '';
                 const btnText = isFollowing ? 'Following' : 'Follow';
-                // Note: Added stopPropagation inside onclick wrapper just in case
                 actionHtml = `<button class="btn-follow ${btnClass}" onclick="event.stopPropagation(); toggleFollow(this, '${notif.senderId}')">${btnText}</button>`;
             }
         } else if (notif.type === 'like' && notif.noteData) {
@@ -546,7 +535,6 @@
 
     // --- 7. ACTIONS ---
     async function toggleFollow(btn, targetUid) {
-        // Extra safety to stop parent click events
         if(event) { event.stopPropagation(); event.preventDefault(); }
         
         if (btn.classList.contains('loading')) return; 
@@ -563,8 +551,6 @@
                 await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
                 btn.innerText = "Follow"; 
                 btn.classList.remove("btn-following");
-                
-                // Update local list
                 myFollowingList = myFollowingList.filter(id => id !== targetUid);
             } else {
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
@@ -573,8 +559,6 @@
                 });
                 btn.innerText = "Following"; 
                 btn.classList.add("btn-following");
-                
-                // Update local list
                 if(!myFollowingList.includes(targetUid)) myFollowingList.push(targetUid);
             }
         } catch (e) {
@@ -588,7 +572,7 @@
         currentFilter = type;
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-        displayedCount = 0; // Reset scroll
+        displayedCount = 0; 
         renderList();
     }
 
