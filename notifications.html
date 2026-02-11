@@ -161,6 +161,7 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
+    // --- 0. INSTANT HTML CACHE LOAD ---
     (function loadHTMLCache() {
         try {
             const cachedHTML = localStorage.getItem('goorac_notif_html');
@@ -189,6 +190,7 @@
     
     let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
 
+    // --- AUTO READ OBSERVER ---
     const readObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const el = entry.target;
@@ -215,7 +217,7 @@
         markNotificationRead(el.dataset.id);
         readObserver.unobserve(el);
         delete el.dataset.readTimer;
-        localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
+        updateHTMLCache();
     }
 
     function markNotificationRead(id) {
@@ -226,7 +228,7 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
             }
-        } catch(e) { console.error("LS Error", e); }
+        } catch(e) { console.error("Storage Error", e); }
     }
 
     function markAllRead() {
@@ -239,9 +241,13 @@
             markNotificationRead(el.dataset.id);
             readObserver.unobserve(el);
         });
+        updateHTMLCache();
+    }
+
+    function updateHTMLCache() {
         setTimeout(() => {
             localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
-        }, 100);
+        }, 50);
     }
 
     auth.onAuthStateChanged(async (user) => {
@@ -275,6 +281,7 @@
     });
 
     function initListeners() {
+        // LIKES LISTENER
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -315,6 +322,7 @@
                 if(hasChanges) renderList();
             });
 
+        // FOLLOWERS LISTENER
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -372,6 +380,7 @@
         });
     }
 
+    // --- RENDERING ---
     let renderTimeout;
     function renderList() {
         if (renderTimeout) clearTimeout(renderTimeout);
@@ -379,24 +388,23 @@
             const list = document.getElementById('notif-list');
             const loader = document.getElementById('loader');
             
-            // FILTER: Load data from the last 1 day (24 hours)
-            const oneDayAgo = Date.now() - (1 * 24 * 60 * 60 * 1000);
+            // FILTER: 1 Day (24 Hours) logic
+            const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
             
             let allNotifs = Array.from(notificationsMap.values());
             
-            // Apply 1-day filter
-            allNotifs = allNotifs.filter(n => n.timestamp >= oneDayAgo);
-            
-            allNotifs.sort((a, b) => b.timestamp - a.timestamp);
+            // Only show data from last 1 day
+            const filteredByTime = allNotifs.filter(n => n.timestamp >= oneDayAgo);
+            filteredByTime.sort((a, b) => b.timestamp - a.timestamp);
 
             let readIds = [];
-            const rawReads = localStorage.getItem(READ_KEY);
-            if (rawReads !== null) {
-                try { readIds = JSON.parse(rawReads); } catch(e){}
-            }
+            try {
+                const rawReads = localStorage.getItem(READ_KEY);
+                if (rawReads) readIds = JSON.parse(rawReads);
+            } catch(e){}
             
             const readSet = new Set(readIds);
-            const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
+            const filtered = filteredByTime.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="empty-state"><div style="font-size:2rem;">🔔</div><div style="font-size:0.9rem; color:#666;">No recent notifications</div></div>`;
@@ -404,13 +412,10 @@
                 return;
             }
 
-            if(displayedCount === 0) list.innerHTML = ''; 
             list.innerHTML = '';
-
-            const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
+            const renderLimit = Math.min(displayedCount + BATCH_SIZE, filtered.length);
             
             for(let i=0; i < renderLimit; i++) {
-                // Feature removed: No longer marking as read automatically on first visit
                 const isRead = readSet.has(filtered[i].id);
                 list.appendChild(createNotificationElement(filtered[i], isRead));
             }
@@ -422,7 +427,6 @@
                 if(window.saveToCache) window.saveToCache(`notifs_${myUid}`, allNotifs);
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
             }
-
         }, 100); 
     }
 
@@ -431,9 +435,7 @@
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         
-        if (!isRead) {
-            readObserver.observe(div);
-        }
+        if (!isRead) readObserver.observe(div);
 
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
@@ -445,7 +447,7 @@
             if(dot) dot.style.display = 'none';
             
             readObserver.unobserve(this);
-            localStorage.setItem('goorac_notif_html', document.getElementById('notif-list').innerHTML);
+            updateHTMLCache();
 
             if(notif.senderUsername) window.location.href = `userProfile.html?user=${notif.senderUsername}`;
         };
@@ -510,7 +512,7 @@
                 if(!myFollowingList.includes(targetUid)) myFollowingList.push(targetUid);
             }
         } catch (e) {
-            console.error("Action Failed", e);
+            console.error("Follow Error", e);
         } finally {
             btn.classList.remove('loading'); 
         }
