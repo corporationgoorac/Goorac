@@ -639,6 +639,7 @@
     
     // NEW: First load flag for header logic
     let isFirstStatusLoad = true;
+    let offlineCutoffTimer = null; // FEATURE: Track the 15s delay
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -980,14 +981,28 @@
         }, 60000);
 
         rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
-            lastStatusData = snapshot.val();
+            const data = snapshot.val();
             
             if (statusTimeout) clearTimeout(statusTimeout);
             
-            if (!lastStatusData) {
+            if (!data) {
                headerSubLabel.innerText = `@${chatTargetData.username}`;
                headerSubLabel.style.color = "var(--text-secondary)";
                return;
+            }
+
+            // --- 15 SEC CUTOFF LOGIC ---
+            if (data.state === 'online') {
+                clearTimeout(offlineCutoffTimer); // Cancel pending offline hide
+                lastStatusData = data;
+            } else {
+                // User went offline, wait 15 seconds before actually hiding dot/changing text
+                clearTimeout(offlineCutoffTimer);
+                offlineCutoffTimer = setTimeout(() => {
+                    lastStatusData = data;
+                    updateHeaderStatus();
+                }, 15000);
+                return; // Exit here, let the timer handle the update
             }
 
             if (isFirstStatusLoad) {
