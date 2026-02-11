@@ -134,32 +134,18 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    if (window.initFirebaseCore) {
-        window.initFirebaseCore();
-    }
-
+    if (window.initFirebaseCore) { window.initFirebaseCore(); }
     const db = window.db;
     const auth = window.auth;
     
     let myUid = null;
     let myFollowingList = []; 
     let currentFilter = 'all';
-    
     let rawNotifications = []; 
     let displayedCount = 0;   
     const BATCH_SIZE = 15;     
     let READ_KEY = "goorac_read_notifs"; 
-    let CACHE_KEY = "goorac_notif_cache";
     let loadedMap = new Map();
-
-    // --- 0ms CACHE LOADING ---
-    (function loadCache() {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-            rawNotifications = JSON.parse(cached);
-            processAndRender(true); // Immediate render
-        }
-    })();
 
     function isNotificationRead(id) {
         if(!myUid) return false;
@@ -177,9 +163,6 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                // Immediately remove UI unread state
-                const el = document.querySelector(`[data-id="${id}"]`);
-                if(el) el.classList.remove('unread');
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -209,7 +192,6 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
-            CACHE_KEY = `goorac_notif_cache_${myUid}`;
             const myDoc = await db.collection("users").doc(myUid).get();
             if(myDoc.exists) {
                 const data = myDoc.data();
@@ -223,9 +205,10 @@
 
     function initListeners() {
         const list = document.getElementById('notif-list');
-        // No longer clearing innerHTML here to prevent flicker from cache
+        list.innerHTML = ''; 
         loadedMap = new Map();
 
+        // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -236,7 +219,10 @@
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                            
+                            // Deduplicate ID using liker ID and note ID
                             const notifId = `like_${liker.uid}_${doc.id}`;
+
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'like',
@@ -260,6 +246,7 @@
                 processAndRender();
             });
 
+        // 2. FOLLOWERS FROM 'USERS' COLLECTION
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -267,7 +254,10 @@
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                            
+                            // Deduplicate ID using just sender ID for follows
                             const notifId = `follow_${f.uid}`;
+                            
                             loadedMap.set(notifId, {
                                 id: notifId,
                                 type: 'follow',
@@ -319,20 +309,15 @@
         });
     }
 
-    function processAndRender(isFromCache = false) {
+    function processAndRender() {
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
-            if (!isFromCache) {
-                rawNotifications = Array.from(loadedMap.values());
-                rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
-                // Save to cache for next load
-                localStorage.setItem(CACHE_KEY, JSON.stringify(rawNotifications));
-            }
-            
+            rawNotifications = Array.from(loadedMap.values());
+            rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             displayedCount = 0;
             document.getElementById('notif-list').innerHTML = '';
             renderNextBatch();
-        }, isFromCache ? 0 : 150);
+        }, 150);
     }
 
     function renderNextBatch() {
