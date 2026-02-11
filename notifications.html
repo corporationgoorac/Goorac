@@ -11,7 +11,6 @@
     <title>Notifications | Goorac</title>
 
     <script src="config.js"></script>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -128,6 +127,7 @@
     </style>
 </head>
 <body>
+
     <chat-loader></chat-loader>
 
     <header>
@@ -147,14 +147,17 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- CONFIG ---
-    let fbConfig = {};
-
-    if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
-        fbConfig = window.CONFIG.firebase;
+    // --- CONFIG FIXED ---
+    // According to your console, config.js is already running initialization.
+    // We safely check if an app is initialized, otherwise we use window.CONFIG.
+    if (!firebase.apps.length) { 
+        if (window.CONFIG && window.CONFIG.firebase) {
+            firebase.initializeApp(window.CONFIG.firebase); 
+        } else {
+            console.error("Firebase Configuration missing! Check config.js");
+        }
     }
-
-    if (!firebase.apps.length) { firebase.initializeApp(fbConfig); }
+    
     const db = firebase.firestore();
     const auth = firebase.auth();
     
@@ -239,16 +242,14 @@
         const now = Date.now();
 
         // 1. LIKES FROM 'NOTES' COLLECTION (FIXED)
-        // Querying "notes" collection where user is author
         db.collection("notes")
             .where("uid", "==", myUid)
-            .limit(30) // Safety limit, client-side sort
+            .limit(30) 
             .onSnapshot(snapshot => {
                 snapshot.forEach(doc => {
                     const noteData = doc.data();
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
-                            // Skip self-likes and missing timestamps
                             if (!liker.timestamp || liker.uid === myUid) return;
 
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
@@ -277,7 +278,7 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS (Collection: 'users' -> array 'followers')
+        // 2. FOLLOWERS
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -307,7 +308,7 @@
             }
         });
 
-        // 3. GENERAL NOTIFICATIONS (Collection: 'notifications')
+        // 3. GENERAL NOTIFICATIONS
         db.collection('notifications')
             .where('recipientId', '==', myUid)
             .orderBy('timestamp', 'desc')
@@ -435,7 +436,6 @@
         } 
         else if (notif.type === 'like') {
             if (notif.noteData) {
-                // Use 'background' for full gradient support
                 let bgStyle = notif.noteData.bgColor.includes('gradient') 
                     ? `background: ${notif.noteData.bgColor}` 
                     : `background-color: ${notif.noteData.bgColor}`;
