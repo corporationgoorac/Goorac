@@ -63,12 +63,10 @@
         }
         .notif-item:active { background: var(--item-hover); }
         
-        /* UNREAD HIGHLIGHTING */
         .notif-item.unread { 
             background: var(--unread-bg); 
             border-left: 3px solid var(--accent);
         }
-        /* When programmatically removed, transition nicely */
         .notif-item.read {
             background: transparent;
             border-left-color: transparent;
@@ -108,7 +106,6 @@
             overflow: hidden;
         }
 
-        /* FOLLOW BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
             padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
@@ -118,7 +115,6 @@
         .btn-following { background: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-follow:active { transform: scale(0.95); opacity: 0.8; }
 
-        /* CIRCLE LOADER FOR BUTTON */
         .btn-follow.loading { pointer-events: none; color: transparent !important; }
         .btn-follow.loading::after {
             content: ""; position: absolute; width: 14px; height: 14px;
@@ -127,7 +123,6 @@
         }
         .btn-following.loading::after { border-top-color: var(--accent); }
 
-        /* SKELETON ANIMATION */
         .btn-skeleton {
             width: 90px; height: 32px; border-radius: 8px;
             background: #1a1a1a; animation: pulse 1.5s infinite ease-in-out;
@@ -166,7 +161,6 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 0. INSTANT HTML CACHE LOAD ---
     (function loadHTMLCache() {
         try {
             const cachedHTML = localStorage.getItem('goorac_notif_html');
@@ -187,7 +181,6 @@
     let myFollowingList = []; 
     let currentFilter = 'all';
     let isFollowingLoaded = false;
-    let isFirstVisit = false; // Flag to handle "mark all as read" on first visit
     
     let notificationsMap = new Map(); 
     let displayedCount = 0;   
@@ -255,11 +248,6 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
-
-            // Check if this is the first time visiting the notifications page
-            if (localStorage.getItem(READ_KEY) === null) {
-                isFirstVisit = true;
-            }
 
             if(window.loadFromCache) {
                  const cachedData = window.loadFromCache(`notifs_${myUid}`);
@@ -384,7 +372,6 @@
         });
     }
 
-    // --- 6. RENDERING ---
     let renderTimeout;
     function renderList() {
         if (renderTimeout) clearTimeout(renderTimeout);
@@ -392,7 +379,14 @@
             const list = document.getElementById('notif-list');
             const loader = document.getElementById('loader');
             
+            // FILTER: Load data from the last 1 day (24 hours)
+            const oneDayAgo = Date.now() - (1 * 24 * 60 * 60 * 1000);
+            
             let allNotifs = Array.from(notificationsMap.values());
+            
+            // Apply 1-day filter
+            allNotifs = allNotifs.filter(n => n.timestamp >= oneDayAgo);
+            
             allNotifs.sort((a, b) => b.timestamp - a.timestamp);
 
             let readIds = [];
@@ -405,7 +399,7 @@
             const filtered = allNotifs.filter(n => (currentFilter === 'all' || n.type === currentFilter));
 
             if (filtered.length === 0) {
-                list.innerHTML = `<div class="empty-state"><div style="font-size:2rem;">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
+                list.innerHTML = `<div class="empty-state"><div style="font-size:2rem;">🔔</div><div style="font-size:0.9rem; color:#666;">No recent notifications</div></div>`;
                 loader.style.display = 'none';
                 return;
             }
@@ -416,16 +410,9 @@
             const renderLimit = displayedCount + BATCH_SIZE > filtered.length ? filtered.length : displayedCount + BATCH_SIZE;
             
             for(let i=0; i < renderLimit; i++) {
-                // FIX: If isFirstVisit is true, force isRead to true for ALL items
-                const isRead = isFirstVisit ? true : readSet.has(filtered[i].id);
+                // Feature removed: No longer marking as read automatically on first visit
+                const isRead = readSet.has(filtered[i].id);
                 list.appendChild(createNotificationElement(filtered[i], isRead));
-            }
-
-            // Once we have rendered items during a first visit, save them all as read and flip the flag
-            if (isFirstVisit && allNotifs.length > 0) {
-                const allIds = allNotifs.map(n => n.id);
-                localStorage.setItem(READ_KEY, JSON.stringify(allIds));
-                isFirstVisit = false; 
             }
 
             displayedCount = renderLimit;
