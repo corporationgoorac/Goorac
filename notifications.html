@@ -210,7 +210,6 @@
         markNotificationRead(el.dataset.id);
         readObserver.unobserve(el);
         delete el.dataset.readTimer;
-        // updateHTMLCache removed - we use data cache now
     }
 
     function markNotificationRead(id) {
@@ -240,9 +239,7 @@
     function persistDataCache() {
         if(!myUid) return;
         const allData = Array.from(notificationsMap.values());
-        // Sort before saving to ensure order
         allData.sort((a, b) => b.timestamp - a.timestamp);
-        // Limit cache size to avoid bloat (e.g., last 100 items)
         const toSave = allData.slice(0, 100);
         localStorage.setItem(DATA_KEY, JSON.stringify(toSave));
     }
@@ -251,9 +248,9 @@
         if (user) {
             myUid = user.uid;
             READ_KEY = `goorac_read_${myUid}`; 
-            DATA_KEY = `goorac_data_${myUid}`;
+            DATA_KEY = `goorac_data_${myUid}`; // MUST MATCH HOME.HTML KEY
 
-            // 1. INSTANT LOAD FROM LOCAL STORAGE DATA
+            // 1. INSTANT LOAD FROM LOCAL STORAGE DATA (NO DELAY)
             loadFromDataCache();
 
             db.collection("users").doc(myUid).onSnapshot(doc => {
@@ -261,7 +258,6 @@
                     const data = doc.data();
                     myFollowingList = (data.following || []).map(f => typeof f === 'string' ? f : f.uid);
                     isFollowingLoaded = true;
-                    // Re-render only to update button states, don't reshuffle list
                     renderList();
                 }
             });
@@ -277,7 +273,12 @@
             const cachedJson = localStorage.getItem(DATA_KEY);
             if (cachedJson) {
                 const parsed = JSON.parse(cachedJson);
-                parsed.forEach(item => notificationsMap.set(item.dedupeKey, item));
+                // Re-populate map with cache
+                parsed.forEach(item => {
+                    // Unique Key to prevent duplicates: type + sender + target
+                    const dedupeKey = item.dedupeKey || (item.type === 'follow' ? `follow_${item.senderId}` : `like_${item.senderId}_${item.noteId || item.id}`);
+                    notificationsMap.set(dedupeKey, item);
+                });
                 renderList();
             }
         } catch(e) { console.log('Data cache error', e); }
@@ -287,7 +288,7 @@
         // LIKES LISTENER
         db.collection("notes")
             .where("uid", "==", myUid)
-            .limit(30)
+            .limit(50)
             .onSnapshot(snapshot => {
                 let hasNewData = false;
                 snapshot.forEach(doc => {
@@ -295,20 +296,23 @@
                     if (noteData.likes && Array.isArray(noteData.likes)) {
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
-                            const dedupeKey = `like_${liker.uid}_${doc.id}`; 
                             
-                            // CHECK LOCAL STORAGE (MAP) BEFORE UPDATING
-                            if(notificationsMap.has(dedupeKey)) return; // Skip if exists
+                            // STRICT DEDUPE KEY: User + specific note
+                            const dedupeKey = `like_${liker.uid}_${doc.id}`; 
+                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+
+                            // If exists and timestamp is same or older, skip to prevent duplicates
+                            if(notificationsMap.has(dedupeKey) && notificationsMap.get(dedupeKey).timestamp >= timeMillis) return;
 
                             hasNewData = true;
-                            const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const u = userCache[liker.uid] || {};
 
                             notificationsMap.set(dedupeKey, {
                                 dedupeKey: dedupeKey,
-                                id: `${dedupeKey}_${timeMillis}`, // Stable ID
+                                id: `like_${liker.uid}_${timeMillis}`, // Unique ID for Read list
                                 type: 'like',
                                 senderId: liker.uid,
+                                noteId: doc.id,
                                 senderName: u.name || liker.displayName || "Someone",
                                 senderUsername: u.username || liker.username,
                                 senderPic: u.photoURL || liker.photoURL,
@@ -326,8 +330,8 @@
                     }
                 });
                 if(hasNewData) {
-                    persistDataCache(); // Update Cache
-                    renderList();       // Update UI
+                    persistDataCache();
+                    renderList();
                 }
             });
 
@@ -342,10 +346,11 @@
                         const uid = f.uid;
                         const ts = f.timestamp; 
                         const timeMillis = ts.toMillis ? ts.toMillis() : ts;
+                        
+                        // STRICT DEDUPE KEY: Only one follow notification per user
                         const dedupeKey = `follow_${uid}`;
                         
-                        // CHECK LOCAL STORAGE (MAP) BEFORE UPDATING
-                        if(notificationsMap.has(dedupeKey)) return; // Skip if exists
+                        if(notificationsMap.has(dedupeKey) && notificationsMap.get(dedupeKey).timestamp >= timeMillis) return;
 
                         hasNewData = true;
                         const u = userCache[uid] || {};
@@ -353,7 +358,7 @@
                         
                         notificationsMap.set(dedupeKey, {
                             dedupeKey: dedupeKey,
-                            id: `${dedupeKey}_${timeMillis}`,
+                            id: `follow_${uid}_${timeMillis}`,
                             type: 'follow',
                             senderId: uid,
                             senderName: u.name || "User", 
@@ -384,7 +389,6 @@
                     verified: uData.verified || false
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                // Only update if map has this user, to fix name/pic
                 const dedupeKey = `follow_${uid}`;
                 if(notificationsMap.has(dedupeKey)) {
                     const item = notificationsMap.get(dedupeKey);
@@ -392,14 +396,12 @@
                     item.senderUsername = userCache[uid].username; 
                     item.senderPic = userCache[uid].photoURL;
                     item.isVerified = userCache[uid].verified;
-                    persistDataCache();
                     renderList();
                 }
             }
         });
     }
 
-    // --- RENDERING ---
     let renderTimeout;
     function renderList() {
         if (renderTimeout) clearTimeout(renderTimeout);
@@ -407,16 +409,14 @@
             const list = document.getElementById('notif-list');
             const loader = document.getElementById('loader');
             
-            // FILTER: 1 Day (24 Hours) logic
+            // FILTER: Show last 24 hours to match Home Page logic
             const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-            
             let allNotifs = Array.from(notificationsMap.values());
             
             // Only show data from last 1 day
             const filteredByTime = allNotifs.filter(n => n.timestamp >= oneDayAgo);
-            filteredByTime.sort((a, b) => b.timestamp - a.timestamp); // Ensure sorted new->old
+            filteredByTime.sort((a, b) => b.timestamp - a.timestamp);
 
-            // LOAD READ STATUS FRESH
             let readIds = [];
             try {
                 const rawReads = localStorage.getItem(READ_KEY);
@@ -432,24 +432,17 @@
                 return;
             }
 
-            // SMART RENDER (Optional Optimization: Could use DOM diffing, but innerHTML is safe for now with cache)
             list.innerHTML = '';
-            
-            const renderLimit = Math.min(displayedCount + BATCH_SIZE, filtered.length);
-            if (displayedCount === 0 && renderLimit > 0) displayedCount = BATCH_SIZE; // Init default
+            const renderLimit = Math.min(displayedCount || BATCH_SIZE, filtered.length);
+            displayedCount = renderLimit;
 
             for(let i=0; i < renderLimit; i++) {
-                // Determine read status based on ID Match
                 const isRead = readSet.has(filtered[i].id);
                 list.appendChild(createNotificationElement(filtered[i], isRead));
             }
 
-            // Update displayed count var logic
-            if (renderLimit > displayedCount) displayedCount = renderLimit;
-            
             loader.style.display = (displayedCount < filtered.length) ? 'flex' : 'none';
-
-        }, 50); 
+        }, 30); 
     }
 
     function createNotificationElement(notif, isRead) {
@@ -461,16 +454,12 @@
 
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
-            
             markNotificationRead(this.dataset.id);
             this.classList.remove('unread');
             this.classList.add('read');
             const dot = this.querySelector('.unread-dot');
             if(dot) dot.style.display = 'none';
-            
             readObserver.unobserve(this);
-            // No need to update HTML cache string, we rely on DATA cache + ReadKey
-
             if(notif.senderUsername) window.location.href = `userProfile.html?user=${notif.senderUsername}`;
         };
 
@@ -510,41 +499,29 @@
     async function toggleFollow(btn, targetUid) {
         if(event) { event.stopPropagation(); event.preventDefault(); }
         if (btn.classList.contains('loading')) return; 
-
         btn.classList.add('loading'); 
         if(navigator.vibrate) navigator.vibrate(15);
-
         const isCurrentlyFollowing = btn.innerText === "Following";
-        const ts = firebase.firestore.Timestamp.now();
-
         try {
             if (isCurrentlyFollowing) {
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
                 await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
-                btn.innerText = "Follow"; 
-                btn.classList.remove("btn-following");
+                btn.innerText = "Follow"; btn.classList.remove("btn-following");
                 myFollowingList = myFollowingList.filter(id => id !== targetUid);
             } else {
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
-                await db.collection("users").doc(targetUid).update({ 
-                    followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) 
-                });
-                btn.innerText = "Following"; 
-                btn.classList.add("btn-following");
+                await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: firebase.firestore.Timestamp.now() }) });
+                btn.innerText = "Following"; btn.classList.add("btn-following");
                 if(!myFollowingList.includes(targetUid)) myFollowingList.push(targetUid);
             }
-        } catch (e) {
-            console.error("Follow Error", e);
-        } finally {
-            btn.classList.remove('loading'); 
-        }
+        } catch (e) { console.error(e); } finally { btn.classList.remove('loading'); }
     }
 
     function filterType(type, element) {
         currentFilter = type;
         document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
-        displayedCount = 0; 
+        displayedCount = BATCH_SIZE; 
         renderList();
     }
 
