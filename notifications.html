@@ -58,7 +58,7 @@
             display: flex; align-items: center; gap: 14px;
             padding: 14px 16px; border-bottom: 1px solid #1a1a1a;
             transition: background 0.2s ease; position: relative;
-            cursor: pointer; border-left: 0px solid var(--accent);
+            cursor: pointer; border-left: 0px solid transparent;
         }
         .notif-item:active { background: var(--item-hover); }
         
@@ -214,6 +214,7 @@
                 const el = document.querySelector(`.notif-item[data-id="${id}"]`);
                 if(el) {
                     el.classList.remove('unread');
+                    el.classList.add('read');
                 }
             }
         } catch(e) { console.error("LS Error", e); }
@@ -226,14 +227,29 @@
         });
     }
 
+    // --- GAZE DETECTION FIX ---
+    // Uses a timer to ensure user actually "looked" at the message for 2 seconds.
+    const gazeTimers = new Map();
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const row = entry.target;
-                const id = row.dataset.id;
-                if(id && row.classList.contains('unread') && entry.intersectionRatio > 0.9) {
-                    markNotificationRead(id);
-                    gazeObserver.unobserve(row); 
+            const id = entry.target.dataset.id;
+            if (entry.isIntersecting && entry.intersectionRatio > 0.9) {
+                // If it's a new "unread" item in view, start the attention timer
+                if(id && entry.target.classList.contains('unread') && !gazeTimers.has(id)) {
+                    const timer = setTimeout(() => {
+                        // Check one last time if it's still unread before marking
+                        if (entry.target.classList.contains('unread')) {
+                            markNotificationRead(id);
+                            gazeObserver.unobserve(entry.target);
+                        }
+                    }, 2000); // 2 Second "Attention" rule
+                    gazeTimers.set(id, timer);
+                }
+            } else {
+                // If they scroll away before 2 seconds, cancel the mark-as-read
+                if(gazeTimers.has(id)) {
+                    clearTimeout(gazeTimers.get(id));
+                    gazeTimers.delete(id);
                 }
             }
         });
@@ -272,7 +288,7 @@
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             
-                            // CHANGED: Match home.html format exactly for read-state compatibility
+                            // PERFECT MATCH for home.html logic
                             const notifId = `like_${liker.uid}_${timeMillis}`;
                             
                             const u = userCache[liker.uid] || {};
@@ -301,7 +317,7 @@
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             
-                            // CHANGED: Match home.html format exactly with timestamp
+                            // PERFECT MATCH for home.html logic
                             const notifId = `follow_${f.uid}_${timeMillis}`;
                             
                             const u = userCache[f.uid] || {};
