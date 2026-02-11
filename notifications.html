@@ -189,7 +189,11 @@
         const cached = localStorage.getItem(`${DATA_CACHE_KEY}_${uid}`);
         if(cached) {
             const arr = JSON.parse(cached);
-            arr.forEach(item => loadedMap.set(item.id, item));
+            arr.forEach(item => {
+                // Construct dedupe key
+                const mapKey = item.type === 'like' ? `like_${item.senderId}_${item.noteId || item.id}` : `follow_${item.senderId}`;
+                loadedMap.set(mapKey, item);
+            });
             rawNotifications = arr;
         }
     }
@@ -202,6 +206,20 @@
         } catch(e) { return false; }
     }
 
+    // --- FIX: AUTO-READ IF FIRST TIME ---
+    function checkAndMarkFirstTimeRead(notifIds) {
+        const stored = localStorage.getItem(READ_KEY);
+        if (!stored) {
+            // First time loading ever: Mark all current notifications as read
+            localStorage.setItem(READ_KEY, JSON.stringify(notifIds));
+            // Force immediate UI update to remove 'unread' style
+            notifIds.forEach(id => {
+                const el = document.querySelector(`.notif-item[data-id="${id}"]`);
+                if(el) { el.classList.remove('unread'); el.classList.add('read'); }
+            });
+        }
+    }
+
     function markNotificationRead(id) {
         if(!myUid || !id) return;
         try {
@@ -210,12 +228,8 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                
-                const el = document.querySelector(`.notif-item[data-id="${id}"]`);
-                if(el) {
-                    el.classList.remove('unread');
-                    el.classList.add('read');
-                }
+                // Sticky highlight: We update storage but keep visual until reload
+                // Unless triggered by "Mark All" button or First Load logic
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -224,29 +238,25 @@
         const unreadItems = document.querySelectorAll('.notif-item.unread');
         unreadItems.forEach(el => {
             markNotificationRead(el.dataset.id);
+            el.classList.remove('unread'); // Instant visual feedback for manual action
         });
     }
 
-    // --- GAZE DETECTION FIX ---
-    // Uses a timer to ensure user actually "looked" at the message for 2 seconds.
     const gazeTimers = new Map();
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const id = entry.target.dataset.id;
             if (entry.isIntersecting && entry.intersectionRatio > 0.9) {
-                // If it's a new "unread" item in view, start the attention timer
                 if(id && entry.target.classList.contains('unread') && !gazeTimers.has(id)) {
                     const timer = setTimeout(() => {
-                        // Check one last time if it's still unread before marking
                         if (entry.target.classList.contains('unread')) {
                             markNotificationRead(id);
                             gazeObserver.unobserve(entry.target);
                         }
-                    }, 2000); // 2 Second "Attention" rule
+                    }, 2000); 
                     gazeTimers.set(id, timer);
                 }
             } else {
-                // If they scroll away before 2 seconds, cancel the mark-as-read
                 if(gazeTimers.has(id)) {
                     clearTimeout(gazeTimers.get(id));
                     gazeTimers.delete(id);
@@ -276,7 +286,7 @@
     });
 
     function initListeners() {
-        // 1. LIKES FROM 'NOTES'
+        // 1. LIKES (Deduplicated)
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -288,13 +298,16 @@
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             
-                            // PERFECT MATCH for home.html logic
                             const notifId = `like_${liker.uid}_${timeMillis}`;
+                            const mapKey = `like_${liker.uid}_${doc.id}`; 
                             
                             const u = userCache[liker.uid] || {};
 
-                            loadedMap.set(notifId, {
-                                id: notifId, type: 'like', senderId: liker.uid,
+                            loadedMap.set(mapKey, {
+                                id: notifId, // Sync ID for Read Status
+                                noteId: doc.id,
+                                type: 'like',
+                                senderId: liker.uid,
                                 senderName: u.name || liker.displayName || "Someone",
                                 senderUsername: u.username || liker.username,
                                 senderPic: u.photoURL || liker.photoURL,
@@ -308,7 +321,7 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS FROM 'USERS'
+        // 2. FOLLOWERS (Deduplicated)
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -317,19 +330,21 @@
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             
-                            // PERFECT MATCH for home.html logic
                             const notifId = `follow_${f.uid}_${timeMillis}`;
+                            const mapKey = `follow_${f.uid}`; 
                             
                             const u = userCache[f.uid] || {};
 
-                            loadedMap.set(notifId, {
-                                id: notifId, type: 'follow', senderId: f.uid,
+                            loadedMap.set(mapKey, {
+                                id: notifId,
+                                type: 'follow',
+                                senderId: f.uid,
                                 senderName: u.name || "User", senderUsername: u.username || "",
                                 senderPic: u.photoURL || "", isVerified: u.verified || false,
                                 timestamp: timeMillis, text: "started following you.",
                                 needsFetch: !u.name 
                             });
-                            if(!u.name) fetchUserInfo(f.uid, notifId);
+                            if(!u.name) fetchUserInfo(f.uid, mapKey);
                         }
                     });
                     processAndRender();
@@ -344,7 +359,7 @@
         return "liked your note.";
     }
 
-    function fetchUserInfo(uid, notifId) {
+    function fetchUserInfo(uid, mapKey) {
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
                 const uData = uDoc.data();
@@ -355,7 +370,7 @@
                     verified: uData.verified || false
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                const item = loadedMap.get(notifId);
+                const item = loadedMap.get(mapKey);
                 if(item) {
                     item.senderName = userCache[uid].name;
                     item.senderUsername = userCache[uid].username; 
@@ -378,6 +393,11 @@
                 if(nextData.length === 0 && rawNotifications.length > 0) return;
                 rawNotifications = nextData;
                 rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // --- FIRST TIME AUTO-READ CHECK ---
+                // Collect all current IDs
+                const allIds = rawNotifications.map(n => n.id);
+                checkAndMarkFirstTimeRead(allIds);
             }
             
             displayedCount = 0;
@@ -418,6 +438,9 @@
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
             markNotificationRead(this.dataset.id);
+            // Instant remove on click
+            this.classList.remove('unread');
+            this.classList.add('read');
             window.location.href = `userProfile.html?user=${this.dataset.username}`;
         };
 
