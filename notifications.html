@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
 
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000"> 
     <title>Notifications | Goorac</title>
 
     <script src="config.js"></script>
@@ -128,6 +126,7 @@
     </style>
 </head>
 <body>
+
     <chat-loader></chat-loader>
 
     <header>
@@ -147,21 +146,17 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    /**
-     * FIREBASE INITIALIZATION FIX
-     * Your console logs show config.js is already initializing the app.
-     * We check if an app exists before trying to initialize ourselves.
+    /** * --- FIREBASE INITIALIZATION ---
+     * We trigger the initialization function from config.js 
+     * now that the SDK scripts are loaded.
      */
-    if (!firebase.apps.length) {
-        if (typeof window.CONFIG !== 'undefined' && window.CONFIG.firebase) {
-            firebase.initializeApp(window.CONFIG.firebase);
-        } else {
-            console.error("Firebase Configuration missing! Ensure config.js defines window.CONFIG.firebase");
-        }
+    if (window.initFirebaseCore) {
+        window.initFirebaseCore();
     }
 
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+    // Use the global variables established by config.js
+    const db = window.db;
+    const auth = window.auth;
     
     let myUid = null;
     let myFollowingList = []; 
@@ -241,9 +236,8 @@
         const list = document.getElementById('notif-list');
         list.innerHTML = ''; 
         loadedMap = new Map();
-        const now = Date.now();
 
-        // 1. LIKES FROM 'NOTES' COLLECTION (FIXED)
+        // 1. LIKES FROM 'NOTES' COLLECTION
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -446,11 +440,7 @@
                 if(notif.noteData.text) content = `<span style="font-size:0.5rem; display:block;">${notif.noteData.text}</span>`;
                 else if(notif.noteData.songName) content = `<span style="font-size:1rem;">🎵</span>`;
                 
-                actionHtml = `
-                    <div class="mini-note" style="${bgStyle}; color:${notif.noteData.textColor}">
-                        ${content}
-                    </div>
-                `;
+                actionHtml = `<div class="mini-note" style="${bgStyle}; color:${notif.noteData.textColor}">${content}</div>`;
             }
         }
         else if (notif.type === 'comment') {
