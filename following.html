@@ -223,6 +223,8 @@
     let currentUserFollowing = []; 
     let followingIds = []; 
     let processingIds = new Set(); 
+    // --- NOTIFICATION STATE ---
+    let currentUserData = null; 
     
     // Pagination
     let lastFetchedIndex = 0;
@@ -234,6 +236,8 @@
         if (user) { 
             db.collection("users").doc(user.uid).onSnapshot(doc => {
                 const data = doc.data();
+                // --- CAPTURE USER DATA FOR NOTIFICATIONS ---
+                currentUserData = data;
                 if(data && data.following) {
                     currentUserFollowing = data.following.map(f => typeof f === 'string' ? f : f.uid);
                     if (allUsersData.length > 0) {
@@ -446,6 +450,22 @@
                         followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
                         followerCount: firebase.firestore.FieldValue.increment(1)
                     });
+
+                    // --- IMPLEMENT NOTIFICATION SYSTEM ---
+                    if (currentUserData) {
+                        const notifRef = db.collection("users").doc(targetUid).collection("notifications").doc();
+                        batch.set(notifRef, {
+                            type: 'follow',
+                            fromUid: myUid,
+                            fromUsername: currentUserData.username,
+                            fromPhoto: currentUserData.photoURL || 'https://via.placeholder.com/150',
+                            content: `started following you.`,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            isRead: false,
+                            link: `userProfile.html?user=${currentUserData.username}`
+                        });
+                    }
+
                     await batch.commit();
                 }
             }
