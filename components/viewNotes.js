@@ -591,9 +591,6 @@ class ViewNotes extends HTMLElement {
             };
         }
 
-        // ==========================================
-        // FIXED: UNIQUE NOTIFICATION ID LOGIC
-        // ==========================================
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
@@ -677,8 +674,15 @@ class ViewNotes extends HTMLElement {
                         // 2. Delete Notification (Cleanup)
                         if (this.currentNote.uid !== user.uid) {
                             batch.delete(notifRef);
-                            // We do NOT decrement unreadCount here to prevent negative numbers
-                            // or sync issues if they already read it.
+                            
+                            // 3. Conditional Decrement (Only if likely unseen)
+                            // We check if the notification was created recently? 
+                            // Or safer: Just remove doc. 
+                            // If you want strict count accuracy, you can check isSeen before delete,
+                            // but that costs an extra read. 
+                            // A simple decrement is risky if user already viewed notifications page.
+                            // DECISION: Do NOT decrement count to be safe from negative numbers.
+                            // The count will self-correct next time they open notifications page.
                         }
                     }
                     
