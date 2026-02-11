@@ -19,173 +19,170 @@
             --bg: #000000;
             --surface: #121212;
             --surface-elevated: #1e1e1e;
-            --accent: #0095f6;
+            --accent: #0a84ff;
             --text-primary: #ffffff;
-            --text-secondary: #a8a8a8;
-            --border: #262626;
-            --unread-tint: rgba(0, 149, 246, 0.08);
+            --text-secondary: #8e8e93;
+            --border: #2c2c2e;
+            --unread-tint: rgba(10, 132, 255, 0.08);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background: var(--bg); color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
             margin: 0; 
-            padding-top: 108px; /* Header + Tabs */
-            padding-bottom: 30px;
+            padding-top: 110px; /* Header (54) + Filters (56) */
+            padding-bottom: 40px;
             overflow-x: hidden;
             overscroll-behavior-y: none;
         }
 
-        /* --- ERROR TOAST --- */
-        #error-toast {
-            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px);
-            background: #ff3b30; color: white; 
-            padding: 12px 24px; border-radius: 50px; 
-            z-index: 9999; font-size: 0.9rem; font-weight: 600;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: flex; align-items: center; gap: 8px; white-space: nowrap;
-        }
-        #error-toast.show { transform: translateX(-50%) translateY(0); }
-
         /* --- HEADER --- */
         .header {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.9); 
+            background: rgba(0,0,0,0.92); 
             z-index: 100; padding: 0 16px; height: 54px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 0.5px solid var(--border);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             display: flex; align-items: center; justify-content: space-between;
         }
 
-        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-left { display: flex; align-items: center; gap: 8px; }
 
         .back-btn {
-            background: none; border: none; color: white;
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; padding: 0;
+            background: transparent; border: none; color: white;
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; padding: 0; margin-left: -8px;
         }
+        .back-btn svg { width: 24px; height: 24px; }
 
-        .header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; margin: 0; letter-spacing: -0.4px; }
         
         .mark-read-btn {
             font-size: 0.85rem; color: var(--accent); font-weight: 600;
             cursor: pointer; background: transparent; padding: 8px 4px;
         }
 
-        /* --- TABS --- */
-        .tabs-container {
+        /* --- FILTER CHIPS (New Tab Design) --- */
+        .filters-container {
             position: fixed; top: 54px; left: 0; width: 100%;
-            background: rgba(0,0,0,0.92); z-index: 99;
-            display: flex; height: 54px;
-            border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(20px);
+            background: var(--bg); z-index: 99;
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px; overflow-x: auto;
+            border-bottom: 0.5px solid var(--border);
+            scrollbar-width: none; /* Hide scrollbar */
         }
-        .tab {
-            flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: 0.95rem; font-weight: 600; color: var(--text-secondary);
-            cursor: pointer; position: relative; transition: color 0.2s;
+        .filters-container::-webkit-scrollbar { display: none; }
+
+        .filter-chip {
+            padding: 8px 20px; border-radius: 20px;
+            font-size: 0.9rem; font-weight: 600;
+            border: 1px solid var(--border);
+            background: transparent; color: var(--text-secondary);
+            cursor: pointer; white-space: nowrap;
+            transition: all 0.2s ease;
         }
-        .tab.active { color: #fff; }
-        .tab.active::after {
-            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 50%; height: 2px; background: #fff; border-radius: 2px 2px 0 0;
+        .filter-chip.active {
+            background: var(--text-primary);
+            color: var(--bg);
+            border-color: var(--text-primary);
         }
 
-        /* --- LIST --- */
+        /* --- NOTIFICATION LIST --- */
         .notif-list { width: 100%; max-width: 600px; margin: 0 auto; min-height: 60vh; }
 
         .notif-item {
-            display: flex; flex-direction: row; /* Enforce row */
-            align-items: flex-start; /* Align top */
-            gap: 14px; padding: 14px 16px; position: relative;
+            display: flex; flex-direction: row; 
+            align-items: flex-start; 
+            gap: 14px; padding: 16px; position: relative;
             background: transparent; transition: background 0.2s;
+            border-bottom: 1px solid var(--border); /* Distinct Border */
             cursor: pointer;
         }
-        .notif-item:active { background: rgba(255,255,255,0.04); }
+        .notif-item:active { background: rgba(255,255,255,0.03); }
         .notif-item.unread { background: var(--unread-tint); }
         .notif-item.unread::before {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0;
             width: 3px; background: var(--accent);
         }
 
-        /* Profile Pic */
+        /* PFP */
         .notif-pfp-wrapper { position: relative; flex-shrink: 0; padding-top: 2px; }
         .notif-pfp {
             width: 44px; height: 44px; border-radius: 50%; 
-            object-fit: cover; background: #222; border: 1px solid var(--border);
+            object-fit: cover; background: #222; border: 1px solid rgba(255,255,255,0.1);
         }
         
-        /* Mini Type Badge */
         .type-badge {
             position: absolute; bottom: -2px; right: -2px;
             width: 18px; height: 18px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             border: 2px solid #000; color: #fff;
         }
-        .icon-like { background: #ff3040; }
+        .icon-like { background: #ff2d55; }
         .icon-follow { background: #5856d6; }
         .type-badge svg { width: 10px; height: 10px; fill: white; }
 
-        /* Content Area */
-        .notif-content { flex: 1; display: flex; flex-direction: column; min-width: 0; justify-content: center; }
+        /* TEXT CONTENT */
+        .notif-content { flex: 1; display: flex; flex-direction: column; min-width: 0; padding-top: 2px; }
         
-        .text-wrapper {
+        .text-line {
             font-size: 0.95rem; line-height: 1.4; color: var(--text-primary);
         }
 
-        /* Name Alignment Fix */
-        .name-wrapper {
-            display: inline-flex; align-items: center; gap: 4px;
-            vertical-align: top;
+        /* PERFECT ALIGNMENT: Name + Badge */
+        .username-container {
+            display: inline-flex; align-items: center; gap: 4px; 
+            font-weight: 700; color: #fff; vertical-align: top;
+            margin-right: 4px;
         }
-        .username { font-weight: 700; color: #fff; }
         .v-badge { width: 14px; height: 14px; display: block; }
 
         .time-ago { font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px; }
 
-        /* Note Preview (The "Goorac Quantum" look) */
+        /* NOTE PREVIEW (Goorac Style) */
         .note-preview {
-            margin-top: 8px; padding: 12px 16px; border-radius: 14px;
-            background: linear-gradient(135deg, rgba(32,32,32,1) 0%, rgba(20,20,20,1) 100%);
+            margin-top: 10px; padding: 12px 16px; border-radius: 14px;
+            background: linear-gradient(145deg, #1c1c1e, #121212);
             border: 1px solid rgba(255,255,255,0.1);
             width: fit-content; max-width: 100%;
             display: flex; flex-direction: column; align-items: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         .note-text {
             font-family: system-ui; text-align: center; font-weight: 600; font-size: 0.9rem;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-            line-height: 1.35; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            line-height: 1.35; color: rgba(255,255,255,0.95);
         }
         .song-badge {
             display: flex; align-items: center; gap: 5px; margin-top: 8px;
-            background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px;
-            font-size: 0.75rem; color: rgba(255,255,255,0.9);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 100px;
+            font-size: 0.75rem; color: rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.05);
         }
 
-        /* Action Button */
-        .action-container { 
-            display: flex; align-items: center; justify-content: center; 
-            margin-left: 10px; align-self: center; 
+        /* VIEW BUTTON */
+        .action-col {
+            display: flex; align-items: center; justify-content: center;
+            margin-left: 10px; align-self: center;
         }
         .view-btn {
             background: var(--surface-elevated); border: 1px solid var(--border);
             color: #fff; font-size: 0.85rem; font-weight: 600;
-            padding: 6px 16px; border-radius: 8px;
-            cursor: pointer; white-space: nowrap;
+            padding: 6px 16px; border-radius: 10px;
+            cursor: pointer; white-space: nowrap; transition: 0.2s;
         }
+        .view-btn:active { background: #333; transform: scale(0.96); }
 
-        /* Skeletons */
-        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; }
+        /* SKELETONS */
+        .skeleton-wrapper { padding: 16px; display: flex; gap: 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .skeleton { animation: pulse 1.5s infinite; background: rgba(255,255,255,0.08); }
         .sk-pfp { width: 44px; height: 44px; border-radius: 50%; }
         .sk-line { height: 12px; border-radius: 6px; width: 60%; margin-bottom: 6px; }
         .sk-line.short { width: 40%; }
-        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.5; } 100% { opacity: 0.3; } }
 
         .empty-state { text-align: center; padding: 100px 20px; color: var(--text-secondary); }
         .empty-icon { font-size: 40px; margin-bottom: 15px; opacity: 0.3; filter: grayscale(1); }
@@ -196,32 +193,38 @@
         }
         #scroll-spinner.show { opacity: 1; }
         .spinner {
-            width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.2);
+            width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.2);
             border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #error-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: #ff3b30; color: white; padding: 12px 24px; border-radius: 50px;
+            font-weight: 600; font-size: 0.9rem; z-index: 2000; box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            transition: transform 0.4s;
+        }
+        #error-toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
 
-<div id="error-toast">
-    <span>⚠️</span> <span id="error-msg">Error</span>
-</div>
+<div id="error-toast">Error fetching data</div>
 
 <div class="header">
     <div class="header-left">
         <button class="back-btn" onclick="window.history.back()">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <h1>Activity</h1>
     </div>
     <div class="mark-read-btn" onclick="markAllAsRead()">Mark all read</div>
 </div>
 
-<div class="tabs-container">
-    <div class="tab active" onclick="switchTab('all')" id="tab-all">All</div>
-    <div class="tab" onclick="switchTab('likes')" id="tab-likes">Likes</div>
-    <div class="tab" onclick="switchTab('follows')" id="tab-follows">Follows</div>
+<div class="filters-container">
+    <button class="filter-chip active" onclick="switchTab('all')" id="tab-all">All</button>
+    <button class="filter-chip" onclick="switchTab('likes')" id="tab-likes">Likes</button>
+    <button class="filter-chip" onclick="switchTab('follows')" id="tab-follows">Follows</button>
 </div>
 
 <div class="notif-list" id="notif-list">
@@ -235,7 +238,7 @@
     <div class="skeleton-wrapper">
         <div class="skeleton sk-pfp"></div>
         <div style="flex:1">
-            <div class="skeleton sk-line" style="width:50%"></div>
+            <div class="skeleton sk-line"></div>
             <div class="skeleton sk-line short"></div>
         </div>
     </div>
@@ -249,9 +252,8 @@
     // --- 1. CONFIG & UTILS ---
     function showError(msg) {
         const t = document.getElementById('error-toast');
-        document.getElementById('error-msg').innerText = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 4000);
+        t.innerText = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
     }
 
     if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
@@ -323,6 +325,7 @@
         // 2. Identify UIDs needing fetch
         const uidsToFetch = new Set();
         rawNotifications.forEach(n => {
+            // Priority Check for Sender UID
             const uid = n.fromUid || n.uid || n.senderUid;
             if (uid && !userCache[uid]) uidsToFetch.add(uid);
         });
@@ -332,8 +335,8 @@
             const promises = Array.from(uidsToFetch).map(uid => 
                 db.collection('users').doc(uid).get().then(doc => {
                     if (doc.exists) userCache[uid] = doc.data();
-                    else userCache[uid] = { name: 'User', username: 'unknown' };
-                }).catch(() => userCache[uid] = { name: 'User' })
+                    else userCache[uid] = { name: 'Unknown User', username: 'unknown' };
+                }).catch(() => userCache[uid] = { name: 'Unknown User', username: 'unknown' })
             );
             await Promise.all(promises);
         }
@@ -384,11 +387,11 @@
                 iconBadge = `<div class="type-badge icon-like">${ICONS.heart}</div>`;
                 
                 contentHtml = `
-                    <div class="text-wrapper">
-                        <div class="name-wrapper">
-                            <span class="username">${escapeHtml(displayName)}</span>
+                    <div class="text-line">
+                        <span class="username-container">
+                            ${escapeHtml(displayName)} 
                             ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}
-                        </div>
+                        </span>
                         <span style="color:var(--text-secondary);">liked your note.</span>
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
@@ -405,17 +408,17 @@
                 iconBadge = `<div class="type-badge icon-follow">${ICONS.user}</div>`;
                 
                 contentHtml = `
-                    <div class="text-wrapper">
-                        <div class="name-wrapper">
-                            <span class="username">${escapeHtml(displayName)}</span>
+                    <div class="text-line">
+                        <span class="username-container">
+                            ${escapeHtml(displayName)} 
                             ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}
-                        </div>
+                        </span>
                         <span style="color:var(--text-secondary);">started following you.</span>
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
                 `;
                 
-                actionHtml = `<div class="action-container"><button class="view-btn">View</button></div>`;
+                actionHtml = `<div class="action-col"><button class="view-btn">View</button></div>`;
             }
 
             item.innerHTML = `
@@ -427,12 +430,12 @@
                 ${actionHtml}
             `;
 
-            // Click Handler
+            // Click Handlers
             item.onclick = (e) => {
                 if (e.target.classList.contains('view-btn')) e.stopPropagation();
                 handleRedirect(n, handle);
             };
-            if (actionHtml) {
+            if(actionHtml) {
                 item.querySelector('.view-btn').onclick = (e) => {
                     e.stopPropagation();
                     handleRedirect(n, handle);
@@ -453,18 +456,18 @@
             ref.update(n._collection === 'root' ? {isSeen:true} : {isRead:true}).catch(()=>{});
         }
 
-        // Navigate using verified username
         if (username) {
             window.location.href = `userProfile.html?user=${username}`;
         } else {
-            showError("Profile not found");
+            showError("User not found");
         }
     }
 
     // --- 8. HELPERS ---
     function switchTab(t) {
         currentTab = t;
-        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        // Logic for Filter Chips
+        document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
         document.getElementById(`tab-${t}`).classList.add('active');
         render();
     }
