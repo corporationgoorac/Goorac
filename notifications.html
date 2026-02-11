@@ -210,8 +210,12 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                // USER REQUIREMENT: Do NOT remove .unread class from DOM immediately.
-                // Highlighting will only disappear after reload.
+                
+                const el = document.querySelector(`.notif-item[data-id="${id}"]`);
+                if(el) {
+                    el.classList.remove('unread');
+                    el.classList.add('read');
+                }
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -223,22 +227,26 @@
         });
     }
 
-    // Gaze detection with "Attention Rule" (2s)
+    // --- GAZE DETECTION FIX ---
+    // Uses a timer to ensure user actually "looked" at the message for 2 seconds.
     const gazeTimers = new Map();
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const id = entry.target.dataset.id;
             if (entry.isIntersecting && entry.intersectionRatio > 0.9) {
+                // If it's a new "unread" item in view, start the attention timer
                 if(id && entry.target.classList.contains('unread') && !gazeTimers.has(id)) {
                     const timer = setTimeout(() => {
+                        // Check one last time if it's still unread before marking
                         if (entry.target.classList.contains('unread')) {
                             markNotificationRead(id);
                             gazeObserver.unobserve(entry.target);
                         }
-                    }, 2000); 
+                    }, 2000); // 2 Second "Attention" rule
                     gazeTimers.set(id, timer);
                 }
             } else {
+                // If they scroll away before 2 seconds, cancel the mark-as-read
                 if(gazeTimers.has(id)) {
                     clearTimeout(gazeTimers.get(id));
                     gazeTimers.delete(id);
@@ -268,11 +276,7 @@
     });
 
     function initListeners() {
-        // We Use a different key for loadedMap to prevent duplicates for specific pairs
-        // Map Key: like_USER_NOTE
-        // ID: like_USER_TIMESTAMP (to match home.html)
-
-        // 1. LIKES
+        // 1. LIKES FROM 'NOTES'
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -284,15 +288,13 @@
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             
+                            // PERFECT MATCH for home.html logic
                             const notifId = `like_${liker.uid}_${timeMillis}`;
-                            const mapKey = `like_${liker.uid}_${doc.id}`; // Deduplication Key
                             
                             const u = userCache[liker.uid] || {};
 
-                            loadedMap.set(mapKey, {
-                                id: notifId, // For badge sync
-                                type: 'like',
-                                senderId: liker.uid,
+                            loadedMap.set(notifId, {
+                                id: notifId, type: 'like', senderId: liker.uid,
                                 senderName: u.name || liker.displayName || "Someone",
                                 senderUsername: u.username || liker.username,
                                 senderPic: u.photoURL || liker.photoURL,
@@ -306,7 +308,7 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS
+        // 2. FOLLOWERS FROM 'USERS'
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -315,21 +317,19 @@
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             
+                            // PERFECT MATCH for home.html logic
                             const notifId = `follow_${f.uid}_${timeMillis}`;
-                            const mapKey = `follow_${f.uid}`; // Deduplication Key
                             
                             const u = userCache[f.uid] || {};
 
-                            loadedMap.set(mapKey, {
-                                id: notifId, // For badge sync
-                                type: 'follow',
-                                senderId: f.uid,
+                            loadedMap.set(notifId, {
+                                id: notifId, type: 'follow', senderId: f.uid,
                                 senderName: u.name || "User", senderUsername: u.username || "",
                                 senderPic: u.photoURL || "", isVerified: u.verified || false,
                                 timestamp: timeMillis, text: "started following you.",
                                 needsFetch: !u.name 
                             });
-                            if(!u.name) fetchUserInfo(f.uid, mapKey);
+                            if(!u.name) fetchUserInfo(f.uid, notifId);
                         }
                     });
                     processAndRender();
@@ -344,7 +344,7 @@
         return "liked your note.";
     }
 
-    function fetchUserInfo(uid, mapKey) {
+    function fetchUserInfo(uid, notifId) {
         db.collection("users").doc(uid).get().then(uDoc => {
             if(uDoc.exists) {
                 const uData = uDoc.data();
@@ -355,7 +355,7 @@
                     verified: uData.verified || false
                 };
                 localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                const item = loadedMap.get(mapKey);
+                const item = loadedMap.get(notifId);
                 if(item) {
                     item.senderName = userCache[uid].name;
                     item.senderUsername = userCache[uid].username; 
