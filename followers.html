@@ -451,26 +451,64 @@
             } else {
                 const isFollowing = currentUserFollowing.includes(targetUid);
                 if (isFollowing) {
+                    // --- UNFOLLOW START ---
                     await removeFromList(myUid, 'following', targetUid);
                     await removeFromList(targetUid, 'followers', myUid);
+
+                    // NOTIFICATION CLEANUP LOGIC
+                    try {
+                         // Find the exact follow notification sent by YOU to THEM
+                         const notifQuery = await db.collection("users").doc(targetUid)
+                             .collection("notifications")
+                             .where("fromUid", "==", myUid)
+                             .where("type", "==", "follow")
+                             .limit(1)
+                             .get();
+
+                         if (!notifQuery.empty) {
+                             const notifDoc = notifQuery.docs[0];
+                             const notifData = notifDoc.data();
+                             
+                             // 1. Delete the notification
+                             await notifDoc.ref.delete();
+                             
+                             // 2. Decrement badge ONLY if it wasn't seen yet
+                             if (notifData.isRead === false) {
+                                 await db.collection("users").doc(targetUid).update({
+                                     unreadCount: firebase.firestore.FieldValue.increment(-1)
+                                 });
+                             }
+                         }
+                    } catch(err) {
+                        console.error("Cleanup notification failed:", err);
+                    }
+                    // --- UNFOLLOW END ---
+
                 } else {
+                    // --- FOLLOW START ---
                     const batch = db.batch();
+                    
                     batch.update(db.collection("users").doc(myUid), {
                         following: firebase.firestore.FieldValue.arrayUnion(myFollowData),
                         followingCount: firebase.firestore.FieldValue.increment(1)
                     });
+                    
+                    // FIXED: Add unreadCount increment here
                     batch.update(db.collection("users").doc(targetUid), {
                         followers: firebase.firestore.FieldValue.arrayUnion(theirFollowerData),
-                        followerCount: firebase.firestore.FieldValue.increment(1)
+                        followerCount: firebase.firestore.FieldValue.increment(1),
+                        unreadCount: firebase.firestore.FieldValue.increment(1)
                     });
 
                     // --- IMPLEMENT NOTIFICATION SYSTEM ---
                     if (currentUserData) {
                         const notifRef = db.collection("users").doc(targetUid).collection("notifications").doc();
+                        // FIXED: Added full details (name, photo)
                         batch.set(notifRef, {
                             type: 'follow',
                             fromUid: myUid,
                             fromUsername: currentUserData.username,
+                            fromName: currentUserData.name || currentUserData.username,
                             fromPhoto: currentUserData.photoURL || 'https://via.placeholder.com/150',
                             content: `started following you.`,
                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
