@@ -136,7 +136,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
     <chat-loader></chat-loader>
 
@@ -226,13 +226,11 @@
         });
     }
 
-    // Fixed Gaze Observer Logic to prevent auto-reading during fast scroll
     const gazeObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const row = entry.target;
                 const id = row.dataset.id;
-                // Only mark read if it stays in view for a moment (threshold 0.95)
                 if(id && row.classList.contains('unread') && entry.intersectionRatio > 0.9) {
                     markNotificationRead(id);
                     gazeObserver.unobserve(row); 
@@ -262,7 +260,7 @@
     });
 
     function initListeners() {
-        // 1. LIKES
+        // 1. LIKES FROM 'NOTES'
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -273,7 +271,10 @@
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                            const notifId = `like_${liker.uid}_${doc.id}`;
+                            
+                            // CHANGED: Match home.html format exactly for read-state compatibility
+                            const notifId = `like_${liker.uid}_${timeMillis}`;
+                            
                             const u = userCache[liker.uid] || {};
 
                             loadedMap.set(notifId, {
@@ -291,7 +292,7 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS
+        // 2. FOLLOWERS FROM 'USERS'
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -299,7 +300,10 @@
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            const notifId = `follow_${f.uid}`;
+                            
+                            // CHANGED: Match home.html format exactly with timestamp
+                            const notifId = `follow_${f.uid}_${timeMillis}`;
+                            
                             const u = userCache[f.uid] || {};
 
                             loadedMap.set(notifId, {
@@ -316,6 +320,12 @@
                 }
             }
         });
+    }
+
+    function getNotifText(type) {
+        if(type === 'comment') return "commented on your note.";
+        if(type === 'mention') return "mentioned you.";
+        return "liked your note.";
     }
 
     function fetchUserInfo(uid, notifId) {
@@ -346,15 +356,18 @@
         if (window.renderTimeout) clearTimeout(window.renderTimeout);
         window.renderTimeout = setTimeout(() => {
             const list = document.getElementById('notif-list');
-            let nextData = fromCache ? rawNotifications : Array.from(loadedMap.values());
+            let nextData = Array.from(loadedMap.values());
+            
             if (!fromCache) {
                 if(nextData.length === 0 && rawNotifications.length > 0) return;
                 rawNotifications = nextData;
                 rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
             }
+            
             displayedCount = 0;
             list.innerHTML = '';
             renderNextBatch();
+            
             if(!fromCache && currentFilter === 'all') {
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
                 localStorage.setItem(`${DATA_CACHE_KEY}_${myUid}`, JSON.stringify(rawNotifications));
@@ -380,7 +393,6 @@
     function createNotificationElement(notif) {
         const isRead = isNotificationRead(notif.id);
         const div = document.createElement('div');
-        // If not in READ_KEY list, add 'unread' class to trigger highlighting
         div.className = `notif-item ${isRead ? 'read' : 'unread'}`;
         div.dataset.id = notif.id; 
         div.dataset.username = notif.senderUsername || notif.senderName || notif.senderId;
