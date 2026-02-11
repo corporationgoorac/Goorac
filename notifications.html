@@ -62,7 +62,6 @@
         }
         .notif-item:active { background: var(--item-hover); }
         
-        /* UNREAD HIGHLIGHTING */
         .notif-item.unread { 
             background: var(--unread-bg); 
             border-left: 3px solid var(--accent);
@@ -99,7 +98,6 @@
             overflow: hidden;
         }
 
-        /* FOLLOW BUTTONS */
         .btn-follow {
             background: var(--accent); color: white; border: none;
             padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
@@ -109,7 +107,6 @@
         .btn-following { background: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-follow:active { transform: scale(0.95); opacity: 0.8; }
 
-        /* CIRCLE LOADER FOR BUTTON */
         .btn-follow.loading { pointer-events: none; color: transparent !important; }
         .btn-follow.loading::after {
             content: ""; position: absolute; width: 14px; height: 14px;
@@ -118,7 +115,6 @@
         }
         .btn-following.loading::after { border-top-color: var(--accent); }
 
-        /* SKELETON ANIMATION */
         .btn-skeleton {
             width: 90px; height: 32px; border-radius: 8px;
             background: #1a1a1a; animation: pulse 1.5s infinite ease-in-out;
@@ -157,7 +153,6 @@
     <div id="loader"><div class="spinner"></div></div>
 
 <script>
-    // --- 1. 0ms CACHE LOAD ---
     (function loadInitialCache() {
         const cachedHTML = localStorage.getItem('goorac_notif_html');
         if (cachedHTML && cachedHTML.trim() !== "") {
@@ -190,7 +185,6 @@
         if(cached) {
             const arr = JSON.parse(cached);
             arr.forEach(item => {
-                // Construct dedupe key
                 const mapKey = item.type === 'like' ? `like_${item.senderId}_${item.noteId || item.id}` : `follow_${item.senderId}`;
                 loadedMap.set(mapKey, item);
             });
@@ -206,20 +200,6 @@
         } catch(e) { return false; }
     }
 
-    // --- FIX: AUTO-READ IF FIRST TIME ---
-    function checkAndMarkFirstTimeRead(notifIds) {
-        const stored = localStorage.getItem(READ_KEY);
-        if (!stored) {
-            // First time loading ever: Mark all current notifications as read
-            localStorage.setItem(READ_KEY, JSON.stringify(notifIds));
-            // Force immediate UI update to remove 'unread' style
-            notifIds.forEach(id => {
-                const el = document.querySelector(`.notif-item[data-id="${id}"]`);
-                if(el) { el.classList.remove('unread'); el.classList.add('read'); }
-            });
-        }
-    }
-
     function markNotificationRead(id) {
         if(!myUid || !id) return;
         try {
@@ -228,8 +208,6 @@
                 readList.push(id);
                 localStorage.setItem(READ_KEY, JSON.stringify(readList));
                 window.dispatchEvent(new Event('storage'));
-                // Sticky highlight: We update storage but keep visual until reload
-                // Unless triggered by "Mark All" button or First Load logic
             }
         } catch(e) { console.error("LS Error", e); }
     }
@@ -238,7 +216,8 @@
         const unreadItems = document.querySelectorAll('.notif-item.unread');
         unreadItems.forEach(el => {
             markNotificationRead(el.dataset.id);
-            el.classList.remove('unread'); // Instant visual feedback for manual action
+            el.classList.remove('unread');
+            el.classList.add('read');
         });
     }
 
@@ -251,6 +230,8 @@
                     const timer = setTimeout(() => {
                         if (entry.target.classList.contains('unread')) {
                             markNotificationRead(id);
+                            entry.target.classList.remove('unread');
+                            entry.target.classList.add('read');
                             gazeObserver.unobserve(entry.target);
                         }
                     }, 2000); 
@@ -286,7 +267,6 @@
     });
 
     function initListeners() {
-        // 1. LIKES (Deduplicated)
         db.collection("notes")
             .where("uid", "==", myUid)
             .limit(30)
@@ -297,14 +277,11 @@
                         noteData.likes.forEach((liker) => {
                             if (!liker.timestamp || liker.uid === myUid) return;
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
-                            
                             const notifId = `like_${liker.uid}_${timeMillis}`;
                             const mapKey = `like_${liker.uid}_${doc.id}`; 
-                            
                             const u = userCache[liker.uid] || {};
-
                             loadedMap.set(mapKey, {
-                                id: notifId, // Sync ID for Read Status
+                                id: notifId, 
                                 noteId: doc.id,
                                 type: 'like',
                                 senderId: liker.uid,
@@ -321,7 +298,6 @@
                 processAndRender();
             });
 
-        // 2. FOLLOWERS (Deduplicated)
         db.collection("users").doc(myUid).onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -329,12 +305,9 @@
                     data.followers.forEach(f => {
                         if (typeof f === 'object' && f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
-                            
                             const notifId = `follow_${f.uid}_${timeMillis}`;
                             const mapKey = `follow_${f.uid}`; 
-                            
                             const u = userCache[f.uid] || {};
-
                             loadedMap.set(mapKey, {
                                 id: notifId,
                                 type: 'follow',
@@ -351,12 +324,6 @@
                 }
             }
         });
-    }
-
-    function getNotifText(type) {
-        if(type === 'comment') return "commented on your note.";
-        if(type === 'mention') return "mentioned you.";
-        return "liked your note.";
     }
 
     function fetchUserInfo(uid, mapKey) {
@@ -388,22 +355,14 @@
         window.renderTimeout = setTimeout(() => {
             const list = document.getElementById('notif-list');
             let nextData = Array.from(loadedMap.values());
-            
             if (!fromCache) {
                 if(nextData.length === 0 && rawNotifications.length > 0) return;
                 rawNotifications = nextData;
                 rawNotifications.sort((a, b) => b.timestamp - a.timestamp);
-                
-                // --- FIRST TIME AUTO-READ CHECK ---
-                // Collect all current IDs
-                const allIds = rawNotifications.map(n => n.id);
-                checkAndMarkFirstTimeRead(allIds);
             }
-            
             displayedCount = 0;
             list.innerHTML = '';
             renderNextBatch();
-            
             if(!fromCache && currentFilter === 'all') {
                 localStorage.setItem('goorac_notif_html', list.innerHTML);
                 localStorage.setItem(`${DATA_CACHE_KEY}_${myUid}`, JSON.stringify(rawNotifications));
@@ -416,7 +375,7 @@
         const loader = document.getElementById('loader');
         const filtered = rawNotifications.filter(n => (currentFilter === 'all' || n.type === currentFilter));
         if (filtered.length === 0 && displayedCount === 0) {
-            list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
+            list.innerHTML = `<div class="empty-state"><div>🔔</div><div style="font-size:0.9rem; color:#666;">No notifications yet</div></div>`;
             loader.style.display = 'none';
             return;
         }
@@ -438,7 +397,6 @@
         div.onclick = function(e) {
             if(e.target.closest('button')) return;
             markNotificationRead(this.dataset.id);
-            // Instant remove on click
             this.classList.remove('unread');
             this.classList.add('read');
             window.location.href = `userProfile.html?user=${this.dataset.username}`;
@@ -461,9 +419,9 @@
         }
 
         div.innerHTML = `
-            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" id="pfp-${notif.id}" class="n-avatar">
+            <img src="${notif.senderPic || 'https://via.placeholder.com/50'}" class="n-avatar">
             <div class="n-content">
-                <span class="n-username" id="name-${notif.id}">${notif.senderName} ${verifyIcon}</span>
+                <span class="n-username">${notif.senderName} ${verifyIcon}</span>
                 <span class="n-text">${notif.text}</span>
                 <span class="n-time">${timeAgo(notif.timestamp)}</span>
             </div>
@@ -476,13 +434,9 @@
     async function toggleFollow(btn, targetUid) {
         event.stopPropagation();
         if (btn.classList.contains('loading')) return; 
-
         btn.classList.add('loading'); 
         if(navigator.vibrate) navigator.vibrate(15);
-
         const isCurrentlyFollowing = btn.innerText === "Following";
-        const ts = firebase.firestore.Timestamp.now();
-
         try {
             if (isCurrentlyFollowing) {
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
@@ -490,14 +444,10 @@
                 btn.innerText = "Follow"; btn.classList.remove("btn-following");
             } else {
                 await db.collection("users").doc(myUid).update({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) });
-                await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
+                await db.collection("users").doc(targetUid).update({ followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: firebase.firestore.Timestamp.now() }) });
                 btn.innerText = "Following"; btn.classList.add("btn-following");
             }
-        } catch (e) {
-            console.error("Action Failed", e);
-        } finally {
-            btn.classList.remove('loading'); 
-        }
+        } catch (e) { console.error(e); } finally { btn.classList.remove('loading'); }
     }
 
     function filterType(type, element) {
