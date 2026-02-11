@@ -121,6 +121,7 @@ class ChatLoader extends HTMLElement {
     startNotificationListener() {
         const db = firebase.firestore();
         const uid = this.myUid;
+        const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
 
         // A. Listen for LIKES on my notes
         this._unsubLikes = db.collection("notes").where("uid", "==", uid)
@@ -131,8 +132,12 @@ class ChatLoader extends HTMLElement {
                         for (const liker of data.likes) {
                             if (liker.uid !== uid && liker.timestamp) {
                                 const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
+                                
+                                // Only add if it's within the last 24 hours
+                                if (timeMillis < oneDayAgo) continue;
+
                                 const notifId = `like_${liker.uid}_${timeMillis}`;
-                                const mapKey = `like_${liker.uid}_${doc.id}`; // Deduplicate by note
+                                const mapKey = `like_${liker.uid}_${doc.id}`; 
                                 
                                 const u = await this.getFastUser(liker.uid);
                                 this.likeMap.set(mapKey, {
@@ -158,8 +163,12 @@ class ChatLoader extends HTMLElement {
                         for (const f of data.followers) {
                             if (f.timestamp) {
                                 const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
+                                
+                                // Only add if it's within the last 24 hours
+                                if (timeMillis < oneDayAgo) continue;
+
                                 const notifId = `follow_${f.uid}_${timeMillis}`;
-                                const mapKey = `follow_${f.uid}`; // Deduplicate by user
+                                const mapKey = `follow_${f.uid}`; 
                                 
                                 const u = await this.getFastUser(f.uid);
                                 this.followMap.set(mapKey, {
@@ -240,13 +249,17 @@ class ChatLoader extends HTMLElement {
         if (!this.myUid) return;
         const READ_KEY = `goorac_read_${this.myUid}`;
         const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+        const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
         
         let combined = [];
         this.likeMap.forEach(v => combined.push(v));
         this.followMap.forEach(v => combined.push(v));
+        
+        // Strictly filter by 1 day today
+        combined = combined.filter(n => n.timestamp >= oneDayAgo);
         combined.sort((a,b) => b.timestamp - a.timestamp);
 
-        // Store pure data for notifications.html logic
+        // Store pure data
         localStorage.setItem(`goorac_notif_data_${this.myUid}`, JSON.stringify(combined));
 
         // Pre-render HTML for 0ms loading
@@ -263,8 +276,11 @@ class ChatLoader extends HTMLElement {
                 actionHtml = `<div class="mini-note" style="${bg}; width:44px; height:44px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.1); color:${n.noteData.textColor}; font-size:1.2rem;">${n.noteData.text ? '<span style="font-size:0.5rem;">📄</span>' : '🎵'}</div>`;
             }
 
+            // Notification item styling - ensures unread stays unread until marked in readList
+            const unreadStyles = !isRead ? 'background:rgba(0,149,246,0.08); border-left:3px solid #0095f6;' : '';
+
             return `
-                <div class="notif-item ${isRead?'read':'unread'}" data-id="${n.id}" style="display:flex; align-items:center; gap:14px; padding:14px 16px; border-bottom:1px solid #1a1a1a; cursor:pointer; position:relative; ${!isRead?'background:rgba(0,149,246,0.08); border-left:3px solid #0095f6;':''}">
+                <div class="notif-item ${isRead?'read':'unread'}" data-id="${n.id}" style="display:flex; align-items:center; gap:14px; padding:14px 16px; border-bottom:1px solid #1a1a1a; cursor:pointer; position:relative; ${unreadStyles}">
                     <img src="${n.senderPic || 'https://via.placeholder.com/50'}" class="n-avatar" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:1px solid #333; background:#222; flex-shrink:0;">
                     <div class="n-content" style="flex:1; font-size:0.9rem; line-height:1.4; color:#fff; padding-right:10px;">
                         <span class="n-username" style="font-weight:700; color:${!isRead?'#0095f6':'#fff'}">${n.senderName} ${verifyIcon}</span>
