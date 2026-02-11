@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Community | Goorac</title>
+    <title>Notifications | Goorac</title>
     
     <script src="config.js"></script>
     <link rel="manifest" href="manifest.json">
@@ -18,7 +18,7 @@
     <script type="module" src="components/presence.js"></script>
 
     <script>
-        // --- FIREBASE INIT ---
+        // --- FIREBASE INITIALIZATION ---
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
         } 
@@ -42,6 +42,8 @@
             --primary: #FFFFFF;
             --secondary: #888888;
             --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.15);
+            --danger: #ff4444;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
         }
@@ -62,7 +64,7 @@
             background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             padding: calc(10px + var(--safe-top)) 16px 10px;
-            display: flex; align-items: center; gap: 12px;
+            display: flex; align-items: center; justify-content: space-between;
         }
         .nav-btn {
             background: none; border: none; color: var(--primary);
@@ -73,77 +75,91 @@
         .nav-btn:active { background: var(--surface-press); }
         .header-title { font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
 
-        /* --- SEARCH --- */
-        .search-box {
-            padding: 12px 16px;
-            background: var(--bg);
-        }
-        .search-inner {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            display: flex; align-items: center; padding: 0 12px;
-            height: 44px;
-        }
-        .search-inner input {
-            background: none; border: none; color: white; flex: 1;
-            padding-left: 8px; font-size: 14px; outline: none;
-        }
-
-        /* --- USER LIST --- */
-        #list-container {
+        /* --- NOTIFICATION LIST --- */
+        #notif-container {
             padding-bottom: calc(40px + var(--safe-bottom));
         }
 
-        .user-item {
+        .notif-item {
             display: flex; align-items: center; gap: 14px;
-            padding: 12px 16px;
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
-            text-decoration: none; color: inherit;
+            transition: background 0.3s;
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* Highlight for Unread Messages */
+        .notif-item.unread {
+            background: rgba(0, 210, 255, 0.04);
+        }
+
+        .notif-item:active {
+            background: var(--surface-press);
+        }
+
+        .avatar-box {
+            position: relative;
+            width: 48px; height: 48px;
+            flex-shrink: 0;
         }
 
         .avatar {
-            width: 48px; height: 48px;
-            border-radius: 50%; object-fit: cover;
-            background: var(--surface); border: 1px solid var(--border);
-        }
-
-        .user-info { flex: 1; display: flex; flex-direction: column; }
-        .user-info .username { font-weight: 700; font-size: 14px; }
-        .user-info .fullname { font-size: 12px; color: var(--secondary); }
-
-        /* --- FOLLOW BUTTON & LOADER --- */
-        .follow-btn {
-            min-width: 90px; height: 32px;
-            border-radius: 8px; font-size: 13px; font-weight: 700;
-            border: 1px solid var(--border);
-            cursor: pointer; transition: all 0.2s ease;
-            display: flex; align-items: center; justify-content: center;
-            position: relative;
-        }
-
-        .follow-btn.follow { background: #fff; color: #000; border-color: #fff; }
-        .follow-btn.following { background: var(--surface); color: #fff; }
-
-        .follow-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        /* Circle Loader inside Button */
-        .btn-loader {
-            width: 16px; height: 16px;
-            border: 2px solid rgba(128, 128, 128, 0.3);
-            border-top: 2px solid currentColor;
+            width: 100%; height: 100%;
             border-radius: 50%;
-            animation: spin 0.6s linear infinite;
+            object-fit: cover;
+            background: var(--surface);
+            border: 1px solid var(--border);
         }
 
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .notif-content {
+            flex: 1;
+            display: flex; flex-direction: column; gap: 2px;
+        }
 
-        /* --- SKELETON --- */
+        .notif-text {
+            font-size: 14px; line-height: 1.4; color: #d0d0d0;
+        }
+
+        .notif-text b { color: var(--primary); font-weight: 700; }
+
+        .notif-time {
+            font-size: 11px; color: var(--secondary); font-weight: 500;
+            margin-top: 4px; display: flex; align-items: center; gap: 4px;
+        }
+
+        /* --- UNREAD INDICATORS --- */
+        .unread-dot {
+            width: 8px; height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+            margin-left: 8px;
+        }
+
+        .type-icon {
+            position: absolute; bottom: -2px; right: -2px;
+            width: 20px; height: 20px;
+            background: var(--bg);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; border: 1px solid var(--border);
+        }
+
+        /* --- CALL NOTIFIER UI --- */
+        .call-notif {
+            background: linear-gradient(90deg, rgba(0, 210, 255, 0.08), transparent);
+            border-left: 3px solid var(--accent);
+        }
+        .call-icon { color: var(--accent); }
+
+        /* --- SKELETON LOADING --- */
         .skeleton {
-            background: #111; position: relative; overflow: hidden; border-radius: 4px;
+            background: #111;
+            position: relative; overflow: hidden;
+            border-radius: 4px;
         }
         .skeleton::after {
             content: ""; position: absolute; inset: 0;
@@ -151,6 +167,19 @@
             animation: shimmer 1.5s infinite;
         }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 100px 40px; text-align: center; color: var(--secondary);
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+
+        #toast {
+            position: fixed; bottom: 40px; left: 50%; transform: translate(-50%, 20px);
+            background: #fff; color: #000; padding: 10px 20px; border-radius: 100px;
+            font-size: 13px; font-weight: 700; opacity: 0; transition: 0.3s; z-index: 1000;
+        }
+        #toast.show { opacity: 1; transform: translate(-50%, 0); }
     </style>
 </head>
 <body>
@@ -159,165 +188,196 @@
         <button class="nav-btn" onclick="history.back()">
             <span class="material-icons-round">arrow_back</span>
         </button>
-        <div class="header-title" id="page-title">Followers</div>
+        <div class="header-title">Notifications</div>
+        <button class="nav-btn" onclick="markAllAsRead()">
+            <span class="material-icons-round" style="font-size: 20px;">done_all</span>
+        </button>
     </header>
 
-    <div class="search-box">
-        <div class="search-inner">
-            <span class="material-icons-round" style="color:var(--secondary); font-size:20px;">search</span>
-            <input type="text" id="user-search" placeholder="Search people..." oninput="filterList()">
-        </div>
-    </div>
-
-    <div id="list-container">
-        <div class="user-item">
-            <div class="avatar skeleton"></div>
-            <div class="user-info">
-                <div class="skeleton" style="width:100px; height:12px; margin-bottom:6px;"></div>
-                <div class="skeleton" style="width:60px; height:10px;"></div>
+    <div id="notif-container">
+        <div class="notif-item">
+            <div class="avatar-box skeleton" style="border-radius:50%;"></div>
+            <div class="notif-content">
+                <div class="skeleton" style="width: 70%; height: 14px; margin-bottom: 6px;"></div>
+                <div class="skeleton" style="width: 40%; height: 10px;"></div>
             </div>
         </div>
     </div>
 
+    <div id="toast">Marked all as read</div>
+
 <script>
     let myUid = null;
-    let allUsers = [];
-    let myFollowing = [];
-    const processingIds = new Set(); // Multi-click prevention set
+    const container = document.getElementById('notif-container');
+    const readTimers = new Map(); // Store timers for unread items marking as read
 
+    // --- 1. AUTH CHECK & INITIALIZATION ---
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            initPage();
+            listenToNotifications();
+        } else {
+            window.location.href = "login.html";
         }
     });
 
-    async function initPage() {
-        try {
-            // Get my data to know who I follow
-            const myDoc = await db.collection("users").doc(myUid).get();
-            myFollowing = myDoc.data()?.following || [];
-
-            // Load users (Replace with your specific logic for followers/following list)
-            loadUsers();
-        } catch (e) { console.error(e); }
-    }
-
-    async function loadUsers() {
-        // Mocking user fetch - replace with your actual query
-        const snap = await db.collection("users").limit(20).get();
-        allUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-        renderList(allUsers);
-    }
-
-    function renderList(users) {
-        const container = document.getElementById('list-container');
-        container.innerHTML = '';
-
-        users.forEach(user => {
-            if (user.uid === myUid) return;
-
-            const isFollowing = myFollowing.includes(user.uid);
-            const isProcessing = processingIds.has(user.uid);
-
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.innerHTML = `
-                <img src="${user.photoURL || 'https://via.placeholder.com/100'}" class="avatar">
-                <div class="user-info">
-                    <span class="username">${user.username || 'user'}</span>
-                    <span class="fullname">${user.name || ''}</span>
-                </div>
-                <button 
-                    class="follow-btn ${isFollowing ? 'following' : 'follow'}" 
-                    onclick="toggleFollow('${user.uid}', ${isFollowing})"
-                    ${isProcessing ? 'disabled' : ''}
-                >
-                    ${isProcessing ? '<div class="btn-loader"></div>' : (isFollowing ? 'Following' : 'Follow')}
-                </button>
-            `;
-            container.appendChild(div);
+    // --- 2. FIRESTORE LISTENER ---
+    function listenToNotifications() {
+        db.collection("users").doc(myUid).collection("notifications")
+        .orderBy("timestamp", "desc")
+        .limit(50)
+        .onSnapshot(snapshot => {
+            if (snapshot.empty) {
+                renderEmptyState();
+                return;
+            }
+            renderNotifications(snapshot.docs);
+        }, err => {
+            console.error("Notif Error:", err);
+            renderEmptyState("Unable to load notifications");
         });
     }
 
-    async function toggleFollow(targetUid, isCurrentlyFollowing) {
-        // 1. Prevent multiple clicks
-        if (processingIds.has(targetUid)) return;
+    // --- 3. RENDERING ENGINE ---
+    function renderNotifications(docs) {
+        container.innerHTML = '';
         
-        processingIds.add(targetUid);
-        renderList(allUsers); // Update UI to show loader
-        
-        if (navigator.vibrate) navigator.vibrate(15);
+        docs.forEach(doc => {
+            const data = doc.data();
+            const id = doc.id;
+            const isUnread = data.isRead === false;
+            
+            const item = document.createElement('a');
+            item.href = data.link || '#';
+            item.className = `notif-item ${isUnread ? 'unread' : ''} ${data.type === 'call' ? 'call-notif' : ''}`;
+            item.dataset.id = id;
 
-        try {
-            const myRef = db.collection("users").doc(myUid);
-            const targetRef = db.collection("users").doc(targetUid);
-
-            await db.runTransaction(async (transaction) => {
-                if (isCurrentlyFollowing) {
-                    // Unfollow
-                    transaction.update(myRef, { 
-                        following: firebase.firestore.FieldValue.arrayRemove(targetUid),
-                        followingCount: firebase.firestore.FieldValue.increment(-1)
-                    });
-                    transaction.update(targetRef, { 
-                        followers: firebase.firestore.FieldValue.arrayRemove(myUid),
-                        followerCount: firebase.firestore.FieldValue.increment(-1)
-                    });
-                } else {
-                    // Follow
-                    transaction.update(myRef, { 
-                        following: firebase.firestore.FieldValue.arrayAdd(targetUid),
-                        followingCount: firebase.firestore.FieldValue.increment(1)
-                    });
-                    transaction.update(targetRef, { 
-                        followers: firebase.firestore.FieldValue.arrayAdd(myUid),
-                        followerCount: firebase.firestore.FieldValue.increment(1)
-                    });
-                    
-                    // Add to notification subcollection
-                    sendNotification(targetUid);
-                }
-            });
-
-            // Update local state after successful Firebase confirmation
-            if (isCurrentlyFollowing) {
-                myFollowing = myFollowing.filter(id => id !== targetUid);
-            } else {
-                myFollowing.push(targetUid);
+            // Timestamp Logic
+            let timeStr = "Just now";
+            if (data.timestamp) {
+                const date = data.timestamp.toDate();
+                timeStr = timeSince(date);
             }
 
-        } catch (error) {
-            console.error("Transaction failed: ", error);
-        } finally {
-            // 2. Unlock the button
-            processingIds.delete(targetUid);
-            renderList(allUsers);
+            // Type and Icon Assignment
+            let typeIcon = 'notifications';
+            let iconColor = 'var(--secondary)';
+            
+            if (data.type === 'follow') { typeIcon = 'person_add'; iconColor = 'var(--accent)'; }
+            else if (data.type === 'like') { typeIcon = 'favorite'; iconColor = 'var(--danger)'; }
+            else if (data.type === 'call') { typeIcon = 'videocam'; iconColor = 'var(--accent)'; }
+            else if (data.type === 'mention') { typeIcon = 'alternate_email'; iconColor = 'var(--accent)'; }
+
+            item.innerHTML = `
+                <div class="avatar-box">
+                    <img src="${data.fromPhoto || 'https://via.placeholder.com/100'}" class="avatar">
+                    <div class="type-icon" style="color:${iconColor}">
+                        <span class="material-icons-round" style="font-size:12px;">${typeIcon}</span>
+                    </div>
+                </div>
+                <div class="notif-content">
+                    <div class="notif-text">
+                        <b>${data.fromUsername || 'User'}</b> ${data.content || 'interacted with you.'}
+                    </div>
+                    <div class="notif-time">
+                        ${timeStr}
+                    </div>
+                </div>
+                ${isUnread ? '<div class="unread-dot"></div>' : ''}
+            `;
+
+            container.appendChild(item);
+
+            // --- AUTO-READ LOGIC (2.5 SECONDS VISIBILITY) ---
+            if (isUnread) {
+                observeNotification(item, id);
+            }
+        });
+    }
+
+    // --- 4. INTERSECTION OBSERVER FOR AUTO-READ ---
+    function observeNotification(element, notifId) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // User is looking at the notification. Start 2.5s timer.
+                    const timer = setTimeout(() => {
+                        markSingleAsRead(notifId);
+                        observer.unobserve(entry.target);
+                    }, 2500);
+                    readTimers.set(notifId, timer);
+                } else {
+                    // User scrolled away. Cancel the timer.
+                    if (readTimers.has(notifId)) {
+                        clearTimeout(readTimers.get(notifId));
+                        readTimers.delete(notifId);
+                    }
+                }
+            });
+        }, { threshold: 0.8 }); // 80% of the item must be visible
+
+        observer.observe(element);
+    }
+
+    async function markSingleAsRead(id) {
+        try {
+            await db.collection("users").doc(myUid).collection("notifications").doc(id).update({
+                isRead: true
+            });
+        } catch (e) { console.error("Mark as read error", e); }
+    }
+
+    async function markAllAsRead() {
+        if (!myUid) return;
+        if (navigator.vibrate) navigator.vibrate(25);
+        
+        try {
+            const unreadSnap = await db.collection("users").doc(myUid).collection("notifications")
+                .where("isRead", "==", false).get();
+            
+            const batch = db.batch();
+            unreadSnap.forEach(doc => {
+                batch.update(doc.ref, { isRead: true });
+            });
+            
+            await batch.commit();
+            showToast("Cleared all notifications");
+        } catch (e) {
+            console.error(e);
         }
     }
 
-    async function sendNotification(targetUid) {
-        const myData = (await db.collection("users").doc(myUid).get()).data();
-        db.collection("users").doc(targetUid).collection("notifications").add({
-            type: 'follow',
-            fromUid: myUid,
-            fromUsername: myData.username,
-            fromPhoto: myData.photoURL,
-            content: 'started following you',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            isRead: false
-        });
+    // --- UTILITIES ---
+    function renderEmptyState(msg = "No notifications yet") {
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="material-icons-round empty-icon">notifications_none</span>
+                <p>${msg}</p>
+            </div>
+        `;
     }
 
-    function filterList() {
-        const query = document.getElementById('user-search').value.toLowerCase();
-        const filtered = allUsers.filter(u => 
-            u.username?.toLowerCase().includes(query) || 
-            u.name?.toLowerCase().includes(query)
-        );
-        renderList(filtered);
+    function timeSince(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m";
+        return "now";
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
     }
 </script>
-
 </body>
 </html>
