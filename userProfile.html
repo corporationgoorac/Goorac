@@ -21,15 +21,18 @@
 
     <script>
         // --- FIREBASE INIT ---
+        // 1. Try to use the shared init function first (from config.js)
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
         } 
+        // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
         else if (!firebase.apps.length && window.firebaseConfig) {
             firebase.initializeApp(window.firebaseConfig);
         }
         
         const db = firebase.firestore();
         const auth = firebase.auth();
+        // Database needed for presence check if used later
         const rdb = firebase.database(); 
     </script>
 
@@ -382,17 +385,20 @@
         const modal = document.getElementById('bottom-modal');
         
         if (show) {
+            // Push state so back button closes modal
             window.history.pushState({ modalOpen: true }, ""); 
             overlay.style.display = 'block';
             setTimeout(() => modal.classList.add('active'), 10);
             if(navigator.vibrate) navigator.vibrate(15);
         } else {
+            // If the user closed via touch/overlay, manually pop history if needed
             if (window.history.state && window.history.state.modalOpen) {
                 window.history.back();
             }
         }
     }
 
+    // This handles both the physical back button AND history.back() from toggleMenu
     window.addEventListener('popstate', (e) => {
         const modal = document.getElementById('bottom-modal');
         const overlay = document.getElementById('modal-overlay');
@@ -428,8 +434,9 @@
     });
 
     function fetchProfileFresh() {
-        db.collection("users").where("username", "==", targetUsername).limit(1)
-        .onSnapshot((snapshot) => {
+        // FIXED: Changed .onSnapshot to .get() to stop exceeding Firebase Free Tier limits (Status 429)
+        db.collection("users").where("username", "==", targetUsername).limit(1).get()
+        .then((snapshot) => {
             if(snapshot.empty) return; 
             const doc = snapshot.docs[0];
             const freshData = doc.data();
@@ -442,6 +449,11 @@
                 renderProfile(freshData);
                 initNotesComponent(targetUid);
                 checkRelation(freshData);
+            }
+        }).catch(err => {
+            console.error("Firebase fetch error:", err);
+            if(err.message.includes("429")) {
+                showToast("System busy. Please try again in 1 minute.");
             }
         });
     }
@@ -456,6 +468,7 @@
         }
     }
 
+    // --- 3. SAFE COMPONENT INITIALIZER ---
     function initNotesComponent(uid) {
         const notesComp = document.getElementById('profile-notes');
         if(!notesComp) return;
@@ -503,30 +516,34 @@
     async function checkRelation(freshData) {
         if(!myUid || !targetUid || myUid === targetUid) return;
 
-        const myDoc = await db.collection("users").doc(myUid).get();
-        if (!myDoc.exists) return;
-        
-        const myData = myDoc.data();
-        const myFollowing = myData.following || [];
-        const myBlocked = myData.blocked || [];
+        try {
+            const myDoc = await db.collection("users").doc(myUid).get();
+            if (!myDoc.exists) return; // Prevent crash if self-user not ready
 
-        const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
-        doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+            const myData = myDoc.data();
+            const myFollowing = myData.following || [];
+            const myBlocked = myData.blocked || [];
 
-        document.getElementById('block-toggle').checked = doIBlock;
-        updateFollowButton(isFollowing, doIBlock);
-        removeBtnSkeletons();
+            const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+            doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
-        if(doIBlock) {
-            document.getElementById('notes-area').style.opacity = '0.3';
-            document.getElementById('notes-area').style.pointerEvents = 'none';
-        } else {
-            document.getElementById('notes-area').style.opacity = '1';
-            document.getElementById('notes-area').style.pointerEvents = 'auto';
+            document.getElementById('block-toggle').checked = doIBlock;
+            updateFollowButton(isFollowing, doIBlock);
+            removeBtnSkeletons();
+
+            if(doIBlock) {
+                document.getElementById('notes-area').style.opacity = '0.3';
+                document.getElementById('notes-area').style.pointerEvents = 'none';
+            } else {
+                document.getElementById('notes-area').style.opacity = '1';
+                document.getElementById('notes-area').style.pointerEvents = 'auto';
+            }
+
+            const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
+            localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
+        } catch (e) {
+            console.error("Check relation failed", e);
         }
-
-        const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
-        localStorage.setItem(`goorac_user_${targetUsername}`, JSON.stringify(cacheObj));
     }
 
     function updateFollowButton(isFollowing, isBlocked) {
@@ -549,7 +566,6 @@
         }
     }
 
-    // --- FIXED FOLLOW LOGIC ---
     async function handleFollow() {
         if(!targetUid || !myUid || isProcessing) return;
         const btn = document.getElementById('btn-follow');
@@ -573,29 +589,22 @@
                 const myD = await t.get(myRef);
                 const theirD = await t.get(theirRef);
 
-                if (!myD.exists || !theirD.exists) {
-                    throw "User document not found";
-                }
+                if (!myD.exists || !theirD.exists) throw "User docs missing";
 
                 const myData = myD.data();
                 const theirData = theirD.data();
 
-                // Safe array access (Fixes the crash)
                 const myFing = myData.following || [];
                 const theirFing = theirData.followers || [];
-                
                 const ts = firebase.firestore.Timestamp.now();
 
                 if (!isCurrentlyFollowing) {
-                    // Follow
                     t.update(myRef, { following: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }) });
                     t.update(theirRef, { followers: firebase.firestore.FieldValue.arrayUnion({ uid: myUid, timestamp: ts }) });
                     
-                    // Safe notification creation
                     const notifRef = db.collection("notifications").doc();
                     t.set(notifRef, { recipientId: targetUid, senderId: myUid, type: "follow", timestamp: ts, seen: false });
                 } else {
-                    // Unfollow (Filter manually and update)
                     const newMyFing = myFing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newTheirFing = theirFing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
                     
@@ -605,16 +614,12 @@
             });
             updateFollowButton(!isCurrentlyFollowing, false); 
         } catch (e) { 
-            console.error("Follow Error:", e);
+            console.error("Follow error:", e);
             showToast("Error updating relationship"); 
         } 
-        finally { 
-            btn.classList.remove('loading'); 
-            isProcessing = false; 
-        }
+        finally { btn.classList.remove('loading'); isProcessing = false; }
     }
 
-    // --- FIXED BLOCK LOGIC ---
     async function handleBlockToggle(isBlocking) {
         if(!targetUid || !myUid || isProcessing) return;
         isProcessing = true;
@@ -626,22 +631,20 @@
         const theirRef = db.collection("users").doc(targetUid);
 
         try {
-            // Find shared chat to delete (Outside transaction)
+            // Find shared chat to delete safely
             const chatSnap = await db.collection("chats")
                 .where("participants", "array-contains", myUid).get();
-            let sharedChatRef = null;
+            let sharedChatDoc = null;
             chatSnap.forEach(doc => { 
-                const data = doc.data();
-                if(data.participants && data.participants.includes(targetUid)) {
-                    sharedChatRef = doc.ref; 
-                }
+                const d = doc.data();
+                if(d.participants && d.participants.includes(targetUid)) sharedChatDoc = doc.ref; 
             });
 
             await db.runTransaction(async (t) => {
                 const myD = await t.get(myRef);
                 const theirD = await t.get(theirRef);
                 
-                if (!myD.exists || !theirD.exists) throw "User doc missing";
+                if (!myD.exists || !theirD.exists) throw "User docs missing";
 
                 const myData = myD.data();
                 const theirData = theirD.data();
@@ -652,7 +655,6 @@
                 const theirFollowers = theirData.followers || [];
 
                 if(isBlocking) {
-                    // Filter arrays safe
                     const newMyFollowing = myFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newMyFollowers = myFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     const newTheirFollowing = theirFollowing.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
@@ -667,8 +669,8 @@
                         following: newTheirFollowing,
                         followers: newTheirFollowers
                     });
-                    
-                    if(sharedChatRef) t.delete(sharedChatRef);
+                    // Delete the shared chat document
+                    if(sharedChatDoc) t.delete(sharedChatDoc);
                 } else {
                     const myBlocked = myData.blocked || [];
                     const newBlocked = myBlocked.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
@@ -679,14 +681,8 @@
             showToast(isBlocking ? "User Blocked & Chat Deleted" : "User Unblocked");
             if(isBlocking) toggleMenu(false);
             checkRelation(targetUserData);
-        } catch (e) { 
-            console.error("Block Error:", e); 
-            showToast("Action failed"); 
-        }
-        finally { 
-            btn.classList.remove('loading'); 
-            isProcessing = false; 
-        }
+        } catch (e) { console.error(e); showToast("Action failed"); }
+        finally { btn.classList.remove('loading'); isProcessing = false; }
     }
 
     // --- UTILS ---
