@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <title>Goorac | Login</title>
+    <title>Goorac | Secure Login</title>
 
     <script src="config.js"></script>
 
@@ -20,10 +20,12 @@
             --text: #eff3f4;
             --text-muted: #71767b;
             --accent: #1d9bf0;
+            --accent-hover: #1a8cd8;
             --error: #f4212e;
             --border: #333639;
             --btn-hover: #d7dbdc;
             --input-bg: #000000;
+            --surface: #16181c;
         }
 
         * {
@@ -34,6 +36,7 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            outline: none;
         }
 
         body {
@@ -46,28 +49,31 @@
             overflow: hidden;
         }
 
+        /* --- MAIN LOGIN CARD --- */
         .login-card {
             width: 100%;
-            max-width: 400px;
-            padding: 2rem;
+            max-width: 450px;
+            padding: 2.5rem;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: center; /* Centered layout */
         }
 
         .logo-box {
-            font-size: 3.5rem;
-            font-weight: 900;
-            margin-bottom: 2.5rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
             color: var(--text);
+            letter-spacing: -1px;
         }
 
         h1 { 
             font-size: 2rem; 
-            margin-bottom: 0.5rem; 
+            margin-bottom: 0.8rem; 
             font-weight: 800; 
             text-align: left;
             width: 100%;
+            line-height: 1.2;
         }
 
         p { 
@@ -75,12 +81,13 @@
             margin-bottom: 2.5rem; 
             font-size: 1rem; 
             width: 100%;
+            text-align: left;
         }
 
         .btn-group {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
             width: 100%;
         }
 
@@ -98,6 +105,7 @@
             cursor: pointer;
             transition: 0.2s;
             width: 100%;
+            min-height: 48px;
         }
 
         .google-btn {
@@ -110,6 +118,7 @@
             background: transparent;
             color: #ffffff;
             border: 1px solid var(--border);
+            font-weight: 600;
         }
         .phone-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.98); }
 
@@ -117,9 +126,9 @@
             display: flex;
             align-items: center;
             width: 100%;
-            margin: 10px 0;
+            margin: 4px 0;
             color: var(--text-muted);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
         }
         .or-divider::before, .or-divider::after {
             content: "";
@@ -134,17 +143,38 @@
             font-size: 0.85rem;
             color: var(--text-muted);
             min-height: 20px;
+            text-align: center;
         }
 
-        /* --- PHONE MODAL (Full Screen) --- */
-        .modal {
+        /* --- PROFESSIONAL MODAL --- */
+        .modal-overlay {
             display: none;
-            position: fixed;
-            top: 0; left: 0;
+            position: fixed; top: 0; left: 0;
             width: 100vw; height: 100vh;
-            background: var(--bg);
+            background: rgba(91, 112, 131, 0.4);
             z-index: 1000;
+            justify-content: center;
+            align-items: flex-end; /* Slide from bottom on mobile */
+        }
+        
+        /* Desktop Center, Mobile Bottom */
+        @media (min-width: 600px) {
+            .modal-overlay { align-items: center; }
+            .modal-content { 
+                border-radius: 16px; 
+                max-width: 600px; 
+                height: 600px !important;
+                max-height: 90vh;
+            }
+        }
+
+        .modal-content {
+            background: #000000;
+            width: 100%;
+            height: 100%; /* Full screen on mobile */
+            display: flex;
             flex-direction: column;
+            position: relative;
             animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
@@ -154,63 +184,129 @@
         }
 
         .modal-header {
-            padding: 15px 20px;
+            padding: 0 16px;
+            height: 53px;
             display: flex;
             align-items: center;
-            border-bottom: 1px solid var(--border);
+            justify-content: space-between;
         }
 
         .close-btn {
             background: none; border: none; color: var(--text);
-            font-size: 1.5rem; cursor: pointer; padding: 0 10px 0 0;
+            font-size: 20px; cursor: pointer; padding: 8px;
+            margin-left: -8px; border-radius: 50%;
+            transition: 0.2s;
         }
+        .close-btn:active { background: rgba(255,255,255,0.1); }
 
-        .modal-title {
-            font-weight: 700; font-size: 1.1rem; flex: 1;
+        .modal-logo {
+            font-size: 1.5rem; font-weight: 800; color: var(--text);
+            position: absolute; left: 50%; transform: translateX(-50%);
         }
 
         .modal-body {
-            padding: 20px;
+            padding: 20px 32px;
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
         }
 
-        /* Twitter style input */
-        .input-group {
+        .modal-title {
+            font-size: 1.7rem; font-weight: 700; margin: 20px 0 30px;
+            align-self: flex-start;
+        }
+
+        /* --- FLOATING LABEL INPUTS --- */
+        .input-wrapper {
             position: relative;
+            width: 100%;
+            margin-bottom: 24px;
             border: 1px solid var(--border);
             border-radius: 4px;
-            padding: 8px;
-            background: var(--input-bg);
+            height: 56px;
+            background: var(--bg);
             transition: 0.2s;
+            display: flex;
+            align-items: center;
         }
-        .input-group:focus-within {
+
+        .input-wrapper:focus-within {
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent);
         }
 
-        .input-label {
+        /* Country Select Styling */
+        .country-select {
+            background: transparent;
+            color: var(--text);
+            border: none;
+            height: 100%;
+            padding: 24px 0 8px 12px;
+            font-size: 1.1rem;
+            width: 80px;
+            appearance: none;
+            cursor: pointer;
+            z-index: 2;
+        }
+        
+        .country-label {
+            position: absolute;
+            left: 12px; top: 8px;
             font-size: 0.8rem; color: var(--text-muted);
-            display: block; margin-bottom: 2px;
+            pointer-events: none;
         }
 
-        .modern-input {
-            width: 100%; background: transparent; border: none;
-            color: white; font-size: 1.1rem; outline: none;
+        .phone-input {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 1.1rem;
+            height: 100%;
+            flex: 1;
+            padding: 24px 12px 8px 12px; /* Top padding pushes text down */
+        }
+        .phone-input::placeholder { color: transparent; }
+        
+        .phone-label {
+            position: absolute;
+            left: 90px; top: 18px; /* Centered initially */
+            font-size: 1.1rem; color: var(--text-muted);
+            transition: 0.2s;
+            pointer-events: none;
         }
 
-        .action-btn {
+        /* Floating Animation */
+        .phone-input:focus + .phone-label,
+        .phone-input:not(:placeholder-shown) + .phone-label {
+            top: 8px;
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+        /* Next Button (Fixed Bottom on Mobile) */
+        .next-btn {
             background: var(--text);
             color: var(--bg);
-            margin-top: 10px;
+            border: none;
+            border-radius: 9999px;
+            height: 50px;
+            width: 100%;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-top: auto; /* Push to bottom */
+            margin-bottom: 20px;
+            cursor: pointer;
         }
-        .action-btn:disabled { opacity: 0.5; }
+        .next-btn:disabled { opacity: 0.5; cursor: default; }
+        .next-btn:active:not(:disabled) { transform: scale(0.98); }
 
-        #recaptcha-container { margin-top: 10px; }
-        
-        .hidden { display: none; }
+        #recaptcha-container { margin: 10px 0; }
+        .hidden { display: none !important; }
+        .verify-text { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; align-self: flex-start; }
     </style>
 </head>
 <body oncontextmenu="return false;"> 
@@ -228,7 +324,7 @@
         
         <div class="or-divider">or</div>
 
-        <button id="phone-btn" class="auth-btn phone-btn">
+        <button id="phone-trigger-btn" class="auth-btn phone-btn">
             Sign up with Phone
         </button>
     </div>
@@ -236,41 +332,58 @@
     <div id="status-msg"></div>
 </div>
 
-<div id="phone-modal" class="modal">
-    <div class="modal-header">
-        <button class="close-btn" onclick="closeModal()">×</button>
-        <div class="modal-title">Step 1 of 2</div>
-        <div class="logo-box" style="font-size: 1.2rem; margin:0;">G</div>
-    </div>
-    
-    <div class="modal-body">
-        <h2 style="font-size: 1.5rem; margin-bottom: 10px;">Enter your phone</h2>
+<div id="phone-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div class="modal-logo">G</div>
+            <div style="width: 30px;"></div> </div>
         
-        <div id="step-phone">
-            <div class="input-group">
-                <label class="input-label">Phone</label>
-                <input type="tel" id="phone-input" class="modern-input" placeholder="+1 234 567 8900">
-            </div>
-            <div id="recaptcha-container"></div>
-            <button id="get-code-btn" class="auth-btn action-btn">Next</button>
-        </div>
+        <div class="modal-body">
+            
+            <div id="step-phone" style="width:100%; display:flex; flex-direction:column; height:100%;">
+                <div class="modal-title">Enter your phone number</div>
+                
+                <div class="input-wrapper">
+                    <span class="country-label">Code</span>
+                    <select id="country-code" class="country-select">
+                        <option value="+1">+1 (US)</option>
+                        <option value="+91" selected>+91 (IN)</option>
+                        <option value="+44">+44 (UK)</option>
+                        <option value="+61">+61 (AU)</option>
+                        <option value="+81">+81 (JP)</option>
+                        <option value="+86">+86 (CN)</option>
+                    </select>
+                    
+                    <input type="tel" id="phone-input" class="phone-input" placeholder=" " maxlength="10">
+                    <label class="phone-label">Phone number</label>
+                </div>
 
-        <div id="step-otp" class="hidden">
-            <div class="input-group">
-                <label class="input-label">Verification Code</label>
-                <input type="number" id="otp-input" class="modern-input" placeholder="123456">
+                <div id="recaptcha-container"></div>
+                
+                <button id="get-code-btn" class="next-btn" disabled>Next</button>
             </div>
-            <button id="verify-btn" class="auth-btn action-btn">Verify</button>
-            <p style="margin-top:15px; font-size:0.8rem; color:var(--accent); cursor:pointer;" onclick="resetPhoneFlow()">Change phone number</p>
+
+            <div id="step-otp" class="hidden" style="width:100%; display:flex; flex-direction:column; height:100%;">
+                <div class="modal-title">We sent you a code</div>
+                <div class="verify-text">Enter it below to verify <span id="sent-number" style="color:var(--text);"></span></div>
+
+                <div class="input-wrapper" style="padding-left:12px;">
+                    <input type="number" id="otp-input" class="phone-input" placeholder=" " maxlength="6" style="padding-left:0;">
+                    <label class="phone-label" style="left:12px;">Verification code</label>
+                </div>
+
+                <p style="color:var(--accent); font-size:0.85rem; cursor:pointer; margin-top:10px;" onclick="resetPhoneFlow()">Did not receive code?</p>
+
+                <button id="verify-btn" class="next-btn" disabled>Next</button>
+            </div>
+
         </div>
-        
-        <div id="modal-status" style="color:var(--error); font-size:0.9rem; margin-top:10px;"></div>
     </div>
 </div>
 
 <script>
     // --- FIREBASE INIT ---
-    // 1. Try config.js init
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (!firebase.apps.length && window.firebaseConfig) {
@@ -281,25 +394,26 @@
     const db = firebase.firestore();
     let confirmationResult = null;
 
-    // --- ELEMENTS ---
-    const googleBtn = document.getElementById('google-btn');
-    const phoneBtn = document.getElementById('phone-btn');
+    // --- DOM ELEMENTS ---
+    const phoneTrigger = document.getElementById('phone-trigger-btn');
+    const modal = document.getElementById('phone-modal');
     const statusMsg = document.getElementById('status-msg');
     
-    // Modal Elements
-    const modal = document.getElementById('phone-modal');
+    // Step 1 Elements
+    const stepPhone = document.getElementById('step-phone');
+    const countryCode = document.getElementById('country-code');
     const phoneInput = document.getElementById('phone-input');
     const getCodeBtn = document.getElementById('get-code-btn');
+    
+    // Step 2 Elements
+    const stepOtp = document.getElementById('step-otp');
     const otpInput = document.getElementById('otp-input');
     const verifyBtn = document.getElementById('verify-btn');
-    const modalStatus = document.getElementById('modal-status');
-    const stepPhone = document.getElementById('step-phone');
-    const stepOtp = document.getElementById('step-otp');
+    const sentNumberDisplay = document.getElementById('sent-number');
 
     // --- GOOGLE LOGIN ---
-    googleBtn.addEventListener('click', async () => {
-        googleBtn.disabled = true;
-        statusMsg.innerText = "Authenticating with Google...";
+    document.getElementById('google-btn').addEventListener('click', async () => {
+        statusMsg.innerText = "Authenticating...";
         const provider = new firebase.auth.GoogleAuthProvider();
         try {
             const result = await auth.signInWithPopup(provider);
@@ -307,121 +421,133 @@
         } catch (error) {
             console.error(error);
             statusMsg.innerText = "Error: " + error.message;
-            googleBtn.disabled = false;
         }
     });
 
     // --- PHONE LOGIN LOGIC ---
-    
-    // 1. Open Modal & Push History State
-    phoneBtn.addEventListener('click', () => {
+
+    // 1. Open Modal & Push History State (Mobile Back Button Support)
+    phoneTrigger.addEventListener('click', () => {
         modal.style.display = 'flex';
-        // Push state so back button closes modal
-        history.pushState({ modalOpen: true }, "", "#phone-login");
+        history.pushState({ modalOpen: true }, "", "#phone");
         
+        // Init ReCaptcha
         if (!window.recaptchaVerifier) {
             window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
                 'size': 'invisible',
-                'callback': (response) => {
-                    // reCAPTCHA solved
-                }
+                'callback': (response) => { getCodeBtn.click(); }
             });
         }
     });
 
-    // 2. Handle Browser Back Button
-    window.addEventListener('popstate', () => {
-        modal.style.display = 'none';
-        resetPhoneFlow();
+    // 2. Input Validation (Enable 'Next' button only when valid)
+    phoneInput.addEventListener('input', (e) => {
+        // Enforce Numbers Only
+        e.target.value = e.target.value.replace(/\D/g, '');
+        // Enable button if length is 10
+        getCodeBtn.disabled = e.target.value.length < 10;
+        getCodeBtn.style.opacity = e.target.value.length === 10 ? '1' : '0.5';
+        getCodeBtn.style.color = e.target.value.length === 10 ? '#000' : 'var(--bg)';
+        getCodeBtn.style.background = e.target.value.length === 10 ? '#fff' : 'var(--text)';
     });
 
-    // 3. Manual Close (X button)
-    window.closeModal = function() {
-        history.back(); // Triggers popstate
-    };
+    otpInput.addEventListener('input', (e) => {
+        verifyBtn.disabled = e.target.value.length < 6;
+        verifyBtn.style.background = e.target.value.length === 6 ? '#fff' : 'var(--text)';
+        verifyBtn.style.color = e.target.value.length === 6 ? '#000' : 'var(--bg)';
+    });
 
-    // 4. Send Code
+    // 3. Send Verification Code
     getCodeBtn.addEventListener('click', () => {
-        const phoneNumber = phoneInput.value.trim();
-        if(!phoneNumber) {
-            modalStatus.innerText = "Please enter a valid phone number (e.g., +1...)";
-            return;
-        }
-
+        const fullNumber = countryCode.value + phoneInput.value;
+        getCodeBtn.innerText = "Sending...";
         getCodeBtn.disabled = true;
-        modalStatus.innerText = "Sending code...";
 
-        auth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier)
+        auth.signInWithPhoneNumber(fullNumber, window.recaptchaVerifier)
             .then((res) => {
                 confirmationResult = res;
+                // UI Switch
                 stepPhone.classList.add('hidden');
                 stepOtp.classList.remove('hidden');
-                modalStatus.innerText = "Code sent!";
-                modalStatus.style.color = "var(--accent)";
+                sentNumberDisplay.innerText = fullNumber;
+                getCodeBtn.innerText = "Next"; // Reset text
             }).catch((error) => {
                 console.error(error);
-                modalStatus.innerText = error.message;
-                modalStatus.style.color = "var(--error)";
+                alert("Error sending code: " + error.message);
+                getCodeBtn.innerText = "Next";
                 getCodeBtn.disabled = false;
-                window.recaptchaVerifier.render().then(widgetId => {
-                    grecaptcha.reset(widgetId);
-                });
+                window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
             });
     });
 
-    // 5. Verify Code
+    // 4. Verify Code
     verifyBtn.addEventListener('click', () => {
-        const code = otpInput.value.trim();
-        if(!code) return;
-
+        const code = otpInput.value;
         verifyBtn.innerText = "Verifying...";
         verifyBtn.disabled = true;
 
         confirmationResult.confirm(code).then((result) => {
             handleUserLogin(result.user);
         }).catch((error) => {
-            modalStatus.innerText = "Invalid code. Please try again.";
-            modalStatus.style.color = "var(--error)";
+            alert("Invalid verification code.");
+            verifyBtn.innerText = "Next";
             verifyBtn.disabled = false;
-            verifyBtn.innerText = "Verify";
         });
     });
 
-    // 6. Reset Flow
+    // 5. Back / Close Logic
+    window.closeModal = function() {
+        if(stepOtp.classList.contains('hidden')) {
+            // If on first step, close modal
+            history.back(); 
+        } else {
+            // If on OTP step, go back to Phone step
+            resetPhoneFlow();
+        }
+    };
+
+    window.addEventListener('popstate', () => {
+        modal.style.display = 'none';
+        resetPhoneFlow();
+    });
+
     window.resetPhoneFlow = function() {
         stepPhone.classList.remove('hidden');
         stepOtp.classList.add('hidden');
-        phoneInput.value = '';
         otpInput.value = '';
-        modalStatus.innerText = '';
-        getCodeBtn.disabled = false;
-        verifyBtn.disabled = false;
-        verifyBtn.innerText = "Verify";
+        verifyBtn.disabled = true;
     }
 
-    // --- COMMON REDIRECT LOGIC ---
+    // --- REDIRECT HANDLER ---
     async function handleUserLogin(user) {
-        statusMsg.innerText = "Checking profile...";
-        if(modal.style.display === 'flex') modalStatus.innerText = "Success! Redirecting...";
+        // If modal open, show success state there
+        if(modal.style.display === 'flex') {
+            verifyBtn.innerText = "Success!";
+            verifyBtn.style.background = "var(--accent)";
+        } else {
+            statusMsg.innerText = "Checking profile...";
+        }
 
         try {
             const userDoc = await db.collection("users").doc(user.uid).get();
-            if (userDoc.exists) {
-                window.location.href = "home.html";
-            } else {
-                window.location.href = "setup.html"; // Or home.html depending on your flow
-            }
+            // 500ms delay for UX smoothness
+            setTimeout(() => {
+                if (userDoc.exists) {
+                    window.location.href = "home.html";
+                } else {
+                    window.location.href = "setup.html";
+                }
+            }, 500);
         } catch (e) {
-            console.error("Profile check failed", e);
-            window.location.href = "home.html"; // Fallback
+            console.error("Login Check Failed", e);
+            window.location.href = "home.html";
         }
     }
 
-    // Existing Auth Listener Check (Auto-redirect)
+    // Auto-redirect if already logged in (optional)
     auth.onAuthStateChanged(user => {
         if(user) {
-            // Optional: Auto redirect if already logged in
-            // handleUserLogin(user);
+            // handleUserLogin(user); 
         }
     });
 
