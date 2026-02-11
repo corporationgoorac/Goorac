@@ -246,6 +246,37 @@
             margin-left: auto; background: var(--accent); border: none; color: #000; 
             padding: 8px 16px; border-radius: 50px; font-weight: 800; cursor: pointer; 
         }
+
+        /* --- BELL POP-UP NOTIFICATION (TOAST) --- */
+        #bell-toast {
+            position: fixed; top: 65px; right: 15px; /* Position relative to bell */
+            width: auto; min-width: 200px; max-width: 280px;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 10px 14px;
+            display: flex; align-items: center; gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            z-index: 10000;
+            opacity: 0; transform: translateY(-10px) scale(0.95); pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #bell-toast.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        
+        .toast-icon {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; font-size: 0.9rem;
+        }
+        .icon-like { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+        .icon-follow { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
+        
+        .toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .toast-title { font-size: 0.75rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
+        .toast-body { font-size: 0.7rem; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .toast-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
     </style>
 </head>
 <body oncontextmenu="return false;"> 
@@ -262,6 +293,15 @@
         <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" width="38" height="38" onclick="window.location.href='profile.html'">
     </div>
 </header>
+
+<div id="bell-toast" onclick="window.location.href='notifications.html'">
+    <div class="toast-icon" id="t-icon"></div>
+    <img id="t-img" class="toast-img" style="display:none;">
+    <div class="toast-content">
+        <div class="toast-title" id="t-title"></div>
+        <div class="toast-body" id="t-body"></div>
+    </div>
+</div>
 
 <div id="install-popup">
     <div class="install-text">
@@ -400,17 +440,14 @@
     }
 
     // --- FIREBASE INIT ---
-    // Try to use the shared init function from config.js
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (typeof firebase !== 'undefined' && !firebase.apps.length && window.firebaseConfig) {
-        // Fallback if config.js loaded but function didn't run
         firebase.initializeApp(window.firebaseConfig);
     }
 
     const auth = firebase.auth();
     const db = firebase.firestore();
-    // Safety check for RTDB if it wasn't initialized
     if (!window.rdb && firebase.database) window.rdb = firebase.database();
 
     let READ_KEY = "goorac_read_notifs"; 
@@ -458,19 +495,57 @@
         saveHomeState();
     }
 
-    // --- 💎 SAFE BACKGROUND SYNC ENGINE (READ-LIMITED) ---
+    // --- 🔔 SHOW TOAST FUNCTION ---
+    let toastTimeout;
+    function showNotificationToast(type, name, pic) {
+        const toast = document.getElementById('bell-toast');
+        const icon = document.getElementById('t-icon');
+        const img = document.getElementById('t-img');
+        const title = document.getElementById('t-title');
+        const body = document.getElementById('t-body');
+
+        if(toastTimeout) clearTimeout(toastTimeout);
+        
+        icon.style.display = 'none';
+        img.style.display = 'none';
+
+        if (pic) {
+            img.src = pic;
+            img.style.display = 'block';
+        } else {
+            icon.style.display = 'flex';
+            if(type === 'like') {
+                icon.innerHTML = '❤️';
+                icon.className = 'toast-icon icon-like';
+            } else {
+                icon.innerHTML = '👤';
+                icon.className = 'toast-icon icon-follow';
+            }
+        }
+
+        title.innerText = type === 'like' ? 'New Like' : 'New Follower';
+        body.innerText = `${name} ${type === 'like' ? 'liked your note' : 'started following you'}`;
+
+        toast.classList.add('active');
+        if(navigator.vibrate) navigator.vibrate(20);
+
+        toastTimeout = setTimeout(() => {
+            toast.classList.remove('active');
+        }, 3000);
+    }
+
     function listenNotifications(uid) {
         let likeMap = new Map();
         let followMap = new Map();
         let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
         let followingList = [];
+        let isFirstLoad = true;
 
         const updateBadgeUI = () => {
             const readList = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
             let count = 0;
             let combinedNotifs = [];
 
-            // Combine and sort
             likeMap.forEach(v => combinedNotifs.push(v));
             followMap.forEach(v => combinedNotifs.push(v));
             combinedNotifs.sort((a,b) => b.timestamp - a.timestamp);
@@ -478,20 +553,16 @@
             combinedNotifs.forEach(n => { if(!readList.includes(n.id)) count++; });
 
             const badge = document.getElementById('notif-count');
-            const btn = document.getElementById('notif-btn');
             
             if (count > 0) {
                 badge.innerText = count > 9 ? '9+' : count;
                 badge.classList.add('visible'); 
-                // Removed .has-unread logic to remove glow/fill change
             } else { badge.classList.remove('visible'); }
 
-            // ZERO-GAP SYNC: Save to LocalStorage
             if (combinedNotifs.length > 0) {
                 const DATA_CACHE_KEY = `goorac_notif_data_${uid}`;
                 localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(combinedNotifs));
                 
-                // Build HTML fragment for notifications.html
                 let htmlStr = combinedNotifs.slice(0, 30).map(n => {
                     const isRead = readList.includes(n.id);
                     const verifyIcon = n.isVerified ? `<img src="https://img.icons8.com/color/48/verified-badge.png" class="v-badge" style="width:13px;height:13px;vertical-align:-2px;margin-left:2px;">` : '';
@@ -534,7 +605,6 @@
             return { name: "Someone", username: "", photoURL: "", verified: false };
         };
 
-        // SAFE LISTENER: Limit to 50 most recent notes to protect read quota
         db.collection("notes").where("uid", "==", uid).limit(50).onSnapshot(async snapshot => {
             for (const doc of snapshot.docs) {
                 const data = doc.data();
@@ -543,8 +613,14 @@
                         if (liker.uid !== uid && liker.timestamp) {
                             const timeMillis = liker.timestamp.toMillis ? liker.timestamp.toMillis() : liker.timestamp;
                             const nid = `like_${liker.uid}_${timeMillis}`;
-                            // Deduplication Key: One row per user per note
                             const mid = `like_${liker.uid}_${doc.id}`;
+                            
+                            // Check for newness
+                            if (!likeMap.has(mid) && !isFirstLoad) {
+                                const u = await fetchUserIfNeeded(liker.uid);
+                                showNotificationToast('like', u.name, u.photoURL);
+                            }
+
                             const u = await fetchUserIfNeeded(liker.uid);
                             likeMap.set(mid, { id: nid, type: 'like', senderId: liker.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "liked your note.", noteData: { text: data.text, songName: data.songName, bgColor: data.bgColor, textColor: data.textColor } });
                         }
@@ -554,7 +630,6 @@
             updateBadgeUI();
         });
 
-        // Followers
         db.collection("users").doc(uid).onSnapshot(async doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -564,13 +639,20 @@
                         if (f.timestamp) {
                             const timeMillis = f.timestamp.toMillis ? f.timestamp.toMillis() : f.timestamp;
                             const nid = `follow_${f.uid}_${timeMillis}`;
+                            const mid = `follow_${f.uid}`;
+                            
+                            if (!followMap.has(mid) && !isFirstLoad) {
+                                const u = await fetchUserIfNeeded(f.uid);
+                                showNotificationToast('follow', u.name, u.photoURL);
+                            }
+
                             const u = await fetchUserIfNeeded(f.uid);
-                            // Key by User ID only to prevent duplicate rows for same follower
-                            followMap.set(`follow_${f.uid}`, { id: nid, type: 'follow', senderId: f.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "started following you." });
+                            followMap.set(mid, { id: nid, type: 'follow', senderId: f.uid, senderName: u.name, senderUsername: u.username, senderPic: u.photoURL, isVerified: u.verified, timestamp: timeMillis, text: "started following you." });
                         }
                     }
                 }
                 updateBadgeUI();
+                if(isFirstLoad) setTimeout(() => isFirstLoad = false, 2000);
             }
         });
         window.addEventListener('storage', (e) => { if(e.key === READ_KEY) updateBadgeUI(); });
