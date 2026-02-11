@@ -125,26 +125,46 @@
     </div>
 
     <script>
-        // 1. Firebase Init using Config
-        if (typeof window.initFirebaseCore === 'function') {
-            window.initFirebaseCore();
-        } else if (!firebase.apps.length && window.firebaseConfig) {
-            firebase.initializeApp(window.firebaseConfig);
+        // 1. Robust Initialization
+        function initializeApp() {
+            // Check if initFirebaseCore exists (from config.js)
+            if (typeof window.initFirebaseCore === 'function') {
+                window.initFirebaseCore();
+            } 
+            // Fallback if config.js didn't run properly but we have the object
+            else if (!firebase.apps.length && window.firebaseConfig) {
+                firebase.initializeApp(window.firebaseConfig);
+            }
+
+            // Safety check
+            if (!firebase.apps.length) {
+                console.error("Firebase config missing. Check config.js");
+                return;
+            }
+
+            // 2. The Redirect Logic
+            const auth = firebase.auth();
+            
+            auth.onAuthStateChanged((user) => {
+                // Added a slight delay so the animation looks smooth to the user
+                setTimeout(() => {
+                    if (user) {
+                        console.log("User detected, redirecting to Home...");
+                        window.location.href = "home.html";
+                    } else {
+                        console.log("No user, redirecting to Login...");
+                        window.location.href = "login.html";
+                    }
+                }, 1500); // 1.5s for a high-end app transition feel
+            });
         }
 
-        // 2. The Redirect Logic
-        firebase.auth().onAuthStateChanged((user) => {
-            // Added a slight delay so the animation looks smooth to the user
-            setTimeout(() => {
-                if (user) {
-                    console.log("User detected, redirecting to Home...");
-                    window.location.href = "home.html";
-                } else {
-                    console.log("No user, redirecting to Login...");
-                    window.location.href = "login.html";
-                }
-            }, 1500); // 1.5s for a high-end app transition feel
-        });
+        // Run Init
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
     </script>
 </body>
 </html>
