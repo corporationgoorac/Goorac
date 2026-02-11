@@ -65,14 +65,14 @@
             cursor: pointer; background: transparent; padding: 8px 4px;
         }
 
-        /* --- FILTER CHIPS (New Tab Design) --- */
+        /* --- FILTER CHIPS --- */
         .filters-container {
             position: fixed; top: 54px; left: 0; width: 100%;
             background: var(--bg); z-index: 99;
             display: flex; align-items: center; gap: 10px;
             padding: 10px 16px; overflow-x: auto;
             border-bottom: 0.5px solid var(--border);
-            scrollbar-width: none; /* Hide scrollbar */
+            scrollbar-width: none;
         }
         .filters-container::-webkit-scrollbar { display: none; }
 
@@ -98,7 +98,7 @@
             align-items: flex-start; 
             gap: 14px; padding: 16px; position: relative;
             background: transparent; transition: background 0.2s;
-            border-bottom: 1px solid var(--border); /* Distinct Border */
+            border-bottom: 1px solid var(--border);
             cursor: pointer;
         }
         .notif-item:active { background: rgba(255,255,255,0.03); }
@@ -142,7 +142,7 @@
 
         .time-ago { font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px; }
 
-        /* NOTE PREVIEW (Goorac Style) */
+        /* NOTE PREVIEW */
         .note-preview {
             margin-top: 10px; padding: 12px 16px; border-radius: 14px;
             background: linear-gradient(145deg, #1c1c1e, #121212);
@@ -322,11 +322,11 @@
         // 1. Merge & Sort
         rawNotifications = [...follows, ...likes].sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-        // 2. Identify UIDs needing fetch
+        // 2. Identify UIDs needing fetch (CHECK ALL POSSIBLE KEYS)
         const uidsToFetch = new Set();
         rawNotifications.forEach(n => {
-            // Priority Check for Sender UID
-            const uid = n.fromUid || n.uid || n.senderUid;
+            // Robust UID detection: fromUid, senderId, uid, senderUid
+            const uid = n.fromUid || n.senderId || n.uid || n.senderUid;
             if (uid && !userCache[uid]) uidsToFetch.add(uid);
         });
 
@@ -363,17 +363,24 @@
         filtered.forEach(n => {
             const isRead = n.isRead === true || n.isSeen === true;
             const type = n.type || 'unknown';
-            const uid = n.fromUid || n.uid || n.senderUid;
             
-            // --- PROFILE DATA SOURCE (Realtime > Notification Data) ---
+            // --- DATA EXTRACTION ---
+            // 1. Resolve UID
+            const uid = n.fromUid || n.senderId || n.uid || n.senderUid;
             const profile = userCache[uid] || {};
             
-            // Priority: Realtime Name > Notification Sender Name > Username
-            const displayName = profile.name || profile.displayName || n.senderName || profile.username || 'User';
-            // Username for URL (no spaces)
+            // 2. DISPLAY NAME: Realtime > Notification Snapshot
+            // Prefer: Real Name > Username > Snapshot > 'User'
+            const displayName = profile.name || profile.displayName || profile.username || n.senderName || 'User';
+            
+            // 3. HANDLE: Used for Redirects
             const handle = profile.username || n.fromUsername || 'user'; 
-            const pfp = profile.photoURL || n.senderPfp || 'https://via.placeholder.com/150';
+            
+            // 4. VERIFICATION: Realtime check
             const isVerified = profile.verified === true; 
+            
+            // 5. PFP
+            const pfp = profile.photoURL || n.senderPfp || 'https://via.placeholder.com/150';
 
             const item = document.createElement('div');
             item.className = `notif-item ${!isRead ? 'unread' : ''}`;
@@ -466,7 +473,6 @@
     // --- 8. HELPERS ---
     function switchTab(t) {
         currentTab = t;
-        // Logic for Filter Chips
         document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
         document.getElementById(`tab-${t}`).classList.add('active');
         render();
