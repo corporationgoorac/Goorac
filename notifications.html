@@ -113,22 +113,32 @@
             background: var(--surface); border: 1px solid var(--border);
         }
 
-        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-        .notif-text { font-size: 14px; line-height: 1.4; color: #d0d0d0; padding-right: 10px; }
+        .notif-content { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .notif-text { font-size: 14px; line-height: 1.4; color: #d0d0d0; padding-right: 5px; overflow: hidden; text-overflow: ellipsis; }
         .notif-text b { color: var(--primary); font-weight: 700; }
         .notif-time { font-size: 11px; color: var(--secondary); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+        /* --- BADGE & IDENTITY --- */
+        .v-badge { font-size: 14px; color: var(--accent); vertical-align: middle; margin-left: 2px; }
+
+        /* --- ACTION BUTTONS (FOLLOW) --- */
+        .action-area { flex-shrink: 0; margin-left: auto; display: flex; align-items: center; }
+        .follow-btn {
+            padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+            border: 1px solid var(--border); cursor: pointer; transition: 0.2s;
+            min-width: 85px; text-align: center; display: flex; align-items: center; justify-content: center;
+        }
+        .follow-btn.follow { background: var(--primary); color: var(--bg); border-color: var(--primary); }
+        .follow-btn.following { background: var(--surface); color: var(--primary); }
+        .follow-btn:disabled { opacity: 0.6; cursor: default; }
 
         /* --- POST PREVIEW --- */
         .post-preview {
             width: 44px; height: 44px; border-radius: 6px; overflow: hidden;
             background: var(--surface); border: 1px solid var(--border); flex-shrink: 0;
+            position: relative;
         }
         .post-preview img { width: 100%; height: 100%; object-fit: cover; }
-        .post-preview.video-type::after {
-            content: 'play_arrow'; font-family: 'Material Icons Round';
-            position: absolute; inset: 0; display: flex; align-items: center; 
-            justify-content: center; font-size: 16px; color: white; background: rgba(0,0,0,0.2);
-        }
 
         /* --- INDICATORS --- */
         .unread-dot {
@@ -140,6 +150,13 @@
             background: var(--bg); border-radius: 50%; display: flex; align-items: center; 
             justify-content: center; font-size: 12px; border: 1px solid var(--border);
         }
+
+        .btn-loader {
+            width: 14px; height: 14px; border: 2px solid rgba(128,128,128,0.3);
+            border-top: 2px solid currentColor; border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
         .call-notif { background: linear-gradient(90deg, rgba(0, 210, 255, 0.08), transparent); border-left: 3px solid var(--accent); }
 
@@ -195,19 +212,26 @@
 
 <script>
     let myUid = null;
+    let myFollowing = [];
     let currentFilter = 'all';
     let rawNotifications = [];
+    const processingIds = new Set();
     const container = document.getElementById('notif-container');
     const readTimers = new Map();
 
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
-            listenToNotifications();
+            fetchMyFollowing().then(listenToNotifications);
         } else {
             window.location.href = "login.html";
         }
     });
+
+    async function fetchMyFollowing() {
+        const doc = await db.collection("users").doc(myUid).get();
+        myFollowing = doc.data()?.following || [];
+    }
 
     function setFilter(type, el) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -249,8 +273,7 @@
             const id = doc.id;
             const isUnread = data.isRead === false;
             
-            const item = document.createElement('a');
-            item.href = data.link || '#';
+            const item = document.createElement('div');
             item.className = `notif-item ${isUnread ? 'unread' : ''} ${data.type === 'call' ? 'call-notif' : ''}`;
             
             let timeStr = "Just now";
@@ -261,7 +284,9 @@
             if (data.type === 'follow') { typeIcon = 'person_add'; iconColor = 'var(--accent)'; }
             else if (data.type === 'like') { typeIcon = 'favorite'; iconColor = 'var(--danger)'; }
             else if (data.type === 'call') { typeIcon = 'videocam'; iconColor = 'var(--accent)'; }
-            else if (data.type === 'mention') { typeIcon = 'alternate_email'; iconColor = 'var(--accent)'; }
+
+            const vBadge = data.isVerified ? `<span class="material-icons-round v-badge">verified</span>` : '';
+            const displayName = data.fromName || data.fromUsername || 'User';
 
             // Post/Note Preview logic
             let previewHtml = '';
@@ -272,26 +297,81 @@
                 }
             }
 
+            // Follow Button logic for follow notifications
+            let actionHtml = '';
+            if (data.type === 'follow') {
+                const isFollowing = myFollowing.includes(data.fromUid);
+                const isProcessing = processingIds.has(data.fromUid);
+                actionHtml = `
+                    <div class="action-area">
+                        <button class="follow-btn ${isFollowing ? 'following' : 'follow'}" 
+                                onclick="toggleFollow('${data.fromUid}', ${isFollowing}, event)"
+                                ${isProcessing ? 'disabled' : ''}>
+                            ${isProcessing ? '<div class="btn-loader"></div>' : (isFollowing ? 'Following' : 'Follow')}
+                        </button>
+                    </div>
+                `;
+            }
+
             item.innerHTML = `
-                <div class="avatar-box">
+                <div class="avatar-box" onclick="window.location.href='profile.html?uid=${data.fromUid}'">
                     <img src="${data.fromPhoto || 'https://via.placeholder.com/100'}" class="avatar">
                     <div class="type-icon" style="color:${iconColor}">
                         <span class="material-icons-round" style="font-size:12px;">${typeIcon}</span>
                     </div>
                 </div>
-                <div class="notif-content">
+                <div class="notif-content" onclick="handleNotifClick('${data.link}', '${id}')">
                     <div class="notif-text">
-                        <b>${data.fromUsername || 'User'}</b> ${data.content || 'interacted with you.'}
+                        <b>${displayName}</b>${vBadge} ${data.content || 'interacted with you.'}
                     </div>
                     <div class="notif-time">${timeStr}</div>
                 </div>
                 ${previewHtml}
+                ${actionHtml}
                 ${isUnread ? '<div class="unread-dot"></div>' : ''}
             `;
 
             container.appendChild(item);
             if (isUnread) observeNotification(item, id);
         });
+    }
+
+    function handleNotifClick(link, id) {
+        markSingleAsRead(id);
+        if (link && link !== '#') window.location.href = link;
+    }
+
+    async function toggleFollow(targetUid, isCurrentlyFollowing, event) {
+        event.stopPropagation();
+        if (processingIds.has(targetUid)) return;
+        
+        processingIds.add(targetUid);
+        renderNotifications(rawNotifications); // Immediate UI feedback (loader)
+        
+        try {
+            const myRef = db.collection("users").doc(myUid);
+            const targetRef = db.collection("users").doc(targetUid);
+
+            await db.runTransaction(async (transaction) => {
+                if (isCurrentlyFollowing) {
+                    transaction.update(myRef, { following: firebase.firestore.FieldValue.arrayRemove(targetUid) });
+                    transaction.update(targetRef, { followers: firebase.firestore.FieldValue.arrayRemove(myUid) });
+                } else {
+                    transaction.update(myRef, { following: firebase.firestore.FieldValue.arrayAdd(targetUid) });
+                    transaction.update(targetRef, { followers: firebase.firestore.FieldValue.arrayAdd(myUid) });
+                }
+            });
+
+            if (isCurrentlyFollowing) {
+                myFollowing = myFollowing.filter(id => id !== targetUid);
+            } else {
+                myFollowing.push(targetUid);
+            }
+        } catch (e) { console.error("Follow error", e); }
+        finally {
+            processingIds.delete(targetUid);
+            renderNotifications(rawNotifications);
+        }
     }
 
     function observeNotification(element, notifId) {
