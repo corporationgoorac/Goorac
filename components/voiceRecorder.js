@@ -1,11 +1,11 @@
-// components/voiceRecorder.js
 (function() {
     /**
      * ==========================================
-     * 🎙️ VOICE RECORDER COMPONENT
+     * 🎙️ VOICE RECORDER COMPONENT (UPDATED)
      * ------------------------------------------
-     * Handles audio capture, UI interactions (swipe/lock),
-     * and direct upload to Supabase Storage.
+     * - Professional Mic Icon
+     * - "Wind" Visualizer
+     * - Direct Supabase Upload -> Link Return
      * ==========================================
      */
 
@@ -24,24 +24,16 @@
     class VoiceRecorder extends HTMLElement {
         constructor() {
             super();
-            
-            // --- State ---
             this.state = {
                 isRecording: false,
                 isLocked: false,
                 startTime: 0,
                 duration: 0
             };
-
-            // --- Hardware & Data ---
             this.mediaRecorder = null;
             this.audioChunks = [];
             this.sbClient = null;
-            
-            // --- Touch Tracking ---
             this.touchStart = { x: 0, y: 0 };
-            
-            // --- Timers ---
             this.timerInterval = null;
         }
 
@@ -56,7 +48,7 @@
             if (window.supabase) {
                 this.sbClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
             } else {
-                console.warn("⚠️ Supabase SDK not found. Voice messages will not upload.");
+                console.warn("⚠️ Supabase SDK not found.");
             }
         }
 
@@ -67,34 +59,36 @@
                 .vr-wrapper {
                     display: flex;
                     align-items: center;
-                    justify-content: flex-end;
-                    width: 100%;
+                    justify-content: center;
+                    width: 44px; /* Fixed width to match Send button */
                     height: 44px;
                     position: relative;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 }
 
-                /* --- RECORDING BAR (Slides in) --- */
+                /* --- RECORDING BAR (Slides out to left) --- */
                 .vr-bar {
                     position: absolute;
-                    right: 50px;
-                    height: 44px;
+                    right: 0; /* Anchored right */
+                    height: 48px;
                     background: #1a1a1a;
-                    border-radius: 22px;
+                    border-radius: 24px;
                     display: flex;
                     align-items: center;
                     padding: 0 16px;
-                    z-index: 10;
-                    width: 0;
+                    z-index: 100;
+                    width: 44px; /* Start small */
                     opacity: 0;
                     overflow: hidden;
                     border: 1px solid rgba(255, 255, 255, 0.1);
                     transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s ease;
                     pointer-events: none;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
                 }
 
                 .vr-bar.active {
-                    width: calc(100vw - 90px);
+                    width: calc(100vw - 24px); /* Full width minus margins */
+                    right: -6px; /* Adjust positioning */
                     opacity: 1;
                     pointer-events: auto;
                 }
@@ -122,27 +116,28 @@
                     animation: pulseRed 1s infinite;
                 }
 
-                /* --- AUDIO VISUALIZER --- */
+                /* --- WIND INDICATOR (Visualizer) --- */
                 .vr-visualizer {
                     flex: 1;
                     display: flex;
                     align-items: center;
                     gap: 3px;
-                    height: 16px;
+                    height: 20px;
                     mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
                     -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
                 }
 
                 .v-bar {
                     width: 3px;
-                    height: 20%;
+                    height: 10%;
                     background-color: ${CONFIG.THEME_COLOR};
                     border-radius: 2px;
                     transition: height 0.1s;
                 }
 
+                /* Wind/Wave Animation */
                 .vr-bar.active .v-bar {
-                    animation: audioWave 0.8s ease-in-out infinite;
+                    animation: windWave 0.8s ease-in-out infinite;
                 }
                 .v-bar:nth-child(odd) { animation-duration: 0.6s; }
                 .v-bar:nth-child(2n) { animation-duration: 1.1s; }
@@ -162,7 +157,7 @@
                     gap: 4px;
                 }
 
-                /* --- MAIN BUTTON --- */
+                /* --- SLEEK MIC BUTTON --- */
                 .vr-record-btn {
                     width: 44px;
                     height: 44px;
@@ -172,7 +167,7 @@
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    z-index: 20;
+                    z-index: 101; /* Above bar */
                     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                     -webkit-tap-highlight-color: transparent;
                 }
@@ -180,26 +175,27 @@
                 .vr-record-btn svg {
                     width: 24px;
                     height: 24px;
-                    fill: ${CONFIG.THEME_COLOR};
-                    transition: fill 0.2s;
+                    fill: ${CONFIG.THEME_COLOR}; /* Orange default */
+                    transition: fill 0.2s, transform 0.2s;
                 }
 
+                /* Active Recording State */
                 .vr-record-btn.recording {
                     background-color: ${CONFIG.THEME_COLOR};
-                    transform: scale(1.35);
-                    box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.15);
+                    transform: scale(1.2);
+                    box-shadow: 0 0 0 6px rgba(255, 152, 0, 0.2);
                 }
 
                 .vr-record-btn.recording svg {
                     fill: #ffffff;
-                    transform: scale(0.9);
+                    transform: scale(0.8);
                 }
 
                 /* --- LOCK INDICATOR --- */
                 .vr-lock-indicator {
                     position: absolute;
-                    bottom: 85px;
-                    right: 12px;
+                    bottom: 90px;
+                    right: 0;
                     background: rgba(20, 20, 20, 0.95);
                     backdrop-filter: blur(10px);
                     padding: 12px 16px;
@@ -215,6 +211,7 @@
                     opacity: 0;
                     pointer-events: none;
                     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    z-index: 2000;
                 }
 
                 .vr-lock-indicator.visible {
@@ -223,13 +220,14 @@
                 }
 
                 @keyframes pulseRed { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-                @keyframes audioWave { 0% { height: 20%; } 50% { height: 80%; } 100% { height: 20%; } }
+                @keyframes windWave { 0% { height: 10%; } 50% { height: 90%; } 100% { height: 10%; } }
             </style>
 
             <div class="vr-wrapper">
                 <div class="vr-bar" id="vr-bar">
                     <div class="vr-timer" id="vr-timer">00:00</div>
                     <div class="vr-visualizer">
+                        <div class="v-bar"></div><div class="v-bar"></div>
                         <div class="v-bar"></div><div class="v-bar"></div>
                         <div class="v-bar"></div><div class="v-bar"></div>
                         <div class="v-bar"></div><div class="v-bar"></div>
@@ -263,7 +261,7 @@
 
         bindEvents() {
             this.dom.btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
+                // e.preventDefault(); // Removed to allow potential clicks if needed, managed by logic
                 this.handleTouchStart(e);
             }, { passive: false });
 
@@ -273,11 +271,13 @@
         }
 
         async handleTouchStart(e) {
+            e.preventDefault();
             const touch = e.touches ? e.touches[0] : e;
             this.touchStart = { x: touch.clientX, y: touch.clientY };
             this.state.isLocked = false;
-            this.state.isRecording = true;
-
+            
+            // Delay slightly to differentiate click from hold if needed, 
+            // but for instant record, we start now.
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 this.startRecording(stream);
@@ -286,7 +286,6 @@
             } catch (err) {
                 console.error("❌ Mic Permission Denied:", err);
                 alert("Please enable microphone access.");
-                this.state.isRecording = false;
             }
         }
 
@@ -311,6 +310,7 @@
         }
 
         startRecording(stream) {
+            this.state.isRecording = true;
             this.mediaRecorder = new MediaRecorder(stream);
             this.audioChunks = [];
             this.mediaRecorder.ondataavailable = (event) => {
@@ -331,7 +331,7 @@
         }
 
         cancelRecording() {
-            this.state.isRecording = false;
+            this.state.isRecording = false; // Flag to prevent upload
             if (this.mediaRecorder) this.mediaRecorder.stop();
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
             this.cleanup();
@@ -347,25 +347,31 @@
         }
 
         async uploadToSupabase() {
-            if (this.state.duration < 1) return;
+            if (this.state.duration < 1) return; // Prevent accident
             const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
             const fileName = `voice_${Date.now()}_${Math.floor(Math.random() * 1000)}.webm`;
 
             try {
                 if (!this.sbClient) throw new Error("Supabase client not initialized");
+                
+                // 1. Upload
                 const { error: uploadError } = await this.sbClient.storage
                     .from(CONFIG.BUCKET)
                     .upload(fileName, blob, { cacheControl: '3600', upsert: false });
 
                 if (uploadError) throw uploadError;
+
+                // 2. Get Public URL
                 const { data } = this.sbClient.storage
                     .from(CONFIG.BUCKET)
                     .getPublicUrl(fileName);
 
+                // 3. Emit event with Link
                 this.dispatchEvent(new CustomEvent('voice-uploaded', {
-                    detail: { url: data.publicUrl, duration: this.state.duration, type: 'audio/webm' },
+                    detail: { url: data.publicUrl, duration: this.state.duration },
                     bubbles: true, composed: true
                 }));
+
             } catch (err) { console.error("❌ Upload Failed:", err); }
         }
 
@@ -381,6 +387,7 @@
         }
 
         updateUI(isActive) {
+            // Signal Chat UI to hide Input Box
             this.dispatchEvent(new CustomEvent('recording-state-changed', {
                 detail: { active: isActive }, bubbles: true, composed: true
             }));
@@ -394,6 +401,7 @@
             if (this.mediaRecorder && this.mediaRecorder.stream) {
                 this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
+            // Reset but don't clear chunks instantly in case of async issues (cleared on start)
             this.state.isRecording = false;
             this.state.isLocked = false;
             this.dom.lock.classList.remove('visible');
