@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#000000">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -35,11 +35,12 @@
       const analytics = getAnalytics(app);
     </script>
 
+    <script type="module" src="components/presence.js"></script>
+
     <script src="components/emojiPicker.js" defer></script>
     <script src="components/imagePicker.js" defer></script>
     <script src="components/filePicker.js" defer></script>
     <script src="components/viewMedia.js" defer></script>
-    <script type="module" src="components/presence.js"></script>
 
     <style>
         :root { 
@@ -142,9 +143,7 @@
         
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
         .h-pfp { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #121212; border: 1px solid #333; transition: opacity 0.3s ease; }
-        .online-dot { position: absolute; bottom: 0; right: 0; width: 100px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); animation: pulseGreen 2s infinite; }
-        /* Fix dot size override */
-        .online-dot { width: 10px !important; }
+        .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); animation: pulseGreen 2s infinite; }
         
         .h-info { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
         .h-name-wrapper { display: flex; align-items: center; gap: 4px; line-height: 1.1; }
@@ -173,24 +172,36 @@
         }
         #chat-flow::-webkit-scrollbar { display: none; }
         
-        #messages-container { display: flex; flex-direction: column; padding: 0 14px; will-change: transform; width: 100%; padding-bottom: 10px; }
+        #messages-container { display: flex; flex-direction: column; padding: 0 14px; will-change: transform; width: 100%; padding-bottom: 20px; }
 
-        /* --- TYPING INDICATOR BODY FIX --- */
-        #typing-indicator-bottom { 
-            display: none; 
+        /* MODIFIED TYPING INDICATOR STYLES */
+        .typing-row { 
+            display: none; /* Hidden by default */
             align-items: flex-end; 
-            gap: 8px; 
-            margin: 0 14px 15px 14px; 
-            align-self: flex-start;
-            animation: fadeStatus 0.2s ease;
+            margin-bottom: 15px; 
+            padding-left: 14px; 
+            width: 100%;
         }
-        .typing-pfp {
-            width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 1px solid #222;
+        .typing-avatar { 
+            width: 30px; height: 30px; 
+            border-radius: 50%; 
+            margin-right: 8px; 
+            object-fit: cover; 
+            background: #121212; 
+            border: 1px solid #222;
         }
-        .typing-bubble {
-            background: #262626; width: 54px; height: 32px; border-radius: 18px; border-bottom-left-radius: 4px; 
-            display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 12px;
+        .typing-bubble { 
+            background: var(--received-bg); 
+            padding: 12px 16px; 
+            border-radius: 18px; 
+            border-bottom-left-radius: 4px; 
+            display: flex; 
+            gap: 4px; 
+            align-items: center; 
+            width: fit-content; 
+            height: 42px;
         }
+
         .typing-dot { width: 6px; height: 6px; background: #999; border-radius: 50%; animation: typingWave 1.3s linear infinite; }
         .typing-dot:nth-child(2) { animation-delay: -1.1s; }
         .typing-dot:nth-child(3) { animation-delay: -0.9s; }
@@ -573,13 +584,13 @@
         <div id="scroll-trigger"></div>
         <div id="messages-container"></div>
         
-        <div id="typing-indicator-bottom">
-            <img id="typing-pfp" src="" class="typing-pfp">
-            <div class="typing-bubble">
+        <div class="typing-row" id="typing-row">
+             <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="typing-avatar" id="typing-pfp">
+             <div class="typing-bubble">
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
-            </div>
+             </div>
         </div>
     </div>
 
@@ -660,7 +671,6 @@
     
     // NEW: First load flag for header logic
     let isFirstStatusLoad = true;
-    let offlineCutoffTimer = null; // FEATURE: Track the 15s delay
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -670,7 +680,11 @@
     const inputBox = document.getElementById('msg-input-box');
     const chatFlow = document.getElementById('chat-flow');
     const container = document.getElementById('messages-container');
-    const bottomTyping = document.getElementById('typing-indicator-bottom');
+    
+    // TYPING UI REFS
+    const typingRow = document.getElementById('typing-row');
+    const typingPfp = document.getElementById('typing-pfp');
+
     const emojiTray = document.getElementById('emoji-tray');
     const scrollBtn = document.getElementById('scroll-down-btn');
     const sendBtnUI = document.getElementById('send-btn');
@@ -679,6 +693,7 @@
     const attachmentMenu = document.getElementById('attachment-menu');
 
     // === 0MS INSTANT LOADING BLOCK ===
+    // This executes synchronously before any network requests
     (function instantRender() {
         const storedMyUid = localStorage.getItem('my_uid_cache');
         const userCacheKey = `chat_user_${targetUsername}`;
@@ -686,6 +701,7 @@
 
         if (storedUser && storedMyUid && targetUsername) {
             try {
+                // 1. Render Header Instantly
                 chatTargetData = JSON.parse(storedUser);
                 const pfp = document.getElementById('h-pfp');
                 pfp.classList.remove('loading-shimmer');
@@ -694,10 +710,12 @@
                 document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
                 if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-                myUid = storedMyUid; 
+                // 2. Calculate ChatID
+                myUid = storedMyUid; // Temporarily set strictly for render
                 targetUid = chatTargetData.uid;
                 chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
 
+                // 3. Render Messages Instantly
                 const msgCacheKey = `chat_msgs_${chatId}`;
                 const storedMsgs = localStorage.getItem(msgCacheKey);
                 
@@ -709,9 +727,11 @@
                         messagesMap.set(m.id || m.timestampIso, m);
                     });
                     
+                    // Add class to kill animations for instant feel
                     document.body.classList.add('instant-load');
                     renderAll();
                     
+                    // Scroll to bottom immediately
                     chatFlow.style.opacity = '1';
                     chatFlow.scrollTop = chatFlow.scrollHeight;
                     isFirstLoad = false;
@@ -719,7 +739,9 @@
             } catch(e) { console.error("Instant Load Error", e); }
         }
     })();
+    // === END INSTANT LOAD ===
 
+    // NEW: Double Tap on Background to Scroll Down
     document.addEventListener('dblclick', (e) => {
         if (e.target.id === 'chat-flow' || e.target.id === 'messages-container') {
             scrollToBottom();
@@ -727,7 +749,9 @@
         }
     });
     
+    // NEW: Global Ripple Effect
     document.addEventListener('click', function(e) {
+        // Close attachment menu if clicking elsewhere
         if (!e.target.closest('#attachment-menu') && !e.target.closest('.plus-btn')) {
             attachmentMenu.style.display = 'none';
         }
@@ -742,8 +766,9 @@
         setTimeout(() => circle.remove(), 600);
     });
     
+    // === KEYBOARD FIX: Prevent focus loss on Send Button ===
     const handleSendClick = (e) => {
-        e.preventDefault(); 
+        e.preventDefault(); // Stop button from stealing focus
         sendMsg();
     };
 
@@ -760,6 +785,7 @@
         return hours + ':' + minutes + ' ' + ampm;
     }
 
+    // Helper for "Seen 1m ago" & Active status
     function timeAgo(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
         let interval = seconds / 31536000;
@@ -792,6 +818,7 @@
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
+    // Auto-resize textarea & Send Button Animation
     mInput.addEventListener('input', function() {
         this.style.height = 'auto'; 
         this.style.height = (this.scrollHeight) + 'px';
@@ -805,11 +832,19 @@
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
         
+        // Own Feature: Auto-Scroll on Typing
         if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
               scrollToBottom();
         }
     });
 
+    // Handle Enter key - Modified as per request
+    mInput.addEventListener('keydown', (e) => {
+        // Enter creates new line, so we do nothing here (default behavior)
+        // Only explicitly shift+enter might be useful, but standard Enter = Next Line
+    });
+    
+    // --- SCROLL BUTTON VISIBILITY LOGIC ---
     chatFlow.addEventListener('scroll', () => {
         const diff = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight;
         if (diff > 250) {
@@ -820,12 +855,14 @@
         }
     });
 
+    // --- FIX: ALLOW PASTE BUT DISABLE RIGHT CLICK ELSEWHERE ---
     window.oncontextmenu = (e) => { 
         if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
         e.preventDefault(); 
         return false; 
     };
     
+    // --- COMPONENT INTEGRATION ---
     const mainPicker = document.getElementById('main-picker');
     const imagePickerComponent = document.getElementById('img-picker');
     const filePickerComponent = document.getElementById('file-picker');
@@ -840,15 +877,18 @@
         });
     }
 
+    // NEW: Image Picker Listener - DIRECT SEND
     if (imagePickerComponent) {
         imagePickerComponent.addEventListener('image-uploaded', (e) => {
             const url = e.detail.url;
             if (url) {
+                // Immediately send the message with the image
                 sendImageMessage(url);
             }
         });
     }
 
+    // NEW: File Picker Listener
     if (filePickerComponent) {
         filePickerComponent.addEventListener('file-uploaded', (e) => {
             const { url, metadata } = e.detail;
@@ -862,7 +902,7 @@
         if (attachmentMenu.style.display === 'flex') {
             attachmentMenu.style.display = 'none';
         } else {
-            emojiTray.style.display = 'none'; 
+            emojiTray.style.display = 'none'; // Close emoji if open
             attachmentMenu.style.display = 'flex';
         }
     }
@@ -882,7 +922,7 @@
     }
 
     function toggleEmojiTray() {
-        attachmentMenu.style.display = 'none'; 
+        attachmentMenu.style.display = 'none'; // Close menu if open
         if (emojiTray.style.display === 'block') {
             emojiTray.style.display = 'none';
         } else {
@@ -891,19 +931,22 @@
         scrollToBottom();
     }
     
+    // Reaction Picker Logic (Half Screen Modal Component)
+    // Updated to ensure component usage for reactions
     function expandEmojiMenu() {
         closeMenu();
         const reactionModal = document.getElementById('reaction-picker-modal');
         const container = document.getElementById('reaction-picker-container');
         container.innerHTML = ''; 
         
+        // Dynamically create the component
         const reactionPicker = document.createElement('emoji-picker');
         reactionPicker.style.width = "100%";
         reactionPicker.style.height = "100%";
         reactionPicker.addEventListener('emoji-click', event => {
              const emoji = event.detail.emoji || event.detail.unicode;
              applyReaction(emoji);
-             closeReactionPicker(); 
+             closeReactionPicker(); // Auto-close on selection (Fast Interaction)
         });
         container.appendChild(reactionPicker);
         reactionModal.style.display = 'flex';
@@ -930,23 +973,11 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none'; });
 
-    // === RE-WRITTEN HEADER LOGIC: REMOVED TYPING FROM HEADER & ADDED STRICT PRIVACY ===
+    // === UPDATED: Function to update header UI based on latest data ===
     function updateHeaderStatus() {
-        if (!lastStatusData || !chatTargetData) return;
+        // NOTE: We no longer check typing here, as typing is in the body now
+        if (!lastStatusData) return;
         
-        // PRIVACY RULES
-        const myStatusOff = (myUserData && myUserData.showActivityStatus === false);
-        // FIX: Check BOTH lastStatusData and the static profile data (chatTargetData)
-        // This prevents the status from unhiding if the ephemeral status update is missing the flag.
-        const theirStatusOff = (lastStatusData.showActivityStatus === false || (chatTargetData && chatTargetData.showActivityStatus === false));
-
-        if (myStatusOff || theirStatusOff) {
-            onlineDot.style.display = 'none';
-            headerSubLabel.innerText = `@${chatTargetData.username}`;
-            headerSubLabel.style.color = "var(--text-secondary)";
-            return;
-        }
-
         if (lastStatusData.state === 'online') {
             onlineDot.style.display = 'block';
             headerSubLabel.innerText = "Active now";
@@ -961,43 +992,55 @@
     function monitorTargetStatus() {
         if (!targetUid) return;
         
+        // === PRIVACY CHECK: IF MY STATUS IS OFF, I CANNOT SEE THEIRS ===
+        if (myUserData && myUserData.showActivityStatus === false) {
+             // Force Hide Everything
+             onlineDot.style.display = 'none';
+             headerSubLabel.innerText = `@${chatTargetData.username}`;
+             headerSubLabel.style.color = "var(--text-secondary)";
+             return; // Stop execution, do not attach RDB listener
+        }
+        
+        // Clear any existing interval
         if (statusUpdateInterval) clearInterval(statusUpdateInterval);
+
+        // Start interval to refresh time every 60s
         statusUpdateInterval = setInterval(() => {
-            if (!isFirstStatusLoad) updateHeaderStatus();
+            if (!isFirstStatusLoad) {
+                updateHeaderStatus();
+            }
         }, 60000);
 
         rdb.ref('/status/' + targetUid).on('value', (snapshot) => {
-            const data = snapshot.val();
+            lastStatusData = snapshot.val();
+            
+            // Only update immediately if not typing
             if (statusTimeout) clearTimeout(statusTimeout);
             
-            if (!data) {
+            // Initial simple state
+            if (!lastStatusData) {
                headerSubLabel.innerText = `@${chatTargetData.username}`;
                headerSubLabel.style.color = "var(--text-secondary)";
                return;
             }
 
-            if (data.state === 'online') {
-                clearTimeout(offlineCutoffTimer);
-                lastStatusData = data;
-            } else {
-                clearTimeout(offlineCutoffTimer);
-                offlineCutoffTimer = setTimeout(() => {
-                    lastStatusData = data;
-                    updateHeaderStatus();
-                }, 15000);
-                return; 
-            }
-
+            // === NEW LOGIC: SHOW USERNAME FIRST 3 SECONDS ===
             if (isFirstStatusLoad) {
+                // Force show username
                 headerSubLabel.innerText = `@${chatTargetData.username}`;
                 headerSubLabel.style.color = "var(--text-secondary)";
                 onlineDot.style.display = 'none';
+
+                // Wait 3 seconds, then switch to live status
                 statusTimeout = setTimeout(() => {
                     isFirstStatusLoad = false;
                     updateHeaderStatus(); 
                 }, 3000);
             } else {
-                statusTimeout = setTimeout(() => updateHeaderStatus(), 500); 
+                // Normal live update
+                statusTimeout = setTimeout(() => {
+                    updateHeaderStatus();
+                }, 500); 
             }
         });
     }
@@ -1005,13 +1048,17 @@
     auth.onAuthStateChanged(user => {
         if (user) { 
             myUid = user.uid; 
+            // Save UID for next instant load
             localStorage.setItem('my_uid_cache', myUid);
-            db.collection('users').doc(myUid).onSnapshot(doc => {
+            
+            db.collection('users').doc(myUid).get().then(doc => {
                  if (doc.exists) {
-                    myUserData = doc.data();
-                    updateHeaderStatus(); 
+                     myUserData = doc.data();
+                     // Re-init listener now that we know privacy settings
+                     if (targetUid) monitorTargetStatus(); 
                  }
             });
+            // Presence is now handled by imported presence.js automatically
             initChat(); 
         }
         else { window.location.href = 'login.html'; }
@@ -1019,41 +1066,51 @@
 
     async function initChat() {
         if(!targetUsername) return;
+
+        // --- CACHE LAYER: INSTANT LOAD USER DATA ---
         const cacheKeyUser = `chat_user_${targetUsername}`;
+        
         const snap = await db.collection("users").where("username", "==", targetUsername).get();
         if (snap.empty) return;
         
+        // Update Data from Network
         targetUid = snap.docs[0].id;
         chatTargetData = snap.docs[0].data();
-        chatTargetData.uid = targetUid; 
+        chatTargetData.uid = targetUid; // Append UID for cache usage next time
+        
+        // SAVE USER TO CACHE
         localStorage.setItem(cacheKeyUser, JSON.stringify(chatTargetData));
+
         chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        if (!messagesMap.size) {
-            const pfp = document.getElementById('h-pfp');
-            pfp.classList.remove('loading-shimmer');
-            pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
-            document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
-            document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
-            if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
-        }
+        // Update UI
+        const pfp = document.getElementById('h-pfp');
+        pfp.classList.remove('loading-shimmer');
+        const pfpUrl = chatTargetData.photoURL || 'https://via.placeholder.com/150';
+        pfp.src = pfpUrl;
+        
+        // Update Typing PFP source
+        typingPfp.src = pfpUrl;
 
-        monitorTargetStatus();
+        document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
+        document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
+        if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+
+        // Check Monitor (will wait for myUserData if not ready)
+        if(myUserData) monitorTargetStatus();
 
         db.collection("chats").doc(chatId).update({ 
             [`unreadCount.${myUid}`]: 0, 
             seen: true 
         }).catch(e => {});
 
-        // === TYPING INDICATOR BODY LOGIC ===
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
             const isTyping = s.val();
+            // Show new typing bubble UI
+            typingRow.style.display = isTyping ? 'flex' : 'none';
+            
             if(isTyping) {
-                document.getElementById('typing-pfp').src = chatTargetData.photoURL || 'https://via.placeholder.com/30';
-                bottomTyping.style.display = 'flex';
                 scrollToBottom();
-            } else {
-                bottomTyping.style.display = 'none';
             }
         });
 
@@ -1062,6 +1119,7 @@
         setupGlobalSlide(); 
     }
 
+    // --- INSTAGRAM STYLE TIME REVEAL LOGIC ---
     function setupGlobalSlide() {
         let startX = 0, currentX = 0, isDragging = false;
         const container = document.getElementById('messages-container');
@@ -1100,10 +1158,12 @@
         observer.observe(document.getElementById('scroll-trigger'));
     }
 
+    // Helper to Save Messages to LocalStorage
     function saveMessagesToCache() {
         if (!chatId) return;
         try {
             const msgsToSave = Array.from(messagesMap.values()).map(m => {
+                // Clone and convert timestamp objects to ISO strings for storage
                 let savedM = { ...m };
                 if (m.timestamp && typeof m.timestamp.toDate === 'function') {
                     savedM.timestampIso = m.timestamp.toDate().toISOString();
@@ -1111,11 +1171,14 @@
                 if (m.seenAt && typeof m.seenAt.toDate === 'function') {
                     savedM.seenAtIso = m.seenAt.toDate().toISOString();
                 }
+                // Don't store the complex object
                 delete savedM.timestamp; 
                 delete savedM.seenAt;
                 return savedM;
             });
+            // Sort to ensure order
             msgsToSave.sort((a, b) => new Date(a.timestampIso) - new Date(b.timestampIso));
+            // Limit cache size to last 50 messages to prevent overflow
             const limitMsgs = msgsToSave.slice(-50); 
             localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(limitMsgs));
         } catch (e) { console.error("Cache Save Error", e); }
@@ -1136,7 +1199,7 @@
                 snapshot.docChanges().forEach(change => {
                     const msgData = change.doc.data();
                     const msgId = change.doc.id;
-                    msgData.id = msgId; 
+                    msgData.id = msgId; // Append ID
                     
                     if (change.type === "added") {
                         messagesMap.set(msgId, msgData);
@@ -1162,6 +1225,7 @@
                     }
                 }
 
+                // Initial Load Instant Jump
                 if (isFirstLoad) {
                     renderAll();
                     chatFlow.scrollTop = chatFlow.scrollHeight;
@@ -1177,6 +1241,7 @@
                     }
                 }
                 
+                // SAVE TO CACHE AFTER UPDATE
                 saveMessagesToCache();
             });
     }
@@ -1184,7 +1249,9 @@
     async function loadMoreMessages() {
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
-        chatFlow.style.scrollBehavior = 'auto'; 
+        
+        // CAPTURE SCROLL POS
+        chatFlow.style.scrollBehavior = 'auto'; // Disable smooth for instant jump
         const oldScrollHeight = chatFlow.scrollHeight;
         
         const snapshot = await db.collection("chats").doc(chatId).collection("messages")
@@ -1201,8 +1268,13 @@
             });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
+            
+            // ADJUST SCROLL POSITION INSTANTLY
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
+            
+            // Re-enable smooth after a tick
             setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
+            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -1215,12 +1287,15 @@
         const sorted = Array.from(messagesMap.entries())
             .filter(([id, data]) => data.timestamp) 
             .sort((a, b) => {
+                // Robust sort handling for both Firestore Object and Cache Object
                 const tA = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
                 const tB = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
                 return tA(a[1]) - tB(b[1]);
             });
 
         let lastDateLabel = "";
+
+        // Logic for Last Seen
         let lastSeenMsgId = null;
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
@@ -1230,9 +1305,14 @@
             }
         }
         
+        // Own Feature: Logic for grouping times
+        let lastTimeStr = "";
+        let lastSender = "";
+
         sorted.forEach(([id, data], index) => { 
             const msgDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
             const dateLabel = getDateDivider(msgDate);
+            const timeStr = formatTime12(msgDate);
             
             if (dateLabel !== lastDateLabel) {
                 const div = document.createElement('div');
@@ -1242,13 +1322,23 @@
                 lastDateLabel = dateLabel;
             }
 
+            // --- SMART PROFILE PICTURE LOGIC ---
             let isLastInGroup = true;
+            let showTime = true;
+
             if (index + 1 < sorted.length) {
                 const nextMsg = sorted[index + 1][1];
                 if (nextMsg.sender === data.sender) {
                     isLastInGroup = false;
+                    // Own Feature: If same minute and same sender, hide time on first msg
+                    const nextDate = nextMsg.timestamp.toDate ? nextMsg.timestamp.toDate() : new Date(nextMsg.timestampIso);
+                    if (formatTime12(nextDate) === timeStr) {
+                         // We could hide time here, but CSS handles absolute positioning well.
+                         // Let's keep it visible for slide-to-reveal.
+                    }
                 }
             }
+
             renderMessage(data, id, id === lastSeenMsgId, isLastInGroup); 
         });
     }
@@ -1261,6 +1351,7 @@
         likeSound.play().catch(e => {}); 
     }
 
+    // Own Feature: Link Detection
     function linkify(text) {
         if (!text) return "";
         const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -1301,8 +1392,10 @@
         rowDiv.className = `msg-row ${side}`;
         
         let reactionsList = [];
+        let myReaction = null;
         if (m.reactions) {
             reactionsList = Object.values(m.reactions);
+            if (m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
         }
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
 
@@ -1319,6 +1412,7 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
+        // NEW: Unique Instagram-like Note Reply UI
         const noteReplyHtml = m.replyToNote ? `
             <div class="note-reply-wrapper">
                 <div class="note-reply-pill" style="background: ${m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626'}; color: ${m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff'}">
@@ -1337,10 +1431,12 @@
             </div>
         ` : '';
 
+        // --- MEDIA TYPES LOGIC ---
         let mediaHtml = '';
         let bubbleClass = 'bubble';
         let bubbleStyle = '';
 
+        // 1. IMAGE (Existing)
         if (m.imageUrl) {
             const imgClass = side === 'sent' ? 'sent-media-img' : 'received-media-img';
             mediaHtml = `
@@ -1351,6 +1447,7 @@
             bubbleClass = "bubble has-media";
             if(!m.text) bubbleStyle = "display:none;";
         } 
+        // 2. VIDEO
         else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('video')) {
             mediaHtml = `
             <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${m.fileUrl}', 'video')">
@@ -1361,6 +1458,7 @@
             bubbleClass = "bubble has-media";
             if(!m.text) bubbleStyle = "display:none;";
         }
+        // 3. AUDIO (Instagram Style + VISUALIZER FIX)
         else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('audio')) {
             const safeId = 'audio-' + id;
             mediaHtml = `
@@ -1368,6 +1466,7 @@
                 <div class="audio-control-btn" onclick="event.stopPropagation(); toggleAudio('${safeId}')">
                     <svg id="icon-${safeId}" viewBox="0 0 24 24" style="width:18px; fill:#000;"><path d="M8 5v14l11-7z"/></svg>
                 </div>
+                
                 <div class="audio-wave-container" id="wave-${safeId}">
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
@@ -1377,12 +1476,15 @@
                         <div id="prog-${safeId}" class="audio-real-progress"></div>
                     </div>
                 </div>
+
                 <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
                 <div id="react-${id}" class="reaction-badge" style="position:absolute; bottom:-8px; right:10px; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
             </div>`;
+            // Audio usually doesn't have caption in this style, or it sits below
             bubbleClass = "bubble has-media"; 
             if(!m.text) bubbleStyle = "display:none;";
         }
+        // 4. DOCUMENT
         else if (m.fileUrl) {
             mediaHtml = `
             <div class="msg-file-pill" onclick="window.open('${m.fileUrl}', '_blank')">
@@ -1398,8 +1500,11 @@
             if(!m.text) bubbleStyle = "display:none;";
         }
 
+        // --- HTML ASSEMBLY ---
         const safeText = linkify(m.text);
         let innerHTML = '';
+        
+        // Base content block
         let contentHTML = `
             ${noteReplyHtml}
             ${replyHtml}
@@ -1434,33 +1539,47 @@
         `;
         container.appendChild(rowDiv);
 
+        // Listeners for text bubbles
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
-        if(bubbleEl && bubbleEl.style.display !== 'none') attachMessageListeners(bubbleEl, id, m);
+        if(bubbleEl && bubbleEl.style.display !== 'none') {
+            attachMessageListeners(bubbleEl, id, m);
+        }
+        
+        // Listeners for Wrappers (Media)
         if(m.imageUrl || (m.fileUrl && m.fileMeta.type.includes('video'))) {
              const mediaEl = rowDiv.querySelector('.msg-media-wrapper') || rowDiv.querySelector('.msg-video-container');
              if(mediaEl) attachMessageListeners(mediaEl, id, m);
         }
-        if(m.fileUrl && (m.fileMeta.type.includes('audio') || m.fileMeta.type.includes('file'))) {
+        // Listeners for Audio/File pills
+        if(m.fileUrl && (m.fileMeta.type.includes('audio') || m.fileMeta.type.includes('pdf') || m.fileMeta.type.includes('file'))) {
              const pill = rowDiv.querySelector('.msg-audio-pill') || rowDiv.querySelector('.msg-file-pill');
              if(pill) attachMessageListeners(pill, id, m);
         }
     }
     
+    // --- AUDIO PLAYER LOGIC (FIXED) ---
     window.toggleAudio = function(id) {
         const audio = document.getElementById(id);
         const icon = document.getElementById('icon-' + id);
         const wave = document.getElementById('wave-' + id);
+        
         if (!audio) return;
+
+        // Pause all other audios
         document.querySelectorAll('audio').forEach(a => {
-            if(a.id !== id) { a.pause(); resetAudioUI(a.id); }
+            if(a.id !== id) {
+                a.pause();
+                resetAudioUI(a.id);
+            }
         });
+
         if (audio.paused) {
-            audio.play().catch(e => {});
-            icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            audio.play().catch(e => console.log("Audio play error:", e));
+            icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause Icon
             if(wave) wave.classList.add('audio-playing');
         } else {
             audio.pause();
-            icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play Icon
             if(wave) wave.classList.remove('audio-playing');
         }
     };
@@ -1478,17 +1597,20 @@
         const icon = document.getElementById('icon-' + id);
         const prog = document.getElementById('prog-' + id);
         const wave = document.getElementById('wave-' + id);
+        
         if(icon) icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
         if(prog) prog.style.width = '0%';
         if(wave) wave.classList.remove('audio-playing');
     };
 
+    // Extracted Listener Logic for re-use on Text Bubble OR Image
     function attachMessageListeners(element, id, m) {
+            let reactionsList = [];
             let myReaction = null;
             if (m.reactions && m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
 
             element.addEventListener('dblclick', (e) => {
-                e.preventDefault(); e.stopPropagation(); vibrate(50); 
+                e.preventDefault(); e.stopPropagation(); vibrate(50); // Own Feature: Stronger vibration on like
                 triggerHeartAnimation();
                 applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
             });
@@ -1497,7 +1619,9 @@
 
             element.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
-                isScrolling = false; swipeTriggered = false;
+                isScrolling = false; 
+                swipeTriggered = false;
+                
                 menuTimer = setTimeout(() => {
                     if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
                 }, 500);
@@ -1505,7 +1629,12 @@
 
             element.addEventListener('touchmove', (e) => {
                 currentX = e.touches[0].clientX;
-                if (Math.abs(currentX - startX) > 10) { clearTimeout(menuTimer); isScrolling = true; }
+                
+                if (Math.abs(currentX - startX) > 10) { 
+                      clearTimeout(menuTimer);
+                      isScrolling = true;
+                }
+                
                 let diff = currentX - startX;
                 if (diff > 0 && diff < 80) {
                     element.style.transform = `translateX(${diff}px)`;
@@ -1520,7 +1649,15 @@
                 element.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
                 element.style.transform = `translateX(0px)`;
                 if (diff > 50 && swipeTriggered) {
-                    let replyText = m.text || (m.imageUrl ? "📷 Photo" : m.fileUrl ? "📄 File" : "Attachment");
+                    // Logic to say "Replying to Audio/Video" correctly
+                    let replyText = m.text;
+                    if(!replyText) {
+                        if(m.imageUrl) replyText = "📷 Photo";
+                        else if(m.fileMeta && m.fileMeta.type.includes('video')) replyText = "🎥 Video";
+                        else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
+                        else if(m.fileUrl) replyText = "📄 File";
+                        else replyText = "Attachment";
+                    }
                     triggerReply(replyText);
                 }
                 startX = 0; currentX = 0;
@@ -1534,68 +1671,138 @@
         mInput.focus(); 
     }
 
+    // NEW: Function to send image message immediately
     async function sendImageMessage(imageUrl) {
         popSound.play().catch(e => {});
         scrollToBottom();
-        let msgData = { text: "", sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo: replyingTo, seen: false, reactions: {}, imageUrl: imageUrl };
+
+        let msgData = {
+            text: "", // No caption for direct send
+            sender: myUid, 
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo, 
+            seen: false, 
+            reactions: {},
+            imageUrl: imageUrl
+        };
+        
+        // Reset reply state if any
         cancelInteraction();
+
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
         updateLastMsg("📷 Image");
         scrollToBottom();
     }
 
+    // NEW: Function to send File/Video/Audio
     async function sendFileMessage(fileUrl, metadata) {
         popSound.play().catch(e => {});
         scrollToBottom();
+
         const caption = metadata.caption || "";
-        let msgData = { text: caption, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo: replyingTo, seen: false, reactions: {}, fileUrl: fileUrl, fileMeta: metadata };
+        
+        let msgData = {
+            text: caption,
+            sender: myUid,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo,
+            seen: false,
+            reactions: {},
+            fileUrl: fileUrl,
+            fileMeta: metadata
+        };
+
         cancelInteraction();
+
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
         let type = metadata.type || "";
-        let label = (type.indexOf('video') !== -1) ? "🎥 Video" : (type.indexOf('audio') !== -1) ? "🎵 Audio" : "📄 File";
+        let label = "📄 File";
+        if(type.indexOf('video') !== -1) label = "🎥 Video";
+        else if(type.indexOf('audio') !== -1) label = "🎵 Audio";
+        
         updateLastMsg(caption ? label + " " + caption : label);
         scrollToBottom();
     }
 
     async function updateLastMsg(msgText) {
-        await db.collection("chats").doc(chatId).set({ lastMessage: msgText, lastSender: myUid, lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(), participants: [myUid, targetUid], seen: false, [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+        await db.collection("chats").doc(chatId).set({
+            lastMessage: msgText, 
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            participants: [myUid, targetUid], seen: false,
+            [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
     }
 
     async function sendMsg() {
         const text = mInput.value.trim();
-        if (!text) { inputBox.classList.add('shake-anim'); setTimeout(() => inputBox.classList.remove('shake-anim'), 400); return; }
+        
+        if (!text) {
+            inputBox.classList.add('shake-anim');
+            setTimeout(() => inputBox.classList.remove('shake-anim'), 400);
+            return;
+        }
+
         popSound.play().catch(e => {});
-        mInput.value = ""; mInput.style.height = 'auto'; sendBtnUI.classList.remove('active'); 
-        emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none';
+
+        // KEYBOARD FIX: Clear value but DO NOT BLUR
+        mInput.value = "";
+        mInput.style.height = 'auto'; 
+        
+        sendBtnUI.classList.remove('active'); 
+        emojiTray.style.display = 'none';
+        attachmentMenu.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
+        
+        // FORCE FOCUS TO REMAIN
         mInput.focus(); 
+        setTimeout(() => mInput.focus(), 10); 
+
         if (editModeId) {
-            const idToEdit = editModeId; editModeId = null; cancelInteraction(); 
+            const idToEdit = editModeId; editModeId = null;
+            cancelInteraction(); // Close the editing dock
             await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
         } else {
-            const rText = replyingTo; cancelInteraction(); scrollToBottom();
-            await db.collection("chats").doc(chatId).collection("messages").add({ text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo: rText, seen: false, reactions: {} });
+            const rText = replyingTo; cancelInteraction(); // Close reply dock
+            scrollToBottom();
+            
+            let msgData = {
+                text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                replyTo: rText, seen: false, reactions: {}
+            };
+
+            await db.collection("chats").doc(chatId).collection("messages").add(msgData);
             updateLastMsg(text);
         }
         scrollToBottom();
     }
 
-    function scrollToBottom() { chatFlow.scrollTop = chatFlow.scrollHeight; }
+    function scrollToBottom() { 
+        chatFlow.scrollTop = chatFlow.scrollHeight; 
+    }
 
     function openMenu(id, sender, text) {
         activeMenuId = id;
         const isMine = sender === myUid;
-        document.getElementById('edit-btn').style.display = (isMine && text) ? 'block' : 'none'; 
+        document.getElementById('edit-btn').style.display = (isMine && text) ? 'block' : 'none'; // Only allow edit if text exists
         document.getElementById('unsend-btn').style.display = isMine ? 'block' : 'none';
+        document.getElementById('menu-emoji-grid').style.display = 'none';
         document.getElementById('menu-overlay').style.display = 'flex';
     }
 
     async function copyMessageText() {
         if (!activeMenuId) return;
         const el = document.getElementById('text-' + activeMenuId);
-        if(!el) { closeMenu(); return; } 
+        if(!el) { closeMenu(); return; } // Might be image only
+        
         const msgText = el.innerText.split('(edited)')[0].trim();
-        try { await navigator.clipboard.writeText(msgText); closeMenu(); } catch (err) {}
+        try {
+            await navigator.clipboard.writeText(msgText);
+            closeMenu();
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
     }
 
     async function applyReaction(emoji) {
@@ -1605,69 +1812,137 @@
     }
 
     async function applyReactionToId(id, emoji) {
+        // --- 1. OPTIMISTIC UPDATE (Fix for old messages) ---
         if(messagesMap.has(id)) {
             let msg = messagesMap.get(id);
             if(!msg.reactions) msg.reactions = {};
-            if(msg.reactions[myUid] && msg.reactions[myUid].emoji === emoji) delete msg.reactions[myUid];
-            else if (emoji !== '') msg.reactions[myUid] = { emoji: emoji, timestamp: Date.now() };
-            renderAll(); 
+
+            if(msg.reactions[myUid] && msg.reactions[myUid].emoji === emoji) {
+                 delete msg.reactions[myUid];
+            } else if (emoji !== '') {
+                 msg.reactions[myUid] = { emoji: emoji, timestamp: Date.now() };
+            }
+            
+            messagesMap.set(id, msg);
+            renderAll(); // Refresh UI immediately
         }
+
+        // --- 2. FIREBASE UPDATE ---
         const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(id);
         const doc = await msgRef.get();
         const data = doc.data();
         let currentReaction = (data.reactions && data.reactions[myUid]) ? data.reactions[myUid].emoji : null;
-        if (currentReaction === emoji) await msgRef.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() });
-        else await msgRef.update({ [`reactions.${myUid}`]: { emoji: emoji, timestamp: Date.now() } });
+
+        if (currentReaction === emoji) {
+            await msgRef.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() });
+        } else {
+            await msgRef.update({ [`reactions.${myUid}`]: { emoji: emoji, timestamp: Date.now() } });
+        }
     }
 
     function showReactionDetails(msgId, event) {
         event.stopPropagation();
         const msgData = messagesMap.get(msgId);
         if (!msgData || !msgData.reactions) return;
+
         const listContainer = document.getElementById('react-list-items');
         listContainer.innerHTML = '';
+
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
+            // FIX: Use stored myUserData for my PFP
             const pfpSrc = isMe ? (myUserData ? myUserData.photoURL : 'https://via.placeholder.com/40') : chatTargetData.photoURL;
             const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
+            const timeStr = formatTime12(new Date(rData.timestamp));
+
             const el = document.createElement('div');
             el.className = 'reactor-item';
-            el.innerHTML = `<img src="${pfpSrc}" class="reactor-pfp"><div class="reactor-info"><div class="reactor-name">${name}</div><div class="reactor-time">${formatTime12(new Date(rData.timestamp))}</div></div><div class="reactor-emoji">${rData.emoji}</div>`;
+            el.innerHTML = `
+                <img src="${pfpSrc}" class="reactor-pfp">
+                <div class="reactor-info">
+                    <div class="reactor-name">${name}</div>
+                    <div class="reactor-time">${timeStr}</div>
+                </div>
+                <div class="reactor-emoji">${rData.emoji}</div>
+            `;
             listContainer.appendChild(el);
         });
         document.getElementById('reaction-details-overlay').style.display = 'flex';
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
+    
+    // Note: The Grid function 'expandEmojiMenu' was removed here to prevent conflict
+    // and ensure usage of the Full Component modal defined above.
 
     function initReplyFromActive() {
         const el = document.getElementById('text-'+activeMenuId);
-        triggerReply(el ? el.innerText.split('(edited)')[0].trim() : "Attachment");
+        const text = el ? el.innerText.split('(edited)')[0].trim() : "Image";
+        triggerReply(text);
         closeMenu();
     }
 
     function closeMenu() { document.getElementById('menu-overlay').style.display = 'none'; }
-    function cancelInteraction() { replyingTo = null; editModeId = null; document.getElementById('reply-dock').style.display = 'none'; if(mInput.value === "") mInput.style.height = 'auto'; }
     
+    // Unified Cancel function for Replying AND Editing
+    // FIX: Properly clears edit mode ID to prevent overwriting
+    function cancelInteraction() { 
+        // FIX: Clear input ONLY if we were editing. If replying, keep draft.
+        if (editModeId) {
+            mInput.value = "";
+            mInput.style.height = 'auto';
+        }
+        
+        replyingTo = null; 
+        editModeId = null;
+        document.getElementById('reply-dock').style.display = 'none'; 
+        // REMOVED mInput.blur() to keep keyboard open
+    }
+    
+    // NEW: Proper Edit Mode with UI Feedback
     function initEdit() {
         const el = document.getElementById('text-'+activeMenuId);
-        if(!el) return; 
+        if(!el) return; // Cannot edit image only messages
+        
         const textToEdit = el.innerText.split('(edited)')[0].trim();
-        mInput.value = textToEdit; mInput.style.height = mInput.scrollHeight + 'px';
-        editModeId = activeMenuId; closeMenu(); 
+        mInput.value = textToEdit;
+        mInput.style.height = 'auto'; 
+        mInput.style.height = mInput.scrollHeight + 'px';
+        
+        editModeId = activeMenuId; 
+        closeMenu(); 
+        
+        // Show the dock as "Editing"
         document.getElementById('reply-text').innerHTML = "<strong style='color:#0095f6'>Editing Message:</strong><br> " + textToEdit;
         document.getElementById('reply-dock').style.display = 'flex';
+        
         mInput.focus();
     }
 
     async function unsendMsg() { 
         const idToDelete = activeMenuId; closeMenu();
+        // Optimistic Remove
         if (messagesMap.has(idToDelete)) { messagesMap.delete(idToDelete); renderAll(); }
+        
         await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
         const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
         if (!snapshot.empty) {
             const lastMsg = snapshot.docs[0].data();
-            let txt = lastMsg.text || (lastMsg.imageUrl ? "📷 Image" : "📄 File");
+            let txt = lastMsg.text || "";
+            
+            // Logic to determine type of the NEW last message
+            if (lastMsg.imageUrl) {
+                txt = txt ? "📷 " + txt : "📷 Image";
+            } else if (lastMsg.fileUrl) {
+                const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
+                let icon = "📄";
+                let label = "File";
+                if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
+                else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
+                
+                txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
+            }
+            
             await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
         }
     }
