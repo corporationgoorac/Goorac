@@ -39,10 +39,12 @@
       const analytics = getAnalytics(app);
     </script>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="components/presence.js"></script>
     <script src="components/emojiPicker.js" defer></script>
     <script src="components/imagePicker.js" defer></script>
     <script src="components/filePicker.js" defer></script>
+    <script src="components/voiceRecorder.js" defer></script>
     <script src="components/viewMedia.js" defer></script>
 
     <style>
@@ -563,15 +565,15 @@
             position: absolute; 
             top: 50%; 
             transform: translateY(-50%); 
-            right: -80px; /* Hidden initially offscreen */
-            font-size: 0.75rem; 
-            color: #888; 
-            font-weight: 500; 
-            width: 70px; 
+            right: -85px; /* Hidden initially offscreen */
+            font-size: 0.7rem; 
+            color: #777; 
+            font-weight: 600; 
+            width: 75px; 
             text-align: center; 
             pointer-events: none; 
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s ease;
         }
         
         /* Show timestamp when dragging container */
@@ -786,6 +788,24 @@
             pointer-events: auto; 
             text-shadow: 0 0 15px rgba(255, 152, 0, 0.4); 
             transform: scale(1.05);
+        }
+
+        /* VOICE RECORDER UI FIX */
+        .input-area.is-recording .plus-btn,
+        .input-area.is-recording .input-box,
+        .input-area.is-recording .send-btn {
+            display: none !important;
+        }
+
+        .input-area.is-recording voice-recorder {
+            flex: 1;
+        }
+
+        /* BLOCKED STATE UI */
+        #blocked-msg-bar { 
+            display: none; padding: 20px; background: #0a0a0a; border-top: 1px solid #222; 
+            text-align: center; color: #888; font-size: 0.9rem; font-weight: 600; 
+            justify-content: center; align-items: center;
         }
 
         /* EMOJI & ATTACHMENT MENUS */
@@ -1142,7 +1162,7 @@
         </div>
     </div>
 
-    <div class="input-area-container">
+    <div class="input-area-container" id="chat-input-container">
         
         <div id="reply-dock">
             <div style="flex:1;">
@@ -1172,12 +1192,17 @@
 
         <div class="input-area">
             <div class="plus-btn" onclick="toggleAttachmentMenu()">+</div>
+            
+            <voice-recorder id="v-recorder"></voice-recorder>
+
             <div class="input-box" id="msg-input-box">
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
             <button id="send-btn" class="send-btn">Send</button>
         </div>
     </div>
+
+    <div id="blocked-msg-bar">This account can't be contacted.</div>
 </div>
 
 <script>
@@ -1243,6 +1268,9 @@
     const onlineDot = document.getElementById('h-online-dot');
     const headerSubLabel = document.getElementById('h-username-label');
     const attachmentMenu = document.getElementById('attachment-menu');
+    // NEW REFS
+    const vRecorder = document.getElementById('v-recorder');
+    const inputContainer = document.querySelector('.input-area');
 
     // =========================================
     //  12. INSTANT LOAD / 0ms RENDER
@@ -1374,6 +1402,40 @@
         return false; 
     };
     
+    // NEW: VOICE RECORDER LISTENERS
+    vRecorder.addEventListener('recording-state-changed', (e) => {
+        if (e.detail.active) {
+            inputContainer.classList.add('is-recording');
+        } else {
+            inputContainer.classList.remove('is-recording');
+        }
+    });
+
+    vRecorder.addEventListener('voice-uploaded', async (e) => {
+        const { url, duration } = e.detail;
+        
+        // Feedback sound
+        popSound.play().catch(() => {});
+
+        let voiceMsg = {
+            text: "",
+            sender: myUid,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            seen: false,
+            reactions: {},
+            fileUrl: url,
+            fileMeta: {
+                type: 'audio',
+                duration: duration,
+                name: 'Voice Note'
+            }
+        };
+
+        await db.collection("chats").doc(chatId).collection("messages").add(voiceMsg);
+        updateLastMsg("🎵 Voice Note (" + duration + "s)");
+        scrollToBottom();
+    });
+
     // =========================================
     //  14. COMPONENT INTEGRATION
     // =========================================
@@ -1584,6 +1646,23 @@
 
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
         if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+
+        // === NEW: BLOCK SECURITY LOGIC ===
+        // Fetch current block data fresh
+        const myDoc = await db.collection("users").doc(myUid).get();
+        const myData = myDoc.data();
+        
+        // Am I blocking them?
+        const amIBlockingThem = (myData.blocked || []).some(u => (typeof u === 'string' ? u : u.uid) === targetUid);
+        // Did they block me?
+        const amIBlockedByThem = (chatTargetData.blocked || []).some(u => (typeof u === 'string' ? u : u.uid) === myUid);
+
+        if(amIBlockingThem || amIBlockedByThem) {
+            // Hide Input Area
+            document.getElementById('chat-input-container').style.display = 'none';
+            // Show Block Message
+            document.getElementById('blocked-msg-bar').style.display = 'flex';
+        }
 
         // Start Monitoring Status
         if(myUserData) monitorTargetStatus();
