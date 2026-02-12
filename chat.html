@@ -480,6 +480,7 @@
             margin-bottom: 2px; /* Tight default spacing for groups */
             position: relative; 
             flex-direction: column; 
+            overflow: visible; /* IMPORTANT: Allows timestamp to show on swipe */
         }
         
         /* Spacing for groups */
@@ -557,19 +558,24 @@
         .bubble a { color: #ffffff; text-decoration: underline; cursor: pointer; font-weight: 600; opacity: 0.9; }
         .received .bubble a { color: var(--accent); }
 
-        /* Timestamp sliding in from right */
+        /* Timestamp sliding in from right - IMPROVED */
         .sliding-timestamp { 
             position: absolute; 
             top: 50%; 
             transform: translateY(-50%); 
-            right: -60px; 
-            font-size: 0.7rem; 
-            color: #666; 
+            right: -80px; /* Hidden initially offscreen */
+            font-size: 0.75rem; 
+            color: #888; 
             font-weight: 500; 
-            width: 50px; 
+            width: 70px; 
             text-align: center; 
             pointer-events: none; 
+            opacity: 0;
+            transition: opacity 0.2s;
         }
+        
+        /* Show timestamp when dragging container */
+        .dragging .sliding-timestamp { opacity: 1; }
         
         /* REACTION BADGE */
         .reaction-badge { 
@@ -691,6 +697,15 @@
             pointer-events: none;
             z-index: 3001;
             animation: floatUp 1.5s ease-out forwards;
+        }
+
+        /* === EFFECT LAYERS (CONFETTI / HEARTS) === */
+        #effect-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 4000;
         }
 
         /* =========================================
@@ -1039,6 +1054,7 @@
 <view-media id="media-viewer"></view-media>
 
 <div id="heart-overlay">❤️</div>
+<canvas id="effect-canvas"></canvas>
 
 <div id="scroll-down-btn" onclick="scrollToBottom()">⬇</div>
 
@@ -1208,7 +1224,7 @@
     // Status Logic State
     let lastStatusData = null;
     let statusUpdateInterval = null;
-    let isFirstStatusLoad = true; // CRITICAL for immediate load fix
+    let isFirstStatusLoad = true; 
 
     // Audio SFX
     const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
@@ -1940,32 +1956,72 @@
     // =========================================
     
     // Slide to Reply & Long Press Menu Logic
+    // REPLACED WITH NEW ROBUST LOGIC FOR SWIPE LEFT + RIGHT
     function setupGlobalSlide() {
-        let startX = 0, currentX = 0, isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let isDragging = false;
+        let isScrollingVertically = false;
+        
         const container = document.getElementById('messages-container');
+        const chatFlow = document.getElementById('chat-flow');
 
+        // 1. TOUCH START
         chatFlow.addEventListener('touchstart', (e) => {
+            if(e.target.closest('.input-area') || e.target.closest('.back-btn')) return;
+
             startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
             isDragging = false;
+            isScrollingVertically = false;
+            
+            container.style.transition = 'none';
         }, {passive: true});
 
+        // 2. TOUCH MOVE
         chatFlow.addEventListener('touchmove', (e) => {
-            currentX = e.touches[0].clientX;
-            const diff = currentX - startX;
-            if (diff < -20) { 
-                isDragging = true;
-                const translate = Math.max(diff, -70);
-                container.style.transform = `translateX(${translate}px)`;
-                container.style.transition = 'none';
-            }
-        }, {passive: true});
+            if (isScrollingVertically) return; 
 
+            currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+            
+            const diffX = currentX - startX;
+            const diffY = currentY - startY;
+
+            // Lock Direction
+            if (!isDragging && !isScrollingVertically) {
+                if (Math.abs(diffY) > Math.abs(diffX)) {
+                    isScrollingVertically = true;
+                    return;
+                }
+            }
+
+            // --- SWIPE LEFT (Reveal Timestamps) ---
+            if (diffX < -10 && !isScrollingVertically) { 
+                isDragging = true;
+                container.classList.add('dragging');
+
+                // Resistance Physics
+                const resistance = 0.6; 
+                let translate = diffX * resistance;
+                if (translate < -90) translate = -90 + (translate + 90) * 0.2; // Rubber band limit
+
+                container.style.transform = `translateX(${translate}px)`;
+                if(e.cancelable) e.preventDefault(); 
+            }
+        }, {passive: false});
+
+        // 3. TOUCH END
         chatFlow.addEventListener('touchend', (e) => {
             if (isDragging) {
-                container.style.transition = 'transform 0.25s cubic-bezier(0.33, 1, 0.68, 1)';
+                // Snap back
+                container.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; 
                 container.style.transform = `translateX(0px)`;
+                
+                setTimeout(() => { container.classList.remove('dragging'); }, 300);
             }
-            startX = 0; currentX = 0; isDragging = false;
+            startX = 0; isDragging = false; isScrollingVertically = false;
         });
     }
     
@@ -1982,7 +2038,7 @@
                 applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
             });
 
-            // Long Press & Swipe
+            // Long Press & SWIPE RIGHT TO REPLY
             let startX = 0, currentX = 0, menuTimer = null, isScrolling = false, swipeTriggered = false;
 
             element.addEventListener('touchstart', (e) => {
@@ -2004,19 +2060,23 @@
                 }
                 
                 let diff = currentX - startX;
-                if (diff > 0 && diff < 100) {
+                
+                // ONLY ALLOW SWIPE RIGHT FOR REPLY (Positive Diff)
+                if (diff > 0 && diff < 120) {
                     element.style.transform = `translateX(${diff}px)`;
                     element.style.transition = "none";
-                    if (diff > 60 && !swipeTriggered) { vibrate(30); swipeTriggered = true; }
+                    if (diff > 60 && !swipeTriggered) { vibrate(40); swipeTriggered = true; }
                 }
             }, {passive: true});
 
             element.addEventListener('touchend', () => {
                 clearTimeout(menuTimer);
-                let diff = currentX - startX;
+                
+                // Animate Back
                 element.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
                 element.style.transform = `translateX(0px)`;
-                if (diff > 60 && swipeTriggered) {
+                
+                if (swipeTriggered) {
                     let replyText = m.text;
                     if(!replyText) {
                         if(m.imageUrl) replyText = "📷 Photo";
@@ -2027,7 +2087,7 @@
                     }
                     triggerReply(replyText);
                 }
-                startX = 0; currentX = 0;
+                startX = 0; currentX = 0; swipeTriggered = false;
             });
     }
 
@@ -2110,6 +2170,87 @@
         h.offsetHeight; 
         h.style.animation = 'heartPop 0.8s ease-out';
         likeSound.play().catch(e => {}); 
+        
+        // Trigger particle effect
+        fireEffect('hearts');
+    }
+
+    // === NEW EFFECT SYSTEM (CONFETTI / HEARTS) ===
+    function fireEffect(type) {
+        const canvas = document.getElementById('effect-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        let particles = [];
+        const colors = type === 'hearts' 
+            ? ['#ff0000', '#ff4d4d', '#ff9999', '#ffffff'] 
+            : ['#FFD700', '#FF4500', '#00BFFF', '#32CD32', '#FF69B4'];
+            
+        for(let i=0; i<60; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: type === 'confetti' ? -10 : canvas.height + 10,
+                size: Math.random() * 8 + 4,
+                speedY: type === 'confetti' ? Math.random() * 3 + 2 : -(Math.random() * 4 + 2),
+                speedX: Math.random() * 2 - 1,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rotation: Math.random() * 360,
+                rotationSpeed: Math.random() * 4 - 2
+            });
+        }
+        
+        function animate() {
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            let active = false;
+            
+            particles.forEach((p, index) => {
+                p.y += p.speedY;
+                p.x += p.speedX;
+                p.rotation += p.rotationSpeed;
+                
+                // Gravity for confetti
+                if (type === 'confetti') p.speedY += 0.05;
+                
+                // Draw
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation * Math.PI / 180);
+                ctx.fillStyle = p.color;
+                
+                if (type === 'hearts') {
+                    // Heart Shape
+                    ctx.beginPath();
+                    const topCurveHeight = p.size * 0.3;
+                    ctx.moveTo(0, topCurveHeight);
+                    ctx.bezierCurveTo(0, 0, -p.size/2, 0, -p.size/2, topCurveHeight);
+                    ctx.bezierCurveTo(-p.size/2, (p.size + topCurveHeight)/2, 0, (p.size + topCurveHeight)/2 + p.size/2, 0, p.size);
+                    ctx.bezierCurveTo(0, (p.size + topCurveHeight)/2 + p.size/2, p.size/2, (p.size + topCurveHeight)/2, p.size/2, topCurveHeight);
+                    ctx.bezierCurveTo(p.size/2, 0, 0, 0, 0, topCurveHeight);
+                    ctx.fill();
+                } else {
+                    // Confetti Square
+                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                }
+                ctx.restore();
+                
+                if ((type==='confetti' && p.y < canvas.height) || (type==='hearts' && p.y > -50)) active = true;
+            });
+            
+            if(active) requestAnimationFrame(animate);
+            else ctx.clearRect(0,0, canvas.width, canvas.height);
+        }
+        animate();
+    }
+    
+    // Check keywords
+    function checkKeywords(text) {
+        const lower = text.toLowerCase();
+        if (lower.includes('love') || lower.includes('❤️') || lower.includes('🥰') || lower.includes('😍')) {
+            fireEffect('hearts');
+        } else if (lower.includes('congratulations') || lower.includes('happy birthday') || lower.includes('party') || lower.includes('🎉')) {
+            fireEffect('confetti');
+        }
     }
 
     function linkify(text) {
@@ -2192,7 +2333,7 @@
             text: caption,
             sender: myUid,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            replyTo: replyingTo,
+            replyTo: replyingTo, 
             seen: false, 
             reactions: {},
             fileUrl: fileUrl,
@@ -2216,6 +2357,10 @@
         }
 
         popSound.play().catch(e => {});
+        
+        // Trigger Effects
+        checkKeywords(text);
+        
         mInput.value = "";
         mInput.style.height = 'auto'; 
         sendBtnUI.classList.remove('active'); 
