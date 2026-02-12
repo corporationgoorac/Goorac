@@ -44,6 +44,7 @@
 
     <style>
         :root { 
+            /* Subtle radial background for depth */
             --bg: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); 
             --header-bg: rgba(0,0,0,0.96);
             --accent: #0095f6; 
@@ -78,6 +79,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
 
+        /* --- STRICT COPY PASTE CONTROL --- */
         div, span, p, img, svg { -webkit-user-select: none; user-select: none; }
         
         input, textarea { 
@@ -87,36 +89,58 @@
             font-family: inherit;
         }
 
+        /* --- ANIMATIONS --- */
         @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
         @keyframes flashMessage { 0% { background-color: rgba(255, 165, 0, 0.3); transform: scale(1.02); } 100% { background-color: transparent; transform: scale(1); } }
         @keyframes scaleIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes fadeStatus { 0% { opacity: 0; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }
+        
+        /* FEATURE: Pulse Animation for Online Dot */
         @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 70% { box-shadow: 0 0 0 4px rgba(0, 230, 118, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } }
+        
+        /* FEATURE: Smooth Image Fade In */
         @keyframes imgFadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* Modal Slide Up Animation */
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
 
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff3b00 !important; }
 
-        .loading-shimmer { background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite; }
+        .loading-shimmer {
+            background: var(--shimmer); background-size: 400px 100%; animation: shimmer 1.2s ease-in-out infinite;
+        }
+
+        /* INSTANT LOAD OVERRIDE: Remove animations when data is cached */
         .instant-load .loading-shimmer { animation: none; background: transparent; }
         .instant-load .chat-media-img { animation: none; }
         .instant-load #chat-flow { opacity: 1 !important; transition: none !important; }
 
-        .app-container { display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden; }
+        .app-container { 
+            display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; overflow: hidden;
+        }
 
+        /* --- HEADER ABSOLUTE (WEBVIEW FIX) --- */
         header { 
-            position: absolute; top: 0; left: 0; right: 0;
-            padding: 0 16px; padding-top: calc(env(safe-area-inset-top) + 10px);
+            position: absolute; /* Request: Absolute positioning */
+            top: 0; left: 0; right: 0;
+            padding: 0 16px;
+            padding-top: calc(env(safe-area-inset-top) + 10px);
             height: calc(60px + env(safe-area-inset-top));
-            background: var(--header-bg); border-bottom: 1px solid var(--border); 
-            display: flex; align-items: center; gap: 12px; z-index: 2000; 
+            background: var(--header-bg); 
+            border-bottom: 1px solid var(--border); 
+            display: flex; align-items: center; gap: 12px; 
+            z-index: 2000; 
             backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
         }
 
         .back-btn { font-size: 1.8rem; color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; height: 40px; width: 30px; }
 
         .h-profile-group { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden; }
+        
         .pfp-container { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
         .h-pfp { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #121212; border: 1px solid #333; transition: opacity 0.3s ease; }
         .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #00e676; border-radius: 50%; border: 2px solid #000; display: none; box-shadow: 0 0 4px rgba(0,230,118,0.5); animation: pulseGreen 2s infinite; }
@@ -132,85 +156,177 @@
         .header-icon { width: 26px; height: 26px; cursor: pointer; fill: #ffffff; opacity: 0.9; transition: transform 0.2s, opacity 0.2s; }
         .header-icon:active { opacity: 0.6; transform: scale(0.9); }
 
+        /* --- CHAT AREA --- */
         #chat-flow { 
             flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px 0; 
             display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
             background: transparent; overscroll-behavior-y: contain; position: relative;
+            /* PADDING TOP to clear absolute header */
             padding-top: calc(75px + env(safe-area-inset-top)); 
+            
+            /* Hide Scrollbar */
             -ms-overflow-style: none; scrollbar-width: none;
+            
+            /* Initial State Hidden (Unless Instant Load) */
             opacity: 0; transition: opacity 0.2s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
         
         #messages-container { display: flex; flex-direction: column; padding: 0 14px; will-change: transform; width: 100%; padding-bottom: 20px; }
 
-        .typing-row { display: none; align-items: flex-end; margin-bottom: 15px; padding-left: 14px; width: 100%; }
-        .typing-avatar { width: 30px; height: 30px; border-radius: 50%; margin-right: 8px; object-fit: cover; background: #121212; border: 1px solid #222; }
-        .typing-bubble { background: var(--received-bg); padding: 12px 16px; border-radius: 18px; border-bottom-left-radius: 4px; display: flex; gap: 4px; align-items: center; width: fit-content; height: 42px; }
+        /* MODIFIED TYPING INDICATOR STYLES */
+        .typing-row { 
+            display: none; /* Hidden by default */
+            align-items: flex-end; 
+            margin-bottom: 15px; 
+            padding-left: 14px; 
+            width: 100%;
+        }
+        .typing-avatar { 
+            width: 30px; height: 30px; 
+            border-radius: 50%; 
+            margin-right: 8px; 
+            object-fit: cover; 
+            background: #121212; 
+            border: 1px solid #222;
+        }
+        .typing-bubble { 
+            background: var(--received-bg); 
+            padding: 12px 16px; 
+            border-radius: 18px; 
+            border-bottom-left-radius: 4px; 
+            display: flex; 
+            gap: 4px; 
+            align-items: center; 
+            width: fit-content; 
+            height: 42px;
+        }
+
         .typing-dot { width: 6px; height: 6px; background: #999; border-radius: 50%; animation: typingWave 1.3s linear infinite; }
         .typing-dot:nth-child(2) { animation-delay: -1.1s; }
         .typing-dot:nth-child(3) { animation-delay: -0.9s; }
         @keyframes typingWave { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
 
         #scroll-trigger { text-align: center; padding: 20px; color: #262626; font-size: 0.7rem; order: -1; }
-        .date-divider { text-align: center; margin: 20px 0; font-size: 0.75rem; color: #fff; font-weight: 600; text-transform: capitalize; background: rgba(40,40,40,0.6); padding: 4px 10px; border-radius: 12px; align-self: center; width: fit-content; position: sticky; top: 10px; z-index: 5; backdrop-filter: blur(4px); }
+        .date-divider { text-align: center; margin: 10px 0; font-size: 0.75rem; color: #fff; font-weight: 600; text-transform: capitalize; background: rgba(40,40,40,0.6); padding: 4px 10px; border-radius: 12px; align-self: center; width: fit-content; position: sticky; top: 10px; z-index: 5; backdrop-filter: blur(4px); }
 
         .msg-row { display: flex; width: 100%; margin-bottom: 2px; position: relative; flex-direction: column; }
-        .msg-row.group-start { margin-top: 6px; }
         .msg-row.sent { align-items: flex-end; padding-right: 0px; }
         .msg-row.received { align-items: flex-start; }
-        
         .received-inner-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; }
-        .msg-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 0px; background: #121212; border: 1px solid #222; opacity: 0; }
-        .msg-avatar.visible { opacity: 1; }
+        .msg-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 4px; background: #121212; border: 1px solid #222; }
 
         .msg-bubble-box { position: relative; max-width: 78%; display: flex; flex-direction: column; transition: margin-bottom 0.2s; }
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
 
-        .bubble { padding: 12px 16px; border-radius: 20px; font-size: 1rem; line-height: 1.45; position: relative; word-wrap: break-word; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-        .sent .bubble { background: var(--sent-bg); color: #fff; text-align: left; }
-        .received .bubble { background: var(--received-bg); color: #fff; text-align: left; }
-        
-        /* PROFESSIONAL BUBBLE GROUPING LOGIC */
-        /* SENT */
-        .sent .bubble { border-radius: 18px 18px 4px 18px; }
-        .sent .group-top .bubble { border-radius: 18px 18px 4px 18px; }
-        .sent .group-middle .bubble { border-radius: 18px 4px 4px 18px; }
-        .sent .group-bottom .bubble { border-radius: 18px 4px 18px 18px; }
-        
-        /* RECEIVED */
-        .received .bubble { border-radius: 18px 18px 18px 4px; }
-        .received .group-top .bubble { border-radius: 18px 18px 18px 4px; }
-        .received .group-middle .bubble { border-radius: 4px 18px 18px 4px; }
-        .received .group-bottom .bubble { border-radius: 4px 18px 18px 18px; }
+        /* PROFESSIONAL GROUPING BORDERS */
+        .bubble { 
+            padding: 12px 16px; 
+            border-radius: 18px; 
+            font-size: 1rem; 
+            line-height: 1.45; 
+            position: relative; 
+            word-wrap: break-word; 
+            z-index: 2; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+        }
 
+        /* SENT PROFESSIONAL STYLES */
+        .sent .bubble { background: var(--sent-bg); color: #fff; border-bottom-right-radius: 4px; border-top-right-radius: 18px; }
+        .sent.group-top .bubble { border-bottom-right-radius: 4px; border-top-right-radius: 18px; }
+        .sent.group-mid .bubble { border-radius: 18px 4px 4px 18px; }
+        .sent.group-bottom .bubble { border-radius: 18px 4px 18px 18px; margin-bottom: 6px; }
+        .sent.single .bubble { border-radius: 18px 18px 4px 18px; margin-bottom: 6px; }
+
+        /* RECEIVED PROFESSIONAL STYLES */
+        .received .bubble { background: var(--received-bg); color: #fff; border-bottom-left-radius: 4px; border-top-left-radius: 18px; }
+        .received.group-top .bubble { border-bottom-left-radius: 4px; border-top-left-radius: 18px; }
+        .received.group-mid .bubble { border-radius: 4px 18px 18px 4px; }
+        .received.group-bottom .bubble { border-radius: 4px 18px 18px 18px; margin-bottom: 6px; }
+        .received.single .bubble { border-radius: 18px 18px 18px 4px; margin-bottom: 6px; }
+        
+        /* OWN FEATURE: Link Styling */
         .bubble a { color: #87ceeb; text-decoration: underline; cursor: pointer; }
 
         .sliding-timestamp { position: absolute; top: 50%; transform: translateY(-50%); right: -65px; font-size: 0.7rem; color: #666; font-weight: 500; width: 50px; text-align: center; pointer-events: none; }
         
+        /* FIXED REACTION BADGE VISIBILITY */
         .reaction-badge { 
-            position: absolute; bottom: -10px; background: #1a1a1a; border: 2px solid #000; border-radius: 20px; 
-            padding: 4px 7px; font-size: 0.85rem; z-index: 20; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.5); 
+            position: absolute; 
+            bottom: -10px; /* Moves emoji slightly below the bubble/image */
+            background: #1a1a1a; 
+            border: 2px solid #000; 
+            border-radius: 20px; 
+            padding: 4px 7px; 
+            font-size: 0.85rem; 
+            z-index: 20; /* Ensure it sits on top of images */
+            display: none; 
+            cursor: pointer; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); 
         }
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
 
-        .seen-status { font-size: 0.65rem; color: var(--text-secondary); margin-top: 2px; margin-right: 2px; text-align: right; font-weight: 500; height: 14px; width: 100%; opacity: 0; animation: fadeIn 0.3s forwards; position: relative; z-index: 1; }
+        .seen-status { font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px; margin-right: 2px; text-align: right; font-weight: 500; height: 14px; width: 100%; opacity: 0; animation: fadeIn 0.3s forwards; position: relative; z-index: 1; }
         @keyframes fadeIn { to { opacity: 1; } }
 
         .reply-box-ui { background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 12px; margin-bottom: 6px; font-size: 0.88rem; border-left: 4px solid rgba(255, 255, 255, 0.5); color: #e0e0e0; max-width: 100%; cursor: pointer; transition: opacity 0.2s; white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
         .reply-box-ui:active { opacity: 0.7; }
         
-        .note-reply-wrapper { margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; max-width: 100%; cursor: pointer; }
-        .note-reply-pill { background: #262626; padding: 10px 16px; border-radius: 22px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 120px; max-width: 220px; text-align: center; position: relative; transition: transform 0.2s; }
+        /* === NEW: PROFESSIONAL INSTAGRAM NOTE REPLY UI === */
+        .note-reply-wrapper {
+            margin-bottom: 8px;
+            display: flex; flex-direction: column; align-items: center;
+            max-width: 100%; cursor: pointer;
+        }
+        .note-reply-pill { 
+            /* Fallback dark background if no color provided */
+            background: #262626; 
+            padding: 10px 16px; 
+            border-radius: 22px; 
+            display: inline-flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            min-width: 120px; max-width: 220px; text-align: center;
+            position: relative;
+            transition: transform 0.2s;
+        }
         .note-reply-pill:active { transform: scale(0.96); }
-        .note-header-row { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
-        .note-mini-pfp { width: 16px; height: 16px; border-radius: 50%; background: #444; object-fit: cover; }
-        .note-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.7); }
-        .note-content-text { font-size: 0.9rem; font-weight: 600; color: #fff; line-height: 1.3; margin-bottom: 2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        .note-song-tag { display: flex; align-items: center; gap: 4px; font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; }
-        .note-connector { width: 2px; height: 8px; background: rgba(255,255,255,0.2); margin-top: -1px; margin-bottom: -4px; z-index: 0; }
+        
+        .note-header-row {
+            display: flex; align-items: center; gap: 5px;
+            margin-bottom: 4px;
+        }
+        .note-mini-pfp {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #444; object-fit: cover;
+        }
+        .note-label {
+            font-size: 0.65rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .note-content-text {
+            font-size: 0.9rem; font-weight: 600; color: #fff;
+            line-height: 1.3; margin-bottom: 2px;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        
+        .note-song-tag {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.65rem; color: rgba(255,255,255,0.8);
+            margin-top: 4px; background: rgba(0,0,0,0.2);
+            padding: 2px 8px; border-radius: 10px;
+        }
+        
+        /* The little line connecting note to message */
+        .note-connector {
+            width: 2px; height: 8px; background: rgba(255,255,255,0.2);
+            margin-top: -1px; margin-bottom: -4px; z-index: 0;
+        }
 
         #scroll-down-btn { position: fixed; bottom: 85px; right: 20px; width: 42px; height: 42px; background: #262626; border-radius: 50%; display: none; align-items: center; justify-content: center; color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #333; z-index: 900; cursor: pointer; font-size: 1.2rem; transition: all 0.3s ease; }
         #scroll-down-btn.new-msg { background: var(--accent); color: #fff; animation: bounce 1s infinite; }
@@ -230,12 +346,15 @@
 
         #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
         
+        /* NEW: Attachment Menu (Popup for + Button) */
         #attachment-menu {
             display: none; position: absolute; bottom: 70px; left: 15px;
             background: rgba(28, 28, 28, 0.95); backdrop-filter: blur(10px);
             border-radius: 16px; padding: 10px; z-index: 1001;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5); border: 1px solid #333;
-            animation: slideUpFade 0.2s ease-out; flex-direction: column; gap: 5px; width: 150px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            animation: slideUpFade 0.2s ease-out;
+            flex-direction: column; gap: 5px; width: 150px;
         }
         @keyframes slideUpFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
@@ -244,7 +363,8 @@
         .attach-opt svg { width: 22px; height: 22px; fill: white; }
 
         #menu-overlay, #reaction-details-overlay { 
-            display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 2000; 
+            display: none; position: fixed; inset: 0; 
+            background: rgba(0, 0, 0, 0.6); z-index: 2000; 
             justify-content: center; align-items: center; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
         }
         .menu-card { background: #1c1c1c; border-radius: 16px; width: 280px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -267,41 +387,143 @@
         .reactor-time { font-size: 0.7rem; color: #888; margin-top: 2px; }
         .reactor-emoji { font-size: 1.4rem; }
 
-        #reaction-picker-modal { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); align-items: flex-end; }
-        .picker-modal-content { width: 100%; height: 55vh; background: #1c1c1c; border-top-left-radius: 20px; border-top-right-radius: 20px; display: flex; flex-direction: column; animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); overflow: hidden; }
-        .picker-header { padding: 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #333; color: white; font-weight: 600; font-size: 1rem; }
-        .picker-drag-handle { width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto; }
+        /* REACTION HALF-SCREEN MODAL */
+        #reaction-picker-modal {
+            display: none; position: fixed; inset: 0; z-index: 3000;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+            align-items: flex-end; /* Bottom alignment */
+        }
+        .picker-modal-content {
+            width: 100%; height: 55vh; /* Half screen */
+            background: #1c1c1c;
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
+            display: flex; flex-direction: column;
+            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            overflow: hidden;
+        }
+        .picker-header {
+            padding: 15px; display: flex; align-items: center; gap: 12px;
+            border-bottom: 1px solid #333; color: white; font-weight: 600; font-size: 1rem;
+        }
+        .picker-drag-handle {
+            width: 40px; height: 5px; background: #444; border-radius: 10px; margin: 0 auto;
+        }
 
-        .msg-media-wrapper { position: relative; cursor: pointer; margin-bottom: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-        .chat-media-img { display: block; width: 100%; max-width: 280px; max-height: 350px; object-fit: cover; border-radius: 18px; animation: imgFadeIn 0.4s ease-out; }
+        /* NEW: Styles for Media Messages - FIXED VISIBILITY */
+        .msg-media-wrapper {
+            position: relative; /* Allows absolute positioning of badge */
+            /* REMOVED overflow:hidden so reaction can stick out */
+            cursor: pointer; 
+            margin-bottom: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
         
+        .chat-media-img {
+            display: block; width: 100%; max-width: 280px; max-height: 350px; 
+            object-fit: cover; 
+            border-radius: 18px; /* Rounded corners handled here now */
+            animation: imgFadeIn 0.4s ease-out; /* Feature: Smooth Fade In */
+        }
+        
+        /* Corner logic since parent no longer clips */
         .received .chat-media-img { border-bottom-left-radius: 4px; }
         .sent .chat-media-img { border-bottom-right-radius: 4px; }
-        .bubble.has-media { border-top-left-radius: 4px; border-top-right-radius: 4px; margin-top: 2px; }
 
-        .msg-video-container { position: relative; max-width: 280px; border-radius: 18px; overflow: hidden; }
-        .play-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 45px; height: 45px; background: rgba(0, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); pointer-events: none; }
+        /* When media is present, the caption bubble needs less padding at top or needs to be attached */
+        .bubble.has-media {
+            border-top-left-radius: 4px; border-top-right-radius: 4px;
+            margin-top: 2px;
+        }
+
+        /* --- NEW STYLES FOR FILES/VIDEO/AUDIO --- */
         
-        .msg-audio-pill { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #262626; border-radius: 22px; min-width: 220px; border: 1px solid rgba(255,255,255,0.1); position: relative; }
-        .audio-control-btn { width: 32px; height: 32px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; cursor: pointer; flex-shrink: 0; z-index: 5; }
+        /* Video Container with Overlay Play Button */
+        .msg-video-container {
+            position: relative;
+            max-width: 280px; border-radius: 18px;
+            overflow: hidden;
+        }
+        .play-overlay {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 45px; height: 45px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none; /* Click goes through to wrapper */
+        }
         
-        .audio-wave-container { flex: 1; display: flex; align-items: center; gap: 3px; height: 15px; overflow: hidden; position: relative; }
-        .wave-bar { width: 3px; background: #666; border-radius: 2px; height: 100%; transition: height 0.1s; animation: none; }
-        .audio-playing .wave-bar { background: var(--accent); animation: waveAnim 0.8s ease-in-out infinite; }
+        /* Audio Pill (Instagram Style) */
+        .msg-audio-pill {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            background: #262626;
+            border-radius: 22px;
+            min-width: 220px;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+        .audio-control-btn {
+            width: 32px; height: 32px;
+            background: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #000; cursor: pointer; flex-shrink: 0;
+            z-index: 5;
+        }
+        
+        /* VISUALIZER CSS */
+        .audio-wave-container {
+            flex: 1; display: flex; align-items: center; gap: 3px; height: 15px; overflow: hidden;
+            position: relative;
+        }
+        .wave-bar {
+            width: 3px; background: #666; border-radius: 2px;
+            height: 100%; transition: height 0.1s;
+            animation: none;
+        }
+        /* Fake Visualization Animation */
+        .audio-playing .wave-bar {
+            background: var(--accent);
+            animation: waveAnim 0.8s ease-in-out infinite;
+        }
         .audio-playing .wave-bar:nth-child(odd) { animation-duration: 0.6s; }
         .audio-playing .wave-bar:nth-child(2n) { animation-duration: 1.1s; }
         .audio-playing .wave-bar:nth-child(3n) { animation-duration: 0.9s; }
+        
         @keyframes waveAnim { 0% { height: 20%; } 50% { height: 100%; } 100% { height: 20%; } }
 
-        .audio-progress-track { position: absolute; bottom: -5px; left: 0; width: 100%; height: 2px; background: #444; }
+        .audio-progress-track {
+            position: absolute; bottom: -5px; left: 0; width: 100%; height: 2px; background: #444;
+        }
         .audio-real-progress { height: 100%; background: #fff; width: 0%; transition: width 0.1s linear; }
         
-        .msg-file-pill { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #262626; border-radius: 16px; min-width: 200px; max-width: 260px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
-        .file-icon { width: 40px; height: 40px; background: #333; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+        /* File Card */
+        .msg-file-pill {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            background: #262626;
+            border-radius: 16px;
+            min-width: 200px; max-width: 260px;
+            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+        .file-icon {
+            width: 40px; height: 40px;
+            background: #333; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; flex-shrink: 0;
+        }
         .file-details { flex: 1; min-width: 0; }
-        .file-name { font-size: 0.9rem; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+        .file-name {
+            font-size: 0.9rem; font-weight: 500; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
         .file-meta { font-size: 0.75rem; color: #888; }
         .file-dl-btn { color: #0095f6; font-size: 1.2rem; padding: 5px; }
+        
     </style>
 </head>
 <body>
@@ -468,6 +690,8 @@
     // NEW: Variables for periodic status update
     let lastStatusData = null;
     let statusUpdateInterval = null;
+    
+    // NEW: First load flag for header logic
     let isFirstStatusLoad = true;
 
     // Custom Feature: Sound Effect (Base64 Pop & Like)
@@ -491,6 +715,7 @@
     const attachmentMenu = document.getElementById('attachment-menu');
 
     // === 0MS INSTANT LOADING BLOCK ===
+    // This executes synchronously before any network requests
     (function instantRender() {
         const storedMyUid = localStorage.getItem('my_uid_cache');
         const userCacheKey = `chat_user_${targetUsername}`;
@@ -498,6 +723,7 @@
 
         if (storedUser && storedMyUid && targetUsername) {
             try {
+                // 1. Render Header Instantly
                 chatTargetData = JSON.parse(storedUser);
                 const pfp = document.getElementById('h-pfp');
                 pfp.classList.remove('loading-shimmer');
@@ -506,10 +732,12 @@
                 document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
                 if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
 
-                myUid = storedMyUid; 
+                // 2. Calculate ChatID
+                myUid = storedMyUid; // Temporarily set strictly for render
                 targetUid = chatTargetData.uid;
                 chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
 
+                // 3. Render Messages Instantly
                 const msgCacheKey = `chat_msgs_${chatId}`;
                 const storedMsgs = localStorage.getItem(msgCacheKey);
                 
@@ -521,9 +749,11 @@
                         messagesMap.set(m.id || m.timestampIso, m);
                     });
                     
+                    // Add class to kill animations for instant feel
                     document.body.classList.add('instant-load');
                     renderAll();
                     
+                    // Scroll to bottom immediately
                     chatFlow.style.opacity = '1';
                     chatFlow.scrollTop = chatFlow.scrollHeight;
                     isFirstLoad = false;
@@ -531,7 +761,9 @@
             } catch(e) { console.error("Instant Load Error", e); }
         }
     })();
+    // === END INSTANT LOAD ===
 
+    // NEW: Double Tap on Background to Scroll Down
     document.addEventListener('dblclick', (e) => {
         if (e.target.id === 'chat-flow' || e.target.id === 'messages-container') {
             scrollToBottom();
@@ -539,10 +771,13 @@
         }
     });
     
+    // NEW: Global Ripple Effect
     document.addEventListener('click', function(e) {
+        // Close attachment menu if clicking elsewhere
         if (!e.target.closest('#attachment-menu') && !e.target.closest('.plus-btn')) {
             attachmentMenu.style.display = 'none';
         }
+        
         if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('emoji-picker')) return;
         const circle = document.createElement('div');
         circle.style.width = circle.style.height = '15px';
@@ -553,8 +788,9 @@
         setTimeout(() => circle.remove(), 600);
     });
     
+    // === KEYBOARD FIX: Prevent focus loss on Send Button ===
     const handleSendClick = (e) => {
-        e.preventDefault(); 
+        e.preventDefault(); // Stop button from stealing focus
         sendMsg();
     };
 
@@ -571,6 +807,7 @@
         return hours + ':' + minutes + ' ' + ampm;
     }
 
+    // Helper for "Seen 1m ago" & Active status
     function timeAgo(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
         let interval = seconds / 31536000;
@@ -603,6 +840,7 @@
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
+    // Auto-resize textarea & Send Button Animation
     mInput.addEventListener('input', function() {
         this.style.height = 'auto'; 
         this.style.height = (this.scrollHeight) + 'px';
@@ -616,13 +854,18 @@
 
         rdb.ref(`typing/${chatId}/${myUid}`).set(this.value.trim().length > 0);
         
+        // Own Feature: Auto-Scroll on Typing
         if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
               scrollToBottom();
         }
     });
 
-    mInput.addEventListener('keydown', (e) => {});
+    // Handle Enter key - Modified as per request
+    mInput.addEventListener('keydown', (e) => {
+        // Enter creates new line, so we do nothing here (default behavior)
+    });
     
+    // --- SCROLL BUTTON VISIBILITY LOGIC ---
     chatFlow.addEventListener('scroll', () => {
         const diff = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight;
         if (diff > 250) {
@@ -633,12 +876,14 @@
         }
     });
 
+    // --- FIX: ALLOW PASTE BUT DISABLE RIGHT CLICK ELSEWHERE ---
     window.oncontextmenu = (e) => { 
         if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
         e.preventDefault(); 
         return false; 
     };
     
+    // --- COMPONENT INTEGRATION ---
     const mainPicker = document.getElementById('main-picker');
     const imagePickerComponent = document.getElementById('img-picker');
     const filePickerComponent = document.getElementById('file-picker');
@@ -653,6 +898,7 @@
         });
     }
 
+    // NEW: Image Picker Listener - DIRECT SEND
     if (imagePickerComponent) {
         imagePickerComponent.addEventListener('image-uploaded', (e) => {
             const url = e.detail.url;
@@ -662,6 +908,7 @@
         });
     }
 
+    // NEW: File Picker Listener
     if (filePickerComponent) {
         filePickerComponent.addEventListener('file-uploaded', (e) => {
             const { url, metadata } = e.detail;
@@ -675,7 +922,7 @@
         if (attachmentMenu.style.display === 'flex') {
             attachmentMenu.style.display = 'none';
         } else {
-            emojiTray.style.display = 'none'; 
+            emojiTray.style.display = 'none'; // Close emoji if open
             attachmentMenu.style.display = 'flex';
         }
     }
@@ -695,7 +942,7 @@
     }
 
     function toggleEmojiTray() {
-        attachmentMenu.style.display = 'none';
+        attachmentMenu.style.display = 'none'; // Close menu if open
         if (emojiTray.style.display === 'block') {
             emojiTray.style.display = 'none';
         } else {
@@ -743,9 +990,17 @@
     
     mInput.addEventListener("focus", () => { emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none'; });
 
-    // === HEADER STATUS UPDATER ===
+    // === UPDATED: Function to update header UI based on latest data ===
     function updateHeaderStatus() {
         if (!lastStatusData) return;
+
+        // PRIVACY CHECK: IF TARGET HAS ACTIVITY OFF OR NO STATUS DATA
+        if (chatTargetData && chatTargetData.showActivityStatus === false) {
+             onlineDot.style.display = 'none';
+             headerSubLabel.innerText = `@${chatTargetData.username}`;
+             headerSubLabel.style.color = "var(--text-secondary)";
+             return;
+        }
         
         if (lastStatusData.state === 'online') {
             onlineDot.style.display = 'block';
@@ -761,15 +1016,12 @@
     function monitorTargetStatus() {
         if (!targetUid) return;
         
-        // PRIVACY CHECK 1: My status off -> Can't see theirs
+        // PRIVACY CHECK: IF MY STATUS IS OFF, I CANNOT SEE THEIRS
         if (myUserData && myUserData.showActivityStatus === false) {
-             forceHideStatus(); return; 
-        }
-
-        // PRIVACY CHECK 2: Their status off -> Can't see theirs
-        // We rely on chatTargetData snapshot for this setting.
-        if (chatTargetData && chatTargetData.showActivityStatus === false) {
-            forceHideStatus(); return;
+             onlineDot.style.display = 'none';
+             headerSubLabel.innerText = `@${chatTargetData.username}`;
+             headerSubLabel.style.color = "var(--text-secondary)";
+             return; 
         }
         
         if (statusUpdateInterval) clearInterval(statusUpdateInterval);
@@ -785,9 +1037,10 @@
             
             if (statusTimeout) clearTimeout(statusTimeout);
             
-            // If data exists but empty, or explicit privacy mismatch from DB side
             if (!lastStatusData) {
-               forceHideStatus(); return;
+               headerSubLabel.innerText = `@${chatTargetData.username}`;
+               headerSubLabel.style.color = "var(--text-secondary)";
+               return;
             }
 
             if (isFirstStatusLoad) {
@@ -805,12 +1058,6 @@
                 }, 500); 
             }
         });
-    }
-
-    function forceHideStatus() {
-         onlineDot.style.display = 'none';
-         headerSubLabel.innerText = `@${chatTargetData.username}`;
-         headerSubLabel.style.color = "var(--text-secondary)";
     }
 
     auth.onAuthStateChanged(user => {
@@ -833,6 +1080,7 @@
         if(!targetUsername) return;
 
         const cacheKeyUser = `chat_user_${targetUsername}`;
+        
         const snap = await db.collection("users").where("username", "==", targetUsername).get();
         if (snap.empty) return;
         
@@ -848,6 +1096,7 @@
         pfp.classList.remove('loading-shimmer');
         const pfpUrl = chatTargetData.photoURL || 'https://via.placeholder.com/150';
         pfp.src = pfpUrl;
+        
         typingPfp.src = pfpUrl;
 
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
@@ -864,7 +1113,9 @@
         rdb.ref(`typing/${chatId}/${targetUid}`).on('value', (s) => {
             const isTyping = s.val();
             typingRow.style.display = isTyping ? 'flex' : 'none';
-            if(isTyping) { scrollToBottom(); }
+            if(isTyping) {
+                scrollToBottom();
+            }
         });
 
         startListener(); 
@@ -993,7 +1244,6 @@
     async function loadMoreMessages() {
         if (isLoadingMore || !lastVisible) return;
         isLoadingMore = true;
-        
         chatFlow.style.scrollBehavior = 'auto'; 
         const oldScrollHeight = chatFlow.scrollHeight;
         
@@ -1011,10 +1261,8 @@
             });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
-            
             chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
             setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
-            
             isLoadingMore = false;
         } else {
             isLoadingMore = false;
@@ -1025,24 +1273,25 @@
     function renderAll() {
         container.innerHTML = '';
         const sorted = Array.from(messagesMap.entries())
-            .filter(([id, data]) => data.timestamp) 
+            .filter(([id, data]) => data.timestamp || data.timestampIso) 
             .sort((a, b) => {
-                const tA = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
-                const tB = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
-                return tA(a[1]) - tB(b[1]);
+                const tA = a[1].timestamp?.toMillis ? a[1].timestamp.toMillis() : new Date(a[1].timestampIso).getTime();
+                const tB = b[1].timestamp?.toMillis ? b[1].timestamp.toMillis() : new Date(b[1].timestampIso).getTime();
+                return tA - tB;
             });
 
-        let lastDateLabel = "";
         let lastSeenMsgId = null;
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
             if (data.sender === myUid && data.seen === true) {
-                lastSeenMsgId = id; break; 
+                lastSeenMsgId = id;
+                break; 
             }
         }
-        
+
+        let lastDateLabel = "";
         sorted.forEach(([id, data], index) => { 
-            const msgDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
+            const msgDate = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
             const dateLabel = getDateDivider(msgDate);
             
             if (dateLabel !== lastDateLabel) {
@@ -1053,34 +1302,26 @@
                 lastDateLabel = dateLabel;
             }
 
-            // --- PROFESSIONAL GROUPING LOGIC ---
-            let groupPos = ''; // 'top', 'middle', 'bottom', or '' (single)
-            let showAvatar = false;
-            
-            const prev = index > 0 ? sorted[index - 1][1] : null;
-            const next = index < sorted.length - 1 ? sorted[index + 1][1] : null;
-            
-            // Check if grouped with previous
-            const isGroupedWithPrev = prev && prev.sender === data.sender && (msgDate - (prev.timestamp.toDate ? prev.timestamp.toDate() : new Date(prev.timestampIso))) < 60000;
-            // Check if grouped with next
-            const isGroupedWithNext = next && next.sender === data.sender && ((next.timestamp.toDate ? next.timestamp.toDate() : new Date(next.timestampIso)) - msgDate) < 60000;
+            // PROFESSIONAL GROUPING LOGIC
+            let groupClass = "single";
+            const prevMsg = index > 0 ? sorted[index-1][1] : null;
+            const nextMsg = index < sorted.length - 1 ? sorted[index+1][1] : null;
 
-            if (isGroupedWithPrev && isGroupedWithNext) groupPos = 'group-middle';
-            else if (isGroupedWithPrev && !isGroupedWithNext) groupPos = 'group-bottom';
-            else if (!isGroupedWithPrev && isGroupedWithNext) groupPos = 'group-top';
-            
-            if (data.sender !== myUid) {
-                // Show avatar only if it's the last in group or single
-                if (!isGroupedWithNext) showAvatar = true;
-            }
+            const isSameAsPrev = prevMsg && prevMsg.sender === data.sender;
+            const isSameAsNext = nextMsg && nextMsg.sender === data.sender;
 
-            renderMessage(data, id, id === lastSeenMsgId, showAvatar, groupPos); 
+            if (isSameAsPrev && isSameAsNext) groupClass = "group-mid";
+            else if (isSameAsPrev && !isSameAsNext) groupClass = "group-bottom";
+            else if (!isSameAsPrev && isSameAsNext) groupClass = "group-top";
+
+            renderMessage(data, id, id === lastSeenMsgId, !isSameAsNext, groupClass); 
         });
     }
 
     function triggerHeartAnimation() {
         const h = document.getElementById('heart-overlay');
-        h.style.animation = 'none'; h.offsetHeight; 
+        h.style.animation = 'none';
+        h.offsetHeight; 
         h.style.animation = 'heartPop 0.8s ease-out';
         likeSound.play().catch(e => {}); 
     }
@@ -1108,23 +1349,22 @@
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 const bubble = el.querySelector('.bubble') || el.closest('.bubble');
                 if(bubble) {
-                    bubble.style.animation = 'none'; bubble.offsetHeight; 
+                    bubble.style.animation = 'none';
+                    bubble.offsetHeight; 
                     bubble.style.animation = 'flashMessage 1s ease';
                 }
             }
         }
     }
 
-    function renderMessage(m, id, isLastSeen, showAvatar, groupPos) {
+    function renderMessage(m, id, isLastSeen, isLastInGroup, groupClass) {
         const side = m.sender === myUid ? 'sent' : 'received';
-        const date = m.timestamp.toDate ? m.timestamp.toDate() : new Date(m.timestampIso);
+        const date = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestampIso);
 
         const rowDiv = document.createElement('div');
         rowDiv.id = id;
-        rowDiv.className = `msg-row ${side}`;
-        if (groupPos === 'group-top') rowDiv.classList.add('group-start');
-        if (groupPos) rowDiv.classList.add(groupPos);
-
+        rowDiv.className = `msg-row ${side} ${groupClass}`;
+        
         let reactionsList = [];
         let myReaction = null;
         if (m.reactions) {
@@ -1135,10 +1375,12 @@
 
         let seenText = "";
         if (isLastSeen && side === 'sent') {
-            if (m.seenAt) {
-                const sDate = m.seenAt.toDate ? m.seenAt.toDate() : new Date(m.seenAtIso);
+            if (m.seenAt || m.seenAtIso) {
+                const sDate = m.seenAt?.toDate ? m.seenAt.toDate() : new Date(m.seenAtIso);
                 seenText = "Seen " + timeAgo(sDate);
-            } else { seenText = "Seen"; }
+            } else {
+                seenText = "Seen"; 
+            }
         }
         
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 14px"' : '';
@@ -1152,11 +1394,6 @@
                         <span class="note-label">Replied to note</span>
                     </div>
                     <div class="note-content-text">"${m.replyToNote}"</div>
-                    ${m.noteMetadata && m.noteMetadata.songName ? `
-                    <div class="note-song-tag">
-                        <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                        <span>${m.noteMetadata.songName}</span>
-                    </div>` : ''}
                 </div>
                 <div class="note-connector"></div>
             </div>
@@ -1196,8 +1433,6 @@
                 <div class="audio-wave-container" id="wave-${safeId}">
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
-                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
-                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                     <div class="audio-progress-track"><div id="prog-${safeId}" class="audio-real-progress"></div></div>
                 </div>
                 <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
@@ -1210,11 +1445,7 @@
             mediaHtml = `
             <div class="msg-file-pill" onclick="window.open('${m.fileUrl}', '_blank')">
                 <div class="file-icon">📄</div>
-                <div class="file-details">
-                    <div class="file-name">${m.fileMeta.name || "File"}</div>
-                    <div class="file-meta">${(m.fileMeta.size / (1024*1024)).toFixed(2)} MB • ${m.fileMeta.type.toUpperCase()}</div>
-                </div>
-                <div class="file-dl-btn">⬇</div>
+                <div class="file-details"><div class="file-name">${m.fileMeta.name || "File"}</div></div>
                 <div id="react-${id}" class="reaction-badge" style="right:0; ${reactionDisplay ? 'display:block' : ''}" onclick="showReactionDetails('${id}', event)">${reactionDisplay}</div>
             </div>`;
             bubbleClass = "bubble has-media";
@@ -1222,6 +1453,8 @@
         }
 
         const safeText = linkify(m.text);
+        let innerHTML = '';
+        
         let contentHTML = `
             ${noteReplyHtml}
             ${replyHtml}
@@ -1234,30 +1467,38 @@
 
         if (side === 'received') {
             const pfpUrl = chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/30';
-            rowDiv.innerHTML = `
+            const visibility = isLastInGroup ? 'visible' : 'hidden';
+            innerHTML = `
                 <div class="received-inner-row">
-                    <img src="${pfpUrl}" class="msg-avatar ${showAvatar ? 'visible' : ''}">
-                    <div class="msg-bubble-box" ${boxStyle}>${contentHTML}</div>
-                </div>
-                <div class="sliding-timestamp">${formatTime12(date)}</div>
-            `;
+                    <img src="${pfpUrl}" class="msg-avatar" style="visibility: ${visibility}">
+                    <div class="msg-bubble-box" ${boxStyle}>
+                        ${contentHTML}
+                    </div>
+                </div>`;
         } else {
-            rowDiv.innerHTML = `
-                <div class="msg-bubble-box" ${boxStyle}>${contentHTML}</div>
-                ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
-                <div class="sliding-timestamp">${formatTime12(date)}</div>
-            `;
+            innerHTML = `
+                <div class="msg-bubble-box" ${boxStyle}>
+                    ${contentHTML}
+                </div>`;
         }
-        
+
+        rowDiv.innerHTML = `
+            ${innerHTML}
+            ${seenText ? `<div class="seen-status">${seenText}</div>` : ''}
+            <div class="sliding-timestamp">${formatTime12(date)}</div>
+        `;
         container.appendChild(rowDiv);
 
         const bubbleEl = rowDiv.querySelector(`#bubble-${id}`);
-        if(bubbleEl && bubbleEl.style.display !== 'none') attachMessageListeners(bubbleEl, id, m);
-        if(m.imageUrl || (m.fileUrl && m.fileMeta.type.includes('video'))) {
+        if(bubbleEl && bubbleEl.style.display !== 'none') {
+            attachMessageListeners(bubbleEl, id, m);
+        }
+        
+        if(m.imageUrl || (m.fileUrl && m.fileMeta?.type.includes('video'))) {
              const mediaEl = rowDiv.querySelector('.msg-media-wrapper') || rowDiv.querySelector('.msg-video-container');
              if(mediaEl) attachMessageListeners(mediaEl, id, m);
         }
-        if(m.fileUrl && (m.fileMeta.type.includes('audio') || m.fileMeta.type.includes('pdf') || m.fileMeta.type.includes('file'))) {
+        if(m.fileUrl && (m.fileMeta?.type.includes('audio') || m.fileMeta?.type.includes('file'))) {
              const pill = rowDiv.querySelector('.msg-audio-pill') || rowDiv.querySelector('.msg-file-pill');
              if(pill) attachMessageListeners(pill, id, m);
         }
@@ -1267,8 +1508,10 @@
         const audio = document.getElementById(id);
         const icon = document.getElementById('icon-' + id);
         const wave = document.getElementById('wave-' + id);
+        
         if (!audio) return;
         document.querySelectorAll('audio').forEach(a => { if(a.id !== id) { a.pause(); resetAudioUI(a.id); } });
+
         if (audio.paused) {
             audio.play().catch(e => console.log("Audio play error:", e));
             icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
@@ -1313,7 +1556,8 @@
 
             element.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
-                isScrolling = false; swipeTriggered = false;
+                isScrolling = false; 
+                swipeTriggered = false;
                 menuTimer = setTimeout(() => {
                     if (!isScrolling) { vibrate(70); openMenu(id, m.sender, m.text); }
                 }, 500);
@@ -1339,9 +1583,8 @@
                     let replyText = m.text;
                     if(!replyText) {
                         if(m.imageUrl) replyText = "📷 Photo";
-                        else if(m.fileMeta && m.fileMeta.type.includes('video')) replyText = "🎥 Video";
-                        else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
-                        else if(m.fileUrl) replyText = "📄 File";
+                        else if(m.fileMeta?.type.includes('video')) replyText = "🎥 Video";
+                        else if(m.fileMeta?.type.includes('audio')) replyText = "🎵 Audio";
                         else replyText = "Attachment";
                     }
                     triggerReply(replyText);
@@ -1358,29 +1601,36 @@
     }
 
     async function sendImageMessage(imageUrl) {
-        popSound.play().catch(e => {}); scrollToBottom();
-        let msgData = { text: "", sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo: replyingTo, seen: false, reactions: {}, imageUrl: imageUrl };
+        popSound.play().catch(e => {});
+        scrollToBottom();
+        let msgData = {
+            text: "", sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo, seen: false, reactions: {}, imageUrl: imageUrl
+        };
         cancelInteraction();
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-        updateLastMsg("📷 Image"); scrollToBottom();
+        updateLastMsg("📷 Image");
+        scrollToBottom();
     }
 
     async function sendFileMessage(fileUrl, metadata) {
-        popSound.play().catch(e => {}); scrollToBottom();
+        popSound.play().catch(e => {});
+        scrollToBottom();
         const caption = metadata.caption || "";
-        let msgData = { text: caption, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(), replyTo: replyingTo, seen: false, reactions: {}, fileUrl: fileUrl, fileMeta: metadata };
+        let msgData = {
+            text: caption, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo, seen: false, reactions: {}, fileUrl: fileUrl, fileMeta: metadata
+        };
         cancelInteraction();
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-        let type = metadata.type || "";
-        let label = "📄 File";
-        if(type.indexOf('video') !== -1) label = "🎥 Video";
-        else if(type.indexOf('audio') !== -1) label = "🎵 Audio";
-        updateLastMsg(caption ? label + " " + caption : label); scrollToBottom();
+        updateLastMsg(caption || "File");
+        scrollToBottom();
     }
 
     async function updateLastMsg(msgText) {
         await db.collection("chats").doc(chatId).set({
-            lastMessage: msgText, lastSender: myUid, lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: msgText, lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
             participants: [myUid, targetUid], seen: false,
             [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
         }, { merge: true });
@@ -1391,12 +1641,12 @@
         if (!text) { inputBox.classList.add('shake-anim'); setTimeout(() => inputBox.classList.remove('shake-anim'), 400); return; }
         popSound.play().catch(e => {});
         mInput.value = ""; mInput.style.height = 'auto'; 
-        sendBtnUI.classList.remove('active'); emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none';
+        sendBtnUI.classList.remove('active'); 
+        emojiTray.style.display = 'none'; attachmentMenu.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
-        mInput.focus(); setTimeout(() => mInput.focus(), 10); 
-
+        mInput.focus(); 
         if (editModeId) {
-            const idToEdit = editModeId; editModeId = null; cancelInteraction(); 
+            const idToEdit = editModeId; editModeId = null; cancelInteraction();
             await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
         } else {
             const rText = replyingTo; cancelInteraction(); scrollToBottom();
@@ -1414,7 +1664,6 @@
         const isMine = sender === myUid;
         document.getElementById('edit-btn').style.display = (isMine && text) ? 'block' : 'none'; 
         document.getElementById('unsend-btn').style.display = isMine ? 'block' : 'none';
-        document.getElementById('menu-emoji-grid').style.display = 'none';
         document.getElementById('menu-overlay').style.display = 'flex';
     }
 
@@ -1422,8 +1671,7 @@
         if (!activeMenuId) return;
         const el = document.getElementById('text-' + activeMenuId);
         if(!el) { closeMenu(); return; } 
-        const msgText = el.innerText.split('(edited)')[0].trim();
-        try { await navigator.clipboard.writeText(msgText); closeMenu(); } catch (err) { console.error('Failed to copy: ', err); }
+        try { await navigator.clipboard.writeText(el.innerText.split('(edited)')[0].trim()); closeMenu(); } catch (err) {}
     }
 
     async function applyReaction(emoji) {
@@ -1436,16 +1684,16 @@
         if(messagesMap.has(id)) {
             let msg = messagesMap.get(id);
             if(!msg.reactions) msg.reactions = {};
-            if(msg.reactions[myUid] && msg.reactions[myUid].emoji === emoji) { delete msg.reactions[myUid]; } 
-            else if (emoji !== '') { msg.reactions[myUid] = { emoji: emoji, timestamp: Date.now() }; }
-            messagesMap.set(id, msg); renderAll(); 
+            if(msg.reactions[myUid] && msg.reactions[myUid].emoji === emoji) delete msg.reactions[myUid];
+            else if (emoji !== '') msg.reactions[myUid] = { emoji: emoji, timestamp: Date.now() };
+            messagesMap.set(id, msg); renderAll();
         }
         const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(id);
         const doc = await msgRef.get();
         const data = doc.data();
         let currentReaction = (data.reactions && data.reactions[myUid]) ? data.reactions[myUid].emoji : null;
-        if (currentReaction === emoji) { await msgRef.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() }); } 
-        else { await msgRef.update({ [`reactions.${myUid}`]: { emoji: emoji, timestamp: Date.now() } }); }
+        if (currentReaction === emoji) await msgRef.update({ [`reactions.${myUid}`]: firebase.firestore.FieldValue.delete() });
+        else await msgRef.update({ [`reactions.${myUid}`]: { emoji: emoji, timestamp: Date.now() } });
     }
 
     function showReactionDetails(msgId, event) {
@@ -1456,55 +1704,47 @@
         listContainer.innerHTML = '';
         Object.entries(msgData.reactions).forEach(([uid, rData]) => {
             const isMe = uid === myUid;
-            const pfpSrc = isMe ? (myUserData ? myUserData.photoURL : 'https://via.placeholder.com/40') : chatTargetData.photoURL;
+            const pfpSrc = isMe ? (myUserData?.photoURL || 'https://via.placeholder.com/40') : chatTargetData.photoURL;
             const name = isMe ? "You" : (chatTargetData.name || chatTargetData.username);
-            const timeStr = formatTime12(new Date(rData.timestamp));
             const el = document.createElement('div');
             el.className = 'reactor-item';
-            el.innerHTML = `<img src="${pfpSrc}" class="reactor-pfp"><div class="reactor-info"><div class="reactor-name">${name}</div><div class="reactor-time">${timeStr}</div></div><div class="reactor-emoji">${rData.emoji}</div>`;
+            el.innerHTML = `<img src="${pfpSrc}" class="reactor-pfp"><div class="reactor-info"><div class="reactor-name">${name}</div></div><div class="reactor-emoji">${rData.emoji}</div>`;
             listContainer.appendChild(el);
         });
         document.getElementById('reaction-details-overlay').style.display = 'flex';
     }
 
     function closeReactionDetails() { document.getElementById('reaction-details-overlay').style.display = 'none'; }
+    
     function initReplyFromActive() {
         const el = document.getElementById('text-'+activeMenuId);
-        const text = el ? el.innerText.split('(edited)')[0].trim() : "Image";
-        triggerReply(text); closeMenu();
+        triggerReply(el ? el.innerText.split('(edited)')[0].trim() : "Attachment");
+        closeMenu();
     }
+
     function closeMenu() { document.getElementById('menu-overlay').style.display = 'none'; }
+    
     function cancelInteraction() { 
         if (editModeId) { mInput.value = ""; mInput.style.height = 'auto'; }
-        replyingTo = null; editModeId = null; document.getElementById('reply-dock').style.display = 'none'; 
+        replyingTo = null; editModeId = null;
+        document.getElementById('reply-dock').style.display = 'none'; 
     }
+    
     function initEdit() {
         const el = document.getElementById('text-'+activeMenuId);
-        if(!el) return; 
-        const textToEdit = el.innerText.split('(edited)')[0].trim();
-        mInput.value = textToEdit; mInput.style.height = 'auto'; mInput.style.height = mInput.scrollHeight + 'px';
+        if(!el) return;
+        mInput.value = el.innerText.split('(edited)')[0].trim();
+        mInput.style.height = mInput.scrollHeight + 'px';
         editModeId = activeMenuId; closeMenu(); 
-        document.getElementById('reply-text').innerHTML = "<strong style='color:#0095f6'>Editing Message:</strong><br> " + textToEdit;
-        document.getElementById('reply-dock').style.display = 'flex'; mInput.focus();
+        document.getElementById('reply-text').innerHTML = "Editing Message...";
+        document.getElementById('reply-dock').style.display = 'flex';
+        mInput.focus();
     }
+
     async function unsendMsg() { 
         const idToDelete = activeMenuId; closeMenu();
         if (messagesMap.has(idToDelete)) { messagesMap.delete(idToDelete); renderAll(); }
         await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-        const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
-        if (!snapshot.empty) {
-            const lastMsg = snapshot.docs[0].data();
-            let txt = lastMsg.text || "";
-            if (lastMsg.imageUrl) txt = txt ? "📷 " + txt : "📷 Image";
-            else if (lastMsg.fileUrl) {
-                const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
-                let icon = "📄"; let label = "File";
-                if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
-                else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
-                txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
-            }
-            await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
-        }
     }
 </script>
 
