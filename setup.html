@@ -192,6 +192,9 @@
     let currentSavedUsername = "";
     let currentPhotoURL = "";
 
+    // The required default image URL
+    const DEFAULT_PFP_URL = "https://fabulouspic.com/wp-content/uploads/2024/08/a-black-and-white-circle-with-stars-on-it.jpg";
+
     const userInp = document.getElementById('username');
     const statusMsg = document.getElementById('status');
     const launchBtn = document.getElementById('launchBtn');
@@ -208,10 +211,11 @@
         document.getElementById('bio').value = data.bio || "";
         document.getElementById('display-id').innerText = data.gooracNumber || "--------";
         
-        const src = data.photoURL || "https://via.placeholder.com/150";
+        // If data.photoURL exists, use it. If not, use the specific stars image.
+        const src = data.photoURL || DEFAULT_PFP_URL;
         document.getElementById('user-pfp').src = src;
         
-        currentPhotoURL = data.photoURL;
+        currentPhotoURL = src;
         finalGooracID = data.gooracNumber;
         currentSavedUsername = data.username;
         
@@ -220,8 +224,10 @@
 
     function resetToAuthDefaults(user) {
         document.getElementById('full-name').value = user.displayName || "";
-        document.getElementById('user-pfp').src = user.photoURL || "https://via.placeholder.com/150";
-        currentPhotoURL = user.photoURL;
+        // Logic: Use user.photoURL if available. If email login (no pic), use specific stars image.
+        const picToUse = user.photoURL || DEFAULT_PFP_URL;
+        document.getElementById('user-pfp').src = picToUse;
+        currentPhotoURL = picToUse;
         launchBtn.style.display = "none";
     }
 
@@ -302,13 +308,16 @@
         launchBtn.innerText = "Synchronizing...";
         launchBtn.disabled = true;
 
+        // Ensure currentPhotoURL falls back to the default if empty before saving
+        const finalPhoto = currentPhotoURL || DEFAULT_PFP_URL;
+
         const profileData = {
             uid: activeUser.uid,
             gooracNumber: finalGooracID,
             name: document.getElementById('full-name').value,
             username: userInp.value,
             bio: document.getElementById('bio').value,
-            photoURL: currentPhotoURL,
+            photoURL: finalPhoto,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -317,7 +326,7 @@
             await db.collection("users").doc(activeUser.uid).set(profileData, { merge: true });
             await activeUser.updateProfile({
                 displayName: profileData.name,
-                photoURL: currentPhotoURL
+                photoURL: finalPhoto
             });
             window.location.href = "home.html";
         } catch (e) {
