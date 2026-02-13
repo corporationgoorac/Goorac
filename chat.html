@@ -1863,7 +1863,10 @@
                     if (change.type === "added") {
                         if(!existing) {
                             messagesMap.set(msgId, msgData);
-                            if(msgData.sender !== myUid) isNewIncoming = true;
+                            if(msgData.sender !== myUid) {
+                                isNewIncoming = true;
+                                checkKeywords(msgData.text); // <--- ADDED: Trigger effects for receiver
+                            }
                             hasVisualChanges = true;
                         } else {
                             // GLITCH FIX: If it exists in cache (instantRender), don't flag as visual change
@@ -1983,6 +1986,7 @@
                 // We add a slight delay if it's the sender to avoid conflict with local click anim
                 if (uid !== myUid) {
                     triggerReactionPop(msgId, newReaction.emoji);
+                    if(newReaction.emoji === '❤️') triggerHeartAnimation(); // <--- ADDED: Trigger full screen heart for receiver
                 }
             }
         });
@@ -2273,6 +2277,13 @@
             if(!isInteractive) {
                 pressTimer = setTimeout(() => {
                     document.getElementById('messages-container').classList.add('show-timestamps');
+                    
+                    // <--- ADDED: Fix for timestamps being pushed off screen
+                    const chatFlow = document.getElementById('chat-flow');
+                    if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
+                        setTimeout(() => chatFlow.scrollTop = chatFlow.scrollHeight, 210);
+                    }
+                    
                     vibrate([50, 50]); // Vibrate twice
                 }, 500);
             }
@@ -2622,7 +2633,7 @@
     // Check keywords
     function checkKeywords(text) {
         const lower = text.toLowerCase();
-        if (lower.includes('love') || lower.includes('❤️') || lower.includes('🥰') || lower.includes('😍')) {
+        if (lower.includes('love') || lower.includes('❤️') || lower.includes('meena') || lower.includes('🥰') || lower.includes('😍')) {
             fireEffect('hearts');
         } else if (lower.includes('congratulations') || lower.includes('happy birthday') || lower.includes('party') || lower.includes('🎉')) {
             fireEffect('confetti');
