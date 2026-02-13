@@ -2172,13 +2172,19 @@
         let pressTimer;
         
         bg.addEventListener('touchstart', (e) => {
-            // Only trigger if touching blank background
-            if(e.target === bg || e.target.id === 'messages-container') {
+            // FIX START: Check if user is clicking on interactive elements or bubbles
+            // Instead of checking specific IDs, we check if the target is NOT inside a bubble/input
+            const isInteractive = e.target.closest('.msg-bubble-box') || 
+                                  e.target.closest('.input-area-container') || 
+                                  e.target.closest('#chat-header');
+                                  
+            if(!isInteractive) {
                 pressTimer = setTimeout(() => {
                     document.getElementById('messages-container').classList.add('show-timestamps');
                     vibrate([50, 50]); // Vibrate twice
                 }, 500);
             }
+            // FIX END
         }, {passive: true});
 
         bg.addEventListener('touchend', () => {
@@ -2213,6 +2219,7 @@
 
             element.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
+                currentX = startX; // FIX: Initialize currentX to startX. Critical for long press detection without movement.
                 isScrolling = false; 
                 
                 menuTimer = setTimeout(() => {
@@ -2924,11 +2931,11 @@
                 const blob = new Blob(audioChunks, { type: 'audio/webm' });
                 const duration = Math.ceil((Date.now() - recStartTime) / 1000);
                 if (duration < 1) {
-                     // Too short
-                     vibrate(50);
+                      // Too short
+                      vibrate(50);
                 } else {
-                     popSound.play().catch(()=>{}); // Send Sound
-                     uploadAudioBlob(blob, duration);
+                      popSound.play().catch(()=>{}); // Send Sound
+                      uploadAudioBlob(blob, duration);
                 }
             }, 200);
         } else {
