@@ -68,6 +68,7 @@
             --shimmer: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
             --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
             --ease-smooth: cubic-bezier(0.33, 1, 0.68, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         /* =========================================
@@ -158,18 +159,27 @@
             50% { transform: translateY(-6px); } 
         }
 
-        /* REACTION POP ANIMATION */
+        /* REACTION POP ANIMATION - PHYSICS IMPROVED */
         @keyframes popOut {
             0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.2); opacity: 1; }
+            60% { transform: scale(1.35); opacity: 1; }
+            80% { transform: scale(0.95); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* BADGE POP UPDATE */
+        @keyframes badgeUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); background: #444; }
+            100% { transform: scale(1); background: #2a2a2a; }
         }
 
         /* LIVE FLOATING EMOJI */
         @keyframes floatUp {
-            0% { transform: translateY(0) scale(1); opacity: 1; }
-            50% { transform: translateY(-60px) scale(1.5); opacity: 0.8; }
-            100% { transform: translateY(-120px) scale(1.2); opacity: 0; }
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-20px) scale(1.5); opacity: 1; }
+            50% { transform: translateY(-60px) scale(1.2); opacity: 0.9; }
+            100% { transform: translateY(-140px) scale(0.8); opacity: 0; }
         }
 
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff453a !important; }
@@ -455,6 +465,8 @@
             position: relative; 
             flex-direction: column; 
             overflow: visible; 
+            /* Ensure physics don't get clipped */
+            transform: translateZ(0);
         }
         
         /* Spacing for groups */
@@ -550,7 +562,7 @@
         /* OLD SLIDING TIMESTAMP REMOVED */
         .sliding-timestamp { display: none !important; }
         
-        /* REACTION BADGE */
+        /* REACTION BADGE - PHYSICS ENABLED */
         .reaction-badge { 
             position: absolute; 
             bottom: -8px; 
@@ -565,7 +577,11 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
             min-width: 24px;
             text-align: center;
-            animation: popOut 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: popOut 0.35s var(--ease-out-back);
+            will-change: transform;
+        }
+        .reaction-badge.updated {
+            animation: badgeUpdate 0.3s ease-in-out;
         }
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
@@ -687,7 +703,8 @@
             font-size: 40px;
             pointer-events: none;
             z-index: 3001;
-            animation: floatUp 1.5s ease-out forwards;
+            animation: floatUp 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
+            will-change: transform, opacity;
         }
 
         /* === EFFECT LAYERS (CONFETTI / HEARTS) === */
@@ -1365,6 +1382,11 @@
     const db = firebase.firestore();
     const rdb = firebase.database();
     const auth = firebase.auth();
+    
+    // Attempt to enable offline persistence
+    db.enablePersistence().catch(err => {
+        console.log("Persistence disabled:", err.code);
+    });
 
     // =========================================
     //  11. GLOBAL STATE VARIABLES
@@ -1714,12 +1736,12 @@
             
             db.collection('users').doc(myUid).get().then(doc => {
                  if (doc.exists) {
-                     myUserData = doc.data();
-                     // Only start monitoring if privacy settings allow
-                     if (targetUid) {
-                         monitorTargetStatus();
-                         checkBlockingStatus(); // NEW: Check Blocking
-                     }
+                      myUserData = doc.data();
+                      // Only start monitoring if privacy settings allow
+                      if (targetUid) {
+                          monitorTargetStatus();
+                          checkBlockingStatus(); // NEW: Check Blocking
+                      }
                  }
             });
             initChat(); 
@@ -1828,25 +1850,61 @@
                 
                 if (!lastVisible) lastVisible = snapshot.docs[snapshot.docs.length - 1];
                 let isNewIncoming = false;
+                let hasVisualChanges = false;
+                let reactionOnlyUpdates = false;
 
                 snapshot.docChanges().forEach(change => {
                     const msgData = change.doc.data();
                     const msgId = change.doc.id;
                     msgData.id = msgId; 
                     
+                    const existing = messagesMap.get(msgId);
+
                     if (change.type === "added") {
-                        messagesMap.set(msgId, msgData);
-                        if(msgData.sender !== myUid) isNewIncoming = true;
+                        if(!existing) {
+                            messagesMap.set(msgId, msgData);
+                            if(msgData.sender !== myUid) isNewIncoming = true;
+                            hasVisualChanges = true;
+                        } else {
+                            // GLITCH FIX: If it exists in cache (instantRender), don't flag as visual change
+                            // unless critical data is different. This prevents the wipe/flicker.
+                            if(existing.text !== msgData.text || 
+                               (existing.reactions && !msgData.reactions) || 
+                               (!existing.reactions && msgData.reactions) ||
+                               JSON.stringify(existing.reactions) !== JSON.stringify(msgData.reactions)) {
+                                hasVisualChanges = true;
+                            }
+                            // Always update the map to ensure we have the live objects (Timestamp vs ISO)
+                            messagesMap.set(msgId, msgData);
+                        }
                     } 
                     else if (change.type === "modified") {
-                        // === DETECT NEW REACTIONS HERE ===
+                        // === DETECT NEW REACTIONS HERE AND TRIGGER PHYSICS ===
                         const oldData = messagesMap.get(msgId);
+                        
+                        // Physics trigger: Fire floating emoji
                         detectNewReactions(oldData, msgData, msgId);
                         
-                        messagesMap.set(msgId, msgData);
+                        // GLITCH FIX: If ONLY reactions changed, perform a DOM surgical update
+                        // instead of flagging hasVisualChanges which wipes the list.
+                        const oldReactionsStr = JSON.stringify(oldData ? oldData.reactions : {});
+                        const newReactionsStr = JSON.stringify(msgData.reactions || {});
+                        
+                        if(oldData && oldData.text === msgData.text && oldReactionsStr !== newReactionsStr) {
+                            // It's a reaction-only update. 
+                            // 1. Update Map
+                            messagesMap.set(msgId, msgData);
+                            // 2. Surgical DOM update
+                            updateReactionDOM(msgId, msgData.reactions);
+                        } else {
+                            // Text changed or something major, do full re-render
+                            messagesMap.set(msgId, msgData);
+                            hasVisualChanges = true;
+                        }
                     } 
                     else if (change.type === "removed") {
                         messagesMap.delete(msgId);
+                        hasVisualChanges = true;
                     }
                     
                     // Mark read logic
@@ -1865,23 +1923,46 @@
                     }
                 }
 
-                if (isFirstLoad) {
-                    renderAll();
-                    chatFlow.scrollTop = chatFlow.scrollHeight;
-                    setTimeout(() => {
-                        chatFlow.style.opacity = '1';
-                        isFirstLoad = false;
-                    }, 50);
-                } else {
-                    const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
-                    renderAll();
-                    if (isNearBottom || isNewIncoming && isNearBottom) {
-                        scrollToBottom();
+                if (hasVisualChanges || isFirstLoad) {
+                    if (isFirstLoad) {
+                        renderAll();
+                        chatFlow.scrollTop = chatFlow.scrollHeight;
+                        setTimeout(() => {
+                            chatFlow.style.opacity = '1';
+                            isFirstLoad = false;
+                        }, 50);
+                    } else {
+                        const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
+                        renderAll();
+                        if (isNearBottom || isNewIncoming && isNearBottom) {
+                            scrollToBottom();
+                        }
                     }
                 }
                 
                 saveMessagesToCache();
             });
+    }
+
+    // NEW FUNCTION: Surgical DOM update for reactions (prevents glitching)
+    function updateReactionDOM(msgId, reactions) {
+        const bubble = document.getElementById(`bubble-${msgId}`) || document.getElementById(`media-${msgId}`);
+        // Find reaction badges in this row (text bubble or media wrapper)
+        // We look for ID react-{msgId}
+        const badgeElements = document.querySelectorAll(`#react-${msgId}`);
+        
+        let reactionsList = [];
+        if (reactions) reactionsList = Object.values(reactions);
+        const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
+        
+        badgeElements.forEach(el => {
+            el.innerText = reactionDisplay;
+            el.style.display = reactionDisplay ? 'block' : 'none';
+            // Add a small bounce animation to show update
+            el.classList.remove('updated');
+            void el.offsetWidth; // Trigger reflow
+            el.classList.add('updated');
+        });
     }
 
     // NEW FUNCTION: Detects if someone else added a reaction and triggers physics
@@ -1893,23 +1974,27 @@
         
         // Iterate through new reactions to find added ones
         Object.keys(newReactions).forEach(uid => {
-            // Ignore my own reactions for this animation (optional)
-            if (uid === myUid) return; 
-            
             const oldReaction = oldReactions[uid];
             const newReaction = newReactions[uid];
             
             // If there was no reaction before, or the emoji changed
             if (!oldReaction || oldReaction.emoji !== newReaction.emoji) {
-                // Trigger Visual Pop
-                triggerReactionPop(msgId, newReaction.emoji);
+                // Trigger Visual Pop for BOTH users (Sender sees it locally via click, receiver sees it here)
+                // We add a slight delay if it's the sender to avoid conflict with local click anim
+                if (uid !== myUid) {
+                    triggerReactionPop(msgId, newReaction.emoji);
+                }
             }
         });
     }
 
     // NEW FUNCTION: Spawns a floating emoji
     function triggerReactionPop(msgId, emoji) {
-        const bubble = document.getElementById(`bubble-${msgId}`) || document.getElementById(msgId);
+        // Try to find the bubble or the media container
+        const bubble = document.getElementById(`bubble-${msgId}`) || 
+                       document.getElementById(msgId)?.querySelector('.msg-media-wrapper') ||
+                       document.getElementById(msgId)?.querySelector('.msg-video-container');
+                       
         if (!bubble) return;
 
         const rect = bubble.getBoundingClientRect();
@@ -2802,7 +2887,9 @@
     }
 
     async function applyReactionToId(id, emoji) {
-        // 1. Optimistic Update
+        // 1. Optimistic Update (Visual Pop Instant)
+        triggerReactionPop(id, emoji);
+
         if(messagesMap.has(id)) {
             let msg = messagesMap.get(id);
             if(!msg.reactions) msg.reactions = {};
@@ -2813,7 +2900,8 @@
                  msg.reactions[myUid] = { emoji: emoji, timestamp: Date.now() };
             }
             messagesMap.set(id, msg);
-            renderAll(); 
+            // Surgical Update
+            updateReactionDOM(id, msg.reactions);
         }
 
         // 2. Firebase Update
