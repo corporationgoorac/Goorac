@@ -381,7 +381,8 @@
             flex-direction: column; 
             padding: 0 12px; 
             width: 100%; 
-            padding-bottom: 12px;
+            /* FIX 2: Added extra bottom padding so last msg timestamp isn't hidden */
+            padding-bottom: 50px;
             /* Performance Optimization */
             will-change: transform;
             contain: content;
@@ -457,6 +458,17 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* FIX 3: TIME DIVIDER (Same Style) */
+        .time-divider {
+            text-align: center; 
+            margin: 20px 0 12px 0; 
+            font-size: 0.65rem; 
+            color: #777; 
+            font-weight: 500; 
+            align-self: center; 
+            width: 100%;
         }
 
         /* =========================================
@@ -652,21 +664,21 @@
         }
         .reply-box-ui:active { background: rgba(0,0,0,0.4); }
         
-        /* Note Reply Style */
+        /* Note Reply Style - FIX 1: Support Dynamic Styling */
         .note-reply-wrapper {
             margin-bottom: 8px;
             display: flex; flex-direction: column; align-items: center;
             max-width: 100%; cursor: pointer;
         }
         .note-reply-pill { 
-            background: #262626; 
-            padding: 10px 16px; 
+            /* background, color set inline via JS */
+            padding: 12px 18px; 
             border-radius: 22px; 
             display: inline-flex; flex-direction: column;
-            align-items: center; justify-content: center;
+            justify-content: center;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            min-width: 120px; max-width: 220px; text-align: center;
+            min-width: 140px; max-width: 240px;
             position: relative;
             transform: scale(0.95);
         }
@@ -1345,7 +1357,7 @@
 
         <div id="attachment-menu">
             <div class="attach-opt" onclick="openCameraPicker()">
-                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4 4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 <span>Camera / Gallery</span>
             </div>
             <div class="attach-opt" onclick="openFilePicker()">
@@ -2064,6 +2076,7 @@
 
         let lastDateLabel = "";
         let lastSeenMsgId = null;
+        let lastMsgTime = 0; // NEW: Track last message time for Smart Grouping
 
         // Find last seen message
         for (let i = sorted.length - 1; i >= 0; i--) {
@@ -2076,15 +2089,29 @@
         
         sorted.forEach(([id, data], index) => { 
             const msgDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
-            const dateLabel = getDateDivider(msgDate);
+            const msgTime = msgDate.getTime();
             
+            // 1. DATE DIVIDER (Day level)
+            const dateLabel = getDateDivider(msgDate);
             if (dateLabel !== lastDateLabel) {
                 const div = document.createElement('div');
                 div.className = "date-divider";
                 div.innerText = dateLabel;
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
+                lastMsgTime = msgTime; // Reset timer ref for new day
+            } else {
+                // 2. TIME DIVIDER (Hour level - "IG Style")
+                // If same day, but gap > 1 hour (3600000 ms), show time divider
+                if (lastMsgTime > 0 && (msgTime - lastMsgTime) > 3600000) {
+                    const tDiv = document.createElement('div');
+                    tDiv.className = "time-divider";
+                    tDiv.innerText = formatTime12(msgDate);
+                    container.appendChild(tDiv);
+                }
             }
+            
+            lastMsgTime = msgTime; // Update ref
 
             // SMART GROUPING LOGIC
             const prevMsg = index > 0 ? sorted[index - 1][1] : null;
@@ -2131,15 +2158,31 @@
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 16px"' : '';
         const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
 
-        // Note Reply
+        // Note Reply - FULL UI RENDER (Added logic to handle fonts, alignment, colors, song)
+        const noteMeta = m.noteMetadata || {};
         const noteReplyHtml = m.replyToNote ? `
             <div class="note-reply-wrapper">
-                <div class="note-reply-pill" style="background: ${m.noteMetadata ? (m.noteMetadata.bgColor || '#262626') : '#262626'}; color: ${m.noteMetadata ? (m.noteMetadata.textColor || '#fff') : '#fff'}">
-                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
-                        <img src="${m.noteMetadata && m.noteMetadata.pfp ? m.noteMetadata.pfp : (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" style="width:16px;height:16px;border-radius:50%;">
-                        <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;">Note</span>
+                <div class="note-reply-pill" style="
+                    background: ${noteMeta.bgColor || '#262626'};
+                    color: ${noteMeta.textColor || '#fff'};
+                    font-family: ${noteMeta.font || 'system-ui'};
+                    align-items: ${noteMeta.textAlign === 'left' ? 'flex-start' : 'center'};
+                    text-align: ${noteMeta.textAlign || 'center'};
+                ">
+                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px; width:100%; justify-content: ${noteMeta.textAlign === 'left' ? 'flex-start' : 'center'}; opacity:0.7;">
+                        <img src="${noteMeta.pfp || (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" style="width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);">
+                        <span style="font-size:0.7rem;font-weight:700;">${noteMeta.username || 'User'}</span>
                     </div>
-                    <div style="font-size:0.9rem;font-weight:600;line-height:1.3;">"${m.replyToNote}"</div>
+                    
+                    <div style="font-size:0.95rem;font-weight:600;line-height:1.35; margin-bottom:${noteMeta.songName ? '6px' : '0'}; width:100%;">
+                        ${m.replyToNote}
+                    </div>
+
+                    ${noteMeta.songName ? `
+                    <div style="display:flex;align-items:center;gap:4px; opacity:0.8; font-size:0.65rem; background:rgba(255,255,255,0.15); padding:4px 8px; border-radius:10px;">
+                         <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                         <span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${noteMeta.songName}</span>
+                    </div>` : ''}
                 </div>
                 <div class="note-connector"></div>
             </div>` : '';
