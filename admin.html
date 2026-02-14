@@ -252,6 +252,47 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
         .toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* --- NEW: COMMAND UPLINK MODAL (Message System) --- */
+        #msg-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(15px);
+            z-index: 1500; opacity: 0; pointer-events: none; transition: 0.4s; display: flex; align-items: center; justify-content: center;
+        }
+        #msg-overlay.active { opacity: 1; pointer-events: all; }
+        
+        .uplink-card {
+            width: 90%; max-width: 500px; background: #0f0f0f; border: 1px solid var(--border-subtle);
+            border-radius: 24px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+            transform: scale(0.95); transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #msg-overlay.active .uplink-card { transform: scale(1); }
+
+        .uplink-head {
+            background: #151515; padding: 20px 24px; border-bottom: 1px solid var(--border-subtle);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .uplink-title { display: flex; align-items: center; gap: 10px; color: var(--warning); font-weight: 800; letter-spacing: 0.05em; font-size: 13px; }
+        
+        .uplink-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+        
+        .target-chip {
+            display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; 
+            border-radius: 8px; font-size: 11px; font-weight: 700; background: #222; border: 1px solid #333; margin-bottom: 10px;
+        }
+        .target-chip.t-all { color: var(--warning); border-color: rgba(255, 214, 10, 0.3); background: rgba(255, 214, 10, 0.05); }
+        .target-chip.t-ver { color: var(--accent-blue); border-color: rgba(0, 122, 255, 0.3); background: rgba(0, 122, 255, 0.05); }
+        .target-chip.t-usr { color: var(--text-main); }
+
+        .uplink-area {
+            width: 100%; min-height: 120px; background: #050505; border: 1px solid #222;
+            color: #fff; padding: 16px; border-radius: 14px; font-family: var(--font-ui);
+            resize: none; font-size: 14px; line-height: 1.5;
+        }
+        .uplink-area:focus { border-color: var(--warning); }
+        
+        .media-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        .uplink-foot { padding: 20px 24px; background: #111; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 12px; }
     </style>
 </head>
 <body>
@@ -297,6 +338,9 @@
                 <span>NEXUS v5.1</span>
             </div>
             <div class="header-actions">
+                <button class="btn-icon" onclick="openBroadcast()" title="Broadcast Command" style="color: var(--warning); border-color: rgba(255,214,10,0.2);">
+                    <span class="material-icons-round">campaign</span>
+                </button>
                 <button class="btn-icon" onclick="downloadJSON()"><span class="material-icons-round">cloud_download</span></button>
                 <button class="btn-icon" onclick="refreshDB()"><span class="material-icons-round">sync</span></button>
                 <button class="btn-icon" onclick="firebase.auth().signOut()"><span class="material-icons-round">logout</span></button>
@@ -338,6 +382,41 @@
         <div class="list-container" id="render-area"></div>
     </div>
 
+    <div id="msg-overlay">
+        <div class="uplink-card">
+            <div class="uplink-head">
+                <div class="uplink-title">
+                    <span class="material-icons-round">satellite_alt</span>
+                    COMMAND UPLINK
+                </div>
+                <span class="material-icons-round" style="color:var(--text-muted); cursor:pointer;" onclick="closeCompose()">close</span>
+            </div>
+            <div class="uplink-body">
+                <div id="uplink-target-display">
+                    </div>
+                
+                <textarea class="uplink-area" id="uplink-text" placeholder="Transmitting secure message via @goorac protocol..."></textarea>
+                
+                <div class="media-row">
+                    <div class="inp-group" style="margin:0;">
+                        <input type="text" class="inp-field" id="uplink-img" placeholder="Image Vector (URL)" style="font-size:12px; padding:12px;">
+                    </div>
+                    <div class="inp-group" style="margin:0;">
+                        <input type="text" class="inp-field" id="uplink-file" placeholder="Data File (URL)" style="font-size:12px; padding:12px;">
+                    </div>
+                </div>
+                <div style="font-size:10px; color:var(--text-muted); font-family:var(--font-mono);">
+                    > ENCRYPTED SENDER: @goorac (OFFICIAL)<br>
+                    > LATENCY: < 12ms
+                </div>
+            </div>
+            <div class="uplink-foot">
+                <button class="btn btn-sec" onclick="closeCompose()" style="height:44px; font-size:12px;">ABORT</button>
+                <button class="btn btn-pri" id="btn-transmit" onclick="executeTransmission()" style="background:var(--warning); color:#000; height:44px; font-size:12px;">TRANSMIT SIGNAL</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-overlay" onclick="if(event.target===this) toggleDrawer(false)">
         <div class="drawer">
             <div class="drawer-head">
@@ -352,6 +431,11 @@
                         <span id="ed-uid">UID: --</span>
                     </div>
                 </div>
+                
+                <button onclick="openDirectMessage()" style="width:100%; padding:14px; background:#1c1c1c; border:1px solid #333; color:#fff; border-radius:12px; margin-bottom:24px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span class="material-icons-round" style="font-size:18px; color:var(--text-muted);">mail</span>
+                    Send Official Message as Goorac
+                </button>
 
                 <div class="inp-group">
                     <label class="inp-label">Identity Name</label>
@@ -427,6 +511,11 @@
         let usersData = [];
         let currentId = null;
         let currentUserProfile = null;
+        
+        // NEW: Official ID Holder
+        let OFFICIAL_GOORAC_ID = null;
+        let COMPOSE_MODE = null; // 'SINGLE', 'ALL', 'VERIFIED'
+        let COMPOSE_TARGET_UID = null;
 
         // --- 2. SECURITY MIDDLEWARE (Access Control) ---
         auth.onAuthStateChanged(async (user) => {
@@ -502,7 +591,12 @@
                 // Realtime sync for statistics and list
                 db.collection("users").orderBy("username").limit(500).onSnapshot(snap => {
                     usersData = [];
-                    snap.forEach(doc => usersData.push({ id: doc.id, ...doc.data() }));
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        usersData.push({ id: doc.id, ...d });
+                        // DETECT OFFICIAL ACCOUNT
+                        if(d.username === 'goorac') OFFICIAL_GOORAC_ID = doc.id;
+                    });
                     refreshUI();
                 });
                 initRealtimePresence(); 
@@ -721,6 +815,133 @@
         function downloadJSON() {
             const s = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(usersData,null,2));
             const a = document.createElement('a'); a.href=s; a.download="nexus_backup.json"; a.click();
+        }
+
+        // --- 7. NEW FEATURE: BROADCAST & MESSAGING SYSTEM ---
+        
+        function openBroadcast() {
+            const disp = document.getElementById('uplink-target-display');
+            disp.innerHTML = `
+                <div class="target-chip t-all" onclick="setBroadcastMode('ALL')" style="cursor:pointer">All Entities</div>
+                <div class="target-chip t-ver" onclick="setBroadcastMode('VERIFIED')" style="cursor:pointer">Verified Only</div>
+            `;
+            COMPOSE_MODE = 'ALL'; 
+            setBroadcastMode('ALL'); // Default
+            document.getElementById('msg-overlay').classList.add('active');
+        }
+
+        function setBroadcastMode(mode) {
+            COMPOSE_MODE = mode;
+            const chips = document.getElementById('uplink-target-display').querySelectorAll('.target-chip');
+            chips.forEach(c => c.style.opacity = '0.5');
+            if(mode === 'ALL') chips[0].style.opacity = '1';
+            if(mode === 'VERIFIED') chips[1].style.opacity = '1';
+        }
+
+        function openDirectMessage() {
+            if(!currentId) return;
+            toggleDrawer(false); // Close edit drawer
+            
+            const u = usersData.find(x => x.id === currentId);
+            const disp = document.getElementById('uplink-target-display');
+            
+            disp.innerHTML = `<div class="target-chip t-usr">@${u.username} (${u.name})</div>`;
+            COMPOSE_MODE = 'SINGLE';
+            COMPOSE_TARGET_UID = currentId;
+            document.getElementById('msg-overlay').classList.add('active');
+        }
+
+        function closeCompose() {
+            document.getElementById('msg-overlay').classList.remove('active');
+            document.getElementById('uplink-text').value = '';
+            document.getElementById('uplink-img').value = '';
+            document.getElementById('uplink-file').value = '';
+        }
+
+        async function executeTransmission() {
+            if(!OFFICIAL_GOORAC_ID) {
+                notify("CRITICAL: 'goorac' official ID not found in database.", true);
+                return;
+            }
+
+            const txt = document.getElementById('uplink-text').value;
+            const img = document.getElementById('uplink-img').value;
+            const file = document.getElementById('uplink-file').value;
+            const btn = document.getElementById('btn-transmit');
+
+            if(!txt && !img && !file) {
+                notify("ERROR: Empty transmission payload", true);
+                return;
+            }
+
+            btn.innerText = "ENCRYPTING & SENDING...";
+            btn.disabled = true;
+
+            // Determine Recipients
+            let recipients = [];
+            if (COMPOSE_MODE === 'SINGLE') {
+                recipients = [usersData.find(u => u.id === COMPOSE_TARGET_UID)];
+            } else if (COMPOSE_MODE === 'ALL') {
+                recipients = usersData.filter(u => u.id !== OFFICIAL_GOORAC_ID);
+            } else if (COMPOSE_MODE === 'VERIFIED') {
+                recipients = usersData.filter(u => u.verified && u.id !== OFFICIAL_GOORAC_ID);
+            }
+
+            if(recipients.length === 0 || !recipients[0]) {
+                notify("ERROR: No valid targets found", true);
+                btn.innerText = "TRANSMIT SIGNAL";
+                btn.disabled = false;
+                return;
+            }
+
+            try {
+                // Batch/Loop sending - Note: Client side loop is OK for admin tool limits
+                // For massive scale, this should be a Cloud Function, but per request we implement here.
+                let sentCount = 0;
+                
+                const promises = recipients.map(async (target) => {
+                    const chatId = OFFICIAL_GOORAC_ID < target.id 
+                        ? `${OFFICIAL_GOORAC_ID}_${target.id}` 
+                        : `${target.id}_${OFFICIAL_GOORAC_ID}`;
+                    
+                    const msgData = {
+                        text: txt,
+                        sender: OFFICIAL_GOORAC_ID,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        seen: false,
+                        reactions: {}
+                    };
+                    if(img) msgData.imageUrl = img;
+                    if(file) msgData.fileUrl = file;
+
+                    // 1. Add Message
+                    await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+
+                    // 2. Update Chat Meta
+                    let preview = txt || (img ? "📷 Image" : "📄 File");
+                    await db.collection("chats").doc(chatId).set({
+                        lastMessage: preview,
+                        lastSender: OFFICIAL_GOORAC_ID,
+                        lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        participants: [OFFICIAL_GOORAC_ID, target.id],
+                        [`unreadCount.${target.id}`]: firebase.firestore.FieldValue.increment(1)
+                    }, { merge: true });
+                    
+                    sentCount++;
+                });
+
+                await Promise.all(promises);
+                
+                notify(`TRANSMISSION SUCCESS: ${sentCount} NODES REACHED`);
+                closeCompose();
+
+            } catch(e) {
+                console.error(e);
+                notify("UPLINK FAILURE: " + e.message, true);
+            } finally {
+                btn.innerText = "TRANSMIT SIGNAL";
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
