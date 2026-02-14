@@ -150,8 +150,9 @@
         }
 
         @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+            /* Disabled for smoother instant feel per request */
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes bounce { 
@@ -349,7 +350,7 @@
         #chat-flow { 
             flex: 1; 
             overflow-y: auto; 
-            overflow-x: hidden; /* Changed back to hidden since we aren't swiping to show time anymore */
+            overflow-x: hidden; 
             padding: 0; 
             display: flex; 
             flex-direction: column; 
@@ -358,6 +359,9 @@
             overscroll-behavior-y: contain; 
             position: relative;
             
+            /* KEY FIX FOR JUMPING: Anchor Scroll */
+            overflow-anchor: auto;
+
             /* PADDING TOP to clear absolute header */
             padding-top: calc(75px + env(safe-area-inset-top)); 
             padding-bottom: 20px;
@@ -366,9 +370,9 @@
             -ms-overflow-style: none; 
             scrollbar-width: none;
             
-            /* Initial State Hidden (Unless Instant Load) */
+            /* Initial State */
             opacity: 0; 
-            transition: opacity 0.2s ease-in;
+            transition: opacity 0.1s ease-in;
         }
         #chat-flow::-webkit-scrollbar { display: none; }
         
@@ -381,7 +385,7 @@
             /* Performance Optimization */
             will-change: transform;
             contain: content;
-            touch-action: pan-y; /* Important for vertical scroll, we handle horizontal */
+            touch-action: pan-y; 
         }
 
         /* =========================================
@@ -393,7 +397,7 @@
             margin-bottom: 12px; 
             padding-left: 12px; 
             width: 100%;
-            animation: slideUp 0.3s var(--ease-elastic);
+            /* Removed slideUp for instant feel */
         }
         .typing-avatar { 
             width: 28px; height: 28px; 
@@ -465,7 +469,6 @@
             position: relative; 
             flex-direction: column; 
             overflow: visible; 
-            /* Ensure physics don't get clipped */
             transform: translateZ(0);
         }
         
@@ -494,7 +497,7 @@
             max-width: 75%; 
             display: flex; 
             flex-direction: column; 
-            transition: transform 0.2s; /* Changed from margin-bottom to transform for smooth swipe */
+            transition: transform 0.2s, padding-bottom 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Smooth expand */
         }
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
@@ -507,6 +510,12 @@
             position: relative; 
             word-wrap: break-word; 
             z-index: 2; 
+            transition: box-shadow 0.2s ease;
+        }
+
+        /* ACTIVE GLOW EFFECT */
+        .bubble:active {
+            filter: brightness(1.1);
         }
         
         /* SENT BUBBLES */
@@ -538,26 +547,31 @@
         .bubble a { color: #ffffff; text-decoration: underline; cursor: pointer; font-weight: 600; opacity: 0.9; }
         .received .bubble a { color: var(--accent); }
 
-        /* NEW TIMESTAMP DISPLAY (Long Press) */
+        /* FIXED TIMESTAMP DISPLAY (Long Press) */
         .msg-timestamp-footer {
             font-size: 0.65rem;
             color: var(--text-secondary);
-            margin-top: 4px;
             font-weight: 500;
             opacity: 0;
-            height: 0;
-            overflow: hidden;
-            transition: opacity 0.2s, height 0.2s;
+            /* Changed from height animation to transform/opacity for no jump */
+            position: absolute;
+            bottom: 4px; /* Positioned inside padding area */
             width: 100%;
-            text-align: right;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
         }
-        /* When global class is added */
+        
+        /* Expand padding of bubble box to show timestamp */
+        .show-timestamps .msg-bubble-box {
+            padding-bottom: 18px !important; /* Forces row expansion naturally */
+        }
+        
         .show-timestamps .msg-timestamp-footer {
             opacity: 1;
-            height: 16px;
         }
-        .received .msg-timestamp-footer { text-align: left; padding-left: 2px; }
-        .sent .msg-timestamp-footer { text-align: right; padding-right: 2px; }
+
+        .received .msg-timestamp-footer { text-align: left; left: 4px; }
+        .sent .msg-timestamp-footer { text-align: right; right: 4px; }
 
         /* OLD SLIDING TIMESTAMP REMOVED */
         .sliding-timestamp { display: none !important; }
@@ -1364,19 +1378,12 @@
     //  10. FIREBASE INITIALIZATION
     // =========================================
     
-    // Attempt to load from window.CONFIG (from config.js)
-    // If not found, fall back to hardcoded production keys (Safety Net)
-    let fbConfig = (typeof CONFIG !== 'undefined' && CONFIG.firebase) ? CONFIG.firebase : {
-          apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-          authDomain: "goorac-c3b59.firebaseapp.com",
-          projectId: "goorac-c3b59",
-          storageBucket: "goorac-c3b59.firebasestorage.app",
-          messagingSenderId: "746746595332",
-          appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-          measurementId: "G-M46FEVRYSS"
+    // Updated to use external config.js (window.firebaseConfig)
+    let fbConfig = (typeof window.firebaseConfig !== 'undefined') ? window.firebaseConfig : {
+        // Fallback or empty if config.js missing
     };
 
-    if (!firebase.apps.length) {
+    if (!firebase.apps.length && fbConfig.apiKey) {
         firebase.initializeApp(fbConfig);
     }
     const db = firebase.firestore();
@@ -1998,7 +2005,7 @@
         const bubble = document.getElementById(`bubble-${msgId}`) || 
                        document.getElementById(msgId)?.querySelector('.msg-media-wrapper') ||
                        document.getElementById(msgId)?.querySelector('.msg-video-container');
-                       
+                        
         if (!bubble) return;
 
         const rect = bubble.getBoundingClientRect();
@@ -2276,12 +2283,18 @@
                                   
             if(!isInteractive) {
                 pressTimer = setTimeout(() => {
-                    document.getElementById('messages-container').classList.add('show-timestamps');
-                    
-                    // <--- ADDED: Fix for timestamps being pushed off screen
+                    const container = document.getElementById('messages-container');
                     const chatFlow = document.getElementById('chat-flow');
-                    if(chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 100) {
-                        setTimeout(() => chatFlow.scrollTop = chatFlow.scrollHeight, 210);
+                    
+                    // FIXED: Calculate current scroll offset from bottom
+                    const scrollBottomOffset = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight;
+                    
+                    // Apply class
+                    container.classList.add('show-timestamps');
+                    
+                    // FIXED: If user was near bottom, snap back to bottom instantly (prevent jump)
+                    if(scrollBottomOffset < 50) {
+                         chatFlow.scrollTop = chatFlow.scrollHeight;
                     }
                     
                     vibrate([50, 50]); // Vibrate twice
