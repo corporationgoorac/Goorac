@@ -751,6 +751,7 @@
             await db.collection("chats").doc(chatId).set({
                 lastMessage: msg, lastSender: gooracId, lastTimestamp: ts,
                 participants: [gooracId, uid],
+                seen: false, // Explicitly set seen to false
                 [`unreadCount.${uid}`]: firebase.firestore.FieldValue.increment(1)
             }, {merge:true});
         }
@@ -805,7 +806,9 @@
                 await db.collection("chats").doc(chatId).collection("messages").add(m);
                 await db.collection("chats").doc(chatId).set({
                     lastMessage: txt || (img?"📷 Image":"📄 File"), lastSender: gooracId, lastTimestamp: ts,
-                    participants: [gooracId, uid], [`unreadCount.${uid}`]: firebase.firestore.FieldValue.increment(1)
+                    participants: [gooracId, uid], 
+                    seen: false, // Explicitly set seen to false
+                    [`unreadCount.${uid}`]: firebase.firestore.FieldValue.increment(1)
                 }, {merge:true});
             });
             
