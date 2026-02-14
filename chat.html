@@ -69,6 +69,7 @@
             --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
             --ease-smooth: cubic-bezier(0.33, 1, 0.68, 1);
             --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55); /* New Physics */
         }
 
         /* =========================================
@@ -163,24 +164,25 @@
         /* REACTION POP ANIMATION - PHYSICS IMPROVED */
         @keyframes popOut {
             0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.35); opacity: 1; }
-            80% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 1; }
+            70% { transform: scale(0.9); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
         
-        /* BADGE POP UPDATE */
+        /* BADGE POP UPDATE - SMOOTHER */
         @keyframes badgeUpdate {
             0% { transform: scale(1); }
-            50% { transform: scale(1.4); background: #444; }
+            40% { transform: scale(1.35); background: #444; }
+            70% { transform: scale(0.95); }
             100% { transform: scale(1); background: #2a2a2a; }
         }
 
         /* LIVE FLOATING EMOJI */
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.5); opacity: 0; }
-            20% { transform: translateY(-20px) scale(1.5); opacity: 1; }
-            50% { transform: translateY(-60px) scale(1.2); opacity: 0.9; }
-            100% { transform: translateY(-140px) scale(0.8); opacity: 0; }
+            10% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            50% { transform: translateY(-80px) scale(1.1); opacity: 1; }
+            100% { transform: translateY(-160px) scale(0.9); opacity: 0; }
         }
 
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff453a !important; }
@@ -588,7 +590,7 @@
         /* OLD SLIDING TIMESTAMP REMOVED */
         .sliding-timestamp { display: none !important; }
         
-        /* REACTION BADGE - PHYSICS ENABLED */
+        /* REACTION BADGE - PHYSICS IMPROVED & GLITCH FIXED */
         .reaction-badge { 
             position: absolute; 
             bottom: -8px; 
@@ -603,11 +605,15 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
             min-width: 24px;
             text-align: center;
-            animation: popOut 0.35s var(--ease-out-back);
+            /* REMOVED default animation to prevent load glitch */
             will-change: transform;
         }
+        /* New class for animating entry only when added LIVE */
+        .reaction-badge.pop-in {
+            animation: popOut 0.4s var(--ease-spring);
+        }
         .reaction-badge.updated {
-            animation: badgeUpdate 0.3s ease-in-out;
+            animation: badgeUpdate 0.3s var(--ease-spring);
         }
         .sent .reaction-badge { right: 0; }
         .received .reaction-badge { left: 0; }
@@ -729,7 +735,7 @@
             font-size: 40px;
             pointer-events: none;
             z-index: 3001;
-            animation: floatUp 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
+            animation: floatUp 1.2s var(--ease-spring) forwards; /* Improved physics */
             will-change: transform, opacity;
         }
 
@@ -1918,6 +1924,8 @@
                             messagesMap.set(msgId, msgData);
                             // 2. Surgical DOM update
                             updateReactionDOM(msgId, msgData.reactions);
+                            // 3. Ensure we DO NOT re-render all
+                            // hasVisualChanges remains false for this loop
                         } else {
                             // Text changed or something major, do full re-render
                             messagesMap.set(msgId, msgData);
@@ -1978,12 +1986,18 @@
         const reactionDisplay = reactionsList.map(r => r.emoji).join(' ');
         
         badgeElements.forEach(el => {
-            el.innerText = reactionDisplay;
-            el.style.display = reactionDisplay ? 'block' : 'none';
-            // Add a small bounce animation to show update
-            el.classList.remove('updated');
-            void el.offsetWidth; // Trigger reflow
-            el.classList.add('updated');
+            // Only update DOM if the text is actually different (prevents loop glitch)
+            if (el.innerText !== reactionDisplay) {
+                el.innerText = reactionDisplay;
+                el.style.display = reactionDisplay ? 'block' : 'none';
+                
+                // Add a small bounce animation ONLY if visible
+                if (reactionDisplay) {
+                    el.classList.remove('updated');
+                    void el.offsetWidth; // Trigger reflow
+                    el.classList.add('updated');
+                }
+            }
         });
     }
 
