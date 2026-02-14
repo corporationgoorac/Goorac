@@ -604,8 +604,10 @@
         function renderRow(u) {
             const el = document.createElement('div');
             el.className = 'row';
-            el.id = 'row-' + u.id; // Assign ID for realtime update
-            el.onclick = () => openEdit(u);
+            el.id = 'row-' + u.id;
+            // FIX: Pass the ID string, NOT the object.
+            // This prevents stale data closures.
+            el.onclick = () => openEdit(u.id);
             
             let b = '';
             if(u.admin) b += `<span class="badge admin">ADM</span>`;
@@ -625,10 +627,17 @@
         }
 
         // =========================================
-        // 4. LOGIC: EDIT, SAVE, VERIFY
+        // 4. LOGIC: EDIT, SAVE, VERIFY (FIXED)
         // =========================================
-        function openEdit(u) {
-            editId = u.id;
+        
+        // FIX: openEdit now finds the LATEST user data from memory
+        function openEdit(uid) {
+            // Find the fresh object from memory, not the old passed object
+            const u = userList.find(x => x.id === uid);
+            
+            if(!u) return toast("Error: User Data Sync Issue");
+
+            editId = uid;
             pushHist('edit');
             
             document.getElementById('e-img').src = u.photoURL;
@@ -641,9 +650,10 @@
             document.getElementById('in-num').value = u.gooracNumber || "";
             document.getElementById('in-pfp').value = u.photoURL;
             
-            setTog('tg-ver', u.verified);
-            setTog('tg-adm', u.admin);
-            setTog('tg-sus', u.suspended);
+            // Set Toggles with strict boolean logic
+            setTog('tg-ver', u.verified === true);
+            setTog('tg-adm', u.admin === true);
+            setTog('tg-sus', u.suspended === true);
 
             document.getElementById('backdrop').classList.add('active');
             document.getElementById('drawer').style.transform = 'translateX(0)';
@@ -661,15 +671,23 @@
             const btn = document.getElementById('btn-save');
             btn.innerText = "Processing...";
             
-            const oldUser = userList.find(x => x.id === editId);
-            const wasVer = oldUser ? oldUser.verified : false;
+            // 1. Get the current in-memory user to compare previous state
+            const oldUserIndex = userList.findIndex(x => x.id === editId);
+            if (oldUserIndex === -1) {
+                btn.innerText = "Save Changes";
+                return toast("Error: User lost in memory");
+            }
+            const oldUser = userList[oldUserIndex];
+            
+            const wasVer = oldUser.verified;
             const isVer = document.getElementById('tg-ver').classList.contains('active');
             
+            // 2. Construct Data Payload
             const data = {
                 name: document.getElementById('in-name').value,
                 username: document.getElementById('in-user').value,
                 bio: document.getElementById('in-bio').value,
-                gooracNumber: parseInt(document.getElementById('in-num').value),
+                gooracNumber: parseInt(document.getElementById('in-num').value) || 0,
                 photoURL: document.getElementById('in-pfp').value,
                 verified: isVer,
                 admin: document.getElementById('tg-adm').classList.contains('active'),
@@ -677,12 +695,16 @@
             };
 
             try {
+                // 3. Write to Firestore
                 await db.collection("users").doc(editId).update(data);
                 
-                // Realtime UI Update (No Read Cost)
-                updateRowUI(editId, data);
+                // 4. Update Memory IMMEDIATELY
+                userList[oldUserIndex] = { ...oldUser, ...data };
                 
-                // Verification Logic
+                // 5. Update UI (List Row) IMMEDIATELY
+                updateRowUI(editId, userList[oldUserIndex]);
+                
+                // 6. Handle Verification Event
                 if(!wasVer && isVer) {
                     await sendWelcomeMsg(editId, data.name);
                     toast("User Verified & Notified");
@@ -690,19 +712,17 @@
                     toast("Profile Updated");
                 }
                 
-                // Update Local Memory
-                const idx = userList.findIndex(x => x.id === editId);
-                if(idx > -1) userList[idx] = { ...userList[idx], ...data };
-                
                 closeModals();
-            } catch(e) { toast("Error: " + e.message); }
+            } catch(e) { 
+                toast("Error: " + e.message); 
+                console.error(e);
+            }
             btn.innerText = "Save Changes";
         }
 
-        // Instant DOM Update (The Professional Touch)
         function updateRowUI(uid, d) {
             const row = document.getElementById('row-' + uid);
-            if(!row) return; // Maybe filtered out
+            if(!row) return; 
             
             row.querySelector('.row-name').innerText = d.name;
             row.querySelector('.row-sub').innerText = "@" + d.username;
@@ -713,7 +733,8 @@
             if(d.verified) b += `<span class="badge ver">VER</span>`;
             if(d.suspended) b += `<span class="badge ban">BAN</span>`;
             
-            document.getElementById('badges-'+uid).innerHTML = b;
+            const badgeContainer = document.getElementById('badges-'+uid);
+            if(badgeContainer) badgeContainer.innerHTML = b;
         }
 
         async function sendWelcomeMsg(uid, name) {
@@ -766,7 +787,6 @@
             
             let targets = [];
             if(castMode === 'ALL') {
-                // Fetch All for broadcast
                 const s = await db.collection("users").get();
                 s.forEach(d => targets.push(d.id));
             } else {
@@ -795,24 +815,28 @@
             closeModals();
         }
 
-        // Toggles & Helpers
+        // FIX: Toggles now correctly clean up classes
         function setTog(id, on) {
             const el = document.getElementById(id);
-            if(on) el.classList.add('active'); else el.classList.remove('active');
-            // Color Logic
             if(on) {
-                if(id==='tg-ver') el.classList.add('active');
+                el.classList.add('active');
+                if(id==='tg-ver') el.classList.add('active'); // Default blue is handled by .active
                 if(id==='tg-adm') el.classList.add('purple');
                 if(id==='tg-sus') el.classList.add('red');
             } else {
-                el.classList.remove('purple','red');
+                el.classList.remove('active', 'purple', 'red');
             }
         }
         
         function toggle(id, color) {
             const el = document.getElementById(id);
             el.classList.toggle('active');
-            if(color!=='blue') el.classList.toggle(color);
+            // Logic to handle specific colors if active
+            if(el.classList.contains('active')) {
+                if(color !== 'blue') el.classList.add(color);
+            } else {
+                el.classList.remove(color);
+            }
         }
 
         function onSearch() {
@@ -835,6 +859,7 @@
 
         function copyId() { navigator.clipboard.writeText(editId); toast("UID Copied"); }
         function copyJson() { 
+            // FIX: Ensure we copy the LATEST state from userList
             const u = userList.find(x => x.id === editId);
             navigator.clipboard.writeText(JSON.stringify(u,null,2)); toast("JSON Copied"); 
         }
@@ -847,7 +872,9 @@
         async function nukeUser() {
             if(!confirm("Destroy Node?")) return;
             await db.collection("users").doc(editId).delete();
-            document.getElementById('row-'+editId).remove();
+            const idx = userList.findIndex(x => x.id === editId);
+            if(idx > -1) userList.splice(idx, 1); // Remove from memory
+            document.getElementById('row-'+editId).remove(); // Remove from UI
             toast("Node Deleted"); closeModals();
         }
 
