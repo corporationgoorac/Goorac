@@ -517,6 +517,7 @@
         const myBlocked = myData.blocked || [];
 
         const isFollowing = myFollowing.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
+        // FIX: Check for simple string UID in new block system
         doIBlock = myBlocked.some(i => (typeof i === 'string' ? i : i.uid) === targetUid);
 
         document.getElementById('block-toggle').checked = doIBlock;
@@ -668,14 +669,13 @@
         }
     }
 
-    // --- FIXED BLOCK LOGIC ---
+    // --- FIXED BLOCK LOGIC (AUTOMATIC SYSTEM) ---
     async function handleBlockToggle(isBlocking) {
         if(!targetUid || !myUid || isProcessing) return;
         isProcessing = true;
         const btn = document.getElementById('btn-follow');
         btn.classList.add('loading');
         
-        const ts = firebase.firestore.Timestamp.now();
         const myRef = db.collection("users").doc(myUid);
         const theirRef = db.collection("users").doc(targetUid);
 
@@ -713,7 +713,8 @@
                     const newTheirFollowers = theirFollowers.filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
 
                     t.update(myRef, {
-                        blocked: firebase.firestore.FieldValue.arrayUnion({ uid: targetUid, timestamp: ts }),
+                        // NEW BLOCK FORMAT: Simple String for Rules
+                        blocked: firebase.firestore.FieldValue.arrayUnion(targetUid),
                         following: newMyFollowing,
                         followers: newMyFollowers
                     });
@@ -725,6 +726,7 @@
                     if(sharedChatRef) t.delete(sharedChatRef);
                 } else {
                     const myBlocked = myData.blocked || [];
+                    // Handle cleanup for both formats (old objects and new strings)
                     const newBlocked = myBlocked.filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
                     t.update(myRef, { blocked: newBlocked });
                 }
