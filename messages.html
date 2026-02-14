@@ -552,18 +552,36 @@
         const cid = activeChatId; 
         closeDeleteMenu(true);
         if(confirm("Are you sure? This action is irreversible.")) {
-            // === LOCAL STORAGE CLEANUP ADDED HERE ===
-            localStorage.removeItem('goorac_inbox_html'); // Clear main inbox cache
-            localStorage.removeItem('chat_msgs_' + cid); // Clear specific chat message history
+            // === 1. LOCAL STORAGE & CACHE CLEANUP ===
+            localStorage.removeItem('goorac_inbox_html'); 
+            localStorage.removeItem('chat_msgs_' + cid); 
             
             try {
-                const batch = db.batch();
+                // === 2. CRITICAL: DELETE CHAT DOCUMENT FIRST ===
+                // Separating this from the batch ensures the chat disappears from the Inbox
+                // instantly, even if the message deletion batch limit (500) is hit later.
+                await db.collection("chats").doc(cid).delete();
+
+                // === 3. SUB-RESOURCE CLEANUP ===
+                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
+                rdb.ref(`typing/${cid}`).remove();
+                
+                // === 4. BATCH MESSAGE DELETION (WITH SAFETY LIMIT) ===
                 const msgs = await db.collection("chats").doc(cid).collection("messages").get();
-                msgs.docs.forEach(d => batch.delete(d.ref));
-                batch.delete(db.collection("chats").doc(cid));
-                await batch.commit();
-                await rdb.ref(`typing/${cid}`).remove();
-                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) });
+                if (!msgs.empty) {
+                    const batch = db.batch();
+                    let count = 0;
+                    // Prevent Batch Limit Crash (>500 ops makes the whole batch fail)
+                    // We cap it at 480 to be safe.
+                    msgs.docs.forEach((d, index) => {
+                        if (index < 480) { 
+                            batch.delete(d.ref);
+                            count++;
+                        }
+                    });
+                    if (count > 0) await batch.commit();
+                }
+                
             } catch(e) { console.error("Erase failed:", e); }
         }
     };
