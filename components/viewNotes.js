@@ -25,6 +25,7 @@ class ViewNotes extends HTMLElement {
         };
         
         this.lastTap = 0;
+        this.isActionsOpen = false; // Track secondary modal state
     }
 
     connectedCallback() {
@@ -57,7 +58,8 @@ class ViewNotes extends HTMLElement {
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
             verified: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:4px; vertical-align:text-bottom;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
-            closeFriendsBadge: `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:18px; height:18px; margin-left:6px; box-shadow:0 0 5px rgba(0,186,124,0.4);"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`
+            closeFriendsBadge: `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:18px; height:18px; margin-left:6px; box-shadow:0 0 5px rgba(0,186,124,0.4);"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`,
+            settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
         };
     }
 
@@ -136,7 +138,7 @@ class ViewNotes extends HTMLElement {
                 color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
             }
 
-            /* --- CONTENT AREA (FIXED FOR SQUARE) --- */
+            /* --- CONTENT AREA --- */
             .vn-content {
                 flex: 1; display: flex; flex-direction: column;
                 justify-content: flex-start; align-items: center;
@@ -341,7 +343,7 @@ class ViewNotes extends HTMLElement {
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- REDESIGNED OWN NOTE MODAL --- */
+            /* --- REDESIGNED OWN NOTE UI --- */
             .vn-likers-section { 
                 flex: 1.2;
                 display: flex; 
@@ -382,43 +384,67 @@ class ViewNotes extends HTMLElement {
                 border-radius: 16px;
             }
             
-            /* FIXED: STICKY ACTIONS BAR */
-            .vn-sticky-actions {
-                padding: 16px 20px calc(35px + env(safe-area-inset-bottom));
+            /* Compact Bottom Bar */
+            .vn-manage-bar {
+                padding: 12px 20px calc(25px + env(safe-area-inset-bottom));
                 background: #181818;
                 border-top: 1px solid rgba(255,255,255,0.1);
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+                display: flex; justify-content: center;
+                z-index: 110;
             }
 
-            .vn-btn { 
-                width: 100%; padding: 14px; border-radius: 18px; border: none; 
+            .vn-btn-manage {
+                width: 100%;
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.1);
+                padding: 12px;
+                border-radius: 30px;
+                font-weight: 600;
+                display: flex; align-items: center; justify-content: center; gap: 8px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .vn-btn-manage:active { background: rgba(255,255,255,0.2); }
+
+            /* --- ACTIONS MODAL (SECONDARY) --- */
+            .vn-actions-overlay {
+                position: fixed; inset: 0; 
+                background: rgba(0,0,0,0.5);
+                z-index: 2100;
+                display: none;
+                justify-content: center; align-items: flex-end;
+                backdrop-filter: blur(3px);
+                opacity: 0; transition: opacity 0.2s;
+            }
+            .vn-actions-overlay.open { display: flex; opacity: 1; }
+
+            .vn-actions-sheet {
+                width: 100%; max-width: 500px;
+                background: #1c1c1e;
+                border-radius: 24px 24px 0 0;
+                padding: 20px 20px calc(30px + env(safe-area-inset-bottom));
+                transform: translateY(100%);
+                transition: transform 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+                border-top: 1px solid rgba(255,255,255,0.15);
+                display: flex; flex-direction: column; gap: 12px;
+            }
+            .vn-actions-overlay.open .vn-actions-sheet { transform: translateY(0); }
+
+            .vn-actions-handle {
+                width: 40px; height: 4px; background: rgba(255,255,255,0.3);
+                border-radius: 2px; align-self: center; margin-bottom: 10px;
+            }
+
+            .vn-action-btn {
+                width: 100%; padding: 15px; border-radius: 16px; border: none;
                 font-weight: 700; font-size: 1rem; cursor: pointer;
                 display: flex; justify-content: center; align-items: center; gap: 10px;
-                transition: all 0.2s ease;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }
-            
-            .vn-btn-primary { 
-                background: #fff; color: #000; 
-                box-shadow: 0 4px 15px rgba(255,255,255,0.1);
-            }
-            .vn-btn-primary:active { transform: scale(0.97); background: #eee; }
-
-            .vn-action-row {
-                display: flex; gap: 12px; width: 100%;
-            }
-            .vn-action-row .vn-btn { flex: 1; }
-
-            .vn-btn-danger { 
-                background: rgba(255, 59, 48, 0.12); color: #ff3b30; 
-                border: 1px solid rgba(255, 59, 48, 0.2); 
-            }
-            .vn-btn-archive { 
-                background: rgba(255, 255, 255, 0.08); color: #fff; 
-                border: 1px solid rgba(255, 255, 255, 0.1); 
-            }
+            .vn-btn-primary-action { background: #fff; color: #000; }
+            .vn-btn-archive-action { background: rgba(255, 149, 0, 0.15); color: #ff9f0a; }
+            .vn-btn-delete-action { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
 
         </style>
 
@@ -441,19 +467,38 @@ class ViewNotes extends HTMLElement {
 
             </div>
         </div>
+
+        <div class="vn-actions-overlay" id="vn-actions-modal">
+            <div class="vn-actions-sheet">
+                <div class="vn-actions-handle"></div>
+                <div id="vn-actions-container" style="display:flex; flex-direction:column; gap:12px;"></div>
+            </div>
+        </div>
         `;
     }
 
     setupEventListeners() {
         this.querySelector('#btn-close').onclick = () => this.close();
+        
+        // Close main modal
         this.querySelector('#vn-overlay').onclick = (e) => {
             if (e.target.id === 'vn-overlay') this.close();
         };
 
+        // Close actions modal
+        this.querySelector('#vn-actions-modal').onclick = (e) => {
+            if (e.target.id === 'vn-actions-modal') this.closeActionsModal();
+        };
+
         window.addEventListener('popstate', (event) => {
-            const overlay = this.querySelector('#vn-overlay');
-            if (overlay && overlay.classList.contains('open')) {
-                this.close(true);
+            // Priority: Close Actions Modal first, then Main Modal
+            if (this.isActionsOpen) {
+                this.closeActionsModal();
+            } else {
+                const overlay = this.querySelector('#vn-overlay');
+                if (overlay && overlay.classList.contains('open')) {
+                    this.close(true);
+                }
             }
         });
     }
@@ -463,8 +508,9 @@ class ViewNotes extends HTMLElement {
         const dragTarget = sheet; 
 
         dragTarget.addEventListener('touchstart', (e) => {
+            // Prevent dragging if scrolling inside likes or if interactions
             if(e.target.closest('.vn-likers-scroll') && e.target.closest('.vn-likers-scroll').scrollTop > 0) return;
-            if(e.target.closest('.vn-sticky-actions')) return;
+            if(e.target.closest('.vn-manage-bar')) return;
             
             this.state.isDragging = true;
             this.state.startY = e.touches[0].clientY;
@@ -527,6 +573,8 @@ class ViewNotes extends HTMLElement {
 
         const overlay = this.querySelector('#vn-overlay');
         overlay.classList.add('open');
+        
+        // Push State for Main Modal
         window.history.pushState({ vnOpen: true }, "", "#view-note");
         
         if(navigator.vibrate) navigator.vibrate(10);
@@ -563,7 +611,7 @@ class ViewNotes extends HTMLElement {
     }
 
     renderContent() {
-        const root = this;
+        constVn = this;
         const content = this.querySelector('#vn-content');
         const note = this.currentNote;
         
@@ -572,9 +620,9 @@ class ViewNotes extends HTMLElement {
         }
 
         const bgStyle = note.bgStyle || note.bgColor || '#000'; 
-        root.querySelector('#bg-layer').style.background = bgStyle;
+        this.querySelector('#bg-layer').style.background = bgStyle;
 
-        const texLayer = root.querySelector('#tex-layer');
+        const texLayer = this.querySelector('#tex-layer');
         if (note.bgTexture) texLayer.classList.add('visible');
         else texLayer.classList.remove('visible');
 
@@ -610,6 +658,7 @@ class ViewNotes extends HTMLElement {
         const songText = note.songName ? `${note.songName}` : '';
         const isLongText = songText.length > 20;
 
+        // FIXED UI: Clean scrollable area with a small Manage button at bottom
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper">
@@ -664,15 +713,10 @@ class ViewNotes extends HTMLElement {
                     `).join('') : `<div style="text-align:center; color:#555; padding:40px 20px; font-size:0.9rem;">No likes yet. Share your note to get started!</div>`}
                 </div>
                 
-                <div class="vn-sticky-actions">
-                    ${note.isActive ? 
-                        `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note <span class="material-icons-round">edit</span></button>` : 
-                        `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note <span class="material-icons-round">add</span></button>`
-                    }
-                    <div class="vn-action-row">
-                        ${note.isActive ? `<button class="vn-btn vn-btn-archive" id="archive-note-btn">Archive</button>` : ''}
-                        <button class="vn-btn vn-btn-danger" id="delete-forever-btn">Delete</button>
-                    </div>
+                <div class="vn-manage-bar">
+                    <button id="vn-open-actions" class="vn-btn-manage">
+                        ${icons.settings} Manage Options
+                    </button>
                 </div>
             </div>
         `;
@@ -759,6 +803,88 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
+    // --- NEW METHODS FOR ACTIONS MODAL ---
+
+    openActionsModal() {
+        const modal = this.querySelector('#vn-actions-modal');
+        const container = this.querySelector('#vn-actions-container');
+        const note = this.currentNote;
+
+        if(!note) return;
+
+        // Populate Buttons based on note state
+        container.innerHTML = `
+            ${note.isActive ? 
+                `<button class="vn-action-btn vn-btn-primary-action" id="action-update">
+                    Update Note <span class="material-icons-round">edit</span>
+                </button>` : 
+                `<button class="vn-action-btn vn-btn-primary-action" id="action-update">
+                    Post New Note <span class="material-icons-round">add</span>
+                </button>`
+            }
+            ${note.isActive ? 
+                `<button class="vn-action-btn vn-btn-archive-action" id="action-archive">
+                    Archive Note
+                </button>` : ''
+            }
+            <button class="vn-action-btn vn-btn-delete-action" id="action-delete">
+                Delete Permanently
+            </button>
+        `;
+
+        // Wire up listeners immediately
+        this.querySelector('#action-update').onclick = () => {
+             if(navigator.vibrate) navigator.vibrate(10);
+             window.location.href = 'notes.html';
+        };
+
+        const archiveBtn = this.querySelector('#action-archive');
+        if(archiveBtn) {
+            archiveBtn.onclick = async () => {
+                if(navigator.vibrate) navigator.vibrate(10);
+                if(confirm("Archive this note?")) {
+                    try {
+                        await this.db.collection("notes").doc(note.id).update({ isActive: false });
+                        this.closeActionsModal();
+                        this.close();
+                    } catch(e) { console.error(e); }
+                }
+            };
+        }
+
+        this.querySelector('#action-delete').onclick = async () => {
+            if(navigator.vibrate) navigator.vibrate(10);
+            if(confirm("Delete permanently? This cannot be undone.")) {
+                try {
+                    await this.db.collection("notes").doc(note.id).delete();
+                    this.closeActionsModal();
+                    this.close();
+                    window.location.reload(); 
+                } catch(e) { console.error(e); }
+            }
+        };
+
+        modal.classList.add('open');
+        this.isActionsOpen = true;
+        
+        // Push State for Actions Modal (so back button closes it)
+        window.history.pushState({ vnActions: true }, "", "#manage-note");
+        if(navigator.vibrate) navigator.vibrate(10);
+    }
+
+    closeActionsModal() {
+        const modal = this.querySelector('#vn-actions-modal');
+        modal.classList.remove('open');
+        this.isActionsOpen = false;
+        
+        // If hash is #manage-note, go back to #view-note
+        if(window.location.hash === "#manage-note") {
+            window.history.back();
+        }
+    }
+
+    // --- EXISTING REDIRECT & LOGIC ---
+
     async handleProfileRedirect() {
         if (!this.currentNote) return;
         const uid = this.currentNote.uid;
@@ -817,44 +943,12 @@ class ViewNotes extends HTMLElement {
             });
         }
 
-        const leaveNoteBtn = this.querySelector('#vn-leave-new-note');
-        if(leaveNoteBtn) {
-            leaveNoteBtn.onclick = () => {
-                if(navigator.vibrate) navigator.vibrate(10);
-                window.location.href = 'notes.html';
-            };
-        }
-
-        const archiveBtn = this.querySelector('#archive-note-btn');
-        if (archiveBtn) {
-            archiveBtn.onclick = async () => {
-                if(navigator.vibrate) navigator.vibrate(10);
-                if(confirm("Archive this note? It will be removed from your profile but saved in history.")) {
-                    try {
-                        if (this.currentNote && this.currentNote.id) {
-                            await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
-                            this.close();
-                            if(typeof NotesManager !== 'undefined') NotesManager.init();
-                        }
-                    } catch(e) { console.error("Error archiving note:", e); }
-                }
-            };
-        }
-
-        const deleteForeverBtn = this.querySelector('#delete-forever-btn');
-        if (deleteForeverBtn) {
-            deleteForeverBtn.onclick = async () => {
-                if(navigator.vibrate) navigator.vibrate(10);
-                if(confirm("Delete permanently? This cannot be undone.")) {
-                    try {
-                          if (this.currentNote && this.currentNote.id) {
-                            await this.db.collection("notes").doc(this.currentNote.id).delete();
-                            this.close();
-                            window.location.reload(); 
-                          }
-                    } catch(e) { console.error("Error deleting note:", e); }
-                }
-            };
+        // Trigger for new Actions Modal
+        const manageBtn = this.querySelector('#vn-open-actions');
+        if(manageBtn) {
+            manageBtn.onclick = () => {
+                this.openActionsModal();
+            }
         }
 
         const likeBtn = this.querySelector('#like-toggle-btn');
