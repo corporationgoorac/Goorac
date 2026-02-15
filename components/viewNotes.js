@@ -136,31 +136,38 @@ class ViewNotes extends HTMLElement {
                 color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
             }
 
-            /* --- CONTENT AREA --- */
+            /* --- CONTENT AREA (FIXED FOR SQUARE) --- */
             .vn-content {
                 flex: 1; display: flex; flex-direction: column;
                 justify-content: center; align-items: center;
                 position: relative; z-index: 5;
                 width: 100%;
+                padding-bottom: 40px; /* Space for footer */
             }
 
-            /* THE BUBBLE WRAPPER */
+            /* THE BUBBLE WRAPPER - FORCE SQUARE */
             .vn-bubble-wrapper { 
                 position: relative; 
-                width: auto; max-width: 85%;
-                margin-bottom: 20px;
+                width: 75vw; /* Responsive Width */
+                max-width: 340px; /* Cap width */
+                aspect-ratio: 1 / 1; /* FORCE EXACT SQUARE */
+                margin: 20px auto 30px auto;
                 overflow: visible; 
+                display: flex;
+                flex-direction: column;
+                z-index: 10;
             }
 
             .vn-bubble {
-                min-width: 220px; min-height: 220px;
-                border-radius: 42px;
+                width: 100%; 
+                height: 100%; /* Fill the square exactly */
+                border-radius: 48px; /* Smooth corners */
                 display: flex; align-items: center; justify-content: center;
                 text-align: center; padding: 30px;
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                overflow: hidden;
+                overflow: hidden; /* Clip text */
                 border: 1px solid rgba(255,255,255,0.15);
             }
             
@@ -173,17 +180,23 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 1.7rem; font-weight: 600; line-height: 1.35; z-index: 2;
+                font-size: 2.2rem; /* Larger text for modal */
+                font-weight: 700; line-height: 1.2; z-index: 2;
                 word-break: break-word; width: 100%; white-space: pre-wrap;
+                max-height: 100%;
+                display: -webkit-box;
+                -webkit-line-clamp: 6; /* Prevent overflow */
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
             
             .vn-pfp-sticker {
                 position: absolute; 
-                bottom: -18px; 
-                right: -10px;
-                width: 60px; height: 60px; 
+                bottom: -20px; 
+                right: -20px;
+                width: 65px; height: 65px; 
                 border-radius: 50%;
-                border: 3px solid #000;
+                border: 4px solid #000;
                 background: #333; object-fit: cover; z-index: 10;
                 box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             }
@@ -191,7 +204,7 @@ class ViewNotes extends HTMLElement {
             /* INFO BELOW NOTE */
             .vn-info-bar {
                 display: flex; flex-direction: column; align-items: center; gap: 4px;
-                margin-top: 15px; z-index: 10;
+                margin-top: 10px; z-index: 10;
                 text-shadow: 0 2px 4px rgba(0,0,0,0.8);
             }
             .vn-display-name { 
@@ -230,14 +243,14 @@ class ViewNotes extends HTMLElement {
 
             /* --- FIXED SLOWER ANIMATIONS FOR SONG --- */
             .vn-music-pill { 
-                position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+                position: absolute; top: -35px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 10px; 
-                background: rgba(15, 15, 15, 0.9); padding: 6px 16px; 
-                border-radius: 100px; font-size: 0.75rem; font-weight: 600;
+                background: rgba(15, 15, 15, 0.9); padding: 8px 18px; 
+                border-radius: 100px; font-size: 0.8rem; font-weight: 700;
                 border: 1px solid rgba(255,255,255,0.2);
                 backdrop-filter: blur(15px); color: #fff; z-index: 12;
                 box-shadow: 0 5px 20px rgba(0,0,0,0.4);
-                max-width: 200px;
+                max-width: 240px;
                 overflow: hidden;
             }
             
@@ -245,7 +258,7 @@ class ViewNotes extends HTMLElement {
                 display: flex; align-items: flex-end; gap: 2px; height: 12px;
                 flex-shrink: 0;
             }
-            .vn-eq span { width: 2px; background: #00d2ff; border-radius: 2px; }
+            .vn-eq span { width: 3px; background: #00d2ff; border-radius: 2px; }
             
             /* Slower Equalizer */
             .vn-eq span:nth-child(1) { height: 60%; animation: eq-1 1.2s infinite ease-in-out; }
