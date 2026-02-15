@@ -34,6 +34,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            user-select: none;
         }
 
         /* --- VISUALIZER / AURA --- */
@@ -46,6 +47,7 @@
             align-items: center;
             justify-content: center;
             z-index: 1;
+            transition: opacity 1s;
         }
 
         .aura-glow {
@@ -54,7 +56,7 @@
             height: 300px;
             background: radial-gradient(circle, var(--pulse-color) 0%, rgba(0,0,0,0) 70%);
             opacity: 0.4;
-            filter: blur(40px);
+            filter: blur(50px);
             z-index: -1;
             animation: breathe 4s infinite ease-in-out;
             transition: background 1s ease;
@@ -76,7 +78,7 @@
             height: 280px;
             border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            box-shadow: 0 10px 50px rgba(0,0,0,0.8);
             margin-bottom: 40px;
             position: relative;
             z-index: 2;
@@ -86,6 +88,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 0.5s;
         }
 
         .track-info {
@@ -99,12 +102,28 @@
             font-weight: 700;
             margin-bottom: 8px;
             text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            max-width: 90vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .track-artist {
             font-size: 18px;
             color: rgba(255,255,255,0.7);
             font-weight: 500;
+        }
+
+        .turn-indicator {
+            margin-top: 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--pulse-color);
+            background: rgba(0,0,0,0.6);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         /* --- USER BADGES --- */
@@ -151,6 +170,7 @@
             animation: floatUp 3s ease-out forwards;
             z-index: 50;
             pointer-events: none;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.5); opacity: 0; }
@@ -164,6 +184,7 @@
             background: #121212; border-top-left-radius: 20px; border-top-right-radius: 20px;
             z-index: 80; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex; flex-direction: column;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
         }
         #emojiModalWrapper.active { transform: translateY(0); }
         .modal-drag { width: 40px; height: 5px; background: #333; border-radius: 10px; margin: 10px auto; }
@@ -187,7 +208,7 @@
 
     <div id="waitingScreen">
         <div class="loader-ring"></div>
-        <div id="statusText" style="color: #888; font-size: 14px;">Connecting to Pulse...</div>
+        <div id="statusText" style="color: #888; font-size: 14px;">Initializing Pulse...</div>
     </div>
 
     <div class="pulse-container" id="mainUI" style="opacity: 0;">
@@ -204,40 +225,38 @@
         </div>
 
         <div class="track-info">
-            <div class="track-title" id="currentTitle">Waiting for selection...</div>
+            <div class="track-title" id="currentTitle">Waiting for DJ...</div>
             <div class="track-artist" id="currentArtist">...</div>
+            <div class="turn-indicator" id="turnIndicator">CONNECTED</div>
         </div>
     </div>
 
     <script>
         // --- 1. CONFIGURATION & HELPERS ---
         const urlParams = new URLSearchParams(window.location.search);
-        const targetUsername = urlParams.get('u'); // ?u=target_username
+        // ?u=username of the person you are visiting
+        const targetUsername = urlParams.get('u'); 
 
         let currentUser = null;
         let sessionID = null;
-        let isMyTurn = false;
-        let hasQueuedNext = false;
-        let presenceRef = null;
         let sessionRef = null;
+        let isMyTurnToPick = false; 
+        let hasQueuedNext = false;
         
         // --- 2. INITIALIZATION ---
         window.onload = async () => {
-            // Init Firebase
             if(!window.initFirebaseCore()) {
                 alert("Firebase Error: Config not loaded.");
                 return;
             }
 
-            // Auth Check
             window.auth.onAuthStateChanged(async (user) => {
                 if (user) {
                     currentUser = user;
                     if(targetUsername) initPulse(user);
-                    else document.getElementById('statusText').innerText = "Error: No user specified in URL.";
+                    else document.getElementById('statusText').innerText = "Link broken: No user specified.";
                 } else {
-                    // Redirect to login if needed, or show error
-                    window.location.href = "/login.html"; 
+                    window.location.href = "login.html"; 
                 }
             });
         };
@@ -246,7 +265,7 @@
             const db = window.db;
             const rdb = window.rdb;
             
-            // 1. Get Target User UID from Username
+            // 1. Get Target User Profile
             const snapshot = await db.collection('users').where('username', '==', targetUsername).get();
             
             if (snapshot.empty) {
@@ -258,12 +277,12 @@
             const targetData = targetUserDoc.data();
             const targetUID = targetUserDoc.id;
 
-            // 2. Setup Session ID (Alphabetical sort ensures User A and User B get same ID)
+            // 2. Setup Session ID (Alphabetical sorting ensures consistency)
             const ids = [user.uid, targetUID].sort();
             sessionID = `pulse_${ids[0]}_${ids[1]}`;
             sessionRef = rdb.ref(`pulse_sessions/${sessionID}`);
 
-            // 3. UI Setup (Partner Badge)
+            // 3. UI Setup
             document.getElementById('partnerName').innerText = targetData.username || "User";
             document.getElementById('partnerImg').src = targetData.photoURL || "assets/default_pfp.png";
             if(targetData.isVerified) document.getElementById('partnerBadge').classList.add('verified');
@@ -283,236 +302,212 @@
                 const count = Object.keys(members).length;
                 
                 if (count >= 2) {
-                    // Both here!
                     startPulseSession();
                 } else {
                     document.getElementById('waitingScreen').style.opacity = '1';
                     document.getElementById('waitingScreen').style.pointerEvents = 'auto';
-                    document.getElementById('statusText').innerText = `Waiting for @${targetData.username}...`;
+                    document.getElementById('statusText').innerText = `Waiting for @${targetData.username} to join...`;
+                    // Pause if partner leaves
+                    document.getElementById('mainAudio').pause(); 
                 }
             });
 
-            // 6. Listen for Game State (Song, Reactions)
             setupGameListeners();
         }
 
         // --- 3. GAME LOGIC ---
 
         function startPulseSession() {
-            // Fade out waiting screen
             const ws = document.getElementById('waitingScreen');
             ws.style.opacity = '0';
             ws.style.pointerEvents = 'none';
             document.getElementById('mainUI').style.opacity = '1';
 
-            // Check if game hasn't started, default to alphabetical leader
-            sessionRef.child('state').once('value', s => {
+            // Initial Kickoff: If no song is playing, the alphabetical leader starts.
+            sessionRef.child('current_track').once('value', s => {
                 if(!s.exists()) {
-                    // First time load, initialize
-                    // Alphabetical first ID starts
                     const ids = sessionID.replace('pulse_', '').split('_');
-                    const firstTurn = ids[0] === currentUser.uid;
-                    
-                    if(firstTurn) {
-                        openSongPicker(); // I am the leader, I start
+                    // ID[0] is the leader by default
+                    if(ids[0] === currentUser.uid) {
+                        document.getElementById('turnIndicator').innerText = "IT'S YOUR TURN";
+                        openSongPicker(); // Force open picker
                     } else {
-                         document.getElementById('currentTitle').innerText = "Waiting for DJ...";
+                        document.getElementById('turnIndicator').innerText = "WAITING FOR DJ...";
                     }
                 }
             });
         }
 
         function setupGameListeners() {
-            // A. LISTEN FOR NEW SONGS
+            // A. LISTEN FOR CURRENT SONG CHANGES
             sessionRef.child('current_track').on('value', (snap) => {
                 const song = snap.val();
-                if (song) {
-                    playSong(song);
-                }
+                if (song) playSong(song);
             });
 
             // B. LISTEN FOR REACTIONS
             sessionRef.child('reactions').limitToLast(1).on('child_added', (snap) => {
                 const reaction = snap.val();
-                // Don't show my own floating reaction (I saw it when I clicked)
-                // Actually, showing both is fine for feedback
-                if(Date.now() - reaction.timestamp < 5000) {
+                if(Date.now() - reaction.timestamp < 3000) {
                     showFloatingEmoji(reaction.emoji);
                 }
             });
         }
 
         const audio = document.getElementById('mainAudio');
-        let playTimer;
-        let emojiTimer;
-        let queueTimer;
+        let emojiTimer, songQueueTimer;
 
         function playSong(song) {
-            // 1. Reset State
+            // 1. Reset
             hasQueuedNext = false;
             closeEmoji();
             document.querySelector('song-picker').close();
             clearTimeout(emojiTimer);
-            clearTimeout(queueTimer);
+            clearTimeout(songQueueTimer);
 
             // 2. UI Update
             document.getElementById('currentTitle').innerText = song.trackName;
             document.getElementById('currentArtist').innerText = song.artistName;
+            
             const hdArt = song.artworkUrl100.replace('100x100bb', '600x600bb');
             document.getElementById('currentArt').src = hdArt;
-            
-            // 3. Audio Sync
+
+            // 3. Audio & Sync
             audio.src = song.previewUrl;
             
-            // Calculate offset (Server Time vs Now)
-            // Ideally we use ServerValue.TIMESTAMP, but for simple sync:
             const now = Date.now();
-            const startedAt = song.startedAt;
-            const offset = (now - startedAt) / 1000;
+            const offset = (now - song.startedAt) / 1000;
 
             if (offset < 30) {
                 audio.currentTime = offset > 0 ? offset : 0;
-                audio.play().catch(e => console.log("Autoplay blocked usually, needs interaction"));
+                audio.play().catch(console.warn);
                 
-                // Bump animation
+                // Beat drop effect
                 const artContainer = document.getElementById('artContainer');
                 artContainer.classList.remove('beat-bump');
-                void artContainer.offsetWidth; // trigger reflow
+                void artContainer.offsetWidth; 
                 artContainer.classList.add('beat-bump');
                 
-                changeThemeColor(); // Random visualizer color
+                changeThemeColor();
             }
 
-            // 4. Determine Turn
-            // If I did NOT choose this song, it is my turn next.
-            isMyTurn = song.chosenBy !== currentUser.uid;
+            // 4. Turn Logic
+            // The person who did NOT pick this song needs to pick the NEXT one.
+            const iPickedThis = song.chosenBy === currentUser.uid;
+            isMyTurnToPick = !iPickedThis;
 
-            // 5. Timers
-            
-            // A. Emoji Picker (3 seconds in)
-            if (isMyTurn) {
+            document.getElementById('turnIndicator').innerText = isMyTurnToPick ? "LISTENING..." : "DJING";
+
+            if (isMyTurnToPick) {
+                // TIMER 1: EMOJI (3s)
                 emojiTimer = setTimeout(() => {
                     openEmojiPicker();
-                }, 3000); // 3s
-            }
+                }, 3000);
 
-            // B. Song Picker (15 seconds in) - Time to queue next!
-            if (isMyTurn) {
-                queueTimer = setTimeout(() => {
-                    // Close emoji if open
-                    closeEmoji(); 
+                // TIMER 2: SONG PICKER (15s)
+                songQueueTimer = setTimeout(() => {
+                    closeEmoji();
+                    document.getElementById('turnIndicator').innerText = "PICK NEXT SONG";
                     openSongPicker();
-                }, 15000); // 15s
+                }, 15000);
             }
         }
 
-        // Handle Song End (Loop Logic)
+        // --- 4. THE LOOP (Auto-Switch) ---
         audio.onended = () => {
-            // Check if next song is queued
+            // Song finished (approx 30s).
+            // Check for QUEUED song in DB.
             sessionRef.child('next_track').once('value', snap => {
-                const next = snap.val();
-                if (next) {
-                    // Move Next -> Current
-                    // Only one person needs to do this write. 
-                    // Let the person who picked the NEXT song do the write to ensure ownership.
-                    if (next.chosenBy === currentUser.uid) {
+                const nextSong = snap.val();
+                
+                if (nextSong) {
+                    // Promote Next -> Current
+                    // Only one client needs to perform this write. 
+                    // Let the person who queued it (the NEW DJ) do it to ensure consistency.
+                    if (nextSong.chosenBy === currentUser.uid) {
                         sessionRef.update({
-                            current_track: {
-                                ...next,
-                                startedAt: firebase.database.ServerValue.TIMESTAMP
-                            },
-                            next_track: null // Clear queue
+                            current_track: { ...nextSong, startedAt: firebase.database.ServerValue.TIMESTAMP },
+                            next_track: null
                         });
                     }
                 } else {
                     // No song queued?
-                    // If it was my turn and I didn't pick, force picker open
-                    if (isMyTurn) openSongPicker();
+                    // Panic mode: If it was my turn and I didn't pick, force picker again.
+                    if (isMyTurnToPick) {
+                        openSongPicker();
+                    }
                 }
             });
         };
 
-        // --- 4. COMPONENT HANDLERS ---
+        // --- 5. COMPONENT EVENTS ---
 
         const songPicker = document.getElementById('songPicker');
         const emojiModal = document.getElementById('emojiModalWrapper');
 
-        function openSongPicker() {
-            songPicker.open();
-        }
+        function openSongPicker() { songPicker.open(); }
+        function openEmojiPicker() { emojiModal.classList.add('active'); }
+        function closeEmoji() { emojiModal.classList.remove('active'); }
 
-        function openEmojiPicker() {
-            emojiModal.classList.add('active');
-        }
-
-        function closeEmoji() {
-            emojiModal.classList.remove('active');
-        }
-
-        // Listen for selection from SongPicker Component
+        // Event: Song Selected
         window.addEventListener('song-selected', (e) => {
             const song = e.detail;
             
-            // Are we starting the session or queuing?
+            // Logic: Are we starting fresh or queuing?
             if (audio.paused || audio.ended) {
-                // Start immediately
+                // Start Immediately
                 sessionRef.child('current_track').set({
                     ...song,
                     chosenBy: currentUser.uid,
                     startedAt: firebase.database.ServerValue.TIMESTAMP
                 });
             } else {
-                // Queue it for when current song ends
+                // Queue for next turn
                 sessionRef.child('next_track').set({
                     ...song,
                     chosenBy: currentUser.uid
                 });
                 hasQueuedNext = true;
                 
-                // Show feedback
-                const title = document.getElementById('currentTitle');
-                const oldText = title.innerText;
-                title.innerText = "Next song queued!";
-                setTimeout(() => title.innerText = oldText, 2000);
+                // Feedback
+                const oldText = document.getElementById('turnIndicator').innerText;
+                document.getElementById('turnIndicator').innerText = "QUEUED NEXT";
+                setTimeout(() => {
+                   if(document.getElementById('turnIndicator').innerText === "QUEUED NEXT")
+                       document.getElementById('turnIndicator').innerText = "WAITING...";
+                }, 2000);
             }
         });
 
-        // Listen for emoji click
+        // Event: Reaction
         window.addEventListener('emoji-click', (e) => {
-            const emoji = e.detail.emoji;
-            
-            // Send to DB
             sessionRef.child('reactions').push({
-                emoji: emoji,
+                emoji: e.detail.emoji,
                 from: currentUser.uid,
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
-
-            // Close picker after selection? Or keep open?
-            // User requirement: "choose a reaction... if not need simple close"
-            // Let's keep it open for spamming, user closes manually or auto-closes at 15s
+            // Optional: Close emoji picker after selection?
+            // closeEmoji(); 
         });
 
-        // --- 5. VISUALS ---
+        // --- 6. VISUALS ---
 
         function showFloatingEmoji(char) {
             const el = document.createElement('div');
             el.innerText = char;
             el.className = 'floating-emoji';
-            el.style.left = (20 + Math.random() * 60) + '%'; // Random horizontal
+            // Random horizontal position (20% to 80%)
+            el.style.left = (20 + Math.random() * 60) + '%'; 
             document.body.appendChild(el);
             setTimeout(() => el.remove(), 3000);
         }
 
         function changeThemeColor() {
-            // Generate a vibrant color
+            // Random vibrant hue
             const hue = Math.floor(Math.random() * 360);
             const color = `hsl(${hue}, 80%, 60%)`;
             
-            // Update CSS Variable for Aura
             document.documentElement.style.setProperty('--pulse-color', color);
-            
-            // Update Mobile Browser Toolbar
             document.getElementById('themeMeta').content = color;
         }
 
