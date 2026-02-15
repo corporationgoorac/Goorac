@@ -57,7 +57,7 @@ class ViewNotes extends HTMLElement {
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
             verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:2px;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
-            // FIX: Sleek Green Star for Close Friends
+            // FIX: Sleek Green Star for Close Friends (Visible in Modal)
             star: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#00ba7c" style="filter: drop-shadow(0 0 2px rgba(0,255,100,0.5)); margin-left:4px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`
         };
     }
@@ -228,11 +228,23 @@ class ViewNotes extends HTMLElement {
                 
                 /* FIX: Layout overflow for Song Name */
                 max-width: 85%;
+                overflow: hidden; /* Ensure text marquee hides within */
             }
             
+            /* Running Text Logic */
             .vn-music-pill span {
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                max-width: 150px; display: inline-block;
+                display: inline-block;
+                white-space: nowrap;
+            }
+            
+            .vn-music-pill span.scrolling {
+                animation: vn-scroll-text 10s linear infinite;
+                padding-left: 10px; /* Init spacing */
+            }
+            
+            @keyframes vn-scroll-text {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); } /* Assumes duplicate text approach or enough space */
             }
 
             .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
@@ -512,13 +524,20 @@ class ViewNotes extends HTMLElement {
         // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
         const uiColor = note.textColor || '#ffffff';
 
+        // Prepare running text if song name is long
+        const songLabel = note.songName || '';
+        const isLongText = songLabel.length > 20;
+        const songHtml = isLongText 
+            ? `<span class="scrolling">${songLabel} &nbsp;&nbsp; • &nbsp;&nbsp; ${songLabel}</span>` 
+            : `<span>${songLabel}</span>`;
+
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper">
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
-                            <span>${note.songName}</span>
+                            ${songHtml}
                         </div>
                     ` : ''}
 
@@ -598,13 +617,20 @@ class ViewNotes extends HTMLElement {
         // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
         const uiColor = note.textColor || '#ffffff';
 
+        // Prepare running text if song name is long
+        const fullSongInfo = `${note.songName || ''} • ${note.songArtist || ''}`;
+        const isLongText = fullSongInfo.length > 25;
+        const songHtml = isLongText 
+            ? `<span class="scrolling">${fullSongInfo} &nbsp;&nbsp; • &nbsp;&nbsp; ${fullSongInfo}</span>` 
+            : `<span>${fullSongInfo}</span>`;
+
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper vn-clickable" id="vn-header-click">
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
-                            <span>${note.songName} • ${note.songArtist || ''}</span>
+                            ${songHtml}
                         </div>
                     ` : ''}
 
@@ -1029,7 +1055,8 @@ const NotesManager = {
                 border: 2px solid #00ba7c !important; /* Green Solid Border for better visibility */
                 box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
             }
-            /* Add tiny green star badge to outer bubble for CF */
+            /* REMOVED OUTER BADGE AS REQUESTED */
+            /*
             .note-bubble.cf-note::before {
                 content: '★';
                 position: absolute;
@@ -1045,6 +1072,7 @@ const NotesManager = {
                 box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 pointer-events: none;
             }
+            */
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
             
@@ -1273,7 +1301,8 @@ const NotesManager = {
                                     const viewer = document.querySelector('view-notes');
                                     const nav = document.querySelector('main-navbar');
                                     if(nav) nav.classList.add('hidden');
-                                    if(navigator.vibrate) navigator.vibrate(10);
+                                    // DOUBLE VIBRATION HERE
+                                    if(navigator.vibrate) navigator.vibrate([10, 30]);
                                     // Pass note data with the Firestore Doc ID
                                     viewer.open({ ...noteData, id: noteId }, false);
                                 };
