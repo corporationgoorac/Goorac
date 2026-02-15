@@ -1,6 +1,6 @@
 /**
  * =======================================================
- * GOORAC QUANTUM - VIEW NOTES ENGINE v2.0
+ * GOORAC QUANTUM - VIEW NOTES ENGINE v3.0
  * Handles: Viewer Modal, Swipe Logic, Audio, Feed & Privacy
  * =======================================================
  */
@@ -12,7 +12,7 @@ class ViewNotes extends HTMLElement {
         this.currentUserProfile = null;
         this.isOwnNote = false;
         
-        // Dedicated audio player to prevent overlap
+        // Dedicated audio player
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.audioPlayer.volume = 1.0; 
@@ -166,8 +166,8 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-close-btn {
-                position: absolute; right: 20px; top: 20px;
-                width: 36px; height: 36px; border-radius: 50%;
+                position: absolute; right: 15px; top: 15px;
+                width: 34px; height: 34px; border-radius: 50%;
                 background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
                 display: flex; align-items: center; justify-content: center;
                 color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.08);
@@ -398,7 +398,7 @@ class ViewNotes extends HTMLElement {
             if (!this.swipeState.isDragging) return;
             this.swipeState.isDragging = false;
             
-            const delta = this.swipeState.currentY - this.swipeState.startY;
+            const delta = this.state.currentY - this.state.startY;
             const time = Date.now() - this.swipeState.startTime;
             const velocity = Math.abs(delta / time); // Calculate speed
 
@@ -417,7 +417,11 @@ class ViewNotes extends HTMLElement {
 
     async open(initialNoteData, isOwnNote = false) {
         if (!this.db && window.firebase) this.db = firebase.firestore();
-        
+        if (!this.db) {
+            console.error("Firebase not initialized yet.");
+            return;
+        }
+
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
@@ -602,6 +606,7 @@ class ViewNotes extends HTMLElement {
         const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
         const isVerified = note.verified || this.currentUserProfile?.verified;
         
+        // CF Badge Check
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
@@ -894,9 +899,69 @@ const NotesManager = {
             const chunks = [];
             while(following.length) chunks.push(following.splice(0, 10));
 
+            // Helper to render
+            const renderNoteItem = (noteData, uid) => {
+                const existingEl = document.getElementById(`note-${uid}`);
+                if(existingEl) existingEl.remove();
+
+                const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
+                const isCF = noteData.audience === 'close_friends';
+                const div = document.createElement('div');
+                div.id = `note-${uid}`; 
+                div.className = 'note-item friend-note has-note';
+                
+                const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
+                const cfClass = isCF ? 'cf-note' : '';
+
+                div.innerHTML = `
+                    <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
+                        <div class="note-text-content" style="text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}">${noteData.text}</div>
+                        ${noteData.songName ? `
+                            <div class="note-music-tag">
+                                <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                <span>${noteData.songName.substring(0, 10)}${noteData.songName.length>10?'...':''}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                    ${isLiked ? `
+                        <div class="note-like-indicator">
+                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        </div>` : ''}
+                    <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
+                `;
+                div.onclick = () => {
+                    const viewer = document.querySelector('view-notes');
+                    const nav = document.querySelector('main-navbar');
+                    if(nav) nav.classList.add('hidden');
+                    if(navigator.vibrate) navigator.vibrate(10);
+                    // Pass note data with ID
+                    viewer.open({ ...noteData, id: uid }, false);
+                };
+                container.appendChild(div);
+            };
+
             chunks.forEach(chunk => {
                 db.collection("notes")
-                    .where("uid", "in", chunk)
+                    .where("uid", "in", chunk) 
                     .where("isActive", "==", true)
-                    .onSnapshot(snap => {
-                        snap.docChanges().
+                    .onSnapshot(snapshot => {
+                        snapshot.docChanges().forEach(change => {
+                            const noteData = change.doc.data();
+                            const uid = change.doc.id; 
+                            
+                            if (change.type === "removed") {
+                                const el = document.getElementById(`note-${uid}`);
+                                if(el) el.remove();
+                                return;
+                            }
+
+                            if (!noteData.expiresAt || noteData.expiresAt.toDate() > new Date()) {
+                                // --- STRICT CLOSE FRIENDS LOGIC FIXED ---
+                                if (noteData.audience === 'close_friends') {
+                                    // Fetch Author's Profile using noteData.uid (NOT uid which is Note ID)
+                                    db.collection('users').doc(noteData.uid).get().then(doc => {
+                                        if (doc.exists) {
+                                            const authorCF = doc.data().closeFriends || [];
+                                            // Check if I am in their list
+                                            if (authorCF.includes(user.uid
