@@ -15,7 +15,7 @@ class ViewNotes extends HTMLElement {
         this.db = null; 
         this.unsubscribe = null;
 
-        // Enhanced Swipe Logic
+        // Enhanced Swipe Logic - Preserving Physics
         this.state = {
             isDragging: false,
             startY: 0,
@@ -55,7 +55,7 @@ class ViewNotes extends HTMLElement {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
+            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
             star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#00ba7c"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`
         };
     }
@@ -148,7 +148,6 @@ class ViewNotes extends HTMLElement {
                 position: relative; 
                 width: auto; max-width: 85%;
                 margin-bottom: 15px;
-                /* Allow sticker to hang out */
                 overflow: visible; 
             }
 
@@ -222,7 +221,16 @@ class ViewNotes extends HTMLElement {
                 border: 1px solid rgba(255,255,255,0.2);
                 backdrop-filter: blur(10px); color: #fff; z-index: 12;
                 white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                
+                /* FIX: Layout overflow for Song Name */
+                max-width: 85%;
             }
+            
+            .vn-music-pill span {
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                max-width: 150px; display: inline-block;
+            }
+
             .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
             .vn-eq span:nth-child(2) { animation-delay: 0.2s; } 
             .vn-eq span:nth-child(3) { animation-delay: 0.4s; } 
@@ -674,6 +682,7 @@ class ViewNotes extends HTMLElement {
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
+                    // FIX: Double Vibration
                     if(navigator.vibrate) navigator.vibrate([10, 30]);
 
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
@@ -734,7 +743,8 @@ class ViewNotes extends HTMLElement {
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
-                if(navigator.vibrate) navigator.vibrate(10);
+                // FIX: Double Vibration on Like
+                if(navigator.vibrate) navigator.vibrate([10, 30]);
                 
                 // 1. Optimistic UI Toggle
                 const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30');
@@ -997,10 +1007,24 @@ const NotesManager = {
                 background-position: center;
             }
             
-            /* Close Friends Indicator in List */
+            /* Close Friends Indicator in List - Fixed for visibility */
             .note-bubble.cf-note {
-                border: 2px dashed #00d2ff !important;
-                box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+                border: 2px solid #00ba7c !important; /* Green Solid Border for better visibility */
+                box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
+            }
+            /* Add tiny green star badge to outer bubble for CF */
+            .note-bubble.cf-note::before {
+                content: '★';
+                position: absolute;
+                top: -5px; right: -5px;
+                width: 16px; height: 16px;
+                background: #00ba7c;
+                border-radius: 50%;
+                color: #000;
+                font-size: 10px;
+                display: flex; align-items: center; justify-content: center;
+                z-index: 15;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
@@ -1040,6 +1064,7 @@ const NotesManager = {
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
+                word-break: break-word; /* Ensure long words break */
             }
 
             .note-music-tag {
@@ -1114,8 +1139,9 @@ const NotesManager = {
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
+                    // FIX: Single Quotes for font-family in preview
                     preview.innerHTML = `
-                        ${data.text ? `<div class="note-text-content" style="text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}">${data.text}</div>` : ''}
+                        ${data.text ? `<div class="note-text-content" style='text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}'>${data.text}</div>` : ''}
                         ${data.songName ? `
                             <div class="note-music-tag">
                                 <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -1206,9 +1232,10 @@ const NotesManager = {
                                 // NEW: Add .cf-note class if it's a Close Friends note
                                 const cfClass = isCF ? 'cf-note' : '';
 
+                                // FIX: Single Quotes for Style in outer bubble to fix Font Issue
                                 div.innerHTML = `
                                     <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
-                                        <div class="note-text-content" style="text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}">${noteData.text}</div>
+                                        <div class="note-text-content" style='text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}'>${noteData.text}</div>
                                         ${noteData.songName ? `
                                             <div class="note-music-tag">
                                                 <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
