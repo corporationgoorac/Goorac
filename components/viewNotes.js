@@ -143,27 +143,26 @@ class ViewNotes extends HTMLElement {
                 position: relative; z-index: 5;
                 width: 100%;
                 padding-bottom: 20px;
+                min-height: 400px;
             }
 
-            /* THE BUBBLE WRAPPER - UPDATED FOR LAYOUT & ANIMATION */
+            /* THE BUBBLE WRAPPER */
             .vn-bubble-wrapper { 
                 position: relative; 
-                width: 70vw; /* Reduced Width */
-                max-width: 300px; /* Reduced Max Width */
+                width: 70vw; 
+                max-width: 300px; 
                 aspect-ratio: 1 / 1; 
-                margin: 140px auto 30px auto; /* MOVED DOWN: Adjusted from 50px to 140px for perfect positioning */
+                margin: 140px auto 30px auto; 
                 overflow: visible; 
                 display: flex;
                 flex-direction: column;
                 z-index: 10;
                 flex-shrink: 0;
-                /* Animation: Sticky Note Entrance - FIXED: Professional Spring Pop */
                 opacity: 0;
                 will-change: transform, opacity;
                 animation: springPop 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             }
 
-            /* NEW: Smooth Spring Animation to fix flickering */
             @keyframes springPop {
                 0% { opacity: 0; transform: scale(0.5) translateY(50px); }
                 60% { opacity: 1; transform: scale(1.05) translateY(-5px); }
@@ -172,14 +171,14 @@ class ViewNotes extends HTMLElement {
 
             .vn-bubble {
                 width: 100%; 
-                height: 100%; /* Fill the square exactly */
-                border-radius: 48px; /* Smooth corners */
+                height: 100%; 
+                border-radius: 48px; 
                 display: flex; align-items: center; justify-content: center;
                 text-align: center; padding: 30px;
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                overflow: hidden; /* Clip text */
+                overflow: hidden; 
                 border: 1px solid rgba(255,255,255,0.15);
             }
             
@@ -192,12 +191,12 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 2.0rem; /* Slightly smaller text */
+                font-size: 2.0rem; 
                 font-weight: 700; line-height: 1.2; z-index: 2;
                 word-break: break-word; width: 100%; white-space: pre-wrap;
                 max-height: 100%;
                 display: -webkit-box;
-                -webkit-line-clamp: 6; /* Prevent overflow */
+                -webkit-line-clamp: 6; 
                 -webkit-box-orient: vertical;
                 overflow: hidden;
             }
@@ -213,7 +212,6 @@ class ViewNotes extends HTMLElement {
                 box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             }
 
-            /* INFO BELOW NOTE */
             .vn-info-bar {
                 display: flex; flex-direction: column; align-items: center; gap: 4px;
                 margin-top: 5px; z-index: 10;
@@ -254,7 +252,6 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
-            /* --- FIXED SLOWER ANIMATIONS FOR SONG --- */
             .vn-music-pill { 
                 position: absolute; top: -35px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 10px; 
@@ -273,7 +270,6 @@ class ViewNotes extends HTMLElement {
             }
             .vn-eq span { width: 3px; background: #00d2ff; border-radius: 2px; }
             
-            /* Slower Equalizer */
             .vn-eq span:nth-child(1) { height: 60%; animation: eq-1 1.2s infinite ease-in-out; }
             .vn-eq span:nth-child(2) { height: 100%; animation: eq-2 1.0s infinite ease-in-out; } 
             .vn-eq span:nth-child(3) { height: 50%; animation: eq-3 1.4s infinite ease-in-out; } 
@@ -293,7 +289,6 @@ class ViewNotes extends HTMLElement {
             .vn-song-content {
                 display: inline-block;
                 padding-left: 0;
-                /* Slower Marquee Speed: 12s */
                 animation: marquee 12s linear infinite;
             }
             
@@ -346,44 +341,83 @@ class ViewNotes extends HTMLElement {
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- OWN NOTE ACTIONS FIXED --- */
+            /* --- REDESIGNED OWN NOTE MODAL --- */
             .vn-likers-section { 
-                margin-top: auto; 
-                border-top: 1px solid rgba(255,255,255,0.1); 
-                padding: 15px 20px calc(35px + env(safe-area-inset-bottom)); /* Fixed Padding */
+                flex: 1.2;
+                display: flex; 
+                flex-direction: column;
                 background: #141414; 
-                z-index: 100; position: relative;
-                height: auto;
-                max-height: 45vh; /* Adjusted max-height */
-                display: flex; flex-direction: column;
+                border-top: 1px solid rgba(255,255,255,0.08);
+                position: relative;
+                z-index: 100;
+                overflow: hidden;
             }
             
-            .vn-likers-scroll {
-                flex: 1; overflow-y: auto; margin-bottom: 15px;
-                padding-right: 5px;
-                min-height: 50px;
+            .vn-activity-header {
+                padding: 16px 20px;
+                font-weight: 800;
+                font-size: 1rem;
+                color: #fff;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
             }
 
-            .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+            .vn-likers-scroll {
+                flex: 1;
+                overflow-y: auto;
+                padding: 15px 20px;
+                scrollbar-width: none;
+            }
+            .vn-likers-scroll::-webkit-scrollbar { display: none; }
+
+            .vn-liker-item { 
+                display: flex; 
+                align-items: center; 
+                justify-content: space-between; 
+                margin-bottom: 16px; 
+                background: rgba(255,255,255,0.03);
+                padding: 10px;
+                border-radius: 16px;
+            }
             
-            /* FIXED: Smaller, compact buttons */
+            /* FIXED: STICKY ACTIONS BAR */
+            .vn-sticky-actions {
+                padding: 16px 20px calc(35px + env(safe-area-inset-bottom));
+                background: #181818;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+            }
+
             .vn-btn { 
-                width: 100%; padding: 12px; border-radius: 12px; border: none; 
-                font-weight: 700; font-size: 0.95rem; cursor: pointer; margin-top: 0; 
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                display: flex; justify-content: center; align-items: center; gap: 8px;
-                flex-shrink: 0;
+                width: 100%; padding: 14px; border-radius: 18px; border: none; 
+                font-weight: 700; font-size: 1rem; cursor: pointer;
+                display: flex; justify-content: center; align-items: center; gap: 10px;
+                transition: all 0.2s ease;
             }
-            .vn-btn-primary { background: #fff; color: #000; }
-            .vn-btn-danger { background: rgba(255, 59, 48, 0.15); color: #ff3b30; border: 1px solid rgba(255,59,48,0.2); }
-            .vn-btn-archive { background: rgba(255, 149, 0, 0.15); color: #ff9f0a; border: 1px solid rgba(255,149,0,0.2); }
             
-            /* NEW: Row for Archive/Delete buttons */
-            .vn-action-row {
-                display: flex; gap: 10px; margin-top: 10px; width: 100%;
+            .vn-btn-primary { 
+                background: #fff; color: #000; 
+                box-shadow: 0 4px 15px rgba(255,255,255,0.1);
             }
-            .vn-action-row .vn-btn {
-                flex: 1; /* Equal width */
+            .vn-btn-primary:active { transform: scale(0.97); background: #eee; }
+
+            .vn-action-row {
+                display: flex; gap: 12px; width: 100%;
+            }
+            .vn-action-row .vn-btn { flex: 1; }
+
+            .vn-btn-danger { 
+                background: rgba(255, 59, 48, 0.12); color: #ff3b30; 
+                border: 1px solid rgba(255, 59, 48, 0.2); 
+            }
+            .vn-btn-archive { 
+                background: rgba(255, 255, 255, 0.08); color: #fff; 
+                border: 1px solid rgba(255, 255, 255, 0.1); 
             }
 
         </style>
@@ -426,12 +460,11 @@ class ViewNotes extends HTMLElement {
 
     setupSwipeLogic() {
         const sheet = this.querySelector('#vn-sheet');
-        const handle = this.querySelector('#vn-handle');
         const dragTarget = sheet; 
 
         dragTarget.addEventListener('touchstart', (e) => {
-            if(e.target.closest('.vn-likers-section') && e.target.closest('.vn-likers-section').scrollTop > 0) return;
-            if(e.target.closest('.vn-footer')) return;
+            if(e.target.closest('.vn-likers-scroll') && e.target.closest('.vn-likers-scroll').scrollTop > 0) return;
+            if(e.target.closest('.vn-sticky-actions')) return;
             
             this.state.isDragging = true;
             this.state.startY = e.touches[0].clientY;
@@ -552,14 +585,12 @@ class ViewNotes extends HTMLElement {
         this.attachDynamicListeners();
     }
 
-    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        // UPDATED: Check user.displayName immediately to prevent glitch
         const displayName = note.displayName || user?.displayName || this.currentUserProfile?.name || note.username || 'You';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         const isCF = note.audience === 'close_friends';
@@ -613,26 +644,27 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-likers-section">
-                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#aaa; display:flex; justify-content:space-between; flex-shrink:0;">
-                    Activity <span>${(note.likes||[]).length}</span>
+                <div class="vn-activity-header">
+                    <span>Activity</span>
+                    <span style="opacity:0.5; font-size:0.9rem;">${(note.likes||[]).length} Likes</span>
                 </div>
                 
                 <div class="vn-likers-scroll">
                     ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
                         <div class="vn-liker-item">
-                            <div style="display:flex; align-items:center; gap:10px; color:#fff;">
-                                <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
-                                <span style="font-weight:600; display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+                            <div style="display:flex; align-items:center; gap:12px; color:#fff;">
+                                <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
+                                <span style="font-weight:600; display:flex; align-items:center; gap:4px; font-size:0.95rem;">
                                     ${liker.displayName || 'User'}
                                     ${liker.verified ? icons.verified : ''}
                                 </span>
                             </div>
                             <span style="color:#ff3b30;">${icons.heartFilled}</span>
                         </div>
-                    `).join('') : `<div style="text-align:center; color:#555; padding:20px;">No likes yet</div>`}
+                    `).join('') : `<div style="text-align:center; color:#555; padding:40px 20px; font-size:0.9rem;">No likes yet. Share your note to get started!</div>`}
                 </div>
                 
-                <div style="flex-shrink:0;">
+                <div class="vn-sticky-actions">
                     ${note.isActive ? 
                         `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note <span class="material-icons-round">edit</span></button>` : 
                         `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note <span class="material-icons-round">add</span></button>`
@@ -802,9 +834,7 @@ class ViewNotes extends HTMLElement {
                         if (this.currentNote && this.currentNote.id) {
                             await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
                             this.close();
-                            if(NotesManager) NotesManager.init();
-                        } else {
-                            console.error("Cannot archive: No Note ID found");
+                            if(typeof NotesManager !== 'undefined') NotesManager.init();
                         }
                     } catch(e) { console.error("Error archiving note:", e); }
                 }
@@ -821,8 +851,6 @@ class ViewNotes extends HTMLElement {
                             await this.db.collection("notes").doc(this.currentNote.id).delete();
                             this.close();
                             window.location.reload(); 
-                          } else {
-                            console.error("Cannot delete: No Note ID found");
                           }
                     } catch(e) { console.error("Error deleting note:", e); }
                 }
@@ -939,8 +967,6 @@ class ViewNotes extends HTMLElement {
             emojiEl.onclick = () => {
                 const emoji = emojiEl.dataset.emoji;
                 if(navigator.vibrate) navigator.vibrate(25);
-                emojiEl.classList.add('popped');
-                setTimeout(() => emojiEl.classList.remove('popped'), 500);
                 this.handleSendReply(emoji);
             };
         });
@@ -1280,7 +1306,6 @@ const NotesManager = {
                                             return; 
                                         }
                                     } catch (e) {
-                                        console.error("Error checking CF permission", e);
                                         return;
                                     }
                                 }
