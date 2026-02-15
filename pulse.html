@@ -4,8 +4,8 @@
     <link rel="manifest" href="/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000" id="theme-meta">
-    <title>Pulse | Goorac</title>
+    <meta name="theme-color" content="#000000">
+    <title>Pulse Session | Goorac</title>
     
     <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -30,7 +30,6 @@
             --text-dim: #888;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
-            --verified-color: #0095f6;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -43,7 +42,6 @@
             transition: background 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        /* --- GLOBAL HEADER --- */
         .top-nav {
             position: absolute; top: 0; left: 0; width: 100%;
             padding: calc(15px + var(--safe-top)) 20px 15px;
@@ -59,110 +57,9 @@
         }
         .back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
 
-        /* --- LOBBY UI --- */
-        #lobby-view {
-            display: none; flex-direction: column; height: 100%;
-            background: var(--bg); overflow: hidden;
-        }
-        #lobby-view.active { display: flex; }
+        /* SESSION UI */
+        #session-view { display: block; height: 100%; }
 
-        .lobby-hero {
-            padding: calc(70px + var(--safe-top)) 20px 30px;
-            background: radial-gradient(circle at 50% 0%, #1a0505 0%, #000 70%);
-            border-bottom: 1px solid var(--border);
-            display: flex; flex-direction: column; align-items: center;
-        }
-
-        /* Connection Visualizer */
-        .connect-viz {
-            display: flex; align-items: center; justify-content: space-between;
-            width: 100%; max-width: 280px; margin-bottom: 30px; position: relative;
-        }
-        
-        .pfp-node {
-            width: 70px; height: 70px; border-radius: 50%;
-            position: relative; z-index: 2;
-            display: flex; align-items: center; justify-content: center;
-            background: #111; border: 2px solid #222;
-        }
-        
-        /* Left: Me */
-        .pfp-node.me img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        .pfp-node.me::after {
-            content: 'YOU'; position: absolute; bottom: -20px;
-            font-size: 10px; font-weight: 700; color: #555; letter-spacing: 1px;
-        }
-
-        /* Right: Target (Empty) */
-        .pfp-node.target { border: 2px dashed #444; color: #444; transition: 0.3s; }
-        .pfp-node.target.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
-        .pfp-node.target::after {
-            content: 'PICK'; position: absolute; bottom: -20px;
-            font-size: 10px; font-weight: 700; color: #555; letter-spacing: 1px;
-        }
-
-        /* The Line */
-        .data-stream {
-            flex: 1; height: 2px; background: #222; margin: 0 10px;
-            position: relative; overflow: hidden;
-        }
-        .data-stream::after {
-            content: ''; position: absolute; top: 0; left: 0;
-            width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            animation: stream 1.5s infinite linear;
-        }
-        @keyframes stream { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
-
-        .search-container {
-            width: 100%; background: var(--surface-light);
-            border: 1px solid var(--border); border-radius: 14px;
-            padding: 12px 16px; display: flex; align-items: center; gap: 10px;
-        }
-        .search-inp {
-            background: transparent; border: none; color: white; width: 100%;
-            font-size: 14px; font-weight: 500; outline: none;
-        }
-
-        /* Mutuals List */
-        .list-label {
-            padding: 20px 24px 10px; font-size: 12px; font-weight: 700; 
-            color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;
-        }
-
-        .mutuals-scroll {
-            flex: 1; overflow-y: auto; padding: 0 20px 20px;
-            display: flex; flex-direction: column; gap: 8px;
-        }
-        
-        .m-card {
-            display: flex; align-items: center; gap: 14px;
-            padding: 12px; border-radius: 16px;
-            background: transparent; border: 1px solid transparent;
-            cursor: pointer; transition: 0.2s;
-        }
-        .m-card:active { background: var(--surface-light); transform: scale(0.98); }
-        
-        .m-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #222; }
-        .m-details { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-        
-        .m-name { 
-            font-size: 14px; font-weight: 700; color: #fff; 
-            display: flex; align-items: center; gap: 4px;
-        }
-        .verified-badge { font-size: 14px; color: var(--verified-color); }
-        
-        .m-handle { font-size: 12px; color: #666; font-weight: 500; }
-        
-        .m-btn {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: var(--surface-light); border: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
-            color: var(--accent); transition: 0.2s;
-        }
-        .m-btn span { font-size: 18px; }
-
-
-        /* --- ACTIVE SESSION SCREENS --- */
         .screen {
             position: absolute; inset: 0;
             display: flex; flex-direction: column;
@@ -194,7 +91,6 @@
         }
         .s-bubble img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #111; }
         
-        /* Positioning: ME Left, THEM Right */
         .s-bubble.me { transform: translateX(15px) scale(1); }
         .s-bubble.them { transform: translateX(-15px) scale(0.9); opacity: 0.6; filter: grayscale(100%); }
         
@@ -259,7 +155,6 @@
         .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* Sync Overlay for Autoplay Block */
         #sync-overlay {
             position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -268,114 +163,43 @@
         }
         #sync-overlay.active { opacity: 1; pointer-events: auto; }
 
-        /* --- UPDATED EMOJI MODAL (HALF SCREEN) --- */
+        /* MODALS */
         #emoji-modal {
-            position: fixed; 
-            top: auto; 
-            bottom: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 50vh; /* Half screen */
-            background: #1a1a1a; 
-            border-radius: 24px 24px 0 0;
-            z-index: 200; 
-            display: flex; 
-            flex-direction: column;
-            align-items: center; 
-            justify-content: flex-start;
-            padding-top: 20px;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-            transform: translateY(100%);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            visibility: hidden; /* Hide completely when not active */
+            position: fixed; top: auto; bottom: 0; left: 0; width: 100%; height: 50vh;
+            background: #1a1a1a; border-radius: 24px 24px 0 0; z-index: 200; 
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            padding-top: 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            visibility: hidden;
         }
-
-        #emoji-modal.active { 
-            transform: translateY(0); 
-            visibility: visible;
-        }
-
-        /* Make the picker fill the modal */
-        emoji-picker {
-            width: 100%;
-            height: 100%;
-            --background: transparent;
-            --border-color: transparent;
-        }
+        #emoji-modal.active { transform: translateY(0); visibility: visible; }
+        emoji-picker { width: 100%; height: 100%; --background: transparent; --border-color: transparent; }
 
         .seated-emoji {
             position: absolute; font-size: 40px; z-index: 50;
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
-            transition: all 0.5s ease;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: all 0.5s ease;
         }
-        
-        /* Animation for flying emoji */
         .flying-emoji {
             position: fixed; font-size: 48px; z-index: 300; pointer-events: none;
             transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
-
     </style>
 </head>
 <body>
 
     <script>
-        (function() {
-            // Instant load cached PFP
-            try {
-                const profile = localStorage.getItem('my_goorac_profile');
-                if(profile) {
-                    const data = JSON.parse(profile);
-                    const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
-                    document.write(`<style>#lobby-pfp { content: url("${pfpUrl}"); }</style>`);
-                    document.addEventListener("DOMContentLoaded", () => {
-                        const elLobby = document.getElementById('lobby-pfp');
-                        const elAvatar = document.getElementById('my-avatar');
-                        if(elLobby) elLobby.src = pfpUrl;
-                        if(elAvatar) elAvatar.src = pfpUrl;
-                    });
-                }
-            } catch(e) {}
-        })();
+        // Instant load cached PFP
+        try {
+            const profile = localStorage.getItem('my_goorac_profile');
+            if(profile) {
+                const data = JSON.parse(profile);
+                const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
+                document.write(`<style>#my-avatar { content: url("${pfpUrl}"); }</style>`);
+            }
+        } catch(e) {}
     </script>
 
-    <div id="lobby-view">
-        <div class="top-nav">
-            <div class="back-btn" onclick="history.back()">
-                <span class="material-icons-round">west</span>
-            </div>
-            <div style="font-weight:800; font-size:12px; letter-spacing:1px; color:#666;">PULSE NETWORK</div>
-            <div style="width:40px;"></div>
-        </div>
-
-        <div class="lobby-hero">
-            <div class="connect-viz">
-                <div class="pfp-node me">
-                    <img id="lobby-pfp" src="">
-                </div>
-                <div class="data-stream"></div>
-                <div class="pfp-node target">
-                    <span class="material-icons-round">add</span>
-                </div>
-            </div>
-            
-            <h1 style="font-size:24px; font-weight:900; letter-spacing:-0.5px;">Start a Pulse</h1>
-            <p style="font-size:14px; color:#888; margin-top:5px; margin-bottom:25px;">Connect & Listen together in real-time.</p>
-
-            <div class="search-container">
-                <span class="material-icons-round" style="color:#666;">search</span>
-                <input type="text" id="mutual-search" class="search-inp" placeholder="Search mutual friends...">
-            </div>
-        </div>
-
-        <div class="list-label">Available Connections</div>
-        <div class="mutuals-scroll" id="mutuals-container">
-            </div>
-        <div class="loader-pill" id="scroll-loader" style="display:none; text-align:center; padding:20px; font-size:12px; color:#444;">SYNCING...</div>
-    </div>
-
-
-    <div id="session-view" style="display:none; height:100%;">
+    <div id="session-view">
         
         <div class="screen active" id="screen-loading">
             <div class="pulse-wave" style="width:60px; height:60px; background:var(--accent); border-radius:50%; margin-bottom:20px;"></div>
@@ -458,7 +282,6 @@
     </div>
 
     <script>
-        // --- 1. INIT & CONFIG ---
         if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
         else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
 
@@ -472,12 +295,6 @@
         // State
         let myUid = null;
         let myProfile = null;
-        let mutualList = [];
-        let loadedCount = 0;
-        const BATCH_SIZE = 10;
-        let mutualsCache = []; 
-
-        // Session State
         let targetProfile = null;
         let roomRef = null;
         let roomUnsub = null;
@@ -488,31 +305,24 @@
         let isMyTurn = false;
         let currentSongId = null;
         let hasPickedEmoji = false;
-        let emojiTimer = null; // Timer for 5s delay
-        let emojiCloseTimer = null; // Timer for 10s auto-close
-        let turnTimer = null; // 30s timer for turn swap
+        let emojiTimer = null; 
+        let emojiCloseTimer = null; 
+        let turnTimer = null; 
 
-        // --- 2. AUTH FLOW ---
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
                 
-                // Update profile data in background
+                // Update local profile visual
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
-                        const elLobby = document.getElementById('lobby-pfp');
-                        const elAvatar = document.getElementById('my-avatar');
-                        if(elLobby && elLobby.src !== pfp) elLobby.src = pfp;
-                        if(elAvatar && elAvatar.src !== pfp) elAvatar.src = pfp;
-                        localStorage.setItem('my_goorac_profile', JSON.stringify(data));
+                        document.getElementById('my-avatar').src = pfp;
                     }
                 });
 
                 if (targetUsername) {
-                    // -> RESOLVE USERNAME -> ACTIVE SESSION MODE
-                    document.getElementById('session-view').style.display = 'block';
                     try {
                         const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
                         if (!snap.empty) {
@@ -526,146 +336,14 @@
                     } catch (e) {
                         showError("Connection failed.");
                     }
-
                 } else {
-                    // -> LOBBY MODE
-                    document.getElementById('lobby-view').classList.add('active');
-                    initLobby();
+                    // No user param? Go back to lobby.
+                    window.location.href = 'pulseLobby.html';
                 }
             } else {
                 window.location.href = 'login.html';
             }
         });
-
-
-        // ============================================
-        //  PART A: LOBBY LOGIC (Find Friends)
-        // ============================================
-        
-        async function initLobby() {
-            // Instant Load Cache
-            const cachedMutuals = localStorage.getItem('pulse_mutuals_cache');
-            if(cachedMutuals) {
-                mutualsCache = JSON.parse(cachedMutuals);
-                renderList(mutualsCache);
-            }
-
-            try {
-                // Fetch Graphs
-                const doc = await db.collection('users').doc(myUid).get();
-                const data = doc.data();
-                const following = (data.following || []).map(u => typeof u === 'string' ? u : u.uid);
-                const followers = (data.followers || []).map(u => typeof u === 'string' ? u : u.uid);
-
-                // Intersect
-                mutualList = following.filter(id => followers.includes(id));
-                
-                if (mutualList.length === 0) {
-                    document.getElementById('mutuals-container').innerHTML = 
-                        `<div style="text-align:center; padding:50px; color:#555; font-size:13px;">No mutual connections found.</div>`;
-                    return;
-                }
-
-                loadedCount = 0;
-                loadMoreMutuals();
-
-                // Scroll
-                const container = document.getElementById('mutuals-container');
-                container.addEventListener('scroll', () => {
-                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 20) {
-                        loadMoreMutuals();
-                    }
-                });
-
-                // Search
-                document.getElementById('mutual-search').addEventListener('input', (e) => {
-                    const term = e.target.value.toLowerCase();
-                    const items = document.querySelectorAll('.m-card');
-                    items.forEach(item => {
-                        const name = item.dataset.name.toLowerCase();
-                        item.style.display = name.includes(term) ? 'flex' : 'none';
-                    });
-                });
-
-            } catch (e) { console.error(e); }
-        }
-
-        // Render List Function
-        function renderList(list) {
-            const container = document.getElementById('mutuals-container');
-            if(container.children.length === 0 || list.length === mutualList.length) container.innerHTML = ''; 
-            
-            list.forEach(uData => {
-                const existing = document.querySelector(`.m-card[data-uid="${uData.uid}"]`);
-                if(!existing) container.appendChild(createMutualCard(uData));
-            });
-        }
-
-        async function loadMoreMutuals() {
-            if (loadedCount >= mutualList.length) return;
-
-            const loader = document.getElementById('scroll-loader');
-            loader.style.display = 'block';
-
-            const nextBatchIds = mutualList.slice(loadedCount, loadedCount + BATCH_SIZE);
-            let fetchedData = [];
-
-            for (const uid of nextBatchIds) {
-                try {
-                    const uDoc = await db.collection('users').doc(uid).get();
-                    if (uDoc.exists) {
-                        const uData = uDoc.data();
-                        uData.uid = uid; 
-                        fetchedData.push(uData);
-                    }
-                } catch(e) {}
-            }
-
-            // Update Cache & Render
-            if(loadedCount === 0) {
-                mutualsCache = fetchedData;
-            } else {
-                const newItems = fetchedData.filter(newU => !mutualsCache.some(oldU => oldU.uid === newU.uid));
-                mutualsCache = [...mutualsCache, ...newItems];
-            }
-            
-            localStorage.setItem('pulse_mutuals_cache', JSON.stringify(mutualsCache));
-            renderList(mutualsCache);
-
-            loadedCount += nextBatchIds.length;
-            loader.style.display = 'none';
-        }
-
-        function createMutualCard(uData) {
-            const div = document.createElement('div');
-            div.className = 'm-card';
-            div.dataset.uid = uData.uid;
-            div.dataset.name = (uData.name || '') + (uData.username || '');
-            
-            const verifiedHtml = uData.verified ? `<span class="material-icons-round verified-badge">verified</span>` : '';
-
-            div.innerHTML = `
-                <img src="${uData.photoURL || 'https://via.placeholder.com/150'}" class="m-img">
-                <div class="m-details">
-                    <div class="m-name">${uData.name || 'User'} ${verifiedHtml}</div>
-                    <div class="m-handle">@${uData.username}</div>
-                </div>
-                <div class="m-btn">
-                    <span class="material-icons-round">bolt</span>
-                </div>
-            `;
-
-            div.onclick = () => {
-                if(navigator.vibrate) navigator.vibrate(10);
-                window.location.assign(`pulse.html?user=${uData.username}`); 
-            };
-            return div;
-        }
-
-
-        // ============================================
-        //  PART B: PULSE SESSION LOGIC (SYNC FIX)
-        // ============================================
 
         async function verifyMutuals(me, them) {
             const cachedTarget = JSON.parse(localStorage.getItem(`pulse_profile_${them}`));
@@ -707,7 +385,7 @@
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
-            // Check room status first to see if we need a Clean Start
+            // Check room status
             roomRef.get().then(doc => {
                 const data = doc.exists ? doc.data() : {};
                 if (!doc.exists || data[otherField] === 'offline' || !data[otherField]) {
@@ -738,7 +416,6 @@
                 }
             });
 
-            // NOTE: We don't rely on audio.onended for turns anymore, but keep it for visual cleanup
             audio.onended = () => {
                  document.getElementById('active-album-art').classList.remove('playing');
             };
@@ -768,7 +445,7 @@
                 cycleStatus: 'picking',
                 currentSong: null,           
                 emojis: {},
-                ready: {} // Used for buffering check
+                ready: {} 
             });
         }
 
@@ -779,7 +456,6 @@
 
             // 1. STATE: PICKING
             if (status === 'picking') {
-                // FORCE RESET of audio if we are back to picking
                 if (currentSongId !== null) {
                     currentSongId = null;
                     audio.pause();
@@ -810,41 +486,35 @@
                 }
             }
             
-            // 2. STATE: BUFFERING (Preload)
+            // 2. STATE: BUFFERING
             else if (status === 'buffering' && data.currentSong) {
                 const song = data.currentSong;
                 
-                // Set song info visually
                 const highRes = song.artworkUrl100.replace('100x100', '600x600');
                 document.getElementById('active-album-art').src = highRes;
                 document.getElementById('active-song-title').innerText = song.trackName;
                 document.getElementById('active-song-artist').innerText = song.artistName;
-                document.getElementById('active-album-art').classList.add('buffering'); // Add pulsing effect
+                document.getElementById('active-album-art').classList.add('buffering'); 
                 document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:#666;">SYNCING...</p>`;
                 
-                // If we haven't loaded this song yet, load it
                 if (currentSongId !== song.id) {
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
                     audio.load();
                     
-                    // Tell DB I am ready when data loads
                     audio.oncanplaythrough = () => {
                          roomRef.update({ [`ready.${myUid}`]: true });
                     };
-                    // Fallback in case oncanplaythrough doesn't fire (cached)
                     if(audio.readyState >= 3) {
                          roomRef.update({ [`ready.${myUid}`]: true });
                     }
                 }
 
-                // DJ LOGIC: Check if both are ready to switch to 'playing'
                 if (isMyTurn) {
                     const readyMap = data.ready || {};
                     const meReady = readyMap[myUid];
                     const themReady = readyMap[targetUid];
                     
-                    // If both ready OR 5 seconds passed (safety timeout), start playing
                     if ((meReady && themReady) || (Date.now() - (data.timestamp || Date.now()) > 8000)) {
                         roomRef.update({ cycleStatus: 'playing' });
                     }
@@ -853,7 +523,6 @@
 
             // 3. STATE: PLAYING
             else if (status === 'playing' && data.currentSong) {
-                // Ensure song is set (in case user joined late)
                 if (currentSongId !== data.currentSong.id) {
                     currentSongId = data.currentSong.id;
                     audio.src = data.currentSong.previewUrl;
@@ -863,29 +532,23 @@
                 document.getElementById('active-album-art').classList.add('playing');
                 document.getElementById('controls-container').innerHTML = '';
 
-                // Background
                 const hue = (data.currentSong.artistName.length * 50) % 360;
                 document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
 
-                // Play Audio
                 if (audio.paused) {
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch(error => {
-                            // Show Overlay if browser blocked
                             if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
                         });
                     }
                     
-                    // START 30s TIMER HERE
-                    // Triggers next turn automatically
                     clearTimeout(turnTimer);
                     turnTimer = setTimeout(() => {
                         if (isMyTurn) swapTurn();
-                    }, 30000); // 30 seconds exact
+                    }, 30000); 
                 }
 
-                // Emoji Timer
                 clearTimeout(emojiTimer);
                 if (!hasPickedEmoji) {
                     emojiTimer = setTimeout(() => {
@@ -916,19 +579,17 @@
         }
 
         function swapTurn() {
-            // Force the turn to the other person
             const nextDj = targetUid; 
             
             roomRef.update({
                 turn: nextDj,
                 cycleStatus: 'picking',
-                currentSong: firebase.firestore.FieldValue.delete(), // Clear song
+                currentSong: firebase.firestore.FieldValue.delete(), 
                 emojis: {},
                 ready: {}
             });
         }
 
-        // --- HELPERS ---
         function handleEmojiSelection(emoji) {
             hasPickedEmoji = true;
             const modal = document.getElementById('emoji-modal');
@@ -981,16 +642,13 @@
             document.body.style.background = "#000";
         }
 
-        // DJ selects a song -> Goes to Buffering Mode
         document.addEventListener('song-selected', (e) => {
             const song = e.detail;
-            
-            // Send to DB to start Buffering
             roomRef.update({ 
                 currentSong: song, 
-                cycleStatus: 'buffering', // This triggers the preload on both sides
+                cycleStatus: 'buffering', 
                 timestamp: Date.now(),
-                ready: {} // Reset ready state
+                ready: {} 
             });
             if(navigator.vibrate) navigator.vibrate(20);
         });
@@ -1001,8 +659,7 @@
                 roomRef.update({ [updateField]: 'offline' });
             }
             audio.pause(); audio.src = ""; 
-            if (targetUid) window.location.href = "pulse.html"; 
-            else history.back();
+            window.location.href = "pulseLobby.html"; 
         }
 
         function showScreen(id) {
@@ -1014,7 +671,6 @@
             document.getElementById('error-msg').innerText = msg;
             showScreen('screen-error');
         }
-
     </script>
 </body>
 </html>
