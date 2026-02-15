@@ -332,7 +332,7 @@
         <div class="screen" id="screen-waiting">
             <div class="top-nav">
                 <div class="back-btn" onclick="leaveSession()">
-                    <span class="material-icons-round">west</span>
+                    <span class="material-icons-round">close</span>
                 </div>
             </div>
 
@@ -359,10 +359,9 @@
             </div>
 
             <div class="top-nav">
-                 <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4);">
-                    <span class="material-icons-round">west</span>
+                 <div style="width:40px;"></div> <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4);">
+                    <span class="material-icons-round" style="color:#ff3b30;">power_settings_new</span>
                 </div>
-                 <div style="width:40px;"></div> 
             </div>
 
             <div class="player-ui">
@@ -420,7 +419,7 @@
             if (user) {
                 myUid = user.uid;
                 
-                // --- FIX: Active PFP Fetch (Reliable) ---
+                // Active PFP Fetch (Guarantees fresh PFP)
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
@@ -429,7 +428,6 @@
                         const elAvatar = document.getElementById('my-avatar');
                         if(elLobby) elLobby.src = pfp;
                         if(elAvatar) elAvatar.src = pfp;
-                        // Cache for next time
                         localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                     }
                 });
@@ -461,11 +459,12 @@
         // ============================================
         
         async function initLobby() {
-            // LOAD FROM CACHE INSTANTLY
+            // Instant Cache Load
             const cachedMutuals = localStorage.getItem('pulse_mutuals_cache');
             if(cachedMutuals) {
                 mutualsCache = JSON.parse(cachedMutuals);
-                renderMutualsFromCache(mutualsCache);
+                // Render cache immediately
+                renderList(mutualsCache);
             }
 
             try {
@@ -484,8 +483,8 @@
                     return;
                 }
 
-                // 3. Load Fresh Batch
-                loadedCount = 0; // Reset
+                // 3. Load Fresh Batch (Resets the visual count logic)
+                loadedCount = 0;
                 loadMoreMutuals();
 
                 // 4. Scroll Listener
@@ -509,14 +508,11 @@
             } catch (e) { console.error(e); }
         }
 
-        function renderMutualsFromCache(list) {
+        // Render List - Clears and Rebuilds to avoid Duplicates
+        function renderList(list) {
             const container = document.getElementById('mutuals-container');
-            container.innerHTML = ''; // Clear to prevent dupes if reloading
-            
-            list.forEach(uData => {
-                const el = createMutualCard(uData);
-                container.appendChild(el);
-            });
+            container.innerHTML = ''; 
+            list.forEach(uData => container.appendChild(createMutualCard(uData)));
         }
 
         async function loadMoreMutuals() {
@@ -526,33 +522,48 @@
             loader.style.display = 'block';
 
             const nextBatchIds = mutualList.slice(loadedCount, loadedCount + BATCH_SIZE);
-            const container = document.getElementById('mutuals-container');
-            
             let fetchedData = [];
 
+            // Check if these IDs are already in cache to save reads? 
+            // For now, we fetch fresh to ensure PFP/Name is up to date, but we could optimize.
+            // Let's check `mutualsCache` for these IDs first.
+            
             for (const uid of nextBatchIds) {
-                try {
-                    const uDoc = await db.collection('users').doc(uid).get();
-                    if (uDoc.exists) {
-                        const uData = uDoc.data();
-                        uData.uid = uid; // Ensure ID is present
-                        fetchedData.push(uData);
-                        
-                        // Append directly to UI
-                        if(loadedCount === 0 && fetchedData.length === 1) container.innerHTML = ''; // Clear stale cache on first fresh load
-                        const el = createMutualCard(uData);
-                        container.appendChild(el);
-                    }
-                } catch(e) {}
+                // Simple optimization: If already in cache, use it, else fetch
+                const existing = mutualsCache.find(u => u.uid === uid);
+                
+                if (existing) {
+                     fetchedData.push(existing);
+                } else {
+                     try {
+                        const uDoc = await db.collection('users').doc(uid).get();
+                        if (uDoc.exists) {
+                            const uData = uDoc.data();
+                            uData.uid = uid; 
+                            fetchedData.push(uData);
+                        }
+                    } catch(e) {}
+                }
             }
 
-            // Update Cache
+            // Update Cache & Render
             if(loadedCount === 0) {
+                // If first batch, replace cache (in case unfriend happened)
                 mutualsCache = fetchedData;
             } else {
-                mutualsCache = [...mutualsCache, ...fetchedData];
+                // Append unique items
+                fetchedData.forEach(newItem => {
+                    if(!mutualsCache.some(c => c.uid === newItem.uid)) {
+                        mutualsCache.push(newItem);
+                    }
+                });
             }
+            
             localStorage.setItem('pulse_mutuals_cache', JSON.stringify(mutualsCache));
+            
+            // Append only new items to UI to prevent flicker? 
+            // Or just re-render all for simplicity? Re-rendering all guarantees order.
+            renderList(mutualsCache); 
 
             loadedCount += nextBatchIds.length;
             loader.style.display = 'none';
@@ -563,7 +574,6 @@
             div.className = 'm-card';
             div.dataset.name = (uData.name || '') + (uData.username || '');
             
-            // Verified Badge Logic
             const verifiedHtml = uData.verified ? `<span class="material-icons-round verified-badge">verified</span>` : '';
 
             div.innerHTML = `
@@ -577,9 +587,9 @@
                 </div>
             `;
 
-            // CLICK: Redirects to Pulse Session with this UID
             div.onclick = () => {
                 if(navigator.vibrate) navigator.vibrate(10);
+                // Force reload to switch modes cleanly
                 window.location.assign(`pulse.html?uid=${uData.uid}&t=${Date.now()}`); 
             };
             return div;
@@ -591,7 +601,6 @@
         // ============================================
 
         async function verifyMutuals(me, them) {
-            // LOAD FROM CACHE FIRST
             const cachedTarget = JSON.parse(localStorage.getItem(`pulse_profile_${them}`));
             if(cachedTarget) {
                 targetProfile = cachedTarget;
@@ -599,7 +608,6 @@
             }
 
             try {
-                // Double check mutuals live to be safe
                 const myDoc = await db.collection('users').doc(me).get();
                 const theirDoc = await db.collection('users').doc(them).get();
                 
@@ -608,7 +616,6 @@
                 myProfile = myDoc.data(); 
                 targetProfile = theirDoc.data();
                 
-                // Cache target for speed
                 localStorage.setItem(`pulse_profile_${them}`, JSON.stringify(targetProfile));
                 renderTargetProfile(targetProfile);
 
@@ -625,42 +632,35 @@
         }
 
         function initPulseSession() {
-            // Sort UIDs so room ID is identical for both users
             const roomId = [myUid, targetUid].sort().join('_');
             roomRef = db.collection('pulse_rooms').doc(roomId);
 
             showScreen('screen-waiting');
 
             const updateField = (myUid < targetUid) ? 'userA' : 'userB';
-            
             roomRef.set({ 
                 [updateField]: 'online', 
                 lastActive: firebase.firestore.FieldValue.serverTimestamp() 
             }, { merge: true });
 
-            window.addEventListener('beforeunload', () => leaveSession());
+            // AGGRESSIVE DISCONNECT
+            const cleanup = () => leaveSession();
+            window.addEventListener('beforeunload', cleanup);
+            window.addEventListener('pagehide', cleanup);
+            document.addEventListener('visibilitychange', () => { if(document.hidden) cleanup(); });
 
-            // Realtime Sync
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
                 const otherField = (myUid < targetUid) ? 'userB' : 'userA';
                 
-                // 1. Connection Handshake
                 if (data[otherField] === 'online') {
-                    if (!document.getElementById('screen-active').classList.contains('active')) {
-                        activatePulse(data);
-                    }
+                    if (!document.getElementById('screen-active').classList.contains('active')) activatePulse(data);
                 } else {
-                    if (document.getElementById('screen-active').classList.contains('active')) {
-                        deactivatePulse();
-                    }
+                    if (document.getElementById('screen-active').classList.contains('active')) deactivatePulse();
                 }
 
-                // 2. Audio Sync
                 if (data.currentSong) syncAudio(data.currentSong);
-
-                // 3. Reactions
                 if (data.reaction && data.reactionSender !== myUid) spawnReaction(data.reaction);
             });
         }
@@ -668,8 +668,6 @@
         function activatePulse(data) {
             showScreen('screen-active');
             if(navigator.vibrate) navigator.vibrate([40, 40, 40]);
-            
-            // Determine Role: UserA is initial DJ
             isDJ = (myUid < targetUid); 
             renderControls();
         }
@@ -677,7 +675,9 @@
         function deactivatePulse() {
             showScreen('screen-waiting');
             audio.pause();
-            // Reset UI
+            audio.currentTime = 0; // Reset
+            audio.src = "";
+            
             document.getElementById('active-album-art').classList.remove('playing');
             document.getElementById('active-song-title').innerText = "Pulse Paused";
             document.getElementById('active-song-artist').innerText = "Waiting for reconnection...";
@@ -694,7 +694,6 @@
                 btn.className = "dj-btn";
                 btn.onclick = () => document.getElementById('song-picker').open();
                 container.appendChild(btn);
-                
                 document.getElementById('reaction-bar').classList.remove('show');
             } else {
                 container.innerHTML = `<p style="font-size:12px; color:#888; margin-top:20px; letter-spacing:1px; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is DJ</p>`;
@@ -704,16 +703,14 @@
 
         // --- EVENTS ---
 
-        // OPTIMISTIC UPDATE: Play song locally immediately to fix latency for DJ
         document.addEventListener('song-selected', (e) => {
             const song = e.detail;
             
-            // 1. Play locally instantly
+            // 1. Play Locally Immediately
             syncAudio(song);
             
-            // 2. Send to network
+            // 2. Broadcast
             roomRef.update({ currentSong: song, timestamp: Date.now(), dj: myUid });
-            
             if(navigator.vibrate) navigator.vibrate(20);
         });
 
@@ -722,7 +719,6 @@
                 audio.src = song.previewUrl;
                 audio.play().catch(e => console.log("Autoplay blocked - Tap needed"));
                 
-                // Update Metadata
                 const highRes = song.artworkUrl100.replace('100x100', '600x600');
                 document.getElementById('active-album-art').src = highRes;
                 document.getElementById('active-song-title').innerText = song.trackName;
@@ -730,7 +726,6 @@
                 
                 document.getElementById('active-album-art').classList.add('playing');
                 
-                // Color Extraction Simulation (Hash of string to Hue)
                 const hue = (song.artistName.length * 50) % 360;
                 document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
                 document.getElementById('theme-meta').setAttribute('content', `hsl(${hue}, 60%, 10%)`);
@@ -759,8 +754,8 @@
                 roomRef.update({ [updateField]: 'offline' });
             }
             audio.pause();
+            audio.src = ""; // Clear buffer
             
-            // If in active session, go back to Lobby (which is this page without params)
             if (targetUid) window.location.href = "pulse.html"; 
             else history.back();
         }
