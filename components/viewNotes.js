@@ -486,6 +486,9 @@ class ViewNotes extends HTMLElement {
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
 
+        // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
+        const uiColor = note.textColor || '#ffffff';
+
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper">
@@ -496,20 +499,20 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
 
-                    <div class="vn-bubble ${glassClass}" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text || 'Share a thought...'}</div>
+                    <div class="vn-bubble ${glassClass}" style='background:${bgColor}; color:${txtColor}; align-items:${alignItems};'>
+                        <div class="vn-note-text ${effectClass}" style='text-align:${textAlign}; font-family:${fontStyle};'>${note.text || 'Share a thought...'}</div>
                     </div>
                     
                     <img src="${displayPfp}" class="vn-pfp-sticker" style="border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
                 </div>
 
                 <div class="vn-info-bar">
-                     <div class="vn-username">
+                     <div class="vn-username" style="color: ${uiColor};">
                         ${displayName} (You)
                         ${isVerified ? icons.verified : ''}
                         ${isCF ? icons.star : ''}
                     </div>
-                    <div class="vn-timestamp">${timeAgo}</div>
+                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">${timeAgo}</div>
                 </div>
             </div>
 
@@ -569,6 +572,9 @@ class ViewNotes extends HTMLElement {
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
 
+        // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
+        const uiColor = note.textColor || '#ffffff';
+
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper vn-clickable" id="vn-header-click">
@@ -579,21 +585,21 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
 
-                    <div class="vn-bubble ${glassClass}" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
+                    <div class="vn-bubble ${glassClass}" id="vn-active-card" style='background:${bgColor}; color:${txtColor}; align-items:${alignItems};'>
                         <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text}</div>
+                        <div class="vn-note-text ${effectClass}" style='text-align:${textAlign}; font-family:${fontStyle};'>${note.text}</div>
                     </div>
 
                     <img src="${displayPfp}" class="vn-pfp-sticker" style="border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
                 </div>
 
                 <div class="vn-info-bar">
-                     <div class="vn-username">
+                     <div class="vn-username" style="color: ${uiColor};">
                         ${displayName}
                         ${isVerified ? icons.verified : ''}
                         ${isCF ? icons.star : ''}
                     </div>
-                    <div class="vn-timestamp">${timeAgo}</div>
+                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">${timeAgo}</div>
                 </div>
             </div>
 
