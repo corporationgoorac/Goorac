@@ -740,7 +740,8 @@ class ViewNotes extends HTMLElement {
     getFriendNoteHTML(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
-        const timeAgo = this.getRelativeTime(note.createdAt);
+        let timeAgo = this.getRelativeTime(note.createdAt);
+        if (timeAgo !== 'Just now') timeAgo += ' ago';
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
@@ -766,7 +767,7 @@ class ViewNotes extends HTMLElement {
 
         return `
             <div class="vn-content">
-                <div class="vn-bubble-wrapper vn-clickable" id="vn-header-click">
+                <div class="vn-bubble-wrapper">
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
@@ -783,11 +784,11 @@ class ViewNotes extends HTMLElement {
                         <div class="vn-note-text ${effectClass}" style='text-align:${textAlign}; font-family:${fontStyle};'>${note.text}</div>
                     </div>
 
-                    <img src="${displayPfp}" class="vn-pfp-sticker" style="border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
+                    <img src="${displayPfp}" id="vn-pfp-click" class="vn-pfp-sticker" style="cursor:pointer; border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
                 </div>
 
                 <div class="vn-info-bar">
-                     <div class="vn-display-name" style="color: ${uiColor};">
+                     <div class="vn-display-name" id="vn-name-click" style="cursor:pointer; color: ${uiColor};">
                         ${displayName}
                         ${isVerified ? icons.verified : ''}
                     </div>
@@ -921,9 +922,15 @@ class ViewNotes extends HTMLElement {
         if (!user) return;
         const icons = this.getIcons();
 
-        const headerClick = this.querySelector('#vn-header-click');
-        if (headerClick) {
-            headerClick.onclick = () => this.handleProfileRedirect();
+        // Updated Listeners for PFP and Name Click
+        const pfpClick = this.querySelector('#vn-pfp-click');
+        if (pfpClick) {
+            pfpClick.onclick = () => this.handleProfileRedirect();
+        }
+
+        const nameClick = this.querySelector('#vn-name-click');
+        if (nameClick) {
+            nameClick.onclick = () => this.handleProfileRedirect();
         }
 
         const card = this.querySelector('#vn-active-card');
