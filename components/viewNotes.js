@@ -55,7 +55,7 @@ class ViewNotes extends HTMLElement {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
+            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
             star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#00ba7c"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`
         };
     }
@@ -81,7 +81,7 @@ class ViewNotes extends HTMLElement {
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 90dvh; /* Taller height for better visibility */
+                height: 90dvh; 
                 max-height: 850px;
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
@@ -118,7 +118,7 @@ class ViewNotes extends HTMLElement {
                 position: absolute; top: 0; left: 0; width: 100%;
                 height: 60px;
                 display: flex; justify-content: center; align-items: center;
-                z-index: 50; /* Ensure header is on top */
+                z-index: 50; 
             }
             
             .vn-drag-handle { 
@@ -177,7 +177,7 @@ class ViewNotes extends HTMLElement {
                 word-break: break-word; width: 100%; white-space: pre-wrap;
             }
             
-            /* PFP STICKER - BOTTOM RIGHT LIKE NOTES.HTML */
+            /* PFP STICKER */
             .vn-pfp-sticker {
                 position: absolute; 
                 bottom: -15px; 
@@ -213,6 +213,7 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
+            /* SONG PILL - FIXED LAYOUT */
             .vn-music-pill { 
                 position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 8px; 
@@ -221,14 +222,11 @@ class ViewNotes extends HTMLElement {
                 border: 1px solid rgba(255,255,255,0.2);
                 backdrop-filter: blur(10px); color: #fff; z-index: 12;
                 white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                
-                /* FIX: Layout overflow for Song Name */
-                max-width: 85%;
+                /* Fix Overflow */
+                max-width: 80%;
             }
-            
             .vn-music-pill span {
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                max-width: 150px; display: inline-block;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
             }
 
             .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
@@ -404,6 +402,12 @@ class ViewNotes extends HTMLElement {
 
         const overlay = this.querySelector('#vn-overlay');
         overlay.classList.add('open');
+        
+        // FIX: Ensure Modal doesn't get struck (Force reflow/wait for paint)
+        requestAnimationFrame(() => {
+            overlay.classList.add('open');
+        });
+
         window.history.pushState({ vnOpen: true }, "", "#view-note");
         if(navigator.vibrate) navigator.vibrate(15);
         
@@ -1009,22 +1013,27 @@ const NotesManager = {
             
             /* Close Friends Indicator in List - Fixed for visibility */
             .note-bubble.cf-note {
-                border: 2px solid #00ba7c !important; /* Green Solid Border for better visibility */
-                box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
+                border: 2px solid #00D26A !important; /* Green Solid Border for better visibility */
+                box-shadow: 0 0 8px rgba(0, 210, 106, 0.4);
             }
-            /* Add tiny green star badge to outer bubble for CF */
-            .note-bubble.cf-note::before {
-                content: '★';
+            
+            /* Sleek Green Star Badge */
+            .cf-badge {
                 position: absolute;
-                top: -5px; right: -5px;
-                width: 16px; height: 16px;
-                background: #00ba7c;
+                top: -6px;
+                right: -6px;
+                width: 18px;
+                height: 18px;
+                background: #00D26A;
                 border-radius: 50%;
+                border: 2px solid #121212;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 color: #000;
                 font-size: 10px;
-                display: flex; align-items: center; justify-content: center;
-                z-index: 15;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                z-index: 20;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             }
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
@@ -1139,8 +1148,14 @@ const NotesManager = {
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
+                    const isCF = data.audience === 'close_friends';
+                    const cfClass = isCF ? 'cf-note' : '';
+                    if(isCF) preview.classList.add('cf-note');
+                    else preview.classList.remove('cf-note');
+
                     // FIX: Single Quotes for font-family in preview
                     preview.innerHTML = `
+                        ${isCF ? '<div class="cf-badge">★</div>' : ''}
                         ${data.text ? `<div class="note-text-content" style='text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}'>${data.text}</div>` : ''}
                         ${data.songName ? `
                             <div class="note-music-tag">
@@ -1159,6 +1174,7 @@ const NotesManager = {
                 } else {
                     preview.style.background = 'rgba(255,255,255,0.1)';
                     preview.style.color = 'rgba(255,255,255,0.7)';
+                    preview.classList.remove('cf-note');
                     preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                     btn.classList.remove('has-note');
                     btn.onclick = () => window.location.href = 'notes.html';
@@ -1235,6 +1251,7 @@ const NotesManager = {
                                 // FIX: Single Quotes for Style in outer bubble to fix Font Issue
                                 div.innerHTML = `
                                     <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
+                                        ${isCF ? '<div class="cf-badge">★</div>' : ''}
                                         <div class="note-text-content" style='text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}'>${noteData.text}</div>
                                         ${noteData.songName ? `
                                             <div class="note-music-tag">
@@ -1246,26 +1263,4 @@ const NotesManager = {
                                     <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                                     ${isLiked ? `
                                         <div class="note-like-indicator">
-                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                                        </div>` : ''}
-                                    <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
-                                `;
-                                div.onclick = () => {
-                                    const viewer = document.querySelector('view-notes');
-                                    const nav = document.querySelector('main-navbar');
-                                    if(nav) nav.classList.add('hidden');
-                                    if(navigator.vibrate) navigator.vibrate(10);
-                                    // Pass note data with the Firestore Doc ID
-                                    viewer.open({ ...noteData, id: noteId }, false);
-                                };
-                                container.appendChild(div);
-                            }
-                        });
-                    });
-            });
-
-        } catch (e) { console.error("Error loading notes:", e); }
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => NotesManager.init());
+                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76
