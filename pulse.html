@@ -332,7 +332,7 @@
         <div class="screen" id="screen-waiting">
             <div class="top-nav">
                 <div class="back-btn" onclick="leaveSession()">
-                    <span class="material-icons-round">close</span>
+                    <span class="material-icons-round">west</span>
                 </div>
             </div>
 
@@ -359,9 +359,10 @@
             </div>
 
             <div class="top-nav">
-                 <div style="width:40px;"></div> <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4);">
-                    <span class="material-icons-round" style="color:#ff3b30;">power_settings_new</span>
+                 <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4);">
+                    <span class="material-icons-round">west</span>
                 </div>
+                 <div style="width:40px;"></div> 
             </div>
 
             <div class="player-ui">
@@ -419,14 +420,19 @@
             if (user) {
                 myUid = user.uid;
                 
-                // Preload Self (Faster UI)
-                const cached = JSON.parse(localStorage.getItem('my_goorac_profile'));
-                if(cached) {
-                    myProfile = cached;
-                    const pfp = cached.photoURL || 'https://via.placeholder.com/150';
-                    document.getElementById('lobby-pfp').src = pfp;
-                    document.getElementById('my-avatar').src = pfp;
-                }
+                // --- FIX: Active PFP Fetch (Reliable) ---
+                db.collection('users').doc(user.uid).get().then(doc => {
+                    if(doc.exists) {
+                        const data = doc.data();
+                        const pfp = data.photoURL || 'https://via.placeholder.com/150';
+                        const elLobby = document.getElementById('lobby-pfp');
+                        const elAvatar = document.getElementById('my-avatar');
+                        if(elLobby) elLobby.src = pfp;
+                        if(elAvatar) elAvatar.src = pfp;
+                        // Cache for next time
+                        localStorage.setItem('my_goorac_profile', JSON.stringify(data));
+                    }
+                });
 
                 if (targetUid) {
                     // -> ACTIVE SESSION MODE
@@ -698,9 +704,16 @@
 
         // --- EVENTS ---
 
+        // OPTIMISTIC UPDATE: Play song locally immediately to fix latency for DJ
         document.addEventListener('song-selected', (e) => {
             const song = e.detail;
+            
+            // 1. Play locally instantly
+            syncAudio(song);
+            
+            // 2. Send to network
             roomRef.update({ currentSong: song, timestamp: Date.now(), dj: myUid });
+            
             if(navigator.vibrate) navigator.vibrate(20);
         });
 
@@ -748,7 +761,6 @@
             audio.pause();
             
             // If in active session, go back to Lobby (which is this page without params)
-            // But since we use href, history.back() works best to return to Profile or Lobby
             if (targetUid) window.location.href = "pulse.html"; 
             else history.back();
         }
