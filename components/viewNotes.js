@@ -649,6 +649,27 @@ class ViewNotes extends HTMLElement {
         const songText = note.songName ? `${note.songName}` : '';
         const isLongText = songText.length > 20;
 
+        // Logic for Timer / Expiry Display
+        let timerDisplay = '';
+        if (note.isActive !== false) {
+            // It is active
+            const createdAt = note.createdAt ? (note.createdAt.toDate ? note.createdAt.toDate() : new Date(note.createdAt)) : new Date();
+            const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+            const now = new Date();
+            const diffMs = expiresAt - now;
+
+            if (diffMs > 0) {
+                const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                timerDisplay = `Expires in ${diffHrs}h ${diffMins}m`;
+            } else {
+                timerDisplay = 'Expired';
+            }
+        } else {
+            // It is inactive (archived/deleted/expired state)
+            timerDisplay = this.getRelativeTime(note.createdAt) + ' ago';
+        }
+
         return `
             <div class="vn-content">
                 <div class="vn-bubble-wrapper">
@@ -688,6 +709,11 @@ class ViewNotes extends HTMLElement {
                         Activity
                         <span style="font-size:0.8rem; font-weight:500; opacity:0.6; margin-top:2px;">${(note.likes||[]).length} Likes</span>
                     </span>
+                    
+                    <span style="font-size:0.85rem; font-weight:600; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.5px;">
+                        ${timerDisplay}
+                    </span>
+
                     <div class="vn-actions-trigger" id="vn-trigger-actions">
                          <span class="material-icons-round">more_horiz</span>
                     </div>
