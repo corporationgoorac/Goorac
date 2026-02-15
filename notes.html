@@ -29,7 +29,8 @@
             --surface: #1c1c1e;
             --accent: #00d2ff; 
             --text: #ffffff;
-            --safe-bottom: env(safe-area-inset-bottom);
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --safe-top: env(safe-area-inset-top, 20px);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -39,79 +40,108 @@
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0; padding: 0;
-            height: 100vh; display: flex; flex-direction: column;
+            height: 100vh; 
+            display: flex; flex-direction: column;
             overflow: hidden; /* Lock scroll */
+        }
+
+        /* --- PREVIEW BACKGROUND (Full Screen) --- */
+        #preview-bg {
+            position: absolute; inset: 0; z-index: 0;
+            background-color: #000;
+            transition: background 0.5s ease;
+        }
+        /* Overlay to dim the background so the note pops */
+        #preview-overlay {
+            position: absolute; inset: 0; z-index: 1;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         }
 
         /* --- HEADER --- */
         header {
-            padding: 15px 20px;
+            position: relative; z-index: 10;
+            padding: calc(15px + var(--safe-top)) 20px 15px;
             display: flex; justify-content: space-between; align-items: center;
-            z-index: 10;
         }
-        .cancel-btn { color: #888; font-size: 16px; font-weight: 500; cursor: pointer; }
+        .cancel-btn { color: rgba(255,255,255,0.7); font-size: 16px; font-weight: 500; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .header-title { font-weight:700; font-size:15px; letter-spacing:0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
         .post-btn { 
-            background: var(--text); color: #000; 
-            padding: 8px 20px; border-radius: 100px; 
+            background: #fff; color: #000; 
+            padding: 8px 22px; border-radius: 100px; 
             font-weight: 700; font-size: 14px; border: none; 
             transition: 0.2s; opacity: 0.5; pointer-events: none;
+            box-shadow: 0 4px 15px rgba(255,255,255,0.2);
         }
         .post-btn.active { opacity: 1; pointer-events: auto; }
-        .post-btn.loading { opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 8px; }
+        .post-btn.loading { opacity: 0.8; pointer-events: none; display: flex; align-items: center; gap: 8px; }
 
-        /* --- PREVIEW AREA --- */
-        .preview-area {
+        /* --- WORKSPACE --- */
+        .workspace {
             flex: 1; display: flex; flex-direction: column; 
             justify-content: center; align-items: center;
-            position: relative; padding: 20px;
-            transition: background 0.3s;
+            position: relative; z-index: 5;
+            padding-bottom: 20vh; /* Push note up slightly */
         }
-        
-        /* The Note Bubble */
-        .note-bubble {
-            width: 140px; height: 140px;
-            border-radius: 35px;
-            display: flex; align-items: center; justify-content: center;
-            text-align: center;
-            padding: 15px;
+
+        /* Wrapper to hold floating elements (Music, PFP) without clipping */
+        .bubble-wrapper {
             position: relative;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            width: 150px; height: 150px;
+        }
+
+        /* The Actual Note Bubble */
+        .note-bubble {
+            width: 100%; height: 100%;
+            border-radius: 38px;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: 18px;
+            position: relative; z-index: 2;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            overflow: hidden; /* Clip text inside */
         }
         
         .note-text {
-            font-size: 18px; font-weight: 600; line-height: 1.3;
+            font-size: 19px; font-weight: 600; line-height: 1.35;
             outline: none; min-width: 50px;
             word-break: break-word; white-space: pre-wrap;
-            z-index: 2;
+            z-index: 2; position: relative;
         }
-        /* Placeholder logic handled in JS or pseudo */
-        .note-text:empty:before { content: 'Share a thought...'; color: inherit; opacity: 0.5; }
+        .note-text:empty:before { content: 'Tap to type...'; opacity: 0.6; }
 
-        /* Small avatar bubble attached */
+        /* Effects classes */
+        .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+        .fx-shadow { text-shadow: 2px 2px 0px rgba(0,0,0,0.5); }
+
+        /* PFP Floating Outside */
         .note-pfp {
-            position: absolute; bottom: -10px; right: -10px;
-            width: 45px; height: 45px; border-radius: 50%;
-            border: 4px solid var(--bg);
-            background: #333; object-fit: cover; z-index: 3;
+            position: absolute; bottom: -12px; right: -12px;
+            width: 48px; height: 48px; border-radius: 50%;
+            border: 3px solid #000; /* Will be updated via JS to match bg */
+            background: #333; object-fit: cover; z-index: 10;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
-        /* Music Bubble attached */
+        /* Music Tag Floating Outside */
         .music-tag {
-            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
-            padding: 6px 12px; border-radius: 20px;
-            display: flex; align-items: center; gap: 6px;
-            font-size: 11px; font-weight: 600; color: #fff;
-            opacity: 0; transform: translateX(-50%) translateY(10px);
-            transition: 0.3s; z-index: 4; border: 1px solid rgba(255,255,255,0.1);
-            max-width: 160px; white-space: nowrap;
+            position: absolute; top: -38px; left: 50%; transform: translateX(-50%) translateY(10px);
+            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(12px);
+            padding: 6px 14px; border-radius: 100px;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 11px; font-weight: 700; color: #fff;
+            opacity: 0; pointer-events: none;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 0; border: 1px solid rgba(255,255,255,0.1);
+            max-width: 200px; white-space: nowrap;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
         }
-        .music-tag.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .music-anim { display: flex; gap: 2px; align-items: flex-end; height: 10px; }
-        .music-anim span { width: 2px; background: #fff; border-radius: 1px; animation: eq 1s infinite ease-in-out; }
+        .music-tag.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; z-index: 20; top: -16px; }
+        
+        .music-anim { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+        .music-anim span { width: 3px; background: var(--accent); border-radius: 2px; animation: eq 1s infinite ease-in-out; }
         .music-anim span:nth-child(1) { height: 60%; animation-delay: 0s; }
         .music-anim span:nth-child(2) { height: 100%; animation-delay: 0.2s; }
         .music-anim span:nth-child(3) { height: 50%; animation-delay: 0.4s; }
@@ -119,91 +149,110 @@
 
         /* --- CONTROLS (Bottom Sheet) --- */
         .controls {
-            background: var(--surface);
-            border-top-left-radius: 24px; border-top-right-radius: 24px;
-            padding: 20px 20px calc(20px + var(--safe-bottom));
-            display: flex; flex-direction: column; gap: 20px;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-            border-top: 1px solid #333;
+            position: relative; z-index: 20;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border-top-left-radius: 32px; border-top-right-radius: 32px;
+            padding: 25px 20px calc(20px + var(--safe-bottom));
+            display: flex; flex-direction: column; gap: 24px;
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.6);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease;
         }
 
         .control-row { display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
         .control-row::-webkit-scrollbar { display: none; }
 
         .c-btn {
-            width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%;
-            background: #2c2c2e; border: 1px solid #3a3a3c;
+            width: 48px; height: 48px; flex-shrink: 0; border-radius: 16px;
+            background: rgba(255,255,255,0.06); 
             display: flex; align-items: center; justify-content: center;
-            color: #fff; cursor: pointer; transition: 0.2s;
+            color: #ccc; cursor: pointer; transition: 0.2s;
         }
-        .c-btn.active { background: var(--text); color: #000; border-color: #fff; transform: scale(1.1); }
+        .c-btn:active { transform: scale(0.95); }
+        .c-btn.active { background: #fff; color: #000; box-shadow: 0 5px 15px rgba(255,255,255,0.2); }
         
-        .color-dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; flex-shrink: 0; cursor: pointer; }
-        .color-dot.active { border-color: #fff; transform: scale(1.15); }
+        .color-dot { 
+            width: 42px; height: 42px; border-radius: 50%; 
+            border: 2px solid rgba(255,255,255,0.1); 
+            flex-shrink: 0; cursor: pointer; transition: 0.2s;
+        }
+        .color-dot.active { border-color: #fff; transform: scale(1.15); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
 
         .font-pill {
-            padding: 8px 16px; background: #2c2c2e; border-radius: 12px;
-            font-size: 13px; color: #fff; white-space: nowrap; flex-shrink: 0;
-            border: 1px solid #3a3a3c; cursor: pointer;
+            padding: 10px 18px; background: rgba(255,255,255,0.06); border-radius: 14px;
+            font-size: 14px; color: #ccc; white-space: nowrap; flex-shrink: 0;
+            cursor: pointer; transition: 0.2s;
         }
-        .font-pill.active { background: #fff; color: #000; border-color: #fff; }
+        .font-pill.active { background: #fff; color: #000; transform: scale(1.05); font-weight: 700; }
 
-        /* --- AUDIENCE SELECTOR (NEW) --- */
+        /* --- AUDIENCE SELECTOR --- */
         .audience-wrapper {
             display: flex; align-items: center; justify-content: space-between;
-            background: rgba(255,255,255,0.05); padding: 12px 16px;
-            border-radius: 16px; margin-bottom: 10px;
-            border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(0,0,0,0.3); padding: 8px 16px;
+            border-radius: 14px; border: 1px solid rgba(255,255,255,0.05);
         }
         .privacy-toggle {
             display: flex; align-items: center; gap: 10px;
             font-size: 13px; font-weight: 600; color: #aaa;
-            cursor: pointer;
+            cursor: pointer; padding: 6px 0;
         }
         .privacy-toggle.selected { color: var(--accent); }
         .privacy-icon { font-size: 18px; }
         
         .edit-cf-btn {
-            font-size: 11px; font-weight: 700; color: var(--text);
-            background: rgba(255,255,255,0.1); padding: 5px 12px;
+            font-size: 11px; font-weight: 700; color: #fff;
+            background: var(--accent); padding: 6px 14px;
             border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
-            display: none; /* Hidden by default */
+            display: none; box-shadow: 0 4px 12px rgba(0, 210, 255, 0.25);
+            cursor: pointer;
         }
 
-        /* --- NEW FEATURE: DICE --- */
+        /* --- DICE (SHUFFLE) --- */
         .dice-btn {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 40px; height: 40px; background: rgba(255,255,255,0.1);
+            position: absolute; bottom: 25px; right: 25px;
+            width: 45px; height: 45px; background: rgba(255,255,255,0.1);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            backdrop-filter: blur(5px); cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px); cursor: pointer; border: 1px solid rgba(255,255,255,0.15);
+            z-index: 100; transition: 0.3s;
         }
-        .dice-btn:active { transform: rotate(180deg); transition: 0.4s; }
+        .dice-btn:active { transform: rotate(180deg) scale(0.9); background: #fff; color: #000 !important; }
+        .dice-btn .material-icons-round { color: #fff; transition: 0.3s; }
+        .dice-btn:active .material-icons-round { color: #000; }
 
     </style>
 </head>
 <body>
 
+    <div id="preview-bg"></div>
+    <div id="preview-overlay"></div>
+
     <header>
         <div class="cancel-btn" onclick="history.back()">Cancel</div>
-        <div style="font-weight:700; font-size:15px; letter-spacing:0.5px;">NEW NOTE</div>
+        <div class="header-title">NEW NOTE</div>
         <button class="post-btn" id="post-btn" onclick="postNote()">Post</button>
     </header>
 
-    <div class="preview-area" id="preview-bg">
-        <div class="note-bubble" id="note-bubble">
+    <div class="workspace">
+        <div class="bubble-wrapper">
             <div class="music-tag" id="music-tag">
                 <div class="music-anim"><span></span><span></span><span></span></div>
-                <span id="music-text">Song Name</span>
-                <span class="material-icons-round" style="font-size:12px; margin-left:4px; cursor:pointer;" onclick="removeSong()">close</span>
+                <div style="display:flex; flex-direction:column; gap:0px; overflow:hidden;">
+                    <span id="music-text" style="line-height:1.2;">Song Name</span>
+                    <span id="music-artist" style="font-size:9px; opacity:0.7; font-weight:500;">Artist</span>
+                </div>
+                <span class="material-icons-round" style="font-size:14px; margin-left:6px; opacity:0.6; cursor:pointer;" onclick="removeSong()">close</span>
             </div>
 
-            <div class="note-text" id="note-input" contenteditable="true" spellcheck="false"></div>
+            <div class="note-bubble" id="note-bubble">
+                <div class="note-text" id="note-input" contenteditable="true" spellcheck="false"></div>
+            </div>
             
             <img class="note-pfp" id="user-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
         </div>
 
         <div class="dice-btn" onclick="randomizeStyle()">
-            <span class="material-icons-round" style="font-size: 20px; color:#fff;">casino</span>
+            <span class="material-icons-round" style="font-size: 22px;">casino</span>
         </div>
     </div>
 
@@ -219,11 +268,16 @@
 
         <div class="control-row">
             <div class="c-btn" onclick="document.getElementById('song-picker').open()"><span class="material-icons-round">music_note</span></div>
+            
             <div class="c-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
-            <div style="width:1px; height:20px; background:#333; margin:0 5px;"></div>
+            
+            <div class="c-btn" onclick="toggleEffect()" id="fx-btn"><span class="material-icons-round">auto_fix_high</span></div>
+
+            <div style="width:1px; height:24px; background:rgba(255,255,255,0.1); margin:0 8px;"></div>
+            
             <div class="font-pill active" onclick="setFont(0)" style="font-family:-apple-system">System</div>
             <div class="font-pill" onclick="setFont(1)" style="font-family:'Abril Fatface'">Serif</div>
-            <div class="font-pill" onclick="setFont(2)" style="font-family:'Bangers'">Loud</div>
+            <div class="font-pill" onclick="setFont(2)" style="font-family:'Bangers'; letter-spacing:1px;">Loud</div>
             <div class="font-pill" onclick="setFont(3)" style="font-family:'Dancing Script'">Script</div>
             <div class="font-pill" onclick="setFont(4)" style="font-family:'Orbitron'">Neon</div>
             <div class="font-pill" onclick="setFont(5)" style="font-family:'Fredoka'">Cute</div>
@@ -235,7 +289,6 @@
     </div>
 
     <song-picker id="song-picker"></song-picker>
-    
     <close-friends-selector id="cf-selector"></close-friends-selector>
 
 <script>
@@ -249,25 +302,25 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
     let currentUser = null;
-    let isPosting = false; // Prevent multiple posts
+    let isPosting = false; 
 
-    // --- STATE & DATA ---
+    // --- CONFIG ---
     const bgColors = [
-        { bg: '#ffffff', text: '#000000' }, // Classic White
-        { bg: '#1c1c1e', text: '#ffffff' }, // Dark Mode
-        { bg: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', text: '#5e2d35' }, // Pastel Pink
-        { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', text: '#4a2d5e' }, // Purple Haze
-        { bg: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', text: '#1d5a44' }, // Mint
-        { bg: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)', text: '#582d1c' }, // Sunset
-        { bg: 'linear-gradient(45deg, #85FFBD 0%, #FFFB7D 100%)', text: '#3c5e1a' }, // Lemon Lime
-        { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355' }, // Ocean
-        { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366' }, // Sky
-        { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a' }, // Dream
-        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff' }, // Emerald
-        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff' }, // Aqua Deep
-        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff' }, // Love
-        { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff'}, // Plasma
-        { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff' } // Stars
+        { bg: '#ffffff', text: '#000000' }, 
+        { bg: '#1c1c1e', text: '#ffffff' }, 
+        { bg: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', text: '#5e2d35' },
+        { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', text: '#4a2d5e' },
+        { bg: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', text: '#1d5a44' },
+        { bg: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)', text: '#582d1c' },
+        { bg: 'linear-gradient(45deg, #85FFBD 0%, #FFFB7D 100%)', text: '#3c5e1a' },
+        { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355' },
+        { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366' },
+        { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a' },
+        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff' },
+        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff' },
+        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff' },
+        { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff'},
+        { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff' }
     ];
 
     const fonts = [
@@ -280,13 +333,20 @@
         '"Righteous", cursive'
     ];
 
+    const effects = [
+        { name: 'none', class: '' },
+        { name: 'glow', class: 'fx-glow' },
+        { name: 'shadow', class: 'fx-shadow' }
+    ];
+
     const state = {
         text: '',
         colorIdx: 0,
         fontIdx: 0,
-        align: 'center', // left, center, right
+        effectIdx: 0,
+        align: 'center', 
         song: null,
-        audience: 'public' // public, close_friends
+        audience: 'public' 
     };
 
     const els = {
@@ -294,20 +354,22 @@
         input: document.getElementById('note-input'),
         postBtn: document.getElementById('post-btn'),
         musicTag: document.getElementById('music-tag'),
+        musicText: document.getElementById('music-text'),
+        musicArtist: document.getElementById('music-artist'),
         cfBtn: document.getElementById('edit-cf'),
         audIcon: document.getElementById('audience-icon'),
-        audText: document.getElementById('audience-text')
+        audText: document.getElementById('audience-text'),
+        bg: document.getElementById('preview-bg'),
+        pfp: document.getElementById('user-pfp')
     };
 
     // --- INIT ---
     function init() {
-        // Load User
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
-                // Try to get high-res photo from cache
                 const cached = JSON.parse(localStorage.getItem('goorac_profile'));
-                document.getElementById('user-pfp').src = (cached ? cached.photoURL : user.photoURL) || 'https://via.placeholder.com/150';
+                els.pfp.src = (cached ? cached.photoURL : user.photoURL) || 'https://via.placeholder.com/150';
             } else {
                 window.location.href = 'login.html';
             }
@@ -323,25 +385,23 @@
             row.appendChild(dot);
         });
 
-        // Event Listeners
         els.input.addEventListener('input', updateState);
         document.addEventListener('song-selected', (e) => setSong(e.detail));
 
-        // Initial Set
         setColor(0);
         
-        // Check for Draft
+        // Restore Draft
         const draft = JSON.parse(localStorage.getItem('goorac_note_draft'));
         if(draft) {
             els.input.innerText = draft.text || "";
-            setColor(draft.colorIdx || 0);
-            setFont(draft.fontIdx || 0);
+            if(draft.colorIdx !== undefined) setColor(draft.colorIdx);
+            if(draft.fontIdx !== undefined) setFont(draft.fontIdx);
             if(draft.song) setSong(draft.song);
             updateState();
         }
     }
 
-    // --- LOGIC ---
+    // --- STATE MANAGEMENT ---
 
     function updateState() {
         const txt = els.input.innerText.trim();
@@ -353,10 +413,8 @@
             els.postBtn.classList.remove('active');
         }
 
-        // Limit Length (Simple)
         if (txt.length > 60) {
             els.input.innerText = txt.substring(0,60);
-            // Move cursor to end
             const range = document.createRange();
             const sel = window.getSelection();
             range.selectNodeContents(els.input);
@@ -365,7 +423,6 @@
             sel.addRange(range);
         }
 
-        // Save Draft
         localStorage.setItem('goorac_note_draft', JSON.stringify({
             text: state.text,
             colorIdx: state.colorIdx,
@@ -377,22 +434,27 @@
     function setColor(idx) {
         state.colorIdx = idx;
         const theme = bgColors[idx];
+        
+        // Apply Bubble Style
         els.bubble.style.background = theme.bg;
         els.bubble.style.color = theme.text;
         els.input.style.color = theme.text;
         
-        // Update Active Dot
+        // Sync PFP Border to Bubble Color (Professional look)
+        // If gradient, we can't set border color easily to gradient, so use white or black
+        // Simple logic: Is text white? Then background is likely dark. Use dark border.
+        els.pfp.style.borderColor = theme.text === '#ffffff' ? '#000' : '#fff';
+
+        // Update Full Screen Background (Export Logic)
+        els.bg.style.background = theme.bg;
+        
+        // Slight Zoom Effect on BG change
+        els.bg.style.transform = "scale(1.05)";
+        setTimeout(() => els.bg.style.transform = "scale(1)", 300);
+
         document.querySelectorAll('.color-dot').forEach((d, i) => {
             d.classList.toggle('active', i === idx);
         });
-
-        // Update Background (Subtle Effect)
-        document.getElementById('preview-bg').style.background = theme.bg.includes('gradient') 
-            ? theme.bg.replace('135deg', '180deg').replace('100%', '80%') // slightly simpler for bg
-            : theme.bg;
-        // Dim the background heavily so bubble pops
-        document.getElementById('preview-bg').style.backgroundBlendMode = 'overlay';
-        document.getElementById('preview-bg').style.backgroundColor = 'rgba(0,0,0,0.8)';
     }
 
     function setFont(idx) {
@@ -415,10 +477,27 @@
         document.getElementById('align-icon').innerText = icons[next];
     }
 
+    function toggleEffect() {
+        state.effectIdx = (state.effectIdx + 1) % effects.length;
+        const effect = effects[state.effectIdx];
+        
+        // Remove all effect classes
+        effects.forEach(e => { if(e.class) els.input.classList.remove(e.class); });
+        
+        // Add new class
+        if (effect.class) els.input.classList.add(effect.class);
+        
+        const btn = document.getElementById('fx-btn');
+        btn.classList.toggle('active', state.effectIdx !== 0);
+        
+        if(navigator.vibrate) navigator.vibrate(10);
+    }
+
     function setSong(song) {
         state.song = song;
         els.musicTag.classList.add('show');
-        document.getElementById('music-text').innerText = song.trackName;
+        els.musicText.innerText = song.trackName;
+        els.musicArtist.innerText = song.artistName;
         updateState();
     }
 
@@ -428,12 +507,10 @@
         updateState();
     }
 
-    // --- NEW FEATURES ---
-
     function toggleAudience() {
         if(state.audience === 'public') {
             state.audience = 'close_friends';
-            els.audIcon.innerText = 'stars'; // Star icon for CF
+            els.audIcon.innerText = 'stars';
             els.audIcon.style.color = 'var(--accent)';
             els.audText.innerText = 'Close Friends';
             els.audText.style.color = 'var(--accent)';
@@ -453,22 +530,23 @@
     }
 
     function randomizeStyle() {
-        // Random Color
         const rColor = Math.floor(Math.random() * bgColors.length);
         setColor(rColor);
-        // Random Font
         const rFont = Math.floor(Math.random() * fonts.length);
         setFont(rFont);
-        // Haptic
+        
+        // Randomly align
+        const alignModes = ['center', 'left', 'right'];
+        state.align = alignModes[Math.floor(Math.random() * 3)];
+        els.input.style.textAlign = state.align;
+        
         if(navigator.vibrate) navigator.vibrate(10);
     }
 
-    // --- POSTING ---
+    // --- POSTING LOGIC ---
 
     async function postNote() {
-        if (isPosting) return; // Prevent double click
-        
-        // Validation
+        if (isPosting) return;
         if (!state.text && !state.song) return;
         if (!currentUser) return;
 
@@ -476,14 +554,13 @@
         els.postBtn.classList.add('loading');
         els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:14px; animation:spin 1s linear infinite;">refresh</span> Posting...`;
 
-        // 24 Hour Expiry
         const expiry = new Date();
         expiry.setHours(expiry.getHours() + 24);
 
         try {
-            // Get fresh user data for the note snapshot
             const userDoc = await db.collection("users").doc(currentUser.uid).get();
             const userData = userDoc.data() || {};
+            const theme = bgColors[state.colorIdx];
 
             const notePayload = {
                 uid: currentUser.uid,
@@ -491,57 +568,50 @@
                 pfp: userData.photoURL || currentUser.photoURL,
                 verified: userData.verified || false,
                 
-                // Content
+                // Visual Data (Exported for Viewer)
                 text: state.text,
-                bgColor: bgColors[state.colorIdx].bg,
-                textColor: bgColors[state.colorIdx].text,
+                bgColor: theme.bg,         // Bubble Background
+                bgStyle: theme.bg,         // Full Screen Background (For viewer consistency)
+                textColor: theme.text,
                 textAlign: state.align,
                 font: fonts[state.fontIdx],
+                effect: effects[state.effectIdx].name, // Export text effect
                 
-                // Music
+                // Audio Data
                 songName: state.song?.trackName || null,
                 songArtist: state.song?.artistName || null,
                 songPreview: state.song?.previewUrl || null,
                 songArt: state.song?.artworkUrl100 || null,
                 
-                // Logic
+                // Metadata
                 isActive: true, 
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiry),
                 likes: [],
-                
-                // NEW: Audience Logic
-                audience: state.audience // 'public' or 'close_friends'
+                audience: state.audience 
             };
 
             const batch = db.batch();
-            
-            // Deactivate old notes (One note per user policy)
             const oldNotes = await db.collection("notes").where("uid", "==", currentUser.uid).where("isActive", "==", true).get();
             oldNotes.forEach(doc => batch.update(doc.ref, { isActive: false }));
             
-            // Create new
-            const newNoteRef = db.collection("notes").doc();
-            batch.set(newNoteRef, notePayload);
+            const newRef = db.collection("notes").doc();
+            batch.set(newRef, notePayload);
             
             await batch.commit();
-            
-            // Clear draft after success
             localStorage.removeItem('goorac_note_draft');
             window.location.href = 'home.html';
 
         } catch(e) {
             console.error(e);
-            alert("Failed to post. Check connection.");
+            alert("Connection error. Try again.");
             els.postBtn.innerHTML = 'Post';
             els.postBtn.classList.remove('loading');
-            isPosting = false; // Release lock on error
+            isPosting = false;
         }
     }
 
-    // Start
     init();
-
 </script>
 </body>
 </html>
