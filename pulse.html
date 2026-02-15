@@ -449,7 +449,10 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
-        const targetUid = params.get('uid');
+        
+        // --- UPDATED: Get User via Username Param ---
+        const targetUsername = params.get('user');
+        let targetUid = null;
 
         // State
         let myUid = null;
@@ -478,26 +481,37 @@
             if (user) {
                 myUid = user.uid;
                 
-                // Update profile data in background, UI already loaded from script above
+                // Update profile data in background
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
                         const elLobby = document.getElementById('lobby-pfp');
                         const elAvatar = document.getElementById('my-avatar');
-                        // Update src if changed to ensure high quality
                         if(elLobby && elLobby.src !== pfp) elLobby.src = pfp;
                         if(elAvatar && elAvatar.src !== pfp) elAvatar.src = pfp;
                         localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                     }
                 });
 
-                if (targetUid) {
-                    // -> ACTIVE SESSION MODE
+                if (targetUsername) {
+                    // -> RESOLVE USERNAME -> ACTIVE SESSION MODE
                     document.getElementById('session-view').style.display = 'block';
-                    const allowed = await verifyMutuals(myUid, targetUid);
-                    if (allowed) initPulseSession();
-                    else showError("You are not mutual friends.");
+                    
+                    try {
+                        const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
+                        if (!snap.empty) {
+                            targetUid = snap.docs[0].id;
+                            const allowed = await verifyMutuals(myUid, targetUid);
+                            if (allowed) initPulseSession();
+                            else showError("You are not mutual friends.");
+                        } else {
+                            showError("User not found.");
+                        }
+                    } catch (e) {
+                        showError("Connection failed.");
+                    }
+
                 } else {
                     // -> LOBBY MODE
                     document.getElementById('lobby-view').classList.add('active');
@@ -537,7 +551,6 @@
                     return;
                 }
 
-                // Initial Load - FIX: Don't clear container if cache exists
                 loadedCount = 0;
                 loadMoreMutuals();
 
@@ -562,13 +575,11 @@
             } catch (e) { console.error(e); }
         }
 
-        // Render List Function (Clears Dupes)
+        // Render List Function
         function renderList(list) {
             const container = document.getElementById('mutuals-container');
-            // FIX: Only clear if list is empty or rewriting fully
             if(container.children.length === 0 || list.length === mutualList.length) container.innerHTML = ''; 
             
-            // Clever render: only append new ones
             list.forEach(uData => {
                 const existing = document.querySelector(`.m-card[data-uid="${uData.uid}"]`);
                 if(!existing) container.appendChild(createMutualCard(uData));
@@ -599,7 +610,6 @@
             if(loadedCount === 0) {
                 mutualsCache = fetchedData;
             } else {
-                // De-dupe merge
                 const newItems = fetchedData.filter(newU => !mutualsCache.some(oldU => oldU.uid === newU.uid));
                 mutualsCache = [...mutualsCache, ...newItems];
             }
@@ -632,7 +642,8 @@
 
             div.onclick = () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                window.location.assign(`pulse.html?uid=${uData.uid}&t=${Date.now()}`); 
+                // --- UPDATED REDIRECT TO USE USERNAME ---
+                window.location.assign(`pulse.html?user=${uData.username}&t=${Date.now()}`); 
             };
             return div;
         }
@@ -679,23 +690,24 @@
 
             showScreen('screen-waiting');
 
-            const updateField = (myUid < targetUid) ? 'userA' : 'userB';
+            const myField = (myUid < targetUid) ? 'userA' : 'userB';
+            const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
-            // Initialize Room if not exists or reset logic
-            roomRef.set({ 
-                [updateField]: 'online', 
-                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-
-            // Initialize turn if undefined (User A starts)
+            // Check room status first to see if we need a Clean Start
             roomRef.get().then(doc => {
-               if(doc.exists && !doc.data().turn) {
-                   roomRef.update({ 
-                       turn: (myUid < targetUid) ? myUid : targetUid,
-                       cycleStatus: 'picking',
-                       audioFinished: { [myUid]: false, [targetUid]: false }
-                   });
-               } 
+                const data = doc.exists ? doc.data() : {};
+                
+                // If the other user is offline, OR if the room doesn't exist yet, we WIPE everything.
+                // This ensures a fresh start every time you open the link and they aren't there.
+                if (!doc.exists || data[otherField] === 'offline' || !data[otherField]) {
+                    cleanSessionStart(myField);
+                } else {
+                    // Just join existing
+                    roomRef.update({ 
+                        [myField]: 'online',
+                        lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
             });
 
             // Listeners
@@ -705,7 +717,6 @@
                 if (document.hidden) leaveSession();
             });
 
-            // --- FIX: BACK BUTTON LISTENER ---
             window.addEventListener('popstate', (event) => {
                 const modal = document.getElementById('emoji-modal');
                 if (modal.classList.contains('active')) {
@@ -713,36 +724,30 @@
                 }
             });
 
-            // --- FIX: EMOJI LISTENER ---
-            // We attach it here to ensure it only binds once per session
+            // EMOJI LISTENER
             const picker = document.getElementById('cycle-emoji-picker');
-            // Remove old listeners to prevent duplicates if function re-runs
             const newPicker = picker.cloneNode(true);
             picker.parentNode.replaceChild(newPicker, picker);
             
             newPicker.addEventListener('emoji-click', (e) => {
-                // e.detail is standard for emoji-picker-element
                 if (e.detail && e.detail.unicode) {
                     handleEmojiSelection(e.detail.unicode);
                 } else if (e.detail && e.detail.emoji) {
-                    handleEmojiSelection(e.detail.emoji); // Fallback
+                    handleEmojiSelection(e.detail.emoji);
                 }
             });
 
-            // Audio Events
-            audio.onended = handleAudioEnded; // Assign direct to avoid duplicates
+            audio.onended = handleAudioEnded;
 
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
-                const otherField = (myUid < targetUid) ? 'userB' : 'userA';
                 
                 // Connection Check
                 if (data[otherField] === 'online') {
                     if (!document.getElementById('screen-active').classList.contains('active')) {
-                          showScreen('screen-active');
+                         showScreen('screen-active');
                     }
-                    // Run Cycle Logic
                     syncCycle(data);
                 } else {
                     deactivatePulse();
@@ -750,27 +755,48 @@
             });
         }
 
+        // --- NEW: CLEAN START FUNCTION ---
+        function cleanSessionStart(myField) {
+            // Deterministically assign turn to whoever has the lower UID string (or User A)
+            // This guarantees the same person starts regardless of who clicked link first.
+            const startingTurn = (myUid < targetUid) ? myUid : targetUid;
+
+            roomRef.set({ 
+                userA: (myUid < targetUid) ? 'online' : 'offline',
+                userB: (myUid > targetUid) ? 'online' : 'offline',
+                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                turn: startingTurn,          // Compulsory DJ Assignment
+                cycleStatus: 'picking',
+                currentSong: null,           // Remove previous song
+                emojis: {},                  // Remove previous emojis
+                audioFinished: { [myUid]: false, [targetUid]: false } 
+            });
+        }
+
         function syncCycle(data) {
             currentTurnUid = data.turn;
             isMyTurn = (myUid === currentTurnUid);
-            const status = data.cycleStatus; // 'picking' or 'playing'
+            const status = data.cycleStatus;
 
             // Song Sync
-            // --- FIX: Strict Guard to prevent restart when emoji updates trigger snapshot ---
             if (data.currentSong && (!currentSongId || data.currentSong.id !== currentSongId)) {
                 currentSongId = data.currentSong.id;
                 playSong(data.currentSong);
-                // Reset emoji state for new song
+                resetEmojiState();
+            } else if (!data.currentSong && currentSongId) {
+                // If song was removed (new cycle), reset local state
+                currentSongId = null;
+                audio.pause();
                 resetEmojiState();
             }
 
-            // --- FIX: TURN LOGIC (Check if both finished) ---
+            // Turn Logic: Check if both finished
             if (status === 'playing') {
                 const finished = data.audioFinished || {};
                 const amIFinished = finished[myUid];
                 const isThemFinished = finished[targetUid];
 
-                // If I am the DJ and BOTH have finished, I swap the turn
+                // Only the CURRENT DJ triggers the swap to avoid race conditions
                 if (isMyTurn && amIFinished && isThemFinished) {
                     swapTurn();
                 }
@@ -781,13 +807,11 @@
             const emojiModal = document.getElementById('emoji-modal');
 
             if (status === 'picking') {
-                // Hide emoji modal immediately if we go back to picking
                 emojiModal.classList.remove('active');
                 clearTimeout(emojiTimer);
                 clearTimeout(emojiCloseTimer);
 
                 if (isMyTurn) {
-                    // It is my turn to pick
                     controls.innerHTML = '';
                     const btn = document.createElement('button');
                     btn.className = "dj-btn";
@@ -797,16 +821,15 @@
                     
                     document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
                 } else {
-                    // Waiting for them
                     controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is choosing...</p>`;
                     document.getElementById('active-song-artist').innerText = "Waiting for track...";
                 }
             } 
             else if (status === 'playing') {
-                controls.innerHTML = ''; // Clean controls
+                controls.innerHTML = '';
             }
 
-            // Emoji Sync (Display seated emojis)
+            // Emoji Sync
             if (data.emojis) {
                 if(data.emojis[myUid]) showSeatedEmoji('me', data.emojis[myUid]);
                 if(data.emojis[targetUid]) showSeatedEmoji('them', data.emojis[targetUid]);
@@ -814,23 +837,19 @@
         }
 
         function playSong(song) {
-            // --- FIX: Prevent song restart if same source is playing ---
-            if (audio.src === song.previewUrl && !audio.paused) {
-                return; // Do nothing if already playing to prevent restart on emoji update
-            }
+            if (audio.src === song.previewUrl && !audio.paused) return;
 
-            // Stop any previous timers
             clearTimeout(emojiTimer);
             clearTimeout(emojiCloseTimer);
             document.getElementById('emoji-modal').classList.remove('active');
             hasPickedEmoji = false;
 
             audio.src = song.previewUrl;
-            audio.loop = false; // --- FIX: Do not loop, so onended fires
+            audio.loop = false;
             audio.currentTime = 0;
             audio.play().catch(e => console.log("Autoplay blocked"));
             
-            // Reset completion status
+            // Reset local completion immediately
             roomRef.update({ [`audioFinished.${myUid}`]: false });
 
             const highRes = song.artworkUrl100.replace('100x100', '600x600');
@@ -842,23 +861,17 @@
             const hue = (song.artistName.length * 50) % 360;
             document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
 
-            // --- FIX: 5 SECOND DELAY FOR EMOJI PICKER + BACK BUTTON + AUTO CLOSE ---
+            // Emoji Picker Timer
             emojiTimer = setTimeout(() => {
                 if (!hasPickedEmoji) {
                     const modal = document.getElementById('emoji-modal');
                     modal.classList.add('active');
-                    // Push state for back button handling
                     history.pushState({modal: 'emoji'}, "");
                     
-                    // Auto Close after another 10 seconds
                     emojiCloseTimer = setTimeout(() => {
                         if (modal.classList.contains('active')) {
-                            // If history state is still ours, go back to clear it and close
-                            if (history.state && history.state.modal === 'emoji') {
-                                history.back();
-                            } else {
-                                modal.classList.remove('active');
-                            }
+                            if (history.state && history.state.modal === 'emoji') history.back();
+                            else modal.classList.remove('active');
                         }
                     }, 10000); 
                 }
@@ -870,30 +883,21 @@
             const modal = document.getElementById('emoji-modal');
             modal.classList.remove('active');
             
-            // --- FIX: CLEANUP TIMERS & HISTORY ---
             clearTimeout(emojiTimer);
             clearTimeout(emojiCloseTimer);
-            // If we are currently in the emoji history state, go back
-            if (history.state && history.state.modal === 'emoji') {
-                history.back();
-            }
+            if (history.state && history.state.modal === 'emoji') history.back();
 
             // 1. Animate Flying
             const flyer = document.createElement('div');
             flyer.className = 'flying-emoji';
             flyer.innerText = emoji;
-            
-            // Start from center
             flyer.style.top = '50%';
             flyer.style.left = '50%';
             flyer.style.transform = 'translate(-50%, -50%) scale(0.5)';
             document.body.appendChild(flyer);
 
-            // Calculate destination (My avatar bubble position)
-            // Use the "s-bubble me" in waiting screen or general location in active screen
-            // For active screen, let's fly to top left or bottom
             setTimeout(() => {
-                flyer.style.top = '100px'; // Near top PFP area
+                flyer.style.top = '100px'; 
                 flyer.style.left = '20px';
                 flyer.style.transform = 'scale(1)';
                 flyer.style.opacity = '0';
@@ -908,7 +912,6 @@
         }
 
         function showSeatedEmoji(who, emoji) {
-            // "who" is 'me' or 'them'.
             const id = `seated-${who}`;
             let el = document.getElementById(id);
             if(!el) {
@@ -917,7 +920,6 @@
                 el.style.position = 'absolute';
                 el.style.fontSize = '24px';
                 el.style.zIndex = '50';
-                // Position based on user
                 if(who === 'me') { el.style.bottom = '120px'; el.style.left = '40px'; }
                 else { el.style.bottom = '120px'; el.style.right = '40px'; }
                 document.querySelector('.player-ui').appendChild(el);
@@ -934,31 +936,25 @@
         }
 
         function handleAudioEnded() {
-            // Song ended logic
-            console.log("Audio Ended");
-            
-            // 1. Mark my audio as finished in DB
+            // Mark my audio as finished
             roomRef.set({
                 audioFinished: { [myUid]: true }
             }, { merge: true });
 
-            // 2. STOP audio. 
             audio.pause();
             document.getElementById('active-album-art').classList.remove('playing');
-
-            // The 'syncCycle' function will detect when both are finished and trigger swapTurn()
         }
 
         function swapTurn() {
-            // Logic to calculate next turn
             const nextDj = targetUid; 
             
+            // --- UPDATED: CLEANUP FOR NEXT TURN ---
             roomRef.update({
                 turn: nextDj,
                 cycleStatus: 'picking',
-                currentSong: firebase.firestore.FieldValue.delete(), // Clear song
+                currentSong: firebase.firestore.FieldValue.delete(), // Completely remove song
                 audioFinished: { [myUid]: false, [targetUid]: false }, 
-                emojis: {} 
+                emojis: {} // Clear emojis
             });
         }
 
@@ -970,11 +966,9 @@
         }
 
         // --- EVENTS ---
-
         document.addEventListener('song-selected', (e) => {
             const song = e.detail;
             
-            // When song selected, update DB to 'playing'
             roomRef.update({ 
                 currentSong: song, 
                 cycleStatus: 'playing',
