@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="manifest" href="/manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000" id="theme-meta">
+    <title>Pulse | Goorac</title>
+    
+    <script src="config.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <script src="components/songPicker.js"></script>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #000000;
+            --accent: #ff3b30; /* Pulse Red */
+            --accent-dim: rgba(255, 59, 48, 0.2);
+            --text: #ffffff;
+            --glass: rgba(20, 20, 20, 0.8);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Inter', sans-serif;
+            height: 100dvh; overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: background 1s ease;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 10;
+        }
+        .screen.active { opacity: 1; pointer-events: auto; }
+
+        /* --- LOADING / ERROR --- */
+        .error-box {
+            background: var(--glass); border: 1px solid var(--border);
+            padding: 30px; border-radius: 24px; text-align: center;
+            max-width: 85%; backdrop-filter: blur(20px);
+        }
+        .error-icon { font-size: 40px; color: var(--accent); margin-bottom: 15px; }
+
+        /* --- WAITING ROOM UI --- */
+        .avatars-container {
+            display: flex; align-items: center; justify-content: center;
+            gap: 20px; position: relative; width: 100%; height: 280px;
+        }
+
+        .avatar-bubble {
+            width: 90px; height: 90px; border-radius: 50%;
+            position: relative; z-index: 2;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        
+        .avatar-img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+            border: 3px solid #151515; background: #222;
+        }
+
+        .my-bubble { transform: translateX(20px) scale(1); }
+        .their-bubble { transform: translateX(-20px) scale(0.9); opacity: 0.5; filter: grayscale(100%); }
+        
+        .connecting-line {
+            position: absolute; height: 2px; background: var(--accent);
+            width: 0%; left: 50%; transform: translateX(-50%);
+            transition: width 0.5s ease; opacity: 0.6;
+        }
+        
+        /* Pulse Animation (Heartbeat) */
+        .pulse-ring::after {
+            content: ''; position: absolute; inset: -5px; border-radius: 50%;
+            border: 2px solid var(--accent); opacity: 0;
+            animation: heartbeat 1.5s infinite;
+        }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 0; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        /* --- ACTIVE PULSE UI --- */
+        .visualizer-bg {
+            position: absolute; inset: 0; z-index: 1; opacity: 0.3;
+            mix-blend-mode: overlay; pointer-events: none;
+        }
+
+        .pulse-header {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: calc(20px + env(safe-area-inset-top)) 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 20;
+        }
+
+        .pulse-status {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 2px;
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 20px;
+        }
+        .live-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); animation: blink 1s infinite; }
+
+        .album-art-large {
+            width: 280px; height: 280px; border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            margin-bottom: 40px; z-index: 20; position: relative;
+            background: #222; overflow: hidden;
+            transform: scale(0.9); transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .album-art-large.playing { transform: scale(1); box-shadow: 0 30px 80px rgba(0,0,0,0.7); }
+        .album-img { width: 100%; height: 100%; object-fit: cover; }
+
+        .song-info { text-align: center; z-index: 20; margin-bottom: 50px; padding: 0 20px; }
+        .song-title { font-size: 26px; font-weight: 800; margin-bottom: 8px; text-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .song-artist { font-size: 16px; opacity: 0.8; font-weight: 600; letter-spacing: 0.5px; }
+
+        /* REACTION BAR */
+        .reaction-bar {
+            position: absolute; bottom: 40px; 
+            display: flex; gap: 12px; z-index: 30;
+            background: rgba(30, 30, 30, 0.6); backdrop-filter: blur(25px);
+            padding: 12px 24px; border-radius: 100px;
+            border: 1px solid var(--border);
+            transform: translateY(120px); opacity: 0;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .reaction-bar.show { transform: translateY(0); opacity: 1; }
+
+        .emoji-btn { font-size: 30px; cursor: pointer; transition: transform 0.2s; user-select: none; }
+        .emoji-btn:active { transform: scale(1.4); }
+
+        /* Floating Reaction */
+        .floater {
+            position: absolute; font-size: 45px; pointer-events: none; z-index: 50;
+            animation: floatUp 1.8s ease-out forwards; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-60px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-350px) scale(1); opacity: 0; }
+        }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        .btn-exit {
+            background: rgba(255,255,255,0.1); border: 1px solid var(--border);
+            color: #fff; padding: 8px 18px; border-radius: 100px;
+            font-size: 11px; font-weight: 700; backdrop-filter: blur(5px);
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .dj-controls-btn {
+            background: var(--text); color: #000;
+            padding: 14px 28px; border-radius: 100px;
+            font-weight: 700; font-size: 14px; border: none;
+            box-shadow: 0 4px 15px rgba(255,255,255,0.2);
+            cursor: pointer; margin-top: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="screen active" id="screen-loading">
+        <div class="pulse-ring" style="width:60px; height:60px; background:var(--accent); border-radius:50%; margin-bottom:20px;"></div>
+        <p style="font-size:12px; letter-spacing:2px; font-weight:700; opacity:0.6;">SYNCING PULSE...</p>
+    </div>
+
+    <div class="screen" id="screen-error">
+        <div class="error-box">
+            <span class="material-icons-round error-icon">leak_off</span>
+            <h2 style="font-size:18px; font-weight:800; margin-bottom:10px;">Connection Lost</h2>
+            <p id="error-msg" style="font-size:13px; color:#aaa; line-height:1.5;">Mutual connection required to start Pulse.</p>
+            <button onclick="history.back()" style="margin-top:25px; padding:12px 30px; background:var(--text); color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px;">Exit</button>
+        </div>
+    </div>
+
+    <div class="screen" id="screen-waiting">
+        <div class="pulse-header">
+            <div style="width:40px;"></div> <button class="btn-exit" onclick="leaveSession()">Leave</button>
+        </div>
+        
+        <div class="avatars-container">
+            <div class="connecting-line" id="connect-line"></div>
+            
+            <div class="avatar-bubble my-bubble">
+                <img id="my-avatar" class="avatar-img" src="">
+            </div>
+            
+            <div class="avatar-bubble their-bubble" id="target-bubble">
+                <img id="target-avatar" class="avatar-img" src="">
+                <div class="pulse-ring" style="position:absolute; inset:0; border-radius:50%;"></div>
+            </div>
+        </div>
+
+        <h1 id="status-text" style="font-size:18px; font-weight:700; text-align:center;">Waiting for signal...</h1>
+        <p style="font-size:12px; opacity:0.5; margin-top:8px;">Both users must be online.</p>
+    </div>
+
+    <div class="screen" id="screen-active">
+        <canvas id="visualizer" class="visualizer-bg"></canvas>
+        
+        <div class="pulse-header">
+            <div class="pulse-status"><div class="live-dot"></div> CONNECTED</div>
+            <button class="btn-exit" onclick="leaveSession()">END</button>
+        </div>
+
+        <div class="album-art-large" id="album-container">
+            <img id="active-album-art" class="album-img" src="">
+        </div>
+
+        <div class="song-info">
+            <div class="song-title" id="active-song-title">Pulse Active</div>
+            <div class="song-artist" id="active-song-artist">Select a track to start...</div>
+        </div>
+
+        <div id="controls-container"></div>
+        
+        <div class="reaction-bar" id="reaction-bar">
+            <span class="emoji-btn" onclick="sendReaction('🔥')">🔥</span>
+            <span class="emoji-btn" onclick="sendReaction('⚡')">⚡</span>
+            <span class="emoji-btn" onclick="sendReaction('💜')">💜</span>
+            <span class="emoji-btn" onclick="sendReaction('🌊')">🌊</span>
+            <span class="emoji-btn" onclick="sendReaction('💿')">💿</span>
+        </div>
+    </div>
+
+    <song-picker id="song-picker"></song-picker>
+
+    <script>
+        // --- 1. INIT ---
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        const params = new URLSearchParams(window.location.search);
+        const targetUid = params.get('uid');
+
+        let myUid = null;
+        let myProfile = null;
+        let targetProfile = null;
+        let roomRef = null;
+        let roomUnsub = null;
+        let audio = new Audio();
+        let isDJ = false; 
+
+        // --- 2. SECURITY & AUTH ---
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                myUid = user.uid;
+                if (!targetUid || targetUid === myUid) {
+                    showError("Invalid Pulse Link.");
+                    return;
+                }
+                
+                loadCachedProfiles();
+                
+                // Privacy Check: Are we mutuals?
+                const allowed = await verifyMutuals(myUid, targetUid);
+                if (allowed) {
+                    initPulseSession();
+                } else {
+                    showError("You must be mutual friends to use Pulse.");
+                }
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+
+        // --- 3. DATA & PROFILE ---
+        function loadCachedProfiles() {
+            const cachedMe = JSON.parse(localStorage.getItem('my_goorac_profile'));
+            if(cachedMe) {
+                myProfile = cachedMe;
+                document.getElementById('my-avatar').src = myProfile.photoURL || 'https://via.placeholder.com/150';
+            }
+        }
+
+        async function verifyMutuals(me, them) {
+            try {
+                const myDoc = await db.collection('users').doc(me).get();
+                const theirDoc = await db.collection('users').doc(them).get();
+
+                if (!myDoc.exists || !theirDoc.exists) return false;
+
+                myProfile = myDoc.data(); 
+                targetProfile = theirDoc.data();
+                
+                // Cache target for speed
+                localStorage.setItem(`pulse_profile_${them}`, JSON.stringify(targetProfile));
+
+                // Update UI
+                document.getElementById('target-avatar').src = targetProfile.photoURL || 'https://via.placeholder.com/150';
+                document.getElementById('status-text').innerText = `Waiting for ${targetProfile.name.split(' ')[0]}...`;
+
+                const myFollowing = (myProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
+                const theirFollowing = (targetProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
+
+                // Strict Mutual Check
+                return myFollowing.includes(them) && theirFollowing.includes(me);
+
+            } catch (e) {
+                console.error(e);
+                return false;
+            }
+        }
+
+        // --- 4. PULSE ENGINE (Realtime) ---
+        function initPulseSession() {
+            // Unique Room ID: Sort UIDs to ensure same ID for both users
+            const roomId = [myUid, targetUid].sort().join('_');
+            roomRef = db.collection('pulse_rooms').doc(roomId);
+
+            showScreen('screen-waiting');
+
+            // 1. Join Room
+            const updateField = (myUid < targetUid) ? 'userA' : 'userB';
+            roomRef.set({
+                [updateField]: 'online',
+                lastActive: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            // 2. Disconnect Handler
+            window.addEventListener('beforeunload', () => leaveSession());
+
+            // 3. Listen for Partner
+            roomUnsub = roomRef.onSnapshot(snapshot => {
+                if (!snapshot.exists) return;
+                const data = snapshot.data();
+
+                const otherField = (myUid < targetUid) ? 'userB' : 'userA';
+                
+                // Connection State
+                if (data[otherField] === 'online') {
+                    if (!document.getElementById('screen-active').classList.contains('active')) {
+                        activatePulse(data);
+                    }
+                } else {
+                    if (document.getElementById('screen-active').classList.contains('active')) {
+                        deactivatePulse();
+                    }
+                }
+
+                // Music Sync
+                if (data.currentSong) {
+                    syncAudio(data.currentSong);
+                }
+
+                // Reactions
+                if (data.reaction && data.reactionSender !== myUid) {
+                    spawnReaction(data.reaction);
+                }
+            });
+        }
+
+        function activatePulse(data) {
+            showScreen('screen-active');
+            if(navigator.vibrate) navigator.vibrate([30, 50, 30]);
+            
+            // Assign Roles: User A is first DJ
+            isDJ = (myUid < targetUid); 
+            renderControls();
+        }
+
+        function deactivatePulse() {
+            showScreen('screen-waiting');
+            audio.pause();
+            // Reset visuals
+            document.getElementById('active-album-art').classList.remove('playing');
+            document.getElementById('active-song-title').innerText = "Pulse Paused";
+            document.body.style.background = "#000";
+        }
+
+        function renderControls() {
+            const container = document.getElementById('controls-container');
+            container.innerHTML = ''; 
+
+            if (isDJ) {
+                // DJ UI
+                const btn = document.createElement('button');
+                btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
+                btn.className = "dj-controls-btn";
+                btn.onclick = () => document.getElementById('song-picker').open();
+                container.appendChild(btn);
+                
+                document.getElementById('reaction-bar').classList.remove('show');
+            } else {
+                // Listener UI
+                container.innerHTML = `<p style="font-size:12px; opacity:0.6; margin-top:20px; letter-spacing:1px;">${targetProfile.name} is picking a vibe...</p>`;
+                document.getElementById('reaction-bar').classList.add('show');
+            }
+        }
+
+        // --- 5. AUDIO & VISUALS ---
+
+        document.addEventListener('song-selected', (e) => {
+            const song = e.detail;
+            // Broadcast
+            roomRef.update({
+                currentSong: song,
+                timestamp: Date.now(),
+                dj: myUid
+            });
+            // Haptic Feedback
+            if(navigator.vibrate) navigator.vibrate(20);
+        });
+
+        function syncAudio(song) {
+            if (audio.src !== song.previewUrl) {
+                audio.src = song.previewUrl;
+                audio.play().catch(e => console.log("Autoplay: User interaction needed"));
+                
+                // Update Meta
+                const highResArt = song.artworkUrl100.replace('100x100', '600x600');
+                document.getElementById('active-album-art').src = highResArt;
+                document.getElementById('active-song-title').innerText = song.trackName;
+                document.getElementById('active-song-artist').innerText = song.artistName;
+                
+                document.getElementById('active-album-art').classList.add('playing');
+                
+                // Dynamic Background (Simulated Extraction)
+                // We use the string length to pick a deterministic hue so it matches for both users
+                const hue = (song.artistName.length * 42) % 360;
+                document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 20%), #000)`;
+                document.getElementById('theme-meta').setAttribute('content', `hsl(${hue}, 60%, 15%)`);
+            }
+        }
+
+        // --- 6. REACTIONS ---
+        
+        window.sendReaction = (emoji) => {
+            if(navigator.vibrate) navigator.vibrate(10);
+            roomRef.update({
+                reaction: emoji,
+                reactionSender: myUid,
+                reactionTime: Date.now()
+            });
+            spawnReaction(emoji); // Show locally
+        }
+
+        function spawnReaction(emoji) {
+            const el = document.createElement('div');
+            el.className = 'floater';
+            el.innerText = emoji;
+            // Randomize position slightly
+            el.style.left = Math.random() * 60 + 20 + '%'; 
+            document.body.appendChild(el);
+            
+            setTimeout(() => el.remove(), 1800);
+            if(navigator.vibrate) navigator.vibrate(20);
+        }
+
+        // --- 7. UTILS ---
+
+        function leaveSession() {
+            if(roomRef) {
+                const updateField = (myUid < targetUid) ? 'userA' : 'userB';
+                roomRef.update({ [updateField]: 'offline' });
+            }
+            audio.pause();
+            // Go back to profile
+            history.back(); 
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            showScreen('screen-error');
+        }
+
+    </script>
+</body>
+</html>
