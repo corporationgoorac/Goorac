@@ -157,13 +157,14 @@ class ViewNotes extends HTMLElement {
                 flex-direction: column;
                 z-index: 10;
                 flex-shrink: 0;
-                /* Animation: Sticky Note Entrance */
+                /* Animation: Sticky Note Entrance - FIXED: No Pulse/Glitch */
                 opacity: 0;
-                animation: stickyEntrance 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                will-change: transform, opacity;
+                animation: stickyEntrance 0.65s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
             }
 
             @keyframes stickyEntrance {
-                0% { transform: scale(0.5) translateY(50px); opacity: 0; }
+                0% { transform: scale(0.9) translateY(40px); opacity: 0; }
                 100% { transform: scale(1) translateY(0); opacity: 1; }
             }
 
