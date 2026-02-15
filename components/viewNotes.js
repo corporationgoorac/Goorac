@@ -60,19 +60,6 @@ class ViewNotes extends HTMLElement {
         };
     }
 
-    // Helper to determine text contrast
-    getContrastColor(hexColor) {
-        if(!hexColor || hexColor.includes('gradient') || hexColor.includes('url')) return '#ffffff';
-        // Handle rgba
-        if(hexColor.startsWith('rgba')) return '#ffffff';
-        
-        const r = parseInt(hexColor.substr(1, 2), 16);
-        const g = parseInt(hexColor.substr(3, 2), 16);
-        const b = parseInt(hexColor.substr(5, 2), 16);
-        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-        return (yiq >= 128) ? '#000000' : '#ffffff';
-    }
-
     render() {
         this.innerHTML = `
         <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&display=swap" rel="stylesheet">
@@ -83,7 +70,7 @@ class ViewNotes extends HTMLElement {
                 justify-content: center; align-items: flex-end;
                 backdrop-filter: blur(4px); 
                 opacity: 0; transition: opacity 0.3s ease;
-                touch-action: none; /* Prevent scroll pass-through */
+                touch-action: none; 
             }
             .vn-overlay.open { display: flex; opacity: 1; }
             
@@ -93,12 +80,9 @@ class ViewNotes extends HTMLElement {
                 transform: translateY(100%); 
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                
-                /* 85% Height Logic */
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 85dvh; 
-                max-height: 800px;
-                
+                height: 90dvh; /* Taller height for better visibility */
+                max-height: 850px;
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
                 overflow: hidden;
@@ -107,13 +91,6 @@ class ViewNotes extends HTMLElement {
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
-            @media (min-width: 768px) {
-                .vn-sheet {
-                    height: 80%; border-radius: 24px; position: relative;
-                    margin-bottom: 20px; overflow: hidden;
-                }
-            }
-
             /* --- BACKGROUND LAYERS --- */
             .vn-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; transition: background 0.3s; opacity: 1; }
             
@@ -129,7 +106,7 @@ class ViewNotes extends HTMLElement {
                 background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
             }
             
-            /* Dim overlay for text readability */
+            /* Dim overlay */
             .vn-dim-layer {
                  position: absolute; inset: 0; z-index: 2;
                  background: rgba(0,0,0,0.3);
@@ -141,7 +118,7 @@ class ViewNotes extends HTMLElement {
                 position: absolute; top: 0; left: 0; width: 100%;
                 height: 60px;
                 display: flex; justify-content: center; align-items: center;
-                z-index: 10;
+                z-index: 50; /* Ensure header is on top */
             }
             
             .vn-drag-handle { 
@@ -158,49 +135,34 @@ class ViewNotes extends HTMLElement {
                 color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
             }
 
-            /* --- CONTENT --- */
+            /* --- CONTENT AREA --- */
             .vn-content {
                 flex: 1; display: flex; flex-direction: column;
                 justify-content: center; align-items: center;
                 position: relative; z-index: 5;
-                padding-bottom: 40px; width: 100%;
+                width: 100%;
             }
 
-            .vn-profile-header {
-                display: flex; align-items: center; gap: 12px; margin-bottom: 25px;
-                position: absolute; top: 60px; left: 24px; z-index: 10;
-            }
-            .vn-friend-pfp {
-                width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
-                border: 2px solid rgba(255,255,255,0.2); background: #222;
-            }
-            .vn-friend-info { display: flex; flex-direction: column; }
-            
-            .vn-text-dark { color: #000 !important; text-shadow: none !important; }
-            .vn-text-light { color: #fff !important; text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important; }
-
-            .vn-friend-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; }
-            .vn-friend-handle { font-size: 0.8rem; opacity: 0.8; }
-
+            /* THE BUBBLE WRAPPER (CENTERPIECE) */
             .vn-bubble-wrapper { 
-                position: relative; width: 100%; max-width: 380px; 
-                display: flex; flex-direction: column; align-items: center; gap: 15px; 
+                position: relative; 
+                width: auto; max-width: 85%;
+                margin-bottom: 15px;
+                /* Allow sticker to hang out */
+                overflow: visible; 
             }
 
-            /* THE BUBBLE - MATCHING CREATOR UI */
             .vn-bubble {
-                width: 180px; height: 180px; /* Matching the creator preview size approx */
+                min-width: 220px; min-height: 220px; /* Big Note Size */
                 border-radius: 42px;
                 display: flex; align-items: center; justify-content: center;
-                text-align: center; padding: 20px;
+                text-align: center; padding: 25px;
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 overflow: hidden;
                 border: 1px solid rgba(255,255,255,0.15);
             }
-            
-            .vn-bubble.pump { transform: scale(0.95); }
             
             /* Glass Mode Logic */
             .vn-bubble.glass {
@@ -212,16 +174,38 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 1.4rem; font-weight: 600; line-height: 1.35; z-index: 2;
-                word-break: break-word; width: 100%;
+                font-size: 1.6rem; font-weight: 600; line-height: 1.3; z-index: 2;
+                word-break: break-word; width: 100%; white-space: pre-wrap;
             }
             
+            /* PFP STICKER - BOTTOM RIGHT LIKE NOTES.HTML */
+            .vn-pfp-sticker {
+                position: absolute; 
+                bottom: -15px; 
+                right: -15px;
+                width: 55px; height: 55px; 
+                border-radius: 50%;
+                border: 3px solid #000;
+                background: #333; object-fit: cover; z-index: 10;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            }
+
+            /* INFO BELOW NOTE */
+            .vn-info-bar {
+                display: flex; flex-direction: column; align-items: center; gap: 4px;
+                margin-top: 10px; z-index: 10;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            }
+            .vn-username { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 4px; color: #fff; }
+            .vn-timestamp { font-size: 0.8rem; opacity: 0.7; color: #eee; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+
+            /* TEXT EFFECTS */
             .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
             .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
 
             .vn-pop-heart {
                 position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
-                opacity: 0; pointer-events: none; z-index: 10;
+                opacity: 0; pointer-events: none; z-index: 20;
             }
             .vn-pop-heart.animate { animation: popHeart 0.8s ease-out forwards; }
             @keyframes popHeart {
@@ -231,23 +215,18 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-music-pill { 
+                position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 8px; 
-                background: rgba(0,0,0,0.6); padding: 8px 16px; 
-                border-radius: 100px; font-size: 0.75rem; font-weight: 600;
-                border: 1px solid rgba(255,255,255,0.15);
-                backdrop-filter: blur(10px); color: #fff; z-index: 10;
-                width: max-content; max-width: 90%;
+                background: rgba(0,0,0,0.8); padding: 6px 14px; 
+                border-radius: 100px; font-size: 0.7rem; font-weight: 600;
+                border: 1px solid rgba(255,255,255,0.2);
+                backdrop-filter: blur(10px); color: #fff; z-index: 12;
+                white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             }
             .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
             .vn-eq span:nth-child(2) { animation-delay: 0.2s; } 
             .vn-eq span:nth-child(3) { animation-delay: 0.4s; } 
             @keyframes vn-eq { 0%, 100% { height: 40%; } 50% { height: 100%; } }
-
-            .vn-timestamp { 
-                font-size: 0.75rem; text-align: center; 
-                margin-top: 25px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
-                opacity: 0.7;
-            }
 
             /* --- FOOTER ACTIONS --- */
             .vn-footer {
@@ -290,18 +269,26 @@ class ViewNotes extends HTMLElement {
             }
             .vn-heart-btn:active { transform: scale(0.8); }
 
-            /* --- OWN NOTE ACTIONS --- */
+            /* --- OWN NOTE ACTIONS FIXED --- */
             .vn-likers-section { 
-                margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding: 20px 20px calc(30px + env(safe-area-inset-bottom));
-                background: rgba(20,20,20,0.95); backdrop-filter: blur(20px);
+                margin-top: auto; 
+                border-top: 1px solid rgba(255,255,255,0.1); 
+                padding: 20px 20px calc(40px + env(safe-area-inset-bottom));
+                background: #141414; /* Solid color to fix blur issue */
+                z-index: 100; position: relative;
                 max-height: 40vh; overflow-y: auto; 
             }
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
             
-            .vn-btn { width: 100%; padding: 16px; border-radius: 16px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+            .vn-btn { 
+                width: 100%; padding: 16px; border-radius: 16px; border: none; 
+                font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; 
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                display: flex; justify-content: center; align-items: center; gap: 8px;
+            }
             .vn-btn-primary { background: #fff; color: #000; }
-            .vn-btn-danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
-            .vn-btn-archive { background: rgba(255, 149, 0, 0.15); color: #ff9f0a; }
+            .vn-btn-danger { background: rgba(255, 59, 48, 0.15); color: #ff3b30; border: 1px solid rgba(255,59,48,0.2); }
+            .vn-btn-archive { background: rgba(255, 149, 0, 0.15); color: #ff9f0a; border: 1px solid rgba(255,149,0,0.2); }
 
         </style>
 
@@ -501,31 +488,29 @@ class ViewNotes extends HTMLElement {
 
         return `
             <div class="vn-content">
-                <div class="vn-profile-header vn-clickable" id="vn-header-click">
-                    <img src="${displayPfp}" class="vn-friend-pfp">
-                    <div class="vn-friend-info">
-                        <div class="vn-friend-name vn-text-light">
-                            ${displayName} (You)
-                            ${isVerified ? icons.verified : ''}
-                            ${isCF ? icons.star : ''}
-                        </div>
-                        <div class="vn-friend-handle vn-text-light">${note.isActive ? 'Active Note' : 'Archived'}</div>
-                    </div>
-                </div>
-
                 <div class="vn-bubble-wrapper">
-                    <div class="vn-bubble ${glassClass}" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text || 'Share a thought...'}</div>
-                    </div>
-                    
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
                             <span>${note.songName}</span>
                         </div>
                     ` : ''}
+
+                    <div class="vn-bubble ${glassClass}" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
+                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text || 'Share a thought...'}</div>
+                    </div>
+                    
+                    <img src="${displayPfp}" class="vn-pfp-sticker" style="border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
                 </div>
-                <div class="vn-timestamp vn-text-light">${timeAgo}</div>
+
+                <div class="vn-info-bar">
+                     <div class="vn-username">
+                        ${displayName} (You)
+                        ${isVerified ? icons.verified : ''}
+                        ${isCF ? icons.star : ''}
+                    </div>
+                    <div class="vn-timestamp">${timeAgo}</div>
+                </div>
             </div>
 
             <div class="vn-likers-section">
@@ -546,8 +531,8 @@ class ViewNotes extends HTMLElement {
                 `).join('') : `<div style="text-align:center; color:#555; padding:20px;">No likes yet</div>`}
                 
                 ${note.isActive ? 
-                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note 📝</button>` : 
-                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note 📝</button>`
+                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note <span class="material-icons-round">edit</span></button>` : 
+                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note <span class="material-icons-round">add</span></button>`
                 }
                 <div style="display:flex; gap:10px;">
                     ${note.isActive ? `<button class="vn-btn vn-btn-archive" id="archive-note-btn">Archive</button>` : ''}
@@ -586,32 +571,30 @@ class ViewNotes extends HTMLElement {
 
         return `
             <div class="vn-content">
-                <div class="vn-profile-header vn-clickable" id="vn-header-click">
-                    <img src="${displayPfp}" class="vn-friend-pfp">
-                    <div class="vn-friend-info">
-                        <div class="vn-friend-name vn-text-light">
-                            ${displayName}
-                            ${isVerified ? icons.verified : ''}
-                            ${isCF ? icons.star : ''}
-                        </div>
-                        <div class="vn-friend-handle vn-text-light">${displayHandle}</div>
-                    </div>
-                </div>
-
-                <div class="vn-bubble-wrapper">
-                    <div class="vn-bubble ${glassClass}" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
-                        <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text}</div>
-                    </div>
-                    
+                <div class="vn-bubble-wrapper vn-clickable" id="vn-header-click">
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
                             <span>${note.songName} • ${note.songArtist || ''}</span>
                         </div>
                     ` : ''}
+
+                    <div class="vn-bubble ${glassClass}" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
+                        <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
+                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text}</div>
+                    </div>
+
+                    <img src="${displayPfp}" class="vn-pfp-sticker" style="border-color:${txtColor === '#ffffff' ? '#000' : '#fff'}">
                 </div>
-                <div class="vn-timestamp vn-text-light">${timeAgo}</div>
+
+                <div class="vn-info-bar">
+                     <div class="vn-username">
+                        ${displayName}
+                        ${isVerified ? icons.verified : ''}
+                        ${isCF ? icons.star : ''}
+                    </div>
+                    <div class="vn-timestamp">${timeAgo}</div>
+                </div>
             </div>
 
             <div class="vn-footer">
