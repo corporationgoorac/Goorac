@@ -5,7 +5,7 @@
  * - Premium UI/UX with Glassmorphism and animations.
  * - Active/Archived Status Indicators.
  * - Relative Time formatting (e.g., "2h ago").
- * - Auto-handles Auth and Privacy logic.
+ * - Auto-handles Auth, Close Friends, and Privacy logic.
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
@@ -149,10 +149,45 @@ class ProfileNotes extends HTMLElement {
                 this.isFinished = true;
             }
 
-            const notes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Process Notes & Filter Close Friends
+            let notes = [];
+            
+            // If viewing someone else's profile, we need to check their CF list if a note is restricted
+            let authorCFList = [];
+            if (!isMine) {
+                const userDoc = await this.db.collection('users').doc(this._uid).get();
+                if(userDoc.exists) authorCFList = userDoc.data().closeFriends || [];
+            }
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                
+                // If isMine, show everything.
+                // If not mine, check audience
+                if (isMine) {
+                    notes.push({ id: doc.id, ...data });
+                } else {
+                    if (data.audience === 'close_friends') {
+                        // Only add if I am in their list
+                        if (authorCFList.includes(this._currentUser.uid)) {
+                            notes.push({ id: doc.id, ...data });
+                        }
+                    } else {
+                        // Public -> Add
+                        notes.push({ id: doc.id, ...data });
+                    }
+                }
+            });
 
             if (isFirstLoad) {
                 this.setupContainer(isMine); // Create initial HTML structure
+            }
+
+            // If we filtered out all notes in this batch (e.g. all were private), fetch next page immediately
+            if (notes.length === 0 && !this.isFinished) {
+                this.isLoading = false;
+                this.fetchNotesBatched(isMine);
+                return;
             }
 
             this.renderItems(notes, isMine); // Append items
@@ -312,6 +347,7 @@ class ProfileNotes extends HTMLElement {
                     <div class="pn-meta" style="${isActive ? `color:${textColor}cc;` : ''}">
                         ${timeStr} 
                         ${note.likes && note.likes.length > 0 ? `&nbsp;•&nbsp; ${note.likes.length} <span style="font-size:10px; margin-left:2px;">❤️</span>` : ''}
+                        ${note.audience === 'close_friends' ? `<span class="material-icons-round" style="font-size:12px; color:#00d2ff; margin-left:4px;">stars</span>` : ''}
                     </div>
                 </div>
             `;
