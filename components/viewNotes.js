@@ -12,21 +12,21 @@ class ViewNotes extends HTMLElement {
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         
-        // FIX: Don't init DB in constructor to prevent startup crash
         this.db = null; 
         this.unsubscribe = null;
 
-        // Swipe Logic Variables
-        this.startY = 0;
-        this.currentY = 0;
-        this.isDragging = false;
+        // Enhanced Swipe Logic
+        this.state = {
+            isDragging: false,
+            startY: 0,
+            currentY: 0,
+            sheetHeight: 0
+        };
         
-        // Double Tap Logic
         this.lastTap = 0;
     }
 
     connectedCallback() {
-        // FIX: Init DB here if available, otherwise it handles in open()
         if (window.firebase && !this.db) {
             this.db = firebase.firestore();
         }
@@ -60,6 +60,16 @@ class ViewNotes extends HTMLElement {
         };
     }
 
+    // Helper to determine text contrast
+    getContrastColor(hexColor) {
+        if(!hexColor || hexColor.includes('gradient') || hexColor.includes('url')) return '#ffffff';
+        const r = parseInt(hexColor.substr(1, 2), 16);
+        const g = parseInt(hexColor.substr(3, 2), 16);
+        const b = parseInt(hexColor.substr(5, 2), 16);
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? '#000000' : '#ffffff';
+    }
+
     render() {
         this.innerHTML = `
         <style>
@@ -69,6 +79,7 @@ class ViewNotes extends HTMLElement {
                 justify-content: center; align-items: flex-end;
                 backdrop-filter: blur(4px); 
                 opacity: 0; transition: opacity 0.3s ease;
+                touch-action: none; /* Prevent scroll pass-through */
             }
             .vn-overlay.open { display: flex; opacity: 1; }
             
@@ -79,15 +90,16 @@ class ViewNotes extends HTMLElement {
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 
-                /* FIX: 85% Height Logic */
+                /* 85% Height Logic */
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 85dvh; /* Dynamic Viewport Height */
+                height: 85dvh; 
                 max-height: 800px;
                 
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
                 overflow: hidden;
                 box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+                will-change: transform;
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
@@ -113,7 +125,7 @@ class ViewNotes extends HTMLElement {
                 background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
             }
 
-            /* --- HEADER ALIGNMENT FIX --- */
+            /* --- HEADER --- */
             .vn-header {
                 position: absolute; top: 0; left: 0; width: 100%;
                 height: 60px;
@@ -122,8 +134,9 @@ class ViewNotes extends HTMLElement {
             }
             
             .vn-drag-handle { 
-                width: 48px; height: 5px; background: rgba(255,255,255,0.3); 
+                width: 48px; height: 5px; background: rgba(255,255,255,0.4); 
                 border-radius: 10px; cursor: grab;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             }
 
             .vn-close-btn {
@@ -151,13 +164,21 @@ class ViewNotes extends HTMLElement {
                 border: 2px solid rgba(255,255,255,0.2); background: #222;
             }
             .vn-friend-info { display: flex; flex-direction: column; }
-            .vn-friend-name { font-weight: 700; font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-            .vn-friend-handle { color: rgba(255,255,255,0.7); font-size: 0.8rem; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+            
+            /* Enhanced Text Contrast Classes */
+            .vn-text-dark { color: #000 !important; text-shadow: none !important; }
+            .vn-text-light { color: #fff !important; text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important; }
 
-            .vn-bubble-wrapper { position: relative; width: 85%; max-width: 340px; aspect-ratio: 1/1; }
+            .vn-friend-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 4px; }
+            .vn-friend-handle { font-size: 0.8rem; opacity: 0.8; }
+
+            .vn-bubble-wrapper { 
+                position: relative; width: 85%; max-width: 340px; 
+                display: flex; flex-direction: column; align-items: center; gap: 15px; 
+            }
 
             .vn-bubble {
-                width: 100%; height: 100%;
+                width: 100%; aspect-ratio: 1/1;
                 border-radius: 40px;
                 display: flex; align-items: center; justify-content: center;
                 text-align: center; padding: 25px;
@@ -168,7 +189,6 @@ class ViewNotes extends HTMLElement {
             }
             .vn-bubble.pump { transform: scale(0.95); }
             
-            /* Glass Mode */
             .vn-bubble.glass {
                 background: rgba(255, 255, 255, 0.15) !important;
                 backdrop-filter: blur(15px) !important;
@@ -181,7 +201,6 @@ class ViewNotes extends HTMLElement {
                 font-size: 1.6rem; font-weight: 700; line-height: 1.35; z-index: 2;
                 word-break: break-word; width: 100%;
             }
-            /* Text Effects */
             .fx-glow { text-shadow: 0 0 15px currentColor; }
             .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.6); }
 
@@ -196,9 +215,8 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
-            /* Music Tag */
+            /* Music Tag - MOVED BELOW BUBBLE TO FIX OVERLAP */
             .vn-music-pill { 
-                position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 8px; 
                 background: rgba(0,0,0,0.6); padding: 8px 16px; 
                 border-radius: 100px; font-size: 0.75rem; font-weight: 600;
@@ -212,16 +230,15 @@ class ViewNotes extends HTMLElement {
             @keyframes vn-eq { 0%, 100% { height: 40%; } 50% { height: 100%; } }
 
             .vn-timestamp { 
-                font-size: 0.75rem; color: rgba(255,255,255,0.6); text-align: center; 
+                font-size: 0.75rem; text-align: center; 
                 margin-top: 25px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
-                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
             }
 
             /* --- FOOTER ACTIONS --- */
             .vn-footer {
                 padding: 10px 20px calc(30px + env(safe-area-inset-bottom));
                 position: relative; z-index: 10;
-                background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+                background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
             }
             
             .vn-emoji-bar {
@@ -312,38 +329,48 @@ class ViewNotes extends HTMLElement {
         const sheet = this.querySelector('#vn-sheet');
         const handle = this.querySelector('#vn-handle');
         
-        const startDrag = (e) => {
-            this.startY = e.touches ? e.touches[0].clientY : e.clientY;
-            this.isDragging = true;
-            sheet.style.transition = 'none'; 
-        };
+        // Use sheet itself for drag initiation to feel more natural
+        const dragTarget = sheet; 
 
-        const onDrag = (e) => {
-            if (!this.isDragging) return;
-            this.currentY = e.touches ? e.touches[0].clientY : e.clientY;
-            const deltaY = this.currentY - this.startY;
-            if (deltaY > 0) {
-                e.preventDefault(); 
-                sheet.style.transform = `translateY(${deltaY}px)`;
+        dragTarget.addEventListener('touchstart', (e) => {
+            // Prevent drag if scrolling content
+            if(e.target.closest('.vn-likers-section') || e.target.closest('.vn-footer')) return;
+            
+            this.state.isDragging = true;
+            this.state.startY = e.touches[0].clientY;
+            this.state.sheetHeight = sheet.offsetHeight;
+            sheet.style.transition = 'none';
+        }, {passive: true});
+
+        dragTarget.addEventListener('touchmove', (e) => {
+            if (!this.state.isDragging) return;
+            
+            this.state.currentY = e.touches[0].clientY;
+            const delta = this.state.currentY - this.state.startY;
+            
+            // Only allow dragging DOWN
+            if (delta > 0) {
+                // Add resistance
+                const resistance = 1; // 1:1 movement feels best for sheets
+                const translateY = delta * resistance;
+                sheet.style.transform = `translateY(${translateY}px)`;
             }
-        };
+        }, {passive: false});
 
-        const endDrag = (e) => {
-            if (!this.isDragging) return;
-            this.isDragging = false;
+        dragTarget.addEventListener('touchend', (e) => {
+            if (!this.state.isDragging) return;
+            this.state.isDragging = false;
+            
+            const delta = this.state.currentY - this.state.startY;
             sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            const deltaY = this.currentY - this.startY;
-            if (deltaY > 120) {
+            
+            // Threshold to close: 20% of sheet height or fast flick
+            if (delta > (this.state.sheetHeight * 0.2)) {
                 this.close();
             } else {
                 sheet.style.transform = `translateY(0)`;
             }
-        };
-
-        // Attach to sheet for easier dragging on mobile
-        sheet.addEventListener('touchstart', startDrag, {passive: true});
-        sheet.addEventListener('touchmove', onDrag, {passive: false});
-        sheet.addEventListener('touchend', endDrag);
+        });
     }
 
     async open(initialNoteData, isOwnNote = false) {
@@ -421,10 +448,14 @@ class ViewNotes extends HTMLElement {
         if (note.bgTexture) texLayer.classList.add('visible');
         else texLayer.classList.remove('visible');
 
+        // Dynamic Text Color Calculation
+        const isDarkBg = this.getContrastColor(note.bgColor || '#000') === '#ffffff';
+        const textColorClass = isDarkBg ? 'vn-text-light' : 'vn-text-dark';
+
         // Render Specific View
         content.innerHTML = this.isOwnNote 
-            ? this.getOwnNoteHTML(note) 
-            : this.getFriendNoteHTML(note);
+            ? this.getOwnNoteHTML(note, textColorClass) 
+            : this.getFriendNoteHTML(note, textColorClass);
         
         this.attachDynamicListeners();
     }
@@ -434,7 +465,7 @@ class ViewNotes extends HTMLElement {
         return '0 2px 10px rgba(0,0,0,0.3)';
     }
 
-    getOwnNoteHTML(note) {
+    getOwnNoteHTML(note, textClass) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
@@ -463,12 +494,12 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-profile-header vn-clickable" id="vn-header-click">
                     <img src="${displayPfp}" class="vn-friend-pfp">
                     <div class="vn-friend-info">
-                        <div class="vn-friend-name">
+                        <div class="vn-friend-name ${textClass}">
                             ${displayName} (You)
                             ${isVerified ? icons.verified : ''}
                             ${isCF ? icons.star : ''}
                         </div>
-                        <div class="vn-friend-handle">${note.isActive ? 'Active Note' : 'Archived'}</div>
+                        <div class="vn-friend-handle ${textClass}">${note.isActive ? 'Active Note' : 'Archived'}</div>
                     </div>
                 </div>
 
@@ -484,7 +515,7 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
                 </div>
-                <div class="vn-timestamp">${timeAgo}</div>
+                <div class="vn-timestamp ${textClass}">${timeAgo}</div>
             </div>
 
             <div class="vn-likers-section">
@@ -516,7 +547,7 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
-    getFriendNoteHTML(note) {
+    getFriendNoteHTML(note, textClass) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
@@ -546,12 +577,12 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-profile-header vn-clickable" id="vn-header-click">
                     <img src="${displayPfp}" class="vn-friend-pfp">
                     <div class="vn-friend-info">
-                        <div class="vn-friend-name">
+                        <div class="vn-friend-name ${textClass}">
                             ${displayName}
                             ${isVerified ? icons.verified : ''}
                             ${isCF ? icons.star : ''}
                         </div>
-                        <div class="vn-friend-handle">${displayHandle}</div>
+                        <div class="vn-friend-handle ${textClass}">${displayHandle}</div>
                     </div>
                 </div>
 
@@ -568,7 +599,7 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
                 </div>
-                <div class="vn-timestamp">${timeAgo}</div>
+                <div class="vn-timestamp ${textClass}">${timeAgo}</div>
             </div>
 
             <div class="vn-footer">
@@ -661,8 +692,6 @@ class ViewNotes extends HTMLElement {
         }
 
         // --- NEW DELETE/ARCHIVE LOGIC ---
-        
-        // 1. Archive Button (Only sets isActive: false)
         const archiveBtn = this.querySelector('#archive-note-btn');
         if (archiveBtn) {
             archiveBtn.onclick = async () => {
@@ -677,7 +706,6 @@ class ViewNotes extends HTMLElement {
             };
         }
 
-        // 2. Delete Forever Button (Completely removes doc)
         const deleteForeverBtn = this.querySelector('#delete-forever-btn');
         if (deleteForeverBtn) {
             deleteForeverBtn.onclick = async () => {
@@ -714,8 +742,6 @@ class ViewNotes extends HTMLElement {
                 try {
                     if (!isCurrentlyLiked) {
                         // --- LIKE ACTION ---
-                        
-                        // 1. Add to Note Likes
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
@@ -730,10 +756,8 @@ class ViewNotes extends HTMLElement {
                             })
                         });
                         
-                        // 2. Create Notification (If not self-like)
                         if (this.currentNote.uid !== user.uid) {
                             const docSnap = await notifRef.get();
-                            
                             if (!docSnap.exists) {
                                 batch.set(notifRef, {
                                     type: 'like',
@@ -747,11 +771,7 @@ class ViewNotes extends HTMLElement {
                                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                                     isSeen: false
                                 });
-
-                                // 3. Increment Counter
-                                batch.update(receiverRef, {
-                                    unreadCount: firebase.firestore.FieldValue.increment(1)
-                                });
+                                batch.update(receiverRef, { unreadCount: firebase.firestore.FieldValue.increment(1) });
                             }
                         }
 
@@ -759,18 +779,13 @@ class ViewNotes extends HTMLElement {
                         // --- UNLIKE ACTION ---
                         const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
                         if (likerObj) {
-                            batch.update(noteRef, { 
-                                likes: firebase.firestore.FieldValue.arrayRemove(likerObj) 
-                            });
+                            batch.update(noteRef, { likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
                         }
-                        
                         if (this.currentNote.uid !== user.uid) {
                             batch.delete(notifRef);
                         }
                     }
-                    
                     await batch.commit();
-
                 } catch (e) { 
                     console.error("Like toggle failed", e);
                     likeBtn.innerHTML = isCurrentlyLiked ? icons.heartFilled : icons.heartEmpty; 
