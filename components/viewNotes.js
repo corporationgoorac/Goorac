@@ -65,35 +65,41 @@ class ViewNotes extends HTMLElement {
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.65); display: none; z-index: 2000;
+                background: rgba(0,0,0,0.7); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: none; 
-                opacity: 0; transition: opacity 0.2s ease;
+                backdrop-filter: blur(4px); 
+                opacity: 0; transition: opacity 0.3s ease;
             }
             .vn-overlay.open { display: flex; opacity: 1; }
             
             .vn-sheet {
                 background: #121212; width: 100%; max-width: 500px;
-                border-radius: 24px 24px 0 0; 
+                border-radius: 32px 32px 0 0; 
                 transform: translateY(100%); 
-                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                /* Immersive Full Screen Mode */
-                position: absolute; bottom: 0; left: 0; height: 100%;
-                border-top: none;
+                
+                /* FIX: 85% Height Logic */
+                position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
+                height: 85dvh; /* Dynamic Viewport Height */
+                max-height: 800px;
+                
+                border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
+                overflow: hidden;
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
             @media (min-width: 768px) {
                 .vn-sheet {
-                    height: 85%; border-radius: 24px; position: relative;
+                    height: 80%; border-radius: 24px; position: relative;
                     margin-bottom: 20px; overflow: hidden;
                 }
             }
 
             /* --- BACKGROUND LAYERS --- */
-            .vn-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; transition: background 0.3s; }
+            .vn-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; transition: background 0.3s; opacity: 0.6; }
             
             .vn-texture {
                 position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
@@ -107,24 +113,25 @@ class ViewNotes extends HTMLElement {
                 background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
             }
 
-            .vn-drag-handle { 
-                width: 40px; height: 5px; background: rgba(255,255,255,0.2); 
-                border-radius: 10px; margin: 15px auto 0; cursor: grab;
-                position: relative; z-index: 10;
-            }
-
-            /* --- HEADER --- */
+            /* --- HEADER ALIGNMENT FIX --- */
             .vn-header {
                 position: absolute; top: 0; left: 0; width: 100%;
-                padding: calc(20px + env(safe-area-inset-top)) 20px 10px;
-                display: flex; justify-content: flex-end;
+                height: 60px;
+                display: flex; justify-content: center; align-items: center;
                 z-index: 10;
             }
+            
+            .vn-drag-handle { 
+                width: 48px; height: 5px; background: rgba(255,255,255,0.3); 
+                border-radius: 10px; cursor: grab;
+            }
+
             .vn-close-btn {
-                width: 36px; height: 36px; border-radius: 50%;
-                background: rgba(0,0,0,0.2); backdrop-filter: blur(10px);
+                position: absolute; right: 20px; top: 20px;
+                width: 32px; height: 32px; border-radius: 50%;
+                background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
                 display: flex; align-items: center; justify-content: center;
-                color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+                color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
             }
 
             /* --- CONTENT --- */
@@ -132,15 +139,15 @@ class ViewNotes extends HTMLElement {
                 flex: 1; display: flex; flex-direction: column;
                 justify-content: center; align-items: center;
                 position: relative; z-index: 5;
-                padding-bottom: 80px; width: 100%;
+                padding-bottom: 40px; width: 100%;
             }
 
             .vn-profile-header {
                 display: flex; align-items: center; gap: 12px; margin-bottom: 25px;
-                position: absolute; top: 80px; left: 20px; z-index: 10;
+                position: absolute; top: 60px; left: 24px; z-index: 10;
             }
             .vn-friend-pfp {
-                width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+                width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
                 border: 2px solid rgba(255,255,255,0.2); background: #222;
             }
             .vn-friend-info { display: flex; flex-direction: column; }
@@ -212,8 +219,9 @@ class ViewNotes extends HTMLElement {
 
             /* --- FOOTER ACTIONS --- */
             .vn-footer {
-                padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+                padding: 10px 20px calc(30px + env(safe-area-inset-bottom));
                 position: relative; z-index: 10;
+                background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
             }
             
             .vn-emoji-bar {
@@ -227,9 +235,9 @@ class ViewNotes extends HTMLElement {
 
             .vn-interaction-bar { 
                 display: flex; align-items: center; gap: 10px; 
-                background: rgba(30, 30, 30, 0.8); backdrop-filter: blur(20px);
+                background: rgba(40, 40, 40, 0.9); backdrop-filter: blur(20px);
                 padding: 6px 6px 6px 18px; border-radius: 35px;
-                border: 1px solid rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.15);
             }
             .vn-reply-input { 
                 flex: 1; background: none; border: none; color: white; 
@@ -252,8 +260,8 @@ class ViewNotes extends HTMLElement {
 
             /* --- OWN NOTE ACTIONS --- */
             .vn-likers-section { 
-                margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
-                background: rgba(0,0,0,0.5); backdrop-filter: blur(20px);
+                margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding: 20px 20px calc(30px + env(safe-area-inset-bottom));
+                background: rgba(20,20,20,0.95); backdrop-filter: blur(20px);
                 max-height: 40vh; overflow-y: auto; 
             }
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
