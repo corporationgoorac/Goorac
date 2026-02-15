@@ -361,7 +361,7 @@
     let isPosting = false; 
 
     // --- CONFIG ---
-    // metaColor added for Dynamic Top Toolbar
+    // UPDATED: metaColor adjusted to match the TOP of the gradient for full-screen integration
     const bgColors = [
         { bg: '#ffffff', text: '#000000', meta: '#ffffff' }, 
         { bg: '#1c1c1e', text: '#ffffff', meta: '#1c1c1e' }, 
@@ -373,9 +373,9 @@
         { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355', meta: '#2AF598' },
         { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366', meta: '#4facfe' },
         { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a', meta: '#a6c1ee' },
-        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff', meta: '#0ba360' },
-        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff', meta: '#13547a' },
-        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff', meta: '#ff0844' },
+        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff', meta: '#3cba92' }, // Updated meta
+        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff', meta: '#80d0c7' }, // Updated meta
+        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff', meta: '#ffb199' }, // Updated meta
         { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff', meta:'#3f5efb'},
         { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff', meta:'#434343' }
     ];
@@ -431,8 +431,27 @@
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
+                
+                // 1. Try Local Cache First
                 const cached = JSON.parse(localStorage.getItem('goorac_profile'));
-                els.pfp.src = (cached ? cached.photoURL : user.photoURL) || 'https://via.placeholder.com/150';
+                if (cached && cached.photoURL) {
+                    els.pfp.src = cached.photoURL;
+                } else if (user.photoURL) {
+                    els.pfp.src = user.photoURL;
+                }
+
+                // 2. Fetch fresh PFP from Firestore (Updates background if changed)
+                db.collection('users').doc(user.uid).get().then(doc => {
+                    if(doc.exists) {
+                        const data = doc.data();
+                        if (data.photoURL && data.photoURL !== els.pfp.src) {
+                            els.pfp.src = data.photoURL;
+                            // Update cache for next time
+                            localStorage.setItem('goorac_profile', JSON.stringify(data));
+                        }
+                    }
+                });
+
             } else {
                 window.location.href = 'login.html';
             }
