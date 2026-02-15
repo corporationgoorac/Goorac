@@ -1,11 +1,11 @@
 /**
  * components/profileNotes.js
  * Features: 
- * - Lazy Loading (Pagination) to save Firebase reads.
- * - Premium UI/UX with Glassmorphism and animations.
- * - Active/Archived Status Indicators.
- * - Relative Time formatting (e.g., "2h ago").
- * - Auto-handles Auth, Close Friends, and Privacy logic.
+ * - Lazy Loading (Pagination)
+ * - Premium UI/UX matching new Notes system
+ * - Active/Archived Status Indicators
+ * - Relative Time formatting
+ * - Auto-handles Auth, Close Friends, and Privacy logic
  */
 class ProfileNotes extends HTMLElement {
     constructor() {
@@ -15,11 +15,11 @@ class ProfileNotes extends HTMLElement {
         this.db = firebase.firestore();
         
         // Pagination State
-        this.lastDoc = null;      // Last fetched document for cursor
-        this.isLoading = false;   // Prevent duplicate fetches
-        this.isFinished = false;  // True when no more notes exist
-        this.BATCH_SIZE = 10;     // Fetch 10 at a time (Cost efficient)
-        this.observer = null;     // Scroll observer
+        this.lastDoc = null;      
+        this.isLoading = false;   
+        this.isFinished = false;  
+        this.BATCH_SIZE = 10;     
+        this.observer = null;     
     }
 
     connectedCallback() {
@@ -66,6 +66,17 @@ class ProfileNotes extends HTMLElement {
         if (d < 7) return `${d}d ago`;
         
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    // --- HELPER: Text Contrast (New) ---
+    getContrastColor(hexColor) {
+        if(!hexColor || hexColor.includes('gradient') || hexColor.includes('url')) return '#ffffff';
+        const hex = hexColor.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? '#000000' : '#ffffff';
     }
 
     // --- MAIN LOGIC ---
@@ -137,14 +148,14 @@ class ProfileNotes extends HTMLElement {
                 this.isFinished = true;
                 this.isLoading = false;
                 if (isFirstLoad) this.renderEmpty(isMine);
-                else this.removeLoader(); // Remove spinner if exists
+                else this.removeLoader(); 
                 return;
             }
 
             // Update Cursor
             this.lastDoc = snapshot.docs[snapshot.docs.length - 1];
             
-            // Check if we reached the end (fewer docs than limit)
+            // Check if we reached the end 
             if (snapshot.docs.length < this.BATCH_SIZE) {
                 this.isFinished = true;
             }
@@ -152,7 +163,7 @@ class ProfileNotes extends HTMLElement {
             // Process Notes & Filter Close Friends
             let notes = [];
             
-            // If viewing someone else's profile, we need to check their CF list if a note is restricted
+            // If viewing someone else's profile, get their CF list
             let authorCFList = [];
             if (!isMine) {
                 const userDoc = await this.db.collection('users').doc(this._uid).get();
@@ -162,8 +173,6 @@ class ProfileNotes extends HTMLElement {
             snapshot.docs.forEach(doc => {
                 const data = doc.data();
                 
-                // If isMine, show everything.
-                // If not mine, check audience
                 if (isMine) {
                     notes.push({ id: doc.id, ...data });
                 } else {
@@ -173,7 +182,6 @@ class ProfileNotes extends HTMLElement {
                             notes.push({ id: doc.id, ...data });
                         }
                     } else {
-                        // Public -> Add
                         notes.push({ id: doc.id, ...data });
                     }
                 }
@@ -183,7 +191,7 @@ class ProfileNotes extends HTMLElement {
                 this.setupContainer(isMine); // Create initial HTML structure
             }
 
-            // If we filtered out all notes in this batch (e.g. all were private), fetch next page immediately
+            // If filtered out all notes, fetch next page
             if (notes.length === 0 && !this.isFinished) {
                 this.isLoading = false;
                 this.fetchNotesBatched(isMine);
@@ -231,7 +239,7 @@ class ProfileNotes extends HTMLElement {
                 .pn-item {
                     background: #111; 
                     border: 1px solid rgba(255,255,255,0.08);
-                    border-radius: 20px; padding: 18px;
+                    border-radius: 20px; padding: 20px;
                     display: flex; flex-direction: column; gap: 12px;
                     cursor: pointer; position: relative; overflow: hidden;
                     transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
@@ -246,41 +254,44 @@ class ProfileNotes extends HTMLElement {
                     font-size: 9px; font-weight: 700; text-transform: uppercase;
                     padding: 3px 8px; border-radius: 100px;
                     border: 1px solid rgba(255,255,255,0.1);
+                    z-index: 5;
                 }
-                .pn-status-badge.active { background: rgba(0, 210, 255, 0.1); color: #00d2ff; border-color: rgba(0, 210, 255, 0.3); }
-                .pn-status-badge.archived { background: rgba(255, 255, 255, 0.05); color: #666; }
                 
                 .pn-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
                 .pn-status-badge.active .pn-dot { box-shadow: 0 0 6px currentColor; animation: pulse 2s infinite; }
 
                 .pn-content { 
-                    font-size: 15px; font-weight: 500; color: #fff; 
-                    line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+                    font-size: 16px; font-weight: 600; color: inherit; 
+                    line-height: 1.4; white-space: pre-wrap; word-break: break-word;
                     padding-right: 50px; /* Space for badge */
                 }
 
                 .pn-footer { 
                     display: flex; align-items: center; justify-content: space-between;
                     margin-top: 4px; padding-top: 12px;
-                    border-top: 1px solid rgba(255,255,255,0.05);
+                    border-top: 1px solid rgba(255,255,255,0.1);
                 }
 
-                .pn-meta { font-size: 11px; color: #777; font-weight: 600; display:flex; align-items:center; gap:6px; }
+                .pn-meta { font-size: 11px; opacity: 0.8; font-weight: 600; display:flex; align-items:center; gap:6px; }
 
                 /* Music Badge */
                 .pn-music {
                     display: inline-flex; align-items: center; gap: 6px;
-                    background: rgba(255,255,255,0.05); padding: 5px 12px;
-                    border-radius: 100px; font-size: 11px; color: #ccc; 
-                    border: 1px solid rgba(255,255,255,0.05);
+                    background: rgba(255,255,255,0.1); padding: 5px 12px;
+                    border-radius: 100px; font-size: 11px; color: inherit; 
+                    border: 1px solid rgba(255,255,255,0.1);
                     max-width: 65%;
                 }
-                .pn-music svg { width: 12px; fill: #00d2ff; flex-shrink: 0; }
+                .pn-music svg { width: 12px; fill: currentColor; flex-shrink: 0; }
                 .pn-music span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 
                 /* Loader */
                 .pn-loader { text-align: center; padding: 20px; color: #666; font-size: 12px; display: none; }
                 .pn-loader.show { display: block; }
+                
+                /* Effects */
+                .fx-glow { text-shadow: 0 0 10px currentColor; }
+                .fx-shadow { text-shadow: 2px 2px 0px rgba(0,0,0,0.3); }
 
                 @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
                 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
@@ -307,47 +318,57 @@ class ProfileNotes extends HTMLElement {
             
             // Background Logic: Use custom if active, else darker fallback
             const customBg = note.bgColor ? note.bgColor : '#111';
-            const textColor = note.textColor || '#ffffff';
             const isActive = note.isActive === true;
+            
+            // Text Color Logic (Dynamic)
+            const contrastTextColor = this.getContrastColor(customBg); 
+            // Fallback for archived/dark notes
+            const finalTextColor = isActive ? contrastTextColor : '#ffffff';
 
             const el = document.createElement('div');
             el.className = 'pn-item';
             
-            // Only apply colorful background if active, otherwise subtle dark
+            // Apply visual styles
             if(isActive) {
                 el.style.background = customBg;
-                el.style.color = textColor;
+                el.style.color = finalTextColor;
             }
 
             el.style.fontFamily = note.font || 'system-ui';
+            
+            // Effect Class
+            const effectClass = (isActive && note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
 
             let musicHtml = '';
             if (note.songName) {
-                const borderStyle = isActive ? `border-color:${textColor}30; background:${textColor}15;` : '';
-                const iconColor = isActive ? textColor : '#00d2ff';
+                const borderStyle = isActive ? `border-color:${finalTextColor}30; background:${finalTextColor}15;` : '';
                 musicHtml = `
                 <div class="pn-music" style="${borderStyle}">
-                    <svg viewBox="0 0 24 24" style="fill:${iconColor}"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                    <span style="color:${isActive ? textColor : '#ccc'}">${note.songName}</span>
+                    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    <span>${note.songName}</span>
                 </div>`;
             }
 
+            const badgeStyle = isActive 
+                ? `background:${finalTextColor}15; color:${finalTextColor}; border-color:${finalTextColor}30;` 
+                : `background:rgba(255,255,255,0.05); color:#666;`;
+
             el.innerHTML = `
-                <div class="pn-status-badge ${isActive ? 'active' : 'archived'}" style="${isActive ? `color:${textColor}; border-color:${textColor}40; background:${textColor}10;` : ''}">
+                <div class="pn-status-badge" style="${badgeStyle}">
                     <div class="pn-dot"></div>
                     <span>${isActive ? 'Active' : 'Archived'}</span>
                 </div>
                 
-                <div class="pn-content" style="text-align:${note.textAlign || 'left'}">
+                <div class="pn-content ${effectClass}" style="text-align:${note.textAlign || 'left'}">
                     ${note.text || '<i style="opacity:0.7">🎵 Shared a song</i>'}
                 </div>
 
-                <div class="pn-footer" style="${isActive ? `border-color:${textColor}20;` : ''}">
+                <div class="pn-footer" style="border-color:${finalTextColor}20">
                     ${musicHtml || '<div></div>'} 
-                    <div class="pn-meta" style="${isActive ? `color:${textColor}cc;` : ''}">
+                    <div class="pn-meta" style="color:${finalTextColor}">
                         ${timeStr} 
                         ${note.likes && note.likes.length > 0 ? `&nbsp;•&nbsp; ${note.likes.length} <span style="font-size:10px; margin-left:2px;">❤️</span>` : ''}
-                        ${note.audience === 'close_friends' ? `<span class="material-icons-round" style="font-size:12px; color:#00d2ff; margin-left:4px;">stars</span>` : ''}
+                        ${note.audience === 'close_friends' ? `<span class="material-icons-round" style="font-size:12px; color:${finalTextColor}; margin-left:4px;">stars</span>` : ''}
                     </div>
                 </div>
             `;
