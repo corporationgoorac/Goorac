@@ -66,13 +66,13 @@ class CloseFriendsSelector extends HTMLElement {
             }
             .cf-overlay.open { transform: translateX(0); }
 
-            /* --- HEADER --- */
+            /* --- HEADER (PURE BLACK) --- */
             .cf-header {
                 padding: 15px 15px 10px;
-                background: rgba(18, 18, 18, 0.9);
-                backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+                background: #000000; /* PURE BLACK REQUESTED */
                 border-bottom: 1px solid var(--border-color);
                 z-index: 10; display: flex; flex-direction: column; gap: 15px;
+                padding-top: max(15px, env(safe-area-inset-top));
             }
 
             .cf-nav { display: flex; justify-content: space-between; align-items: center; }
@@ -115,6 +115,7 @@ class CloseFriendsSelector extends HTMLElement {
             .cf-list {
                 flex: 1; overflow-y: auto; padding: 10px 0;
                 display: flex; flex-direction: column;
+                padding-bottom: 50px;
             }
             .cf-item {
                 display: flex; align-items: center; gap: 14px;
@@ -177,7 +178,7 @@ class CloseFriendsSelector extends HTMLElement {
                 </div>
                 <div class="cf-search-box">
                     <svg viewBox="0 0 24 24" style="width:20px; color:#666;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                    <input type="text" class="cf-search-input" id="search-input" placeholder="Search mutual friends..." autocomplete="off">
+                    <input type="text" class="cf-search-input" id="search-input" placeholder="Search mutual friends..." autocomplete="off" autocapitalize="off">
                 </div>
             </div>
 
@@ -209,10 +210,13 @@ class CloseFriendsSelector extends HTMLElement {
         // 2. Search Logic (Debounced)
         let searchTimer;
         const searchInput = this.shadowRoot.getElementById('search-input');
+        
         searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimer);
+            const val = e.target.value.trim();
+            
             searchTimer = setTimeout(() => {
-                this.handleSearch(e.target.value.trim());
+                this.handleSearch(val);
             }, 500);
         });
 
@@ -235,7 +239,7 @@ class CloseFriendsSelector extends HTMLElement {
         this.isOpen = true;
         this.container.classList.add('open');
         
-        // Lock body scroll
+        // Lock body scroll to prevent parent scrolling
         document.body.style.overflow = 'hidden';
         
         // Push state for mobile back button
@@ -247,6 +251,7 @@ class CloseFriendsSelector extends HTMLElement {
         this.selectedIDs.clear();
         this.loadedCount = 0;
         this.isSearching = false;
+        this.shadowRoot.getElementById('search-input').value = '';
         
         await this.initializeData();
     }
@@ -371,12 +376,13 @@ class CloseFriendsSelector extends HTMLElement {
 
         try {
             // Firestore prefix search
+            // Note: This relies on 'username' field existing and being indexed.
             const end = query + '\uf8ff';
             const snapshot = await this.db.collection('users')
                 .orderBy('username')
                 .startAt(query)
                 .endAt(end)
-                .limit(20) // Search limit
+                .limit(20) // Limit global search to 20
                 .get();
 
             let found = 0;
@@ -393,7 +399,8 @@ class CloseFriendsSelector extends HTMLElement {
             }
 
         } catch (e) {
-            console.error(e);
+            console.error("Search Error:", e);
+            this.listContainer.innerHTML = `<div class="cf-msg" style="font-size:0.8rem">Search failed (Check index)</div>`;
         }
         this.toggleLoader(false);
     }
