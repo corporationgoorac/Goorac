@@ -13,6 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <script src="components/songPicker.js"></script>
+    <script src="components/emojiPicker.js"></script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700&display=swap" rel="stylesheet">
@@ -211,8 +212,6 @@
         @keyframes pulse-out { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 
         /* Active Player */
-        .pulse-bg { position: absolute; inset: 0; z-index: 1; opacity: 0.4; mix-blend-mode: overlay; pointer-events: none; }
-        
         .player-ui {
             width: 100%; flex: 1; display: flex; flex-direction: column; 
             align-items: center; justify-content: center; position: relative; z-index: 20;
@@ -228,12 +227,12 @@
         .album-box.playing { transform: scale(1.05); box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
         .album-box img { width: 100%; height: 100%; object-fit: cover; }
 
-        .track-info { text-align: center; margin-bottom: 50px; padding: 0 30px; }
+        .track-info { text-align: center; margin-bottom: 20px; padding: 0 30px; }
         .track-name { font-size: 24px; font-weight: 800; margin-bottom: 8px; text-shadow: 0 5px 20px rgba(0,0,0,0.5); }
         .track-artist { font-size: 15px; opacity: 0.8; font-weight: 600; letter-spacing: 0.5px; }
 
         /* Controls */
-        .controls-area { width: 100%; display: flex; justify-content: center; height: 80px; }
+        .controls-area { width: 100%; display: flex; justify-content: center; height: 80px; align-items: center; }
         
         .dj-btn {
             background: #fff; color: #000; border: none;
@@ -242,19 +241,10 @@
             box-shadow: 0 5px 20px rgba(255,255,255,0.3);
             display: flex; align-items: center; gap: 8px;
             cursor: pointer; transition: 0.2s;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
         .dj-btn:active { transform: scale(0.95); }
-
-        .reactions {
-            display: flex; gap: 15px; background: rgba(255,255,255,0.1);
-            padding: 10px 25px; border-radius: 100px;
-            backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1);
-            transform: translateY(50px); opacity: 0; transition: 0.4s;
-        }
-        .reactions.show { transform: translateY(0); opacity: 1; }
-        
-        .react-emoji { font-size: 32px; cursor: pointer; transition: 0.2s; user-select: none; }
-        .react-emoji:active { transform: scale(1.4); }
 
         .status-pill {
             position: absolute; top: calc(20px + var(--safe-top)); left: 50%; transform: translateX(-50%);
@@ -266,16 +256,53 @@
         .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* Flying Emojis */
-        .floater {
-            position: absolute; font-size: 48px; pointer-events: none; z-index: 100;
-            animation: floatUp 2s ease-out forwards;
+        /* --- EMOJI & ANIMATIONS --- */
+        #emoji-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            z-index: 200; display: none; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
         }
-        @keyframes floatUp { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 100% { transform: translateY(-400px) scale(1.5); opacity: 0; } }
+        #emoji-modal.active { display: flex; }
+
+        .seated-emoji {
+            position: absolute; font-size: 40px; z-index: 50;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+            transition: all 0.5s ease;
+        }
+        
+        /* Animation for flying emoji */
+        .flying-emoji {
+            position: fixed; font-size: 48px; z-index: 300; pointer-events: none;
+            transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+        }
 
     </style>
 </head>
 <body>
+
+    <script>
+        (function() {
+            // Instant load cached PFP
+            try {
+                const profile = localStorage.getItem('my_goorac_profile');
+                if(profile) {
+                    const data = JSON.parse(profile);
+                    const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
+                    
+                    // Create a style rule to set it immediately if possible
+                    document.write(`<style>#lobby-pfp { content: url("${pfpUrl}"); }</style>`);
+                    
+                    // Also attempt to set on DOMContentLoaded for safety
+                    document.addEventListener("DOMContentLoaded", () => {
+                        const elLobby = document.getElementById('lobby-pfp');
+                        const elAvatar = document.getElementById('my-avatar');
+                        if(elLobby) elLobby.src = pfpUrl;
+                        if(elAvatar) elAvatar.src = pfpUrl;
+                    });
+                }
+            } catch(e) {}
+        })();
+    </script>
 
     <div id="lobby-view">
         <div class="top-nav">
@@ -340,10 +367,12 @@
                 <div class="s-line" id="connect-line"></div>
                 <div class="s-bubble me">
                     <img id="my-avatar" src="">
+                    <div id="my-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
                 </div>
                 <div class="s-bubble them" id="target-bubble">
                     <img id="target-avatar" src="">
                     <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
+                    <div id="their-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
                 </div>
             </div>
 
@@ -352,7 +381,6 @@
         </div>
 
         <div class="screen" id="screen-active">
-            <canvas id="visualizer" class="visualizer-bg"></canvas>
             
             <div class="status-pill">
                 <div class="status-dot"></div> LIVE SYNC
@@ -376,18 +404,15 @@
 
                 <div class="controls-area" id="controls-container"></div>
                 
-                <div class="reactions" id="reaction-bar">
-                    <span class="react-emoji" onclick="sendReaction('🔥')">🔥</span>
-                    <span class="react-emoji" onclick="sendReaction('⚡')">⚡</span>
-                    <span class="react-emoji" onclick="sendReaction('💜')">💜</span>
-                    <span class="react-emoji" onclick="sendReaction('🌊')">🌊</span>
-                    <span class="react-emoji" onclick="sendReaction('💿')">💿</span>
-                </div>
             </div>
         </div>
     </div>
 
     <song-picker id="song-picker"></song-picker>
+    
+    <div id="emoji-modal">
+        <emoji-picker id="cycle-emoji-picker"></emoji-picker>
+    </div>
 
     <script>
         // --- 1. INIT & CONFIG ---
@@ -405,29 +430,35 @@
         let mutualList = [];
         let loadedCount = 0;
         const BATCH_SIZE = 10;
-        let mutualsCache = []; // Local storage cache
+        let mutualsCache = []; 
 
         // Session State
         let targetProfile = null;
         let roomRef = null;
         let roomUnsub = null;
         let audio = new Audio();
-        let isDJ = false;
+        
+        // Cycle Logic State
+        let currentTurnUid = null;
+        let isMyTurn = false;
+        let currentSongId = null;
+        let hasPickedEmoji = false;
 
         // --- 2. AUTH FLOW ---
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
                 
-                // Active PFP Fetch (Guarantees fresh PFP)
+                // Update profile data in background, UI already loaded from script above
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
                         const elLobby = document.getElementById('lobby-pfp');
                         const elAvatar = document.getElementById('my-avatar');
-                        if(elLobby) elLobby.src = pfp;
-                        if(elAvatar) elAvatar.src = pfp;
+                        // Update src if changed to ensure high quality
+                        if(elLobby && elLobby.src !== pfp) elLobby.src = pfp;
+                        if(elAvatar && elAvatar.src !== pfp) elAvatar.src = pfp;
                         localStorage.setItem('my_goorac_profile', JSON.stringify(data));
                     }
                 });
@@ -435,14 +466,9 @@
                 if (targetUid) {
                     // -> ACTIVE SESSION MODE
                     document.getElementById('session-view').style.display = 'block';
-                    
-                    // Verify Friendship before connecting
                     const allowed = await verifyMutuals(myUid, targetUid);
-                    if (allowed) {
-                        initPulseSession();
-                    } else {
-                        showError("You are not mutual friends.");
-                    }
+                    if (allowed) initPulseSession();
+                    else showError("You are not mutual friends.");
                 } else {
                     // -> LOBBY MODE
                     document.getElementById('lobby-view').classList.add('active');
@@ -459,22 +485,21 @@
         // ============================================
         
         async function initLobby() {
-            // Instant Cache Load
+            // Instant Load Cache
             const cachedMutuals = localStorage.getItem('pulse_mutuals_cache');
             if(cachedMutuals) {
                 mutualsCache = JSON.parse(cachedMutuals);
-                // Render cache immediately
                 renderList(mutualsCache);
             }
 
             try {
-                // 1. Fetch Graphs
+                // Fetch Graphs
                 const doc = await db.collection('users').doc(myUid).get();
                 const data = doc.data();
                 const following = (data.following || []).map(u => typeof u === 'string' ? u : u.uid);
                 const followers = (data.followers || []).map(u => typeof u === 'string' ? u : u.uid);
 
-                // 2. Intersect (Mutuals only)
+                // Intersect
                 mutualList = following.filter(id => followers.includes(id));
                 
                 if (mutualList.length === 0) {
@@ -483,11 +508,11 @@
                     return;
                 }
 
-                // 3. Load Fresh Batch (Resets the visual count logic)
+                // Initial Load - FIX: Don't clear container if cache exists
                 loadedCount = 0;
                 loadMoreMutuals();
 
-                // 4. Scroll Listener
+                // Scroll
                 const container = document.getElementById('mutuals-container');
                 container.addEventListener('scroll', () => {
                     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 20) {
@@ -495,7 +520,7 @@
                     }
                 });
 
-                // 5. Search Listener
+                // Search
                 document.getElementById('mutual-search').addEventListener('input', (e) => {
                     const term = e.target.value.toLowerCase();
                     const items = document.querySelectorAll('.m-card');
@@ -508,11 +533,17 @@
             } catch (e) { console.error(e); }
         }
 
-        // Render List - Clears and Rebuilds to avoid Duplicates
+        // Render List Function (Clears Dupes)
         function renderList(list) {
             const container = document.getElementById('mutuals-container');
-            container.innerHTML = ''; 
-            list.forEach(uData => container.appendChild(createMutualCard(uData)));
+            // FIX: Only clear if list is empty or rewriting fully
+            if(container.children.length === 0 || list.length === mutualList.length) container.innerHTML = ''; 
+            
+            // Clever render: only append new ones
+            list.forEach(uData => {
+                const existing = document.querySelector(`.m-card[data-uid="${uData.uid}"]`);
+                if(!existing) container.appendChild(createMutualCard(uData));
+            });
         }
 
         async function loadMoreMutuals() {
@@ -524,46 +555,28 @@
             const nextBatchIds = mutualList.slice(loadedCount, loadedCount + BATCH_SIZE);
             let fetchedData = [];
 
-            // Check if these IDs are already in cache to save reads? 
-            // For now, we fetch fresh to ensure PFP/Name is up to date, but we could optimize.
-            // Let's check `mutualsCache` for these IDs first.
-            
             for (const uid of nextBatchIds) {
-                // Simple optimization: If already in cache, use it, else fetch
-                const existing = mutualsCache.find(u => u.uid === uid);
-                
-                if (existing) {
-                     fetchedData.push(existing);
-                } else {
-                     try {
-                        const uDoc = await db.collection('users').doc(uid).get();
-                        if (uDoc.exists) {
-                            const uData = uDoc.data();
-                            uData.uid = uid; 
-                            fetchedData.push(uData);
-                        }
-                    } catch(e) {}
-                }
+                try {
+                    const uDoc = await db.collection('users').doc(uid).get();
+                    if (uDoc.exists) {
+                        const uData = uDoc.data();
+                        uData.uid = uid; 
+                        fetchedData.push(uData);
+                    }
+                } catch(e) {}
             }
 
             // Update Cache & Render
             if(loadedCount === 0) {
-                // If first batch, replace cache (in case unfriend happened)
                 mutualsCache = fetchedData;
             } else {
-                // Append unique items
-                fetchedData.forEach(newItem => {
-                    if(!mutualsCache.some(c => c.uid === newItem.uid)) {
-                        mutualsCache.push(newItem);
-                    }
-                });
+                // De-dupe merge
+                const newItems = fetchedData.filter(newU => !mutualsCache.some(oldU => oldU.uid === newU.uid));
+                mutualsCache = [...mutualsCache, ...newItems];
             }
             
             localStorage.setItem('pulse_mutuals_cache', JSON.stringify(mutualsCache));
-            
-            // Append only new items to UI to prevent flicker? 
-            // Or just re-render all for simplicity? Re-rendering all guarantees order.
-            renderList(mutualsCache); 
+            renderList(mutualsCache);
 
             loadedCount += nextBatchIds.length;
             loader.style.display = 'none';
@@ -572,6 +585,7 @@
         function createMutualCard(uData) {
             const div = document.createElement('div');
             div.className = 'm-card';
+            div.dataset.uid = uData.uid;
             div.dataset.name = (uData.name || '') + (uData.username || '');
             
             const verifiedHtml = uData.verified ? `<span class="material-icons-round verified-badge">verified</span>` : '';
@@ -589,7 +603,6 @@
 
             div.onclick = () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                // Force reload to switch modes cleanly
                 window.location.assign(`pulse.html?uid=${uData.uid}&t=${Date.now()}`); 
             };
             return div;
@@ -597,7 +610,7 @@
 
 
         // ============================================
-        //  PART B: PULSE SESSION LOGIC
+        //  PART B: PULSE SESSION LOGIC (NEW CYCLE)
         // ============================================
 
         async function verifyMutuals(me, them) {
@@ -638,67 +651,231 @@
             showScreen('screen-waiting');
 
             const updateField = (myUid < targetUid) ? 'userA' : 'userB';
+            
+            // Initialize Room if not exists or reset logic
             roomRef.set({ 
                 [updateField]: 'online', 
-                lastActive: firebase.firestore.FieldValue.serverTimestamp() 
+                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                // Cycle Logic defaults if new
             }, { merge: true });
 
-            // AGGRESSIVE DISCONNECT
-            const cleanup = () => leaveSession();
-            window.addEventListener('beforeunload', cleanup);
-            window.addEventListener('pagehide', cleanup);
-            document.addEventListener('visibilitychange', () => { if(document.hidden) cleanup(); });
+            // Initialize turn if undefined (User A starts)
+            roomRef.get().then(doc => {
+               if(doc.exists && !doc.data().turn) {
+                   roomRef.update({ 
+                       turn: (myUid < targetUid) ? myUid : targetUid,
+                       cycleStatus: 'picking' // picking, playing
+                   });
+               } 
+            });
+
+            // Listeners
+            window.addEventListener('beforeunload', leaveSession);
+            window.addEventListener('pagehide', leaveSession);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) leaveSession();
+            });
+
+            // Emoji Picker Event
+            const picker = document.getElementById('cycle-emoji-picker');
+            picker.addEventListener('emoji-click', (e) => {
+                handleEmojiSelection(e.detail.emoji);
+            });
+
+            // Audio Events
+            audio.addEventListener('ended', handleAudioEnded);
 
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
                 const otherField = (myUid < targetUid) ? 'userB' : 'userA';
                 
+                // Connection Check
                 if (data[otherField] === 'online') {
-                    if (!document.getElementById('screen-active').classList.contains('active')) activatePulse(data);
+                    if (!document.getElementById('screen-active').classList.contains('active')) {
+                         showScreen('screen-active');
+                    }
+                    // Run Cycle Logic
+                    syncCycle(data);
                 } else {
-                    if (document.getElementById('screen-active').classList.contains('active')) deactivatePulse();
+                    deactivatePulse();
                 }
-
-                if (data.currentSong) syncAudio(data.currentSong);
-                if (data.reaction && data.reactionSender !== myUid) spawnReaction(data.reaction);
             });
         }
 
-        function activatePulse(data) {
-            showScreen('screen-active');
-            if(navigator.vibrate) navigator.vibrate([40, 40, 40]);
-            isDJ = (myUid < targetUid); 
-            renderControls();
+        function syncCycle(data) {
+            currentTurnUid = data.turn;
+            isMyTurn = (myUid === currentTurnUid);
+            const status = data.cycleStatus; // 'picking' or 'playing'
+
+            // Song Sync
+            if (data.currentSong && (!currentSongId || data.currentSong.id !== currentSongId)) {
+                currentSongId = data.currentSong.id;
+                playSong(data.currentSong);
+                // Reset emoji state for new song
+                resetEmojiState();
+            }
+
+            // Controls Display
+            const controls = document.getElementById('controls-container');
+            const emojiModal = document.getElementById('emoji-modal');
+
+            if (status === 'picking') {
+                if (isMyTurn) {
+                    // It is my turn to pick
+                    controls.innerHTML = '';
+                    const btn = document.createElement('button');
+                    btn.className = "dj-btn";
+                    btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Song`;
+                    btn.onclick = () => document.getElementById('song-picker').open();
+                    controls.appendChild(btn);
+                    
+                    document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
+                } else {
+                    // Waiting for them
+                    controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is choosing...</p>`;
+                    document.getElementById('active-song-artist').innerText = "Waiting for track...";
+                }
+                emojiModal.classList.remove('active'); // Hide emoji picker during selection
+            } 
+            else if (status === 'playing') {
+                // Show Emoji Picker immediately when song starts
+                if (!hasPickedEmoji) {
+                    emojiModal.classList.add('active');
+                }
+                controls.innerHTML = ''; // Clean controls
+            }
+
+            // Emoji Sync (Display seated emojis)
+            if (data.emojis) {
+                if(data.emojis[myUid]) showSeatedEmoji('me', data.emojis[myUid]);
+                if(data.emojis[targetUid]) showSeatedEmoji('them', data.emojis[targetUid]);
+            }
+        }
+
+        function playSong(song) {
+            audio.src = song.previewUrl;
+            audio.loop = false; // Normal play first
+            audio.play().catch(e => console.log("Autoplay blocked"));
+            
+            // Reset completion status
+            roomRef.update({ [`audioFinished.${myUid}`]: false });
+
+            const highRes = song.artworkUrl100.replace('100x100', '600x600');
+            document.getElementById('active-album-art').src = highRes;
+            document.getElementById('active-song-title').innerText = song.trackName;
+            document.getElementById('active-song-artist').innerText = song.artistName;
+            document.getElementById('active-album-art').classList.add('playing');
+            
+            const hue = (song.artistName.length * 50) % 360;
+            document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
+        }
+
+        function handleEmojiSelection(emoji) {
+            hasPickedEmoji = true;
+            document.getElementById('emoji-modal').classList.remove('active');
+
+            // 1. Animate Flying
+            const flyer = document.createElement('div');
+            flyer.className = 'flying-emoji';
+            flyer.innerText = emoji;
+            
+            // Start from center
+            flyer.style.top = '50%';
+            flyer.style.left = '50%';
+            flyer.style.transform = 'translate(-50%, -50%) scale(0.5)';
+            document.body.appendChild(flyer);
+
+            // Calculate destination (My avatar bubble position)
+            // Use the "s-bubble me" in waiting screen or general location in active screen
+            // For active screen, let's fly to top left or bottom
+            setTimeout(() => {
+                flyer.style.top = '100px'; // Near top PFP area
+                flyer.style.left = '20px';
+                flyer.style.transform = 'scale(1)';
+                flyer.style.opacity = '0';
+            }, 50);
+
+            setTimeout(() => flyer.remove(), 1200);
+
+            // 2. Update Firestore
+            roomRef.set({
+                emojis: { [myUid]: emoji }
+            }, { merge: true });
+        }
+
+        function showSeatedEmoji(who, emoji) {
+            // "who" is 'me' or 'them'. We visualize this on the overlay or corner
+            // For now, let's just create a small badge on the album art or top corner
+            // Simpler: Show it floating permanently near the top nav
+            // (Implementation choice: simple toast for now to ensure robustness)
+            // OR reuse the session-avatars logic if we were in waiting room, but we are in active.
+            
+            // Let's float it near the track info
+            const id = `seated-${who}`;
+            let el = document.getElementById(id);
+            if(!el) {
+                el = document.createElement('div');
+                el.id = id;
+                el.style.position = 'absolute';
+                el.style.fontSize = '24px';
+                el.style.zIndex = '50';
+                // Position based on user
+                if(who === 'me') { el.style.bottom = '120px'; el.style.left = '40px'; }
+                else { el.style.bottom = '120px'; el.style.right = '40px'; }
+                document.querySelector('.player-ui').appendChild(el);
+            }
+            el.innerText = emoji;
+        }
+
+        function resetEmojiState() {
+            hasPickedEmoji = false;
+            const e1 = document.getElementById('seated-me');
+            const e2 = document.getElementById('seated-them');
+            if(e1) e1.remove();
+            if(e2) e2.remove();
+        }
+
+        function handleAudioEnded() {
+            // Song ended logic
+            // 1. Mark my audio as finished in DB
+            roomRef.set({
+                audioFinished: { [myUid]: true }
+            }, { merge: true });
+
+            // 2. Loop locally UNTIL the turn flips
+            audio.currentTime = 0;
+            audio.loop = true;
+            audio.play();
+
+            // 3. Check if both finished (This logic usually runs on both clients)
+            // But to be safe, we use a transaction or simple check inside the snapshot listener 
+            // OR we do a check here if we have the latest data
+            roomRef.get().then(doc => {
+                const d = doc.data();
+                const finished = d.audioFinished || {};
+                // If both users have marked finished (or just me if testing alone)
+                if (finished[myUid] && finished[targetUid]) {
+                    // BOTH ENDED -> SWAP TURN
+                    if (isMyTurn) {
+                        // I was DJ, now I hand over
+                        const nextDj = targetUid;
+                        roomRef.update({
+                            turn: nextDj,
+                            cycleStatus: 'picking',
+                            audioFinished: { [myUid]: false, [targetUid]: false }, // Reset
+                            emojis: {} // Clear emojis
+                        });
+                    }
+                }
+            });
         }
 
         function deactivatePulse() {
             showScreen('screen-waiting');
             audio.pause();
-            audio.currentTime = 0; // Reset
             audio.src = "";
-            
-            document.getElementById('active-album-art').classList.remove('playing');
-            document.getElementById('active-song-title').innerText = "Pulse Paused";
-            document.getElementById('active-song-artist').innerText = "Waiting for reconnection...";
             document.body.style.background = "#000";
-        }
-
-        function renderControls() {
-            const container = document.getElementById('controls-container');
-            container.innerHTML = ''; 
-
-            if (isDJ) {
-                const btn = document.createElement('button');
-                btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
-                btn.className = "dj-btn";
-                btn.onclick = () => document.getElementById('song-picker').open();
-                container.appendChild(btn);
-                document.getElementById('reaction-bar').classList.remove('show');
-            } else {
-                container.innerHTML = `<p style="font-size:12px; color:#888; margin-top:20px; letter-spacing:1px; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is DJ</p>`;
-                document.getElementById('reaction-bar').classList.add('show');
-            }
         }
 
         // --- EVENTS ---
@@ -706,47 +883,14 @@
         document.addEventListener('song-selected', (e) => {
             const song = e.detail;
             
-            // 1. Play Locally Immediately
-            syncAudio(song);
-            
-            // 2. Broadcast
-            roomRef.update({ currentSong: song, timestamp: Date.now(), dj: myUid });
+            // When song selected, update DB to 'playing'
+            roomRef.update({ 
+                currentSong: song, 
+                cycleStatus: 'playing',
+                timestamp: Date.now()
+            });
             if(navigator.vibrate) navigator.vibrate(20);
         });
-
-        function syncAudio(song) {
-            if (audio.src !== song.previewUrl) {
-                audio.src = song.previewUrl;
-                audio.play().catch(e => console.log("Autoplay blocked - Tap needed"));
-                
-                const highRes = song.artworkUrl100.replace('100x100', '600x600');
-                document.getElementById('active-album-art').src = highRes;
-                document.getElementById('active-song-title').innerText = song.trackName;
-                document.getElementById('active-song-artist').innerText = song.artistName;
-                
-                document.getElementById('active-album-art').classList.add('playing');
-                
-                const hue = (song.artistName.length * 50) % 360;
-                document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
-                document.getElementById('theme-meta').setAttribute('content', `hsl(${hue}, 60%, 10%)`);
-            }
-        }
-
-        window.sendReaction = (emoji) => {
-            if(navigator.vibrate) navigator.vibrate(10);
-            roomRef.update({ reaction: emoji, reactionSender: myUid, reactionTime: Date.now() });
-            spawnReaction(emoji); 
-        }
-
-        function spawnReaction(emoji) {
-            const el = document.createElement('div');
-            el.className = 'floater';
-            el.innerText = emoji;
-            el.style.left = Math.random() * 60 + 20 + '%'; 
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 2000);
-            if(navigator.vibrate) navigator.vibrate(20);
-        }
 
         function leaveSession() {
             if(roomRef) {
@@ -754,7 +898,7 @@
                 roomRef.update({ [updateField]: 'offline' });
             }
             audio.pause();
-            audio.src = ""; // Clear buffer
+            audio.src = ""; 
             
             if (targetUid) window.location.href = "pulse.html"; 
             else history.back();
