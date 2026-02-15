@@ -82,7 +82,7 @@ class ViewNotes extends HTMLElement {
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 90dvh; 
+                height: 92dvh; 
                 max-height: 850px;
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
@@ -139,25 +139,24 @@ class ViewNotes extends HTMLElement {
             /* --- CONTENT AREA (FIXED FOR SQUARE) --- */
             .vn-content {
                 flex: 1; display: flex; flex-direction: column;
-                justify-content: flex-start; /* Changed from center to allow custom spacing */
-                align-items: center;
+                justify-content: flex-start; align-items: center;
                 position: relative; z-index: 5;
                 width: 100%;
-                padding-top: 80px; /* Added padding to push content down from header */
-                padding-bottom: 40px; /* Space for footer */
+                padding-bottom: 20px;
             }
 
-            /* THE BUBBLE WRAPPER - FORCE SQUARE */
+            /* THE BUBBLE WRAPPER - UPDATED FOR LAYOUT */
             .vn-bubble-wrapper { 
                 position: relative; 
-                width: 75vw; /* Responsive Width */
-                max-width: 290px; /* REDUCED from 340px to fit correctly */
-                aspect-ratio: 1 / 1; /* FORCE EXACT SQUARE */
-                margin: 40px auto 30px auto; /* Increased top margin */
+                width: 70vw; /* Reduced Width */
+                max-width: 300px; /* Reduced Max Width */
+                aspect-ratio: 1 / 1; 
+                margin: 50px auto 20px auto; /* Increased Top Margin */
                 overflow: visible; 
                 display: flex;
                 flex-direction: column;
                 z-index: 10;
+                flex-shrink: 0;
             }
 
             .vn-bubble {
@@ -165,7 +164,7 @@ class ViewNotes extends HTMLElement {
                 height: 100%; /* Fill the square exactly */
                 border-radius: 48px; /* Smooth corners */
                 display: flex; align-items: center; justify-content: center;
-                text-align: center; padding: 25px; /* Slightly reduced padding */
+                text-align: center; padding: 30px;
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -182,7 +181,7 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 2.0rem; /* Slightly reduced font */
+                font-size: 2.0rem; /* Slightly smaller text */
                 font-weight: 700; line-height: 1.2; z-index: 2;
                 word-break: break-word; width: 100%; white-space: pre-wrap;
                 max-height: 100%;
@@ -206,8 +205,9 @@ class ViewNotes extends HTMLElement {
             /* INFO BELOW NOTE */
             .vn-info-bar {
                 display: flex; flex-direction: column; align-items: center; gap: 4px;
-                margin-top: 15px; z-index: 10;
+                margin-top: 5px; z-index: 10;
                 text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                flex-shrink: 0;
             }
             .vn-display-name { 
                 font-weight: 700; font-size: 1.15rem; 
@@ -245,8 +245,7 @@ class ViewNotes extends HTMLElement {
 
             /* --- FIXED SLOWER ANIMATIONS FOR SONG --- */
             .vn-music-pill { 
-                position: absolute; top: -45px; /* Pushed up slightly more */
-                left: 50%; transform: translateX(-50%);
+                position: absolute; top: -35px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 10px; 
                 background: rgba(15, 15, 15, 0.9); padding: 8px 18px; 
                 border-radius: 100px; font-size: 0.8rem; font-weight: 700;
@@ -340,11 +339,18 @@ class ViewNotes extends HTMLElement {
             .vn-likers-section { 
                 margin-top: auto; 
                 border-top: 1px solid rgba(255,255,255,0.1); 
-                padding: 20px 20px calc(40px + env(safe-area-inset-bottom));
+                padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
                 background: #141414; 
                 z-index: 100; position: relative;
-                max-height: 40vh; overflow-y: auto; 
+                height: 45vh; /* Fixed height for flex layout */
+                display: flex; flex-direction: column;
             }
+            
+            .vn-likers-scroll {
+                flex: 1; overflow-y: auto; margin-bottom: 15px;
+                padding-right: 5px;
+            }
+
             .vn-liker-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
             
             .vn-btn { 
@@ -352,6 +358,7 @@ class ViewNotes extends HTMLElement {
                 font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; 
                 box-shadow: 0 4px 10px rgba(0,0,0,0.3);
                 display: flex; justify-content: center; align-items: center; gap: 8px;
+                flex-shrink: 0;
             }
             .vn-btn-primary { background: #fff; color: #000; }
             .vn-btn-danger { background: rgba(255, 59, 48, 0.15); color: #ff3b30; border: 1px solid rgba(255,59,48,0.2); }
@@ -481,7 +488,6 @@ class ViewNotes extends HTMLElement {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
-                    // Re-render, but getOwnNoteHTML/getFriendNoteHTML now handles glitch prevention
                     this.renderContent(); 
                 }
             });
@@ -524,17 +530,15 @@ class ViewNotes extends HTMLElement {
         this.attachDynamicListeners();
     }
 
-    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE & FIXED NAME GLITCH
+    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        
-        // Fix: Glitch Prevention - Prioritize Note Data
-        const displayName = note.displayName || note.username || this.currentUserProfile?.name || user?.displayName || 'You';
-        
+        // UPDATED: Check user.displayName immediately to prevent glitch
+        const displayName = note.displayName || user?.displayName || this.currentUserProfile?.name || note.username || 'You';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         const isCF = note.audience === 'close_friends';
 
@@ -587,29 +591,34 @@ class ViewNotes extends HTMLElement {
             </div>
 
             <div class="vn-likers-section">
-                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#aaa; display:flex; justify-content:space-between;">
+                <div style="font-weight:700; font-size:0.9rem; margin-bottom:15px; color:#aaa; display:flex; justify-content:space-between; flex-shrink:0;">
                     Activity <span>${(note.likes||[]).length}</span>
                 </div>
-                ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
-                    <div class="vn-liker-item">
-                        <div style="display:flex; align-items:center; gap:10px; color:#fff;">
-                            <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
-                            <span style="font-weight:600; display:flex; align-items:center; gap:4px; font-size:0.9rem;">
-                                ${liker.displayName || 'User'}
-                                ${liker.verified ? icons.verified : ''}
-                            </span>
-                        </div>
-                        <span style="color:#ff3b30;">${icons.heartFilled}</span>
-                    </div>
-                `).join('') : `<div style="text-align:center; color:#555; padding:20px;">No likes yet</div>`}
                 
-                ${note.isActive ? 
-                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note <span class="material-icons-round">edit</span></button>` : 
-                    `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note <span class="material-icons-round">add</span></button>`
-                }
-                <div style="display:flex; gap:10px;">
-                    ${note.isActive ? `<button class="vn-btn vn-btn-archive" id="archive-note-btn">Archive</button>` : ''}
-                    <button class="vn-btn vn-btn-danger" id="delete-forever-btn">Delete</button>
+                <div class="vn-likers-scroll">
+                    ${note.likes && note.likes.length > 0 ? note.likes.map(liker => `
+                        <div class="vn-liker-item">
+                            <div style="display:flex; align-items:center; gap:10px; color:#fff;">
+                                <img src="${liker.photoURL || 'https://via.placeholder.com/44'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
+                                <span style="font-weight:600; display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+                                    ${liker.displayName || 'User'}
+                                    ${liker.verified ? icons.verified : ''}
+                                </span>
+                            </div>
+                            <span style="color:#ff3b30;">${icons.heartFilled}</span>
+                        </div>
+                    `).join('') : `<div style="text-align:center; color:#555; padding:20px;">No likes yet</div>`}
+                </div>
+                
+                <div style="flex-shrink:0;">
+                    ${note.isActive ? 
+                        `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Update Note <span class="material-icons-round">edit</span></button>` : 
+                        `<button class="vn-btn vn-btn-primary" id="vn-leave-new-note">Post New Note <span class="material-icons-round">add</span></button>`
+                    }
+                    <div style="display:flex; gap:10px;">
+                        ${note.isActive ? `<button class="vn-btn vn-btn-archive" id="archive-note-btn">Archive</button>` : ''}
+                        <button class="vn-btn vn-btn-danger" id="delete-forever-btn">Delete</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -622,10 +631,7 @@ class ViewNotes extends HTMLElement {
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
-        
-        // Fix: Glitch Prevention - Prioritize Note Data
-        const displayName = note.displayName || note.username || this.currentUserProfile?.name || 'User';
-        
+        const displayName = note.displayName || this.currentUserProfile?.name || note.username || 'User';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
         const isCF = note.audience === 'close_friends';
 
