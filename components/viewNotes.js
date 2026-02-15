@@ -21,7 +21,7 @@ class ViewNotes extends HTMLElement {
             startY: 0,
             currentY: 0,
             sheetHeight: 0,
-            startTime: 0 // Added for velocity calculation
+            startTime: 0 
         };
         
         this.lastTap = 0;
@@ -57,7 +57,6 @@ class ViewNotes extends HTMLElement {
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
             verified: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:4px; vertical-align:text-bottom;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
-            // Green Circle with Star for Close Friends (Inside Modal)
             closeFriendsBadge: `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:18px; height:18px; margin-left:6px; box-shadow:0 0 5px rgba(0,186,124,0.4);"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`
         };
     }
@@ -109,7 +108,6 @@ class ViewNotes extends HTMLElement {
                 background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
             }
             
-            /* Dim overlay */
             .vn-dim-layer {
                  position: absolute; inset: 0; z-index: 2;
                  background: rgba(0,0,0,0.3);
@@ -146,7 +144,7 @@ class ViewNotes extends HTMLElement {
                 width: 100%;
             }
 
-            /* THE BUBBLE WRAPPER (CENTERPIECE) */
+            /* THE BUBBLE WRAPPER */
             .vn-bubble-wrapper { 
                 position: relative; 
                 width: auto; max-width: 85%;
@@ -166,7 +164,6 @@ class ViewNotes extends HTMLElement {
                 border: 1px solid rgba(255,255,255,0.15);
             }
             
-            /* Glass Mode Logic */
             .vn-bubble.glass {
                 background: rgba(255, 255, 255, 0.15) !important;
                 backdrop-filter: blur(20px) !important;
@@ -180,7 +177,6 @@ class ViewNotes extends HTMLElement {
                 word-break: break-word; width: 100%; white-space: pre-wrap;
             }
             
-            /* PFP STICKER - BOTTOM RIGHT LIKE NOTES.HTML */
             .vn-pfp-sticker {
                 position: absolute; 
                 bottom: -18px; 
@@ -209,7 +205,6 @@ class ViewNotes extends HTMLElement {
                 display: flex; align-items: center; gap: 6px;
             }
             
-            /* Close Friends Tag styled as a text badge */
             .vn-cf-tag {
                 background: rgba(0, 186, 124, 0.2);
                 color: #00ba7c;
@@ -219,7 +214,6 @@ class ViewNotes extends HTMLElement {
                 text-transform: none;
             }
 
-            /* TEXT EFFECTS */
             .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
             .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
 
@@ -234,7 +228,7 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
-            /* NEW MUSIC PILL WITH SCROLLING TEXT */
+            /* --- FIXED SLOWER ANIMATIONS FOR SONG --- */
             .vn-music-pill { 
                 position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 10px; 
@@ -252,9 +246,11 @@ class ViewNotes extends HTMLElement {
                 flex-shrink: 0;
             }
             .vn-eq span { width: 2px; background: #00d2ff; border-radius: 2px; }
-            .vn-eq span:nth-child(1) { height: 60%; animation: eq-1 0.8s infinite ease-in-out; }
-            .vn-eq span:nth-child(2) { height: 100%; animation: eq-2 0.6s infinite ease-in-out; } 
-            .vn-eq span:nth-child(3) { height: 50%; animation: eq-3 1s infinite ease-in-out; } 
+            
+            /* Slower Equalizer */
+            .vn-eq span:nth-child(1) { height: 60%; animation: eq-1 1.2s infinite ease-in-out; }
+            .vn-eq span:nth-child(2) { height: 100%; animation: eq-2 1.0s infinite ease-in-out; } 
+            .vn-eq span:nth-child(3) { height: 50%; animation: eq-3 1.4s infinite ease-in-out; } 
             
             @keyframes eq-1 { 0%,100%{height:40%} 50%{height:90%} }
             @keyframes eq-2 { 0%,100%{height:100%} 50%{height:50%} }
@@ -271,15 +267,15 @@ class ViewNotes extends HTMLElement {
             .vn-song-content {
                 display: inline-block;
                 padding-left: 0;
-                animation: marquee 8s linear infinite;
+                /* Slower Marquee Speed: 12s */
+                animation: marquee 12s linear infinite;
             }
             
-            /* If text is short, don't scroll */
             .vn-song-content.short { animation: none; text-align: center; width: 100%; }
 
             @keyframes marquee {
                 0% { transform: translateX(0); }
-                20% { transform: translateX(0); } /* Pause at start */
+                20% { transform: translateX(0); } 
                 100% { transform: translateX(-100%); }
             }
 
@@ -386,12 +382,9 @@ class ViewNotes extends HTMLElement {
     setupSwipeLogic() {
         const sheet = this.querySelector('#vn-sheet');
         const handle = this.querySelector('#vn-handle');
-        
-        // Use sheet itself for drag initiation to feel more natural
         const dragTarget = sheet; 
 
         dragTarget.addEventListener('touchstart', (e) => {
-            // Prevent drag if scrolling content inside likers list - FIX for physics
             if(e.target.closest('.vn-likers-section') && e.target.closest('.vn-likers-section').scrollTop > 0) return;
             if(e.target.closest('.vn-footer')) return;
             
@@ -408,12 +401,8 @@ class ViewNotes extends HTMLElement {
             this.state.currentY = e.touches[0].clientY;
             const delta = this.state.currentY - this.state.startY;
             
-            // Only allow dragging DOWN
             if (delta > 0) {
-                // FIX: Prevent browser scrolling (Stuck Issue)
                 if(e.cancelable) e.preventDefault();
-                
-                // Add resistance - Smooth physics
                 const resistance = 0.8; 
                 const translateY = delta * resistance;
                 sheet.style.transform = `translateY(${translateY}px)`;
@@ -429,7 +418,6 @@ class ViewNotes extends HTMLElement {
             
             sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
-            // Threshold to close: 20% of sheet height or fast flick
             const isFlick = delta > 50 && timeDiff < 200;
             const isDragThreshold = delta > (this.state.sheetHeight * 0.2);
 
@@ -473,17 +461,15 @@ class ViewNotes extends HTMLElement {
             this.audioPlayer.play().catch(err => {});
         }
 
-        // Fetch User Profile if not provided
         if(initialNoteData.uid) {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
-                    this.renderContent(); // Re-render with profile data
+                    this.renderContent(); 
                 }
             });
         }
 
-        // Live Listen to Note (Updates likes in real-time)
         if (initialNoteData.id) {
             this.unsubscribe = this.db.collection("notes").doc(initialNoteData.id)
                 .onSnapshot((doc) => {
@@ -492,7 +478,6 @@ class ViewNotes extends HTMLElement {
                         this.currentNote = { ...data, id: doc.id };
                         this.renderContent();
                     } else {
-                        // Note was deleted externally
                         this.close();
                     }
                 });
@@ -508,17 +493,13 @@ class ViewNotes extends HTMLElement {
              this.currentNote = { text: "Add a note...", uid: firebase.auth().currentUser.uid };
         }
 
-        // 1. BACKGROUND & VISUALS
-        // Use bgStyle for full gradient, fallback to bgColor
         const bgStyle = note.bgStyle || note.bgColor || '#000'; 
         root.querySelector('#bg-layer').style.background = bgStyle;
 
-        // Texture
         const texLayer = root.querySelector('#tex-layer');
         if (note.bgTexture) texLayer.classList.add('visible');
         else texLayer.classList.remove('visible');
 
-        // Render Specific View
         content.innerHTML = this.isOwnNote 
             ? this.getOwnNoteHTML(note) 
             : this.getFriendNoteHTML(note);
@@ -526,23 +507,18 @@ class ViewNotes extends HTMLElement {
         this.attachDynamicListeners();
     }
 
+    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        
-        // PRIORITY: Display Name -> Username -> 'You'
         const displayName = note.displayName || this.currentUserProfile?.name || note.username || user?.displayName || 'You';
-        
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
-        
-        // CF Badge Logic
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
-        // Flex alignment mapping
         let alignItems = 'center';
         if (textAlign === 'left') alignItems = 'flex-start';
         if (textAlign === 'right') alignItems = 'flex-end';
@@ -550,15 +526,10 @@ class ViewNotes extends HTMLElement {
         const fontStyle = note.font || '-apple-system, BlinkMacSystemFont, sans-serif';
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
-        
-        // Effects & Glass
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
-
-        // UI text color safety
         const uiColor = note.textColor || '#ffffff';
         
-        // Song Text Logic (Marquee)
         const songText = note.songName ? `${note.songName}` : '';
         const isLongText = songText.length > 20;
 
@@ -631,16 +602,11 @@ class ViewNotes extends HTMLElement {
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
-        
-        // PRIORITY: Display Name -> Username -> 'User'
         const displayName = note.displayName || this.currentUserProfile?.name || note.username || 'User';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
-        
-        // CF Badge Check
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
-        // Flex alignment mapping
         let alignItems = 'center';
         if (textAlign === 'left') alignItems = 'flex-start';
         if (textAlign === 'right') alignItems = 'flex-end';
@@ -651,10 +617,8 @@ class ViewNotes extends HTMLElement {
         
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
-
         const uiColor = note.textColor || '#ffffff';
 
-        // Song Text Logic (Marquee)
         const songText = note.songName ? `${note.songName} • ${note.songArtist || 'Unknown'}` : '';
         const isLongText = songText.length > 20;
 
@@ -743,27 +707,23 @@ class ViewNotes extends HTMLElement {
         if (!user) return;
         const icons = this.getIcons();
 
-        // --- ATTACH REDIRECT LISTENER ---
         const headerClick = this.querySelector('#vn-header-click');
         if (headerClick) {
             headerClick.onclick = () => this.handleProfileRedirect();
         }
 
-        // Double Tap Logic
         const card = this.querySelector('#vn-active-card');
         if(card && !this.isOwnNote) {
             card.addEventListener('click', (e) => {
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - this.lastTap;
                 if (tapLength < 300 && tapLength > 0) {
-                    // Double Tap Detected
                     const popHeart = this.querySelector('#vn-pop-heart');
                     const likeBtn = this.querySelector('#like-toggle-btn');
                     
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    // Double Pulse Vibration
                     if(navigator.vibrate) navigator.vibrate([10, 30]);
 
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
@@ -782,7 +742,6 @@ class ViewNotes extends HTMLElement {
             };
         }
 
-        // --- FIXED DELETE/ARCHIVE LOGIC ---
         const archiveBtn = this.querySelector('#archive-note-btn');
         if (archiveBtn) {
             archiveBtn.onclick = async () => {
@@ -792,7 +751,6 @@ class ViewNotes extends HTMLElement {
                         if (this.currentNote && this.currentNote.id) {
                             await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
                             this.close();
-                            // Force refresh of note list if needed
                             if(NotesManager) NotesManager.init();
                         } else {
                             console.error("Cannot archive: No Note ID found");
@@ -811,7 +769,6 @@ class ViewNotes extends HTMLElement {
                           if (this.currentNote && this.currentNote.id) {
                             await this.db.collection("notes").doc(this.currentNote.id).delete();
                             this.close();
-                            // Force refresh
                             window.location.reload(); 
                           } else {
                             console.error("Cannot delete: No Note ID found");
@@ -824,10 +781,8 @@ class ViewNotes extends HTMLElement {
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
-                // FIX: Single Vibration on click interaction
                 if(navigator.vibrate) navigator.vibrate(10);
                 
-                // 1. Optimistic UI Toggle
                 const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30');
                 likeBtn.innerHTML = isCurrentlyLiked ? icons.heartEmpty : icons.heartFilled;
                 likeBtn.style.transform = "scale(1.3)";
@@ -836,14 +791,12 @@ class ViewNotes extends HTMLElement {
                 const batch = this.db.batch();
                 const noteRef = this.db.collection("notes").doc(this.currentNote.id);
                 
-                // Create Deterministic ID: like_USERID_NOTEID
                 const notifId = `like_${user.uid}_${this.currentNote.id}`;
                 const notifRef = this.db.collection('notifications').doc(notifId);
                 const receiverRef = this.db.collection('users').doc(this.currentNote.uid);
 
                 try {
                     if (!isCurrentlyLiked) {
-                        // --- LIKE ACTION ---
                         const userDoc = await this.db.collection('users').doc(user.uid).get();
                         const userData = userDoc.exists ? userDoc.data() : {};
                         
@@ -878,7 +831,6 @@ class ViewNotes extends HTMLElement {
                         }
 
                     } else {
-                        // --- UNLIKE ACTION ---
                         const likerObj = this.currentNote.likes.find(l => l.uid === user.uid);
                         if (likerObj) {
                             batch.update(noteRef, { likes: firebase.firestore.FieldValue.arrayRemove(likerObj) });
@@ -950,7 +902,6 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
-        // --- SEND ALL VISUAL METADATA ---
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
@@ -963,7 +914,6 @@ class ViewNotes extends HTMLElement {
             verified: this.currentNote.verified || false,
             uid: this.currentNote.uid,
             font: this.currentNote.font || '-apple-system, BlinkMacSystemFont, sans-serif',
-            // NEW METADATA FOR VISUAL REPLICATION
             bgTexture: this.currentNote.bgTexture || false,
             isGlass: this.currentNote.isGlass || false,
             effect: this.currentNote.effect || 'none',
@@ -1028,7 +978,6 @@ const NotesManager = {
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(user => {
                 if (user) {
-                    // FIX: Ensure we are on the Home Page before running home logic
                     if(document.getElementById('notes-container')) {
                         this.setupMyNote(user);
                         this.loadMutualNotes(user);
@@ -1090,9 +1039,8 @@ const NotesManager = {
                 background-position: center;
             }
             
-            /* Close Friends Border Logic - BUT NO BADGE HERE */
             .note-bubble.cf-note {
-                border: 2px solid #00ba7c !important; /* Green Solid Border */
+                border: 2px solid #00ba7c !important; 
                 box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
             }
             
@@ -1133,7 +1081,7 @@ const NotesManager = {
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 width: 100%;
-                word-break: break-word; /* Ensure long words break */
+                word-break: break-word; 
             }
 
             .note-music-tag {
@@ -1208,7 +1156,6 @@ const NotesManager = {
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
-                    // FIX: Single Quotes for font-family in preview
                     preview.innerHTML = `
                         ${data.text ? `<div class="note-text-content" style='text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}'>${data.text}</div>` : ''}
                         ${data.songName ? `
@@ -1222,7 +1169,6 @@ const NotesManager = {
                     
                     btn.onclick = () => {
                         const viewer = document.querySelector('view-notes');
-                        // Pass ID correctly
                         if(data && viewer) viewer.open({ ...data, id: noteId }, true);
                     };
                 } else {
@@ -1267,7 +1213,7 @@ const NotesManager = {
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(async change => {
                             const noteData = change.doc.data();
-                            const noteId = change.doc.id; // THE DOCUMENT ID
+                            const noteId = change.doc.id; 
                             const userUid = noteData.uid; 
                             
                             const existingEl = document.getElementById(`note-${userUid}`);
@@ -1275,12 +1221,10 @@ const NotesManager = {
 
                             if (change.type !== "removed" && (!noteData.expiresAt || noteData.expiresAt.toDate() > new Date())) {
                                 
-                                // FIX: Check Close Friends Permission
                                 if (noteData.audience === 'close_friends' && noteData.uid !== user.uid) {
                                     try {
                                         const authorDoc = await db.collection('users').doc(noteData.uid).get();
                                         const authorData = authorDoc.data();
-                                        // If author has no closeFriends list or current user is not in it, stop rendering
                                         if (!authorData || !authorData.closeFriends || !authorData.closeFriends.includes(user.uid)) {
                                             return; 
                                         }
@@ -1298,10 +1242,8 @@ const NotesManager = {
                                 
                                 const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
                                 
-                                // NEW: Add .cf-note class for border coloring only
                                 const cfClass = isCF ? 'cf-note' : '';
 
-                                // FIX: Single Quotes for Style in outer bubble to fix Font Issue
                                 div.innerHTML = `
                                     <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
                                         <div class="note-text-content" style='text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}'>${noteData.text}</div>
@@ -1324,10 +1266,8 @@ const NotesManager = {
                                     const nav = document.querySelector('main-navbar');
                                     if(nav) nav.classList.add('hidden');
                                     
-                                    // Double Pulse on selection
                                     if(navigator.vibrate) navigator.vibrate([10, 40]);
                                     
-                                    // Pass note data with the Firestore Doc ID
                                     viewer.open({ ...noteData, id: noteId }, false);
                                 };
                                 container.appendChild(div);
