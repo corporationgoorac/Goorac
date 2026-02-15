@@ -300,7 +300,7 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-header">
                     <div class="vn-drag-handle" id="vn-handle"></div>
                     <div class="vn-close-btn" id="btn-close">
-                        <span class="material-icons-round">expand_more</span>
+                        <span class="material-icons-round"></span>
                     </div>
                 </div>
 
