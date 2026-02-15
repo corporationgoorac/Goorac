@@ -63,6 +63,9 @@ class ViewNotes extends HTMLElement {
     // Helper to determine text contrast
     getContrastColor(hexColor) {
         if(!hexColor || hexColor.includes('gradient') || hexColor.includes('url')) return '#ffffff';
+        // Handle rgba
+        if(hexColor.startsWith('rgba')) return '#ffffff';
+        
         const r = parseInt(hexColor.substr(1, 2), 16);
         const g = parseInt(hexColor.substr(3, 2), 16);
         const b = parseInt(hexColor.substr(5, 2), 16);
@@ -72,6 +75,7 @@ class ViewNotes extends HTMLElement {
 
     render() {
         this.innerHTML = `
+        <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&display=swap" rel="stylesheet">
         <style>
             .vn-overlay {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -111,18 +115,25 @@ class ViewNotes extends HTMLElement {
             }
 
             /* --- BACKGROUND LAYERS --- */
-            .vn-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; transition: background 0.3s; opacity: 0.6; }
+            .vn-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; transition: background 0.3s; opacity: 1; }
             
             .vn-texture {
                 position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
                 background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
             }
-            .vn-texture.visible { opacity: 0.12; }
+            .vn-texture.visible { opacity: 0.15; }
 
             .vn-grid {
                 position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.05;
                 background-size: 40px 40px;
                 background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
+            }
+            
+            /* Dim overlay for text readability */
+            .vn-dim-layer {
+                 position: absolute; inset: 0; z-index: 2;
+                 background: rgba(0,0,0,0.3);
+                 backdrop-filter: blur(5px);
             }
 
             /* --- HEADER --- */
@@ -165,7 +176,6 @@ class ViewNotes extends HTMLElement {
             }
             .vn-friend-info { display: flex; flex-direction: column; }
             
-            /* Enhanced Text Contrast Classes */
             .vn-text-dark { color: #000 !important; text-shadow: none !important; }
             .vn-text-light { color: #fff !important; text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important; }
 
@@ -173,22 +183,26 @@ class ViewNotes extends HTMLElement {
             .vn-friend-handle { font-size: 0.8rem; opacity: 0.8; }
 
             .vn-bubble-wrapper { 
-                position: relative; width: 85%; max-width: 340px; 
+                position: relative; width: 100%; max-width: 380px; 
                 display: flex; flex-direction: column; align-items: center; gap: 15px; 
             }
 
+            /* THE BUBBLE - MATCHING CREATOR UI */
             .vn-bubble {
-                width: 100%; aspect-ratio: 1/1;
-                border-radius: 40px;
+                width: 180px; height: 180px; /* Matching the creator preview size approx */
+                border-radius: 42px;
                 display: flex; align-items: center; justify-content: center;
-                text-align: center; padding: 25px;
+                text-align: center; padding: 20px;
                 position: relative; z-index: 2;
-                box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 overflow: hidden;
+                border: 1px solid rgba(255,255,255,0.15);
             }
+            
             .vn-bubble.pump { transform: scale(0.95); }
             
+            /* Glass Mode Logic */
             .vn-bubble.glass {
                 background: rgba(255, 255, 255, 0.15) !important;
                 backdrop-filter: blur(15px) !important;
@@ -198,11 +212,12 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 1.6rem; font-weight: 700; line-height: 1.35; z-index: 2;
+                font-size: 1.4rem; font-weight: 600; line-height: 1.35; z-index: 2;
                 word-break: break-word; width: 100%;
             }
-            .fx-glow { text-shadow: 0 0 15px currentColor; }
-            .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.6); }
+            
+            .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+            .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
 
             .vn-pop-heart {
                 position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
@@ -215,7 +230,6 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
-            /* Music Tag - MOVED BELOW BUBBLE TO FIX OVERLAP */
             .vn-music-pill { 
                 display: inline-flex; align-items: center; gap: 8px; 
                 background: rgba(0,0,0,0.6); padding: 8px 16px; 
@@ -232,6 +246,7 @@ class ViewNotes extends HTMLElement {
             .vn-timestamp { 
                 font-size: 0.75rem; text-align: center; 
                 margin-top: 25px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;
+                opacity: 0.7;
             }
 
             /* --- FOOTER ACTIONS --- */
@@ -294,13 +309,14 @@ class ViewNotes extends HTMLElement {
             <div class="vn-sheet" id="vn-sheet">
                 
                 <div class="vn-bg-layer" id="bg-layer"></div>
+                <div class="vn-dim-layer"></div>
                 <div class="vn-texture" id="tex-layer"></div>
                 <div class="vn-grid"></div>
 
                 <div class="vn-header">
                     <div class="vn-drag-handle" id="vn-handle"></div>
                     <div class="vn-close-btn" id="btn-close">
-                        <span class="material-icons-round"></span>
+                        <span class="material-icons-round">close</span>
                     </div>
                 </div>
 
@@ -333,7 +349,7 @@ class ViewNotes extends HTMLElement {
         const dragTarget = sheet; 
 
         dragTarget.addEventListener('touchstart', (e) => {
-            // Prevent drag if scrolling content
+            // Prevent drag if scrolling content inside likers list
             if(e.target.closest('.vn-likers-section') || e.target.closest('.vn-footer')) return;
             
             this.state.isDragging = true;
@@ -423,6 +439,7 @@ class ViewNotes extends HTMLElement {
                         this.currentNote = { ...data, id: doc.id };
                         this.renderContent();
                     } else {
+                        // Note was deleted externally
                         this.close();
                     }
                 });
@@ -448,24 +465,15 @@ class ViewNotes extends HTMLElement {
         if (note.bgTexture) texLayer.classList.add('visible');
         else texLayer.classList.remove('visible');
 
-        // Dynamic Text Color Calculation
-        const isDarkBg = this.getContrastColor(note.bgColor || '#000') === '#ffffff';
-        const textColorClass = isDarkBg ? 'vn-text-light' : 'vn-text-dark';
-
         // Render Specific View
         content.innerHTML = this.isOwnNote 
-            ? this.getOwnNoteHTML(note, textColorClass) 
-            : this.getFriendNoteHTML(note, textColorClass);
+            ? this.getOwnNoteHTML(note) 
+            : this.getFriendNoteHTML(note);
         
         this.attachDynamicListeners();
     }
 
-    getTextShadow(color) {
-        if (color === '#000000' || color === '#000') return '0 1px 15px rgba(255,255,255,0.4)';
-        return '0 2px 10px rgba(0,0,0,0.3)';
-    }
-
-    getOwnNoteHTML(note, textClass) {
+    getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
@@ -478,12 +486,14 @@ class ViewNotes extends HTMLElement {
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
-        const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
-        const fontStyle = note.font || 'system-ui';
+        // Flex alignment mapping
+        let alignItems = 'center';
+        if (textAlign === 'left') alignItems = 'flex-start';
+        if (textAlign === 'right') alignItems = 'flex-end';
         
+        const fontStyle = note.font || '-apple-system, BlinkMacSystemFont, sans-serif';
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
-        const textShadow = this.getTextShadow(txtColor);
         
         // Effects & Glass
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
@@ -494,18 +504,18 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-profile-header vn-clickable" id="vn-header-click">
                     <img src="${displayPfp}" class="vn-friend-pfp">
                     <div class="vn-friend-info">
-                        <div class="vn-friend-name ${textClass}">
+                        <div class="vn-friend-name vn-text-light">
                             ${displayName} (You)
                             ${isVerified ? icons.verified : ''}
                             ${isCF ? icons.star : ''}
                         </div>
-                        <div class="vn-friend-handle ${textClass}">${note.isActive ? 'Active Note' : 'Archived'}</div>
+                        <div class="vn-friend-handle vn-text-light">${note.isActive ? 'Active Note' : 'Archived'}</div>
                     </div>
                 </div>
 
                 <div class="vn-bubble-wrapper">
                     <div class="vn-bubble ${glassClass}" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle}; text-shadow:${textShadow};">${note.text || 'Share a thought...'}</div>
+                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text || 'Share a thought...'}</div>
                     </div>
                     
                     ${note.songName ? `
@@ -515,7 +525,7 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
                 </div>
-                <div class="vn-timestamp ${textClass}">${timeAgo}</div>
+                <div class="vn-timestamp vn-text-light">${timeAgo}</div>
             </div>
 
             <div class="vn-likers-section">
@@ -547,7 +557,7 @@ class ViewNotes extends HTMLElement {
         `;
     }
 
-    getFriendNoteHTML(note, textClass) {
+    getFriendNoteHTML(note) {
         const user = firebase.auth()?.currentUser;
         const isLiked = note.likes?.some(l => l.uid === user?.uid);
         const timeAgo = this.getRelativeTime(note.createdAt);
@@ -562,12 +572,14 @@ class ViewNotes extends HTMLElement {
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
-        const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
-        const fontStyle = note.font || 'system-ui';
+        // Flex alignment mapping
+        let alignItems = 'center';
+        if (textAlign === 'left') alignItems = 'flex-start';
+        if (textAlign === 'right') alignItems = 'flex-end';
         
+        const fontStyle = note.font || '-apple-system, BlinkMacSystemFont, sans-serif';
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
-        const textShadow = this.getTextShadow(txtColor);
         
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
@@ -577,19 +589,19 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-profile-header vn-clickable" id="vn-header-click">
                     <img src="${displayPfp}" class="vn-friend-pfp">
                     <div class="vn-friend-info">
-                        <div class="vn-friend-name ${textClass}">
+                        <div class="vn-friend-name vn-text-light">
                             ${displayName}
                             ${isVerified ? icons.verified : ''}
                             ${isCF ? icons.star : ''}
                         </div>
-                        <div class="vn-friend-handle ${textClass}">${displayHandle}</div>
+                        <div class="vn-friend-handle vn-text-light">${displayHandle}</div>
                     </div>
                 </div>
 
                 <div class="vn-bubble-wrapper">
                     <div class="vn-bubble ${glassClass}" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
                         <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle}; text-shadow:${textShadow};">${note.text}</div>
+                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle};">${note.text}</div>
                     </div>
                     
                     ${note.songName ? `
@@ -599,7 +611,7 @@ class ViewNotes extends HTMLElement {
                         </div>
                     ` : ''}
                 </div>
-                <div class="vn-timestamp ${textClass}">${timeAgo}</div>
+                <div class="vn-timestamp vn-text-light">${timeAgo}</div>
             </div>
 
             <div class="vn-footer">
@@ -691,17 +703,22 @@ class ViewNotes extends HTMLElement {
             };
         }
 
-        // --- NEW DELETE/ARCHIVE LOGIC ---
+        // --- FIXED DELETE/ARCHIVE LOGIC ---
         const archiveBtn = this.querySelector('#archive-note-btn');
         if (archiveBtn) {
             archiveBtn.onclick = async () => {
                 if(navigator.vibrate) navigator.vibrate(10);
                 if(confirm("Archive this note? It will be removed from your profile but saved in history.")) {
                     try {
-                        await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
-                        this.close();
-                        window.location.reload(); 
-                    } catch(e) { console.error(e); }
+                        if (this.currentNote && this.currentNote.id) {
+                            await this.db.collection("notes").doc(this.currentNote.id).update({ isActive: false });
+                            this.close();
+                            // Force refresh of note list if needed
+                            if(NotesManager) NotesManager.init();
+                        } else {
+                            console.error("Cannot archive: No Note ID found");
+                        }
+                    } catch(e) { console.error("Error archiving note:", e); }
                 }
             };
         }
@@ -712,10 +729,15 @@ class ViewNotes extends HTMLElement {
                 if(navigator.vibrate) navigator.vibrate(10);
                 if(confirm("Delete permanently? This cannot be undone.")) {
                     try {
-                        await this.db.collection("notes").doc(this.currentNote.id).delete();
-                        this.close();
-                        window.location.reload(); 
-                    } catch(e) { console.error(e); }
+                         if (this.currentNote && this.currentNote.id) {
+                            await this.db.collection("notes").doc(this.currentNote.id).delete();
+                            this.close();
+                            // Force refresh
+                            window.location.reload(); 
+                         } else {
+                            console.error("Cannot delete: No Note ID found");
+                         }
+                    } catch(e) { console.error("Error deleting note:", e); }
                 }
             };
         }
@@ -848,6 +870,7 @@ class ViewNotes extends HTMLElement {
         const targetUid = this.currentNote.uid;
         const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
         
+        // --- SEND ALL VISUAL METADATA ---
         const noteMetadata = {
             text: this.currentNote.text || "",
             bgColor: this.currentNote.bgColor || "#262626",
@@ -858,7 +881,11 @@ class ViewNotes extends HTMLElement {
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
             uid: this.currentNote.uid,
-            font: this.currentNote.font || 'system-ui'
+            font: this.currentNote.font || '-apple-system, BlinkMacSystemFont, sans-serif',
+            // NEW METADATA FOR VISUAL REPLICATION
+            bgTexture: this.currentNote.bgTexture || false,
+            isGlass: this.currentNote.isGlass || false,
+            effect: this.currentNote.effect || 'none'
         };
 
         try {
@@ -1111,6 +1138,7 @@ const NotesManager = {
                     
                     btn.onclick = () => {
                         const viewer = document.querySelector('view-notes');
+                        // Pass ID correctly
                         if(data && viewer) viewer.open({ ...data, id: noteId }, true);
                     };
                 } else {
@@ -1155,9 +1183,10 @@ const NotesManager = {
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(async change => {
                             const noteData = change.doc.data();
-                            const uid = change.doc.id; 
+                            const noteId = change.doc.id; // THE DOCUMENT ID
+                            const userUid = noteData.uid; 
                             
-                            const existingEl = document.getElementById(`note-${uid}`);
+                            const existingEl = document.getElementById(`note-${userUid}`);
                             if(existingEl) existingEl.remove();
 
                             if (change.type !== "removed" && (!noteData.expiresAt || noteData.expiresAt.toDate() > new Date())) {
@@ -1180,7 +1209,7 @@ const NotesManager = {
                                 const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
                                 const isCF = noteData.audience === 'close_friends';
                                 const div = document.createElement('div');
-                                div.id = `note-${uid}`; 
+                                div.id = `note-${userUid}`; 
                                 div.className = 'note-item friend-note has-note';
                                 
                                 const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
@@ -1210,8 +1239,8 @@ const NotesManager = {
                                     const nav = document.querySelector('main-navbar');
                                     if(nav) nav.classList.add('hidden');
                                     if(navigator.vibrate) navigator.vibrate(10);
-                                    // Pass note data with ID
-                                    viewer.open({ ...noteData, id: uid }, false);
+                                    // Pass note data with the Firestore Doc ID
+                                    viewer.open({ ...noteData, id: noteId }, false);
                                 };
                                 container.appendChild(div);
                             }
