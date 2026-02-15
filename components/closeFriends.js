@@ -136,10 +136,10 @@ class CloseFriendsSelector extends HTMLElement {
             
             /* --- BADGES --- */
             .cf-verified {
-                width: 16px; height: 16px; display: inline-block;
-                background: var(--accent-color);
-                -webkit-mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>') no-repeat center;
-                mask-size: contain; -webkit-mask-size: contain;
+                width: 18px; height: 18px; 
+                fill: var(--accent-color);
+                display: inline-block;
+                vertical-align: middle;
             }
 
             /* --- CHECKBOX (Custom) --- */
@@ -235,6 +235,9 @@ class CloseFriendsSelector extends HTMLElement {
         this.isOpen = true;
         this.container.classList.add('open');
         
+        // Lock body scroll
+        document.body.style.overflow = 'hidden';
+        
         // Push state for mobile back button
         window.history.pushState({ cfOpen: true }, "");
 
@@ -251,6 +254,9 @@ class CloseFriendsSelector extends HTMLElement {
     close(fromHistory = false) {
         this.isOpen = false;
         this.container.classList.remove('open');
+        
+        // Unlock body scroll
+        document.body.style.overflow = '';
         
         if (!fromHistory && history.state && history.state.cfOpen) {
             history.back();
@@ -276,6 +282,18 @@ class CloseFriendsSelector extends HTMLElement {
             
             // Intersection
             this.mutualIDs = following.filter(uid => followers.includes(uid));
+
+            // SORT: Selected friends at the TOP
+            this.mutualIDs.sort((a, b) => {
+                const isSelectedA = this.selectedIDs.has(a);
+                const isSelectedB = this.selectedIDs.has(b);
+                // If A is selected and B is not, A comes first (-1)
+                // If B is selected and A is not, B comes first (1)
+                // If both same, keep original order (0)
+                if (isSelectedA && !isSelectedB) return -1;
+                if (!isSelectedA && isSelectedB) return 1;
+                return 0;
+            });
 
             if (this.mutualIDs.length === 0) {
                 this.listContainer.innerHTML = `<div class="cf-msg">No mutual friends found.<br><span style="font-size:0.8em; opacity:0.7">Follow people who follow you back to add them here.</span></div>`;
@@ -390,7 +408,11 @@ class CloseFriendsSelector extends HTMLElement {
         const pfp = data.photoURL || 'https://via.placeholder.com/150';
         const name = data.name || 'User';
         const username = data.username || 'unknown';
-        const badge = data.verified ? '<span class="cf-verified"></span>' : '';
+        
+        // Professional Material Badge (SVG)
+        const badge = data.verified 
+            ? `<svg class="cf-verified" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>` 
+            : '';
 
         row.innerHTML = `
             <img src="${pfp}" class="cf-pfp">
