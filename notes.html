@@ -17,6 +17,11 @@
     <script src="components/songPicker.js"></script>
     <script src="components/chatLoader.js" defer></script>
     <chat-loader></chat-loader>
+    
+    <script src="components/closeFriends.js" defer></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
         :root { 
@@ -27,471 +32,498 @@
             --safe-bottom: env(safe-area-inset-bottom);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; outline: none; }
-        
-        body { 
-            background: var(--bg); color: var(--text); 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; 
-            height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh; display: flex; flex-direction: column;
+            overflow: hidden; /* Lock scroll */
         }
 
         /* --- HEADER --- */
-        header { 
-            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
-            padding-top: max(15px, env(safe-area-inset-top)); z-index: 100;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-        }
-
-        .cancel-btn { font-size: 1rem; color: #fff; opacity: 0.8; cursor: pointer; padding: 10px; font-weight: 500; }
-        
-        .post-btn { 
-            background: var(--text); color: #000; border: none; 
-            padding: 8px 24px; border-radius: 20px; font-weight: 700; font-size: 0.9rem;
-            opacity: 0.4; pointer-events: none; transition: 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-            transform: scale(0.95);
-        }
-        .post-btn.ready { opacity: 1; pointer-events: auto; transform: scale(1); box-shadow: 0 4px 15px rgba(255,255,255,0.2); }
-        .post-btn:active { transform: scale(0.92); }
-
-        /* --- EDITOR AREA (Auto Centering) --- */
-        .editor-container { 
-            flex: 1; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            position: relative; width: 100%;
-            /* Ensure space for toolbar */
-            padding-bottom: 100px; 
-        }
-
-        /* Note Bubble */
-        .bubble-wrapper {
-            position: relative; z-index: 10;
-            display: flex; flex-direction: column; align-items: center;
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            width: 100%;
-        }
-        .bubble-wrapper.typing { transform: translateY(-30px); }
-
-        .note-bubble {
-            background: #262626; color: #fff;
-            padding: 24px 32px; border-radius: 36px;
-            min-width: 120px; max-width: 80vw; min-height: 80px;
-            text-align: center; position: relative;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            transition: all 0.3s ease;
-            cursor: text; display: flex; flex-direction: column; justify-content: center;
-        }
-        /* Tail */
-        .note-bubble::after {
-            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
-            width: 24px; height: 24px; background: inherit; border-radius: 50%; z-index: -1;
-        }
-        .note-bubble::before {
-            content: ''; position: absolute; bottom: -18px; left: 45%;
-            width: 14px; height: 14px; background: inherit; border-radius: 50%; opacity: 0.6; z-index: -2;
-        }
-
-        .display-text { 
-            font-size: 1.2rem; font-weight: 600; line-height: 1.4; 
-            white-space: pre-wrap; word-break: break-word;
-        }
-
-        /* Music Pill (Inside Bubble) */
-        .music-pill {
-            display: none; align-items: center; gap: 6px;
-            background: rgba(255,255,255,0.2); padding: 4px 10px;
-            border-radius: 12px; font-size: 0.7rem; font-weight: 700;
-            margin-top: 12px; width: fit-content; align-self: center;
-            backdrop-filter: blur(10px); color: inherit;
-        }
-
-        .pfp-preview {
-            width: 55px; height: 55px; border-radius: 50%; 
-            border: 3px solid #111; margin-top: 20px;
-            background: #222; object-fit: cover;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        /* Invisible Input overlay */
-        #hidden-input {
-            position: absolute; opacity: 0; width: 100%; height: 100%; 
-            top: 0; left: 0; z-index: 20; font-size: 16px; 
-            caret-color: transparent; color: transparent;
-        }
-
-        /* --- TOOLBAR (Bottom Fixed) --- */
-        .toolbar {
-            width: 100%; padding: 15px 20px; 
-            padding-bottom: calc(20px + var(--safe-bottom));
-            background: rgba(20, 20, 22, 0.85);
-            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
-            border-top: 1px solid rgba(255,255,255,0.08);
-            display: flex; justify-content: space-evenly; align-items: center;
-            position: fixed; bottom: 0; left: 0; z-index: 50;
-        }
-
-        .tool-btn {
-            width: 48px; height: 48px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.06);
-            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); cursor: pointer;
-        }
-        .tool-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.15); }
-        .tool-btn svg { width: 22px; height: 22px; fill: #e0e0e0; transition: fill 0.2s; }
-        .tool-btn.active svg { fill: #fff; }
-
-        /* --- MENUS (Bottom Sheets) --- */
-        .overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
-            opacity: 0; pointer-events: none; transition: 0.3s; z-index: 150;
-            backdrop-filter: blur(4px);
-        }
-        .overlay.show { opacity: 1; pointer-events: auto; }
-
-        .sheet {
-            position: fixed; bottom: 0; left: 0; width: 100%;
-            background: #1c1c1e; border-radius: 24px 24px 0 0;
-            padding: 25px; padding-bottom: max(35px, var(--safe-bottom));
-            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-            z-index: 200; border-top: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-        }
-        .sheet.open { transform: translateY(0); }
-        
-        .sheet-header {
+        header {
+            padding: 15px 20px;
             display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 20px;
+            z-index: 10;
         }
-        .sheet-label { font-size: 0.9rem; color: #fff; font-weight: 700; letter-spacing: 0.5px; }
-        .sheet-close { font-size: 0.8rem; color: #888; font-weight: 600; cursor: pointer; background: #2c2c2e; padding: 4px 10px; border-radius: 12px; }
+        .cancel-btn { color: #888; font-size: 16px; font-weight: 500; cursor: pointer; }
+        .post-btn { 
+            background: var(--text); color: #000; 
+            padding: 8px 20px; border-radius: 100px; 
+            font-weight: 700; font-size: 14px; border: none; 
+            transition: 0.2s; opacity: 0.5; pointer-events: none;
+        }
+        .post-btn.active { opacity: 1; pointer-events: auto; }
+        .post-btn.loading { opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 8px; }
 
-        /* Color Grid */
-        .color-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
-        .color-opt { 
-            aspect-ratio: 1; border-radius: 50%; cursor: pointer; 
-            position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
-            transition: transform 0.2s;
+        /* --- PREVIEW AREA --- */
+        .preview-area {
+            flex: 1; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center;
+            position: relative; padding: 20px;
+            transition: background 0.3s;
         }
-        .color-opt:active { transform: scale(0.9); }
-        .color-opt.selected { border: 3px solid #fff; transform: scale(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        
+        /* The Note Bubble */
+        .note-bubble {
+            width: 140px; height: 140px;
+            border-radius: 35px;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center;
+            padding: 15px;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .note-text {
+            font-size: 18px; font-weight: 600; line-height: 1.3;
+            outline: none; min-width: 50px;
+            word-break: break-word; white-space: pre-wrap;
+            z-index: 2;
+        }
+        /* Placeholder logic handled in JS or pseudo */
+        .note-text:empty:before { content: 'Share a thought...'; color: inherit; opacity: 0.5; }
 
-        /* Font Grid */
-        .font-grid { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
-        .font-opt {
-            padding: 12px 20px; background: #2c2c2e; border-radius: 14px;
-            font-size: 1rem; color: #aaa; white-space: nowrap; cursor: pointer;
-            border: 1px solid transparent; transition: 0.2s;
+        /* Small avatar bubble attached */
+        .note-pfp {
+            position: absolute; bottom: -10px; right: -10px;
+            width: 45px; height: 45px; border-radius: 50%;
+            border: 4px solid var(--bg);
+            background: #333; object-fit: cover; z-index: 3;
         }
-        .font-opt.selected { background: #fff; color: #000; transform: scale(1.05); font-weight: 700; }
+
+        /* Music Bubble attached */
+        .music-tag {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+            padding: 6px 12px; border-radius: 20px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 600; color: #fff;
+            opacity: 0; transform: translateX(-50%) translateY(10px);
+            transition: 0.3s; z-index: 4; border: 1px solid rgba(255,255,255,0.1);
+            max-width: 160px; white-space: nowrap;
+        }
+        .music-tag.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .music-anim { display: flex; gap: 2px; align-items: flex-end; height: 10px; }
+        .music-anim span { width: 2px; background: #fff; border-radius: 1px; animation: eq 1s infinite ease-in-out; }
+        .music-anim span:nth-child(1) { height: 60%; animation-delay: 0s; }
+        .music-anim span:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+        .music-anim span:nth-child(3) { height: 50%; animation-delay: 0.4s; }
+        @keyframes eq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
+
+        /* --- CONTROLS (Bottom Sheet) --- */
+        .controls {
+            background: var(--surface);
+            border-top-left-radius: 24px; border-top-right-radius: 24px;
+            padding: 20px 20px calc(20px + var(--safe-bottom));
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+            border-top: 1px solid #333;
+        }
+
+        .control-row { display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        .control-row::-webkit-scrollbar { display: none; }
+
+        .c-btn {
+            width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%;
+            background: #2c2c2e; border: 1px solid #3a3a3c;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; cursor: pointer; transition: 0.2s;
+        }
+        .c-btn.active { background: var(--text); color: #000; border-color: #fff; transform: scale(1.1); }
+        
+        .color-dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; flex-shrink: 0; cursor: pointer; }
+        .color-dot.active { border-color: #fff; transform: scale(1.15); }
+
+        .font-pill {
+            padding: 8px 16px; background: #2c2c2e; border-radius: 12px;
+            font-size: 13px; color: #fff; white-space: nowrap; flex-shrink: 0;
+            border: 1px solid #3a3a3c; cursor: pointer;
+        }
+        .font-pill.active { background: #fff; color: #000; border-color: #fff; }
+
+        /* --- AUDIENCE SELECTOR (NEW) --- */
+        .audience-wrapper {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.05); padding: 12px 16px;
+            border-radius: 16px; margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .privacy-toggle {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; font-weight: 600; color: #aaa;
+            cursor: pointer;
+        }
+        .privacy-toggle.selected { color: var(--accent); }
+        .privacy-icon { font-size: 18px; }
+        
+        .edit-cf-btn {
+            font-size: 11px; font-weight: 700; color: var(--text);
+            background: rgba(255,255,255,0.1); padding: 5px 12px;
+            border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
+            display: none; /* Hidden by default */
+        }
+
+        /* --- NEW FEATURE: DICE --- */
+        .dice-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 40px; height: 40px; background: rgba(255,255,255,0.1);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px); cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .dice-btn:active { transform: rotate(180deg); transition: 0.4s; }
 
     </style>
 </head>
 <body>
 
-<header>
-    <div class="cancel-btn" onclick="clearAndBack()">Cancel</div>
-    <button class="post-btn" id="post-btn" onclick="publishNote()">Post</button>
-</header>
+    <header>
+        <div class="cancel-btn" onclick="history.back()">Cancel</div>
+        <div style="font-weight:700; font-size:15px; letter-spacing:0.5px;">NEW NOTE</div>
+        <button class="post-btn" id="post-btn" onclick="postNote()">Post</button>
+    </header>
 
-<div class="editor-container">
-    <div class="bubble-wrapper" id="bubble-wrap">
-        <div class="note-bubble" id="preview">
-            <div class="display-text" id="display">Type a note...</div>
-            <div class="music-pill" id="music-pill" onclick="removeSong(event)">
-                <svg viewBox="0 0 24 24" style="width:12px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                <span id="song-name"></span>
-                <span style="opacity:0.6; margin-left:4px;">×</span>
+    <div class="preview-area" id="preview-bg">
+        <div class="note-bubble" id="note-bubble">
+            <div class="music-tag" id="music-tag">
+                <div class="music-anim"><span></span><span></span><span></span></div>
+                <span id="music-text">Song Name</span>
+                <span class="material-icons-round" style="font-size:12px; margin-left:4px; cursor:pointer;" onclick="removeSong()">close</span>
             </div>
+
+            <div class="note-text" id="note-input" contenteditable="true" spellcheck="false"></div>
+            
+            <img class="note-pfp" id="user-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
         </div>
-        <img id="user-pfp" class="pfp-preview" src="https://via.placeholder.com/150">
+
+        <div class="dice-btn" onclick="randomizeStyle()">
+            <span class="material-icons-round" style="font-size: 20px; color:#fff;">casino</span>
+        </div>
+    </div>
+
+    <div class="controls">
         
-        <input type="text" id="hidden-input" maxlength="60" autocomplete="off" onfocus="onFocus()" onblur="onBlur()">
-    </div>
-</div>
+        <div class="audience-wrapper">
+            <div class="privacy-toggle" id="audience-toggle" onclick="toggleAudience()">
+                <span class="material-icons-round privacy-icon" id="audience-icon">public</span>
+                <span id="audience-text">Public</span>
+            </div>
+            <div class="edit-cf-btn" id="edit-cf" onclick="openCFSelector()">Edit List</div>
+        </div>
 
-<div class="toolbar">
-    <div class="tool-btn" onclick="openSheet('color')">
-        <svg viewBox="0 0 24 24"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.49 10 10-4.49 10-10 10zm1-17.93c-3.95.49-7 3.85-7 7.93 0 1.8.63 3.46 1.69 4.81l6.53-12.74z"/></svg>
-    </div>
-    <div class="tool-btn" onclick="openSheet('font')">
-        <svg viewBox="0 0 24 24"><path d="M9.93 13.5h4.14L12 7.98zM20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4.05 16.5l-1.14-3H9.17l-1.12 3H5.96l5.11-13h1.86l5.11 13h-2.09z"/></svg>
-    </div>
-    <div class="tool-btn" id="align-btn" onclick="toggleAlign()">
-        <svg id="align-icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg>
-    </div>
-    <div class="tool-btn" onclick="document.getElementById('song-picker').open()">
-        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-    </div>
-</div>
+        <div class="control-row">
+            <div class="c-btn" onclick="document.getElementById('song-picker').open()"><span class="material-icons-round">music_note</span></div>
+            <div class="c-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
+            <div style="width:1px; height:20px; background:#333; margin:0 5px;"></div>
+            <div class="font-pill active" onclick="setFont(0)" style="font-family:-apple-system">System</div>
+            <div class="font-pill" onclick="setFont(1)" style="font-family:'Abril Fatface'">Serif</div>
+            <div class="font-pill" onclick="setFont(2)" style="font-family:'Bangers'">Loud</div>
+            <div class="font-pill" onclick="setFont(3)" style="font-family:'Dancing Script'">Script</div>
+            <div class="font-pill" onclick="setFont(4)" style="font-family:'Orbitron'">Neon</div>
+            <div class="font-pill" onclick="setFont(5)" style="font-family:'Fredoka'">Cute</div>
+            <div class="font-pill" onclick="setFont(6)" style="font-family:'Righteous'">Tech</div>
+        </div>
 
-<div class="overlay" id="overlay" onclick="closeSheets()"></div>
-
-<div class="sheet" id="color-sheet">
-    <div class="sheet-header">
-        <span class="sheet-label">Bubble Color</span>
-        <span class="sheet-close" onclick="closeSheets()">Done</span>
+        <div class="control-row" id="color-row">
+            </div>
     </div>
-    <div class="color-grid" id="color-grid"></div>
-</div>
 
-<div class="sheet" id="font-sheet">
-    <div class="sheet-header">
-        <span class="sheet-label">Typography</span>
-        <span class="sheet-close" onclick="closeSheets()">Done</span>
-    </div>
-    <div class="font-grid">
-        <div class="font-opt selected" onclick="setFont('system-ui')" style="font-family:system-ui">System</div>
-        <div class="font-opt" onclick="setFont('serif')" style="font-family:serif">Serif</div>
-        <div class="font-opt" onclick="setFont('monospace')" style="font-family:monospace">Mono</div>
-        <div class="font-opt" onclick="setFont('cursive')" style="font-family:cursive">Script</div>
-        <div class="font-opt" onclick="setFont('fantasy')" style="font-family:fantasy">Bold</div>
-    </div>
-</div>
-
-<song-picker id="song-picker"></song-picker>
+    <song-picker id="song-picker"></song-picker>
+    
+    <close-friends-selector id="cf-selector"></close-friends-selector>
 
 <script>
     // --- FIREBASE INIT ---
-    // 1. Try to use the shared init function first
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
-    } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
+    } else if (!firebase.apps.length && window.firebaseConfig) {
         firebase.initializeApp(window.firebaseConfig);
     }
     
     const db = firebase.firestore();
     const auth = firebase.auth();
+    let currentUser = null;
+    let isPosting = false; // Prevent multiple posts
 
-    // --- 2. STATE MANAGEMENT & RESTORE ---
-    const DEFAULT_STATE = {
-        text: '',
-        bgColor: '#262626',
-        textColor: '#fff',
-        align: 'center',
-        font: 'system-ui',
-        song: null
-    };
-
-    let state = JSON.parse(localStorage.getItem('goorac_note_draft')) || { ...DEFAULT_STATE };
-
-    // --- 3. THEME DATA ---
-    const themes = [
-        {bg:'#262626', t:'#fff'}, 
-        {bg:'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', t:'#000'},
-        {bg:'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', t:'#fff'},
-        {bg:'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', t:'#000'},
-        {bg:'#fff', t:'#000'},
-        {bg:'#007AFF', t:'#fff'},
-        {bg:'#FF3B30', t:'#fff'},
-        {bg:'#FFCC00', t:'#000'},
-        {bg:'#5856D6', t:'#fff'},
-        {bg:'#000', t:'#fff'}
+    // --- STATE & DATA ---
+    const bgColors = [
+        { bg: '#ffffff', text: '#000000' }, // Classic White
+        { bg: '#1c1c1e', text: '#ffffff' }, // Dark Mode
+        { bg: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', text: '#5e2d35' }, // Pastel Pink
+        { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', text: '#4a2d5e' }, // Purple Haze
+        { bg: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', text: '#1d5a44' }, // Mint
+        { bg: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)', text: '#582d1c' }, // Sunset
+        { bg: 'linear-gradient(45deg, #85FFBD 0%, #FFFB7D 100%)', text: '#3c5e1a' }, // Lemon Lime
+        { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355' }, // Ocean
+        { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366' }, // Sky
+        { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a' }, // Dream
+        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff' }, // Emerald
+        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff' }, // Aqua Deep
+        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff' }, // Love
+        { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff'}, // Plasma
+        { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff' } // Stars
     ];
 
-    // --- 4. DOM REFERENCES ---
-    const els = {
-        input: document.getElementById('hidden-input'),
-        display: document.getElementById('display'),
-        preview: document.getElementById('preview'),
-        pfp: document.getElementById('user-pfp'),
-        postBtn: document.getElementById('post-btn'),
-        wrap: document.getElementById('bubble-wrap'),
-        musicPill: document.getElementById('music-pill'),
-        songName: document.getElementById('song-name')
+    const fonts = [
+        '-apple-system, BlinkMacSystemFont, sans-serif',
+        '"Abril Fatface", serif',
+        '"Bangers", cursive',
+        '"Dancing Script", cursive',
+        '"Orbitron", sans-serif',
+        '"Fredoka", sans-serif',
+        '"Righteous", cursive'
+    ];
+
+    const state = {
+        text: '',
+        colorIdx: 0,
+        fontIdx: 0,
+        align: 'center', // left, center, right
+        song: null,
+        audience: 'public' // public, close_friends
     };
 
-    // --- 5. INITIALIZATION ---
+    const els = {
+        bubble: document.getElementById('note-bubble'),
+        input: document.getElementById('note-input'),
+        postBtn: document.getElementById('post-btn'),
+        musicTag: document.getElementById('music-tag'),
+        cfBtn: document.getElementById('edit-cf'),
+        audIcon: document.getElementById('audience-icon'),
+        audText: document.getElementById('audience-text')
+    };
+
+    // --- INIT ---
     function init() {
-        // Restore Text
-        if(state.text) {
-            els.input.value = state.text;
-            els.display.innerText = state.text;
-            els.display.style.opacity = '1';
-            els.postBtn.classList.add('ready');
-        }
-
-        // Restore Style
-        els.preview.style.background = state.bgColor;
-        els.preview.style.color = state.textColor;
-        els.preview.style.textAlign = state.align;
-        els.display.style.fontFamily = state.font;
-
-        // Restore Song
-        if(state.song) {
-            els.musicPill.style.display = 'flex';
-            els.songName.innerText = state.song.trackName;
-            els.postBtn.classList.add('ready');
-        }
-
-        // Restore PFP
-        const cachedPfp = localStorage.getItem('goorac_user_pfp');
-        if(cachedPfp) els.pfp.src = cachedPfp;
-
-        auth.onAuthStateChanged(async (user) => {
-            if(user) {
-                const doc = await db.collection("users").doc(user.uid).get();
-                const data = doc.data() || {};
-                const src = data.photoURL || user.photoURL || 'https://via.placeholder.com/150';
-                els.pfp.src = src;
-                localStorage.setItem('goorac_user_pfp', src); // Update cache
+        // Load User
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                // Try to get high-res photo from cache
+                const cached = JSON.parse(localStorage.getItem('goorac_profile'));
+                document.getElementById('user-pfp').src = (cached ? cached.photoURL : user.photoURL) || 'https://via.placeholder.com/150';
+            } else {
+                window.location.href = 'login.html';
             }
         });
 
-        // Update Alignment Icon
-        updateAlignIcon();
+        // Render Colors
+        const row = document.getElementById('color-row');
+        bgColors.forEach((c, i) => {
+            const dot = document.createElement('div');
+            dot.className = 'color-dot';
+            dot.style.background = c.bg;
+            dot.onclick = () => setColor(i);
+            row.appendChild(dot);
+        });
+
+        // Event Listeners
+        els.input.addEventListener('input', updateState);
+        document.addEventListener('song-selected', (e) => setSong(e.detail));
+
+        // Initial Set
+        setColor(0);
         
-        // Update Font Selection UI
-        document.querySelectorAll('.font-opt').forEach(el => {
-            el.classList.toggle('selected', el.style.fontFamily.includes(state.font));
-        });
-    }
-
-    // --- 6. LOGIC ---
-
-    function saveState() {
-        localStorage.setItem('goorac_note_draft', JSON.stringify(state));
-    }
-
-    els.input.addEventListener('input', (e) => {
-        state.text = e.target.value;
-        if(state.text.length > 0) {
-            els.display.innerText = state.text;
-            els.display.style.opacity = '1';
-            els.postBtn.classList.add('ready');
-        } else {
-            els.display.innerText = "Type a note...";
-            els.display.style.opacity = '0.5';
-            if(!state.song) els.postBtn.classList.remove('ready');
+        // Check for Draft
+        const draft = JSON.parse(localStorage.getItem('goorac_note_draft'));
+        if(draft) {
+            els.input.innerText = draft.text || "";
+            setColor(draft.colorIdx || 0);
+            setFont(draft.fontIdx || 0);
+            if(draft.song) setSong(draft.song);
+            updateState();
         }
-        saveState();
-    });
-
-    function onFocus() { els.wrap.classList.add('typing'); }
-    function onBlur() { els.wrap.classList.remove('typing'); }
-
-    // Color Picker
-    const colorGrid = document.getElementById('color-grid');
-    themes.forEach((t) => {
-        const d = document.createElement('div');
-        d.className = `color-opt ${state.bgColor === t.bg ? 'selected' : ''}`;
-        d.style.background = t.bg;
-        d.onclick = () => {
-            document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('selected'));
-            d.classList.add('selected');
-            state.bgColor = t.bg;
-            state.textColor = t.t;
-            els.preview.style.background = t.bg;
-            els.preview.style.color = t.t;
-            if(navigator.vibrate) navigator.vibrate(5);
-            saveState();
-        };
-        colorGrid.appendChild(d);
-    });
-
-    // Font Logic
-    function setFont(font) {
-        state.font = font;
-        els.display.style.fontFamily = font;
-        document.querySelectorAll('.font-opt').forEach(el => {
-            el.classList.toggle('selected', el.style.fontFamily.includes(font));
-        });
-        if(navigator.vibrate) navigator.vibrate(5);
-        saveState();
     }
 
-    // Alignment
+    // --- LOGIC ---
+
+    function updateState() {
+        const txt = els.input.innerText.trim();
+        state.text = txt;
+        
+        if (txt.length > 0 || state.song) {
+            els.postBtn.classList.add('active');
+        } else {
+            els.postBtn.classList.remove('active');
+        }
+
+        // Limit Length (Simple)
+        if (txt.length > 60) {
+            els.input.innerText = txt.substring(0,60);
+            // Move cursor to end
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(els.input);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
+        // Save Draft
+        localStorage.setItem('goorac_note_draft', JSON.stringify({
+            text: state.text,
+            colorIdx: state.colorIdx,
+            fontIdx: state.fontIdx,
+            song: state.song
+        }));
+    }
+
+    function setColor(idx) {
+        state.colorIdx = idx;
+        const theme = bgColors[idx];
+        els.bubble.style.background = theme.bg;
+        els.bubble.style.color = theme.text;
+        els.input.style.color = theme.text;
+        
+        // Update Active Dot
+        document.querySelectorAll('.color-dot').forEach((d, i) => {
+            d.classList.toggle('active', i === idx);
+        });
+
+        // Update Background (Subtle Effect)
+        document.getElementById('preview-bg').style.background = theme.bg.includes('gradient') 
+            ? theme.bg.replace('135deg', '180deg').replace('100%', '80%') // slightly simpler for bg
+            : theme.bg;
+        // Dim the background heavily so bubble pops
+        document.getElementById('preview-bg').style.backgroundBlendMode = 'overlay';
+        document.getElementById('preview-bg').style.backgroundColor = 'rgba(0,0,0,0.8)';
+    }
+
+    function setFont(idx) {
+        state.fontIdx = idx;
+        els.input.style.fontFamily = fonts[idx];
+        
+        document.querySelectorAll('.font-pill').forEach((p, i) => {
+            p.classList.toggle('active', i === idx);
+        });
+    }
+
     function toggleAlign() {
-        if(navigator.vibrate) navigator.vibrate(10);
-        state.align = (state.align === 'center') ? 'left' : 'center';
-        els.preview.style.textAlign = state.align;
-        updateAlignIcon();
-        saveState();
+        const modes = ['center', 'left', 'right'];
+        const icons = ['format_align_center', 'format_align_left', 'format_align_right'];
+        let curr = modes.indexOf(state.align);
+        let next = (curr + 1) % 3;
+        
+        state.align = modes[next];
+        els.input.style.textAlign = state.align;
+        document.getElementById('align-icon').innerText = icons[next];
     }
 
-    function updateAlignIcon() {
-        const icon = document.getElementById('align-icon');
-        if(state.align === 'left') {
-            icon.innerHTML = '<path d="M3 15h18v-2H3v2zm0 4h12v-2H3v2zm0-8h18v-2H3v2zm0-6v2h18V5H3z"/>';
+    function setSong(song) {
+        state.song = song;
+        els.musicTag.classList.add('show');
+        document.getElementById('music-text').innerText = song.trackName;
+        updateState();
+    }
+
+    function removeSong() {
+        state.song = null;
+        els.musicTag.classList.remove('show');
+        updateState();
+    }
+
+    // --- NEW FEATURES ---
+
+    function toggleAudience() {
+        if(state.audience === 'public') {
+            state.audience = 'close_friends';
+            els.audIcon.innerText = 'stars'; // Star icon for CF
+            els.audIcon.style.color = 'var(--accent)';
+            els.audText.innerText = 'Close Friends';
+            els.audText.style.color = 'var(--accent)';
+            els.cfBtn.style.display = 'block';
         } else {
-            icon.innerHTML = '<path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/>';
+            state.audience = 'public';
+            els.audIcon.innerText = 'public';
+            els.audIcon.style.color = '#aaa';
+            els.audText.innerText = 'Public';
+            els.audText.style.color = '#aaa';
+            els.cfBtn.style.display = 'none';
         }
     }
 
-    // Song Logic
-    const songPicker = document.getElementById('song-picker');
-    songPicker.addEventListener('song-selected', (e) => {
-        state.song = e.detail;
-        els.musicPill.style.display = 'flex';
-        els.songName.innerText = state.song.trackName;
-        els.postBtn.classList.add('ready');
-        saveState();
-    });
-
-    function removeSong(e) {
-        e.stopPropagation(); // Don't trigger other clicks
-        state.song = null;
-        els.musicPill.style.display = 'none';
-        if(state.text.length === 0) els.postBtn.classList.remove('ready');
-        saveState();
+    function openCFSelector() {
+        document.getElementById('cf-selector').open();
     }
 
-    // Sheets
-    function openSheet(id) {
-        document.getElementById('overlay').classList.add('show');
-        document.getElementById(`${id}-sheet`).classList.add('open');
-    }
-    function closeSheets() {
-        document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
-        document.getElementById('overlay').classList.remove('show');
-    }
-
-    function clearAndBack() {
-        // Optional: clear draft if cancelling? 
-        // For now, let's keep it saved so users don't lose work accidentally.
-        // localStorage.removeItem('goorac_note_draft');
-        history.back();
+    function randomizeStyle() {
+        // Random Color
+        const rColor = Math.floor(Math.random() * bgColors.length);
+        setColor(rColor);
+        // Random Font
+        const rFont = Math.floor(Math.random() * fonts.length);
+        setFont(rFont);
+        // Haptic
+        if(navigator.vibrate) navigator.vibrate(10);
     }
 
-    // --- PUBLISH ---
-    async function publishNote() {
-        if(!els.postBtn.classList.contains('ready')) return;
-        const user = auth.currentUser;
-        if(!user) return;
+    // --- POSTING ---
 
-        els.postBtn.innerHTML = '...';
-        els.postBtn.style.opacity = '0.7';
+    async function postNote() {
+        if (isPosting) return; // Prevent double click
+        
+        // Validation
+        if (!state.text && !state.song) return;
+        if (!currentUser) return;
+
+        isPosting = true;
+        els.postBtn.classList.add('loading');
+        els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:14px; animation:spin 1s linear infinite;">refresh</span> Posting...`;
+
+        // 24 Hour Expiry
+        const expiry = new Date();
+        expiry.setHours(expiry.getHours() + 24);
 
         try {
-            const userDoc = await db.collection("users").doc(user.uid).get();
-            const userData = userDoc.exists ? userDoc.data() : {};
-            const expiry = new Date(Date.now() + 86400000); // 24h
+            // Get fresh user data for the note snapshot
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            const userData = userDoc.data() || {};
 
             const notePayload = {
-                uid: user.uid,
-                username: userData.name || user.displayName || "User",
-                handle: userData.username || "",
-                pfp: userData.photoURL || user.photoURL,
+                uid: currentUser.uid,
+                username: userData.username || "",
+                pfp: userData.photoURL || currentUser.photoURL,
                 verified: userData.verified || false,
+                
+                // Content
                 text: state.text,
-                bgColor: state.bgColor,
-                textColor: state.textColor,
+                bgColor: bgColors[state.colorIdx].bg,
+                textColor: bgColors[state.colorIdx].text,
                 textAlign: state.align,
-                font: state.font,
+                font: fonts[state.fontIdx],
+                
+                // Music
                 songName: state.song?.trackName || null,
                 songArtist: state.song?.artistName || null,
                 songPreview: state.song?.previewUrl || null,
                 songArt: state.song?.artworkUrl100 || null,
+                
+                // Logic
                 isActive: true, 
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiry),
-                likes: []
+                likes: [],
+                
+                // NEW: Audience Logic
+                audience: state.audience // 'public' or 'close_friends'
             };
 
             const batch = db.batch();
-            const oldNotes = await db.collection("notes").where("uid", "==", user.uid).where("isActive", "==", true).get();
+            
+            // Deactivate old notes (One note per user policy)
+            const oldNotes = await db.collection("notes").where("uid", "==", currentUser.uid).where("isActive", "==", true).get();
             oldNotes.forEach(doc => batch.update(doc.ref, { isActive: false }));
-            batch.set(db.collection("notes").doc(), notePayload);
+            
+            // Create new
+            const newNoteRef = db.collection("notes").doc();
+            batch.set(newNoteRef, notePayload);
+            
             await batch.commit();
             
             // Clear draft after success
@@ -500,8 +532,10 @@
 
         } catch(e) {
             console.error(e);
-            alert("Failed to post.");
+            alert("Failed to post. Check connection.");
             els.postBtn.innerHTML = 'Post';
+            els.postBtn.classList.remove('loading');
+            isPosting = false; // Release lock on error
         }
     }
 
