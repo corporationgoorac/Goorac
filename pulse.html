@@ -574,7 +574,7 @@
             // CLICK: Redirects to Pulse Session with this UID
             div.onclick = () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                window.location.href = `pulse.html?uid=${uData.uid}`; 
+                window.location.assign(`pulse.html?uid=${uData.uid}&t=${Date.now()}`); 
             };
             return div;
         }
@@ -727,4 +727,42 @@
         window.sendReaction = (emoji) => {
             if(navigator.vibrate) navigator.vibrate(10);
             roomRef.update({ reaction: emoji, reactionSender: myUid, reactionTime: Date.now() });
-            spawnReaction(emoji);
+            spawnReaction(emoji); 
+        }
+
+        function spawnReaction(emoji) {
+            const el = document.createElement('div');
+            el.className = 'floater';
+            el.innerText = emoji;
+            el.style.left = Math.random() * 60 + 20 + '%'; 
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+            if(navigator.vibrate) navigator.vibrate(20);
+        }
+
+        function leaveSession() {
+            if(roomRef) {
+                const updateField = (myUid < targetUid) ? 'userA' : 'userB';
+                roomRef.update({ [updateField]: 'offline' });
+            }
+            audio.pause();
+            
+            // If in active session, go back to Lobby (which is this page without params)
+            // But since we use href, history.back() works best to return to Profile or Lobby
+            if (targetUid) window.location.href = "pulse.html"; 
+            else history.back();
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            showScreen('screen-error');
+        }
+
+    </script>
+</body>
+</html>
