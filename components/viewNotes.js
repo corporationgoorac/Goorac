@@ -145,18 +145,26 @@ class ViewNotes extends HTMLElement {
                 padding-bottom: 20px;
             }
 
-            /* THE BUBBLE WRAPPER - UPDATED FOR LAYOUT */
+            /* THE BUBBLE WRAPPER - UPDATED FOR LAYOUT & ANIMATION */
             .vn-bubble-wrapper { 
                 position: relative; 
                 width: 70vw; /* Reduced Width */
                 max-width: 300px; /* Reduced Max Width */
                 aspect-ratio: 1 / 1; 
-                margin: 50px auto 20px auto; /* Increased Top Margin */
+                margin: 140px auto 30px auto; /* MOVED DOWN: Adjusted from 50px to 140px for perfect positioning */
                 overflow: visible; 
                 display: flex;
                 flex-direction: column;
                 z-index: 10;
                 flex-shrink: 0;
+                /* Animation: Sticky Note Entrance */
+                opacity: 0;
+                animation: stickyEntrance 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            }
+
+            @keyframes stickyEntrance {
+                0% { transform: scale(0.5) translateY(50px); opacity: 0; }
+                100% { transform: scale(1) translateY(0); opacity: 1; }
             }
 
             .vn-bubble {
