@@ -12,7 +12,7 @@ class ViewNotes extends HTMLElement {
         this.currentUserProfile = null;
         this.isOwnNote = false;
         
-        // Dedicated audio player
+        // Dedicated audio player to prevent overlap
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
         this.audioPlayer.volume = 1.0; 
@@ -967,3 +967,30 @@ const NotesManager = {
                                 // --- STRICT CLOSE FRIENDS LOGIC FIXED ---
                                 if (noteData.audience === 'close_friends') {
                                     // Fetch Author's Profile using noteData.uid (NOT uid which is Note ID)
+                                    db.collection('users').doc(noteData.uid).get().then(doc => {
+                                        if (doc.exists) {
+                                            const authorCF = doc.data().closeFriends || [];
+                                            // Check if I am in their list
+                                            if (authorCF.includes(user.uid)) {
+                                                renderNoteItem(noteData, uid);
+                                            } else {
+                                                // I am NOT a close friend -> Hide Note
+                                                const el = document.getElementById(`note-${uid}`);
+                                                if(el) el.remove();
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    // Public Note -> Show
+                                    renderNoteItem(noteData, uid);
+                                }
+                            }
+                        });
+                    });
+            });
+
+        } catch (e) { console.error("Error loading notes:", e); }
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => NotesManager.init());
