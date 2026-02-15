@@ -139,9 +139,11 @@ class ViewNotes extends HTMLElement {
             /* --- CONTENT AREA (FIXED FOR SQUARE) --- */
             .vn-content {
                 flex: 1; display: flex; flex-direction: column;
-                justify-content: center; align-items: center;
+                justify-content: flex-start; /* Changed from center to allow custom spacing */
+                align-items: center;
                 position: relative; z-index: 5;
                 width: 100%;
+                padding-top: 80px; /* Added padding to push content down from header */
                 padding-bottom: 40px; /* Space for footer */
             }
 
@@ -149,9 +151,9 @@ class ViewNotes extends HTMLElement {
             .vn-bubble-wrapper { 
                 position: relative; 
                 width: 75vw; /* Responsive Width */
-                max-width: 340px; /* Cap width */
+                max-width: 290px; /* REDUCED from 340px to fit correctly */
                 aspect-ratio: 1 / 1; /* FORCE EXACT SQUARE */
-                margin: 20px auto 30px auto;
+                margin: 40px auto 30px auto; /* Increased top margin */
                 overflow: visible; 
                 display: flex;
                 flex-direction: column;
@@ -163,7 +165,7 @@ class ViewNotes extends HTMLElement {
                 height: 100%; /* Fill the square exactly */
                 border-radius: 48px; /* Smooth corners */
                 display: flex; align-items: center; justify-content: center;
-                text-align: center; padding: 30px;
+                text-align: center; padding: 25px; /* Slightly reduced padding */
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -180,7 +182,7 @@ class ViewNotes extends HTMLElement {
             }
 
             .vn-note-text { 
-                font-size: 2.2rem; /* Larger text for modal */
+                font-size: 2.0rem; /* Slightly reduced font */
                 font-weight: 700; line-height: 1.2; z-index: 2;
                 word-break: break-word; width: 100%; white-space: pre-wrap;
                 max-height: 100%;
@@ -204,7 +206,7 @@ class ViewNotes extends HTMLElement {
             /* INFO BELOW NOTE */
             .vn-info-bar {
                 display: flex; flex-direction: column; align-items: center; gap: 4px;
-                margin-top: 10px; z-index: 10;
+                margin-top: 15px; z-index: 10;
                 text-shadow: 0 2px 4px rgba(0,0,0,0.8);
             }
             .vn-display-name { 
@@ -243,7 +245,8 @@ class ViewNotes extends HTMLElement {
 
             /* --- FIXED SLOWER ANIMATIONS FOR SONG --- */
             .vn-music-pill { 
-                position: absolute; top: -35px; left: 50%; transform: translateX(-50%);
+                position: absolute; top: -45px; /* Pushed up slightly more */
+                left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 10px; 
                 background: rgba(15, 15, 15, 0.9); padding: 8px 18px; 
                 border-radius: 100px; font-size: 0.8rem; font-weight: 700;
@@ -478,6 +481,7 @@ class ViewNotes extends HTMLElement {
             this.db.collection('users').doc(initialNoteData.uid).get().then(doc => {
                 if(doc.exists) {
                     this.currentUserProfile = doc.data();
+                    // Re-render, but getOwnNoteHTML/getFriendNoteHTML now handles glitch prevention
                     this.renderContent(); 
                 }
             });
@@ -520,14 +524,17 @@ class ViewNotes extends HTMLElement {
         this.attachDynamicListeners();
     }
 
-    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE
+    // FIXED: EXACTLY MATCHING FRIEND HTML STRUCTURE & FIXED NAME GLITCH
     getOwnNoteHTML(note) {
         const timeAgo = this.getRelativeTime(note.createdAt);
         const user = firebase.auth().currentUser;
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        const displayName = note.displayName || this.currentUserProfile?.name || note.username || user?.displayName || 'You';
+        
+        // Fix: Glitch Prevention - Prioritize Note Data
+        const displayName = note.displayName || note.username || this.currentUserProfile?.name || user?.displayName || 'You';
+        
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         const isCF = note.audience === 'close_friends';
 
@@ -615,7 +622,10 @@ class ViewNotes extends HTMLElement {
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
-        const displayName = note.displayName || this.currentUserProfile?.name || note.username || 'User';
+        
+        // Fix: Glitch Prevention - Prioritize Note Data
+        const displayName = note.displayName || note.username || this.currentUserProfile?.name || 'User';
+        
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
         const isCF = note.audience === 'close_friends';
 
