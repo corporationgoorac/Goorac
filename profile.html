@@ -206,7 +206,7 @@
             </label>
         </div>
 
-        <div class="setting-row" onclick="document.getElementById('cf-selector').open(); toggleMenu(false);">
+        <div class="setting-row" onclick="openCloseFriends()">
             <span style="font-size:14px; font-weight:600;">Close Friends</span>
             <span class="material-icons-round" style="color:var(--secondary);">chevron_right</span>
         </div>
@@ -313,6 +313,19 @@
         }
     }
 
+    function openCloseFriends() {
+        // Push state so back button works for the custom component
+        history.pushState({modal: 'closeFriends'}, ""); 
+        const cfSelector = document.getElementById('cf-selector');
+        if(cfSelector) {
+            cfSelector.open();
+            // Close the settings menu when opening Close Friends
+            const bottomModal = document.getElementById('bottom-modal');
+            bottomModal.classList.remove('active');
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+    }
+
     function openBlockedList() {
         history.pushState({modal: 'blocked'}, "");
         document.getElementById('blocked-modal').classList.add('active');
@@ -328,9 +341,19 @@
 
     // Fixed Back Button Logic
     window.onpopstate = function(e) {
-        if(document.getElementById('blocked-modal').classList.contains('active')) {
-            document.getElementById('blocked-modal').classList.remove('active');
-        } else if(document.getElementById('bottom-modal').classList.contains('active')) {
+        const cfSelector = document.getElementById('cf-selector');
+        const blockedModal = document.getElementById('blocked-modal');
+        const bottomModal = document.getElementById('bottom-modal');
+
+        // Check Close Friends Component first
+        if (cfSelector && typeof cfSelector.close === 'function') {
+            // Note: We check if it's visually open. If your component has an 'isOpen' property, use that.
+            cfSelector.close();
+        }
+
+        if(blockedModal.classList.contains('active')) {
+            blockedModal.classList.remove('active');
+        } else if(bottomModal.classList.contains('active')) {
             toggleMenu(false);
         }
     };
