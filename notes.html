@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#000000" id="theme-color-meta">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>New Note | Goorac</title>
@@ -40,22 +40,42 @@
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0; padding: 0;
-            height: 100vh; 
+            /* FIX: Use Dynamic Viewport Height to prevent hiding behind address bar */
+            height: 100dvh; 
             display: flex; flex-direction: column;
-            overflow: hidden; /* Lock scroll */
+            overflow: hidden; 
+            justify-content: space-between; /* Pushes controls to bottom */
         }
 
-        /* --- PREVIEW BACKGROUND (Full Screen) --- */
+        /* --- PREVIEW LAYERS --- */
         #preview-bg {
             position: absolute; inset: 0; z-index: 0;
             background-color: #000;
             transition: background 0.5s ease;
         }
-        /* Overlay to dim the background so the note pops */
-        #preview-overlay {
+        
+        /* NEW: Noise Texture Layer */
+        #preview-texture {
             position: absolute; inset: 0; z-index: 1;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            opacity: 0; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+            transition: opacity 0.3s;
+        }
+        #preview-texture.active { opacity: 0.15; }
+
+        /* NEW: Grid Pattern Layer */
+        #preview-grid {
+            position: absolute; inset: 0; z-index: 1;
+            opacity: 0.05; pointer-events: none;
+            background-size: 40px 40px;
+            background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
+        }
+
+        /* Overlay to dim background */
+        #preview-overlay {
+            position: absolute; inset: 0; z-index: 2;
+            background: rgba(0,0,0,0.4); /* Reduced dimming for better visibility */
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         }
 
         /* --- HEADER --- */
@@ -63,9 +83,10 @@
             position: relative; z-index: 10;
             padding: calc(15px + var(--safe-top)) 20px 15px;
             display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; /* Never shrink header */
         }
-        .cancel-btn { color: rgba(255,255,255,0.7); font-size: 16px; font-weight: 500; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .header-title { font-weight:700; font-size:15px; letter-spacing:0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .cancel-btn { color: rgba(255,255,255,0.8); font-size: 16px; font-weight: 500; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .header-title { font-weight:700; font-size:15px; letter-spacing:0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
         
         .post-btn { 
             background: #fff; color: #000; 
@@ -79,66 +100,74 @@
 
         /* --- WORKSPACE --- */
         .workspace {
-            flex: 1; display: flex; flex-direction: column; 
+            flex: 1; /* Takes up all remaining space */
+            display: flex; flex-direction: column; 
             justify-content: center; align-items: center;
             position: relative; z-index: 5;
-            padding-bottom: 20vh; /* Push note up slightly */
+            width: 100%;
         }
 
-        /* Wrapper to hold floating elements (Music, PFP) without clipping */
         .bubble-wrapper {
             position: relative;
-            width: 150px; height: 150px;
+            width: 160px; height: 160px; /* Slightly larger */
         }
 
-        /* The Actual Note Bubble */
         .note-bubble {
             width: 100%; height: 100%;
-            border-radius: 38px;
+            border-radius: 42px;
             display: flex; align-items: center; justify-content: center;
-            text-align: center; padding: 18px;
+            text-align: center; padding: 20px;
             position: relative; z-index: 2;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             border: 1px solid rgba(255,255,255,0.15);
-            overflow: hidden; /* Clip text inside */
+            overflow: hidden;
+        }
+        
+        /* NEW: Glass Mode Class */
+        .note-bubble.glass-mode {
+            background: rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(15px) !important;
+            -webkit-backdrop-filter: blur(15px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
         }
         
         .note-text {
-            font-size: 19px; font-weight: 600; line-height: 1.35;
+            font-size: 20px; font-weight: 600; line-height: 1.35;
             outline: none; min-width: 50px;
             word-break: break-word; white-space: pre-wrap;
             z-index: 2; position: relative;
         }
-        .note-text:empty:before { content: 'Tap to type...'; opacity: 0.6; }
+        .note-text:empty:before { content: 'Type here...'; opacity: 0.6; }
 
-        /* Effects classes */
+        /* Text Effects */
         .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-        .fx-shadow { text-shadow: 2px 2px 0px rgba(0,0,0,0.5); }
+        .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
 
-        /* PFP Floating Outside */
+        /* PFP */
         .note-pfp {
-            position: absolute; bottom: -12px; right: -12px;
-            width: 48px; height: 48px; border-radius: 50%;
-            border: 3px solid #000; /* Will be updated via JS to match bg */
+            position: absolute; bottom: -14px; right: -14px;
+            width: 50px; height: 50px; border-radius: 50%;
+            border: 3px solid #000;
             background: #333; object-fit: cover; z-index: 10;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
         }
 
-        /* Music Tag Floating Outside */
+        /* Music Tag */
         .music-tag {
-            position: absolute; top: -38px; left: 50%; transform: translateX(-50%) translateY(10px);
-            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(12px);
-            padding: 6px 14px; border-radius: 100px;
+            position: absolute; top: -42px; left: 50%; transform: translateX(-50%) translateY(10px);
+            background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(15px);
+            padding: 8px 16px; border-radius: 100px;
             display: flex; align-items: center; gap: 8px;
             font-size: 11px; font-weight: 700; color: #fff;
             opacity: 0; pointer-events: none;
             transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 0; border: 1px solid rgba(255,255,255,0.1);
-            max-width: 200px; white-space: nowrap;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            z-index: 0; border: 1px solid rgba(255,255,255,0.15);
+            max-width: 220px; white-space: nowrap;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
-        .music-tag.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; z-index: 20; top: -16px; }
+        .music-tag.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; z-index: 20; top: -20px; }
         
         .music-anim { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
         .music-anim span { width: 3px; background: var(--accent); border-radius: 2px; animation: eq 1s infinite ease-in-out; }
@@ -150,37 +179,47 @@
         /* --- CONTROLS (Bottom Sheet) --- */
         .controls {
             position: relative; z-index: 20;
-            background: rgba(28, 28, 30, 0.95);
-            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            background: rgba(20, 20, 20, 0.95); /* Slightly darker for better contrast */
+            backdrop-filter: blur(35px); -webkit-backdrop-filter: blur(35px);
             border-top-left-radius: 32px; border-top-right-radius: 32px;
-            padding: 25px 20px calc(20px + var(--safe-bottom));
-            display: flex; flex-direction: column; gap: 24px;
-            box-shadow: 0 -20px 60px rgba(0,0,0,0.6);
-            border-top: 1px solid rgba(255,255,255,0.08);
+            
+            /* FIXED PADDING: MASSIVE INCREASE to ensure visibility on all phones */
+            padding: 25px 16px calc(60px + var(--safe-bottom)); 
+            
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.7);
+            border-top: 1px solid rgba(255,255,255,0.1);
             transition: transform 0.3s ease;
+            width: 100%;
+            flex-shrink: 0; /* Do not shrink */
         }
 
-        .control-row { display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        .control-row { 
+            display: flex; align-items: center; gap: 12px; 
+            overflow-x: auto; padding-bottom: 5px; 
+            scrollbar-width: none; -ms-overflow-style: none;
+            padding-left: 4px; padding-right: 4px;
+        }
         .control-row::-webkit-scrollbar { display: none; }
 
         .c-btn {
-            width: 48px; height: 48px; flex-shrink: 0; border-radius: 16px;
-            background: rgba(255,255,255,0.06); 
+            width: 46px; height: 46px; flex-shrink: 0; border-radius: 14px;
+            background: rgba(255,255,255,0.08); 
             display: flex; align-items: center; justify-content: center;
-            color: #ccc; cursor: pointer; transition: 0.2s;
+            color: #ddd; cursor: pointer; transition: 0.2s;
         }
-        .c-btn:active { transform: scale(0.95); }
+        .c-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.15); }
         .c-btn.active { background: #fff; color: #000; box-shadow: 0 5px 15px rgba(255,255,255,0.2); }
         
         .color-dot { 
-            width: 42px; height: 42px; border-radius: 50%; 
+            width: 40px; height: 40px; border-radius: 50%; 
             border: 2px solid rgba(255,255,255,0.1); 
             flex-shrink: 0; cursor: pointer; transition: 0.2s;
         }
-        .color-dot.active { border-color: #fff; transform: scale(1.15); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .color-dot.active { border-color: #fff; transform: scale(1.15); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
 
         .font-pill {
-            padding: 10px 18px; background: rgba(255,255,255,0.06); border-radius: 14px;
+            padding: 10px 18px; background: rgba(255,255,255,0.08); border-radius: 12px;
             font-size: 14px; color: #ccc; white-space: nowrap; flex-shrink: 0;
             cursor: pointer; transition: 0.2s;
         }
@@ -189,13 +228,13 @@
         /* --- AUDIENCE SELECTOR --- */
         .audience-wrapper {
             display: flex; align-items: center; justify-content: space-between;
-            background: rgba(0,0,0,0.3); padding: 8px 16px;
-            border-radius: 14px; border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.05); padding: 10px 16px;
+            border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);
         }
         .privacy-toggle {
             display: flex; align-items: center; gap: 10px;
             font-size: 13px; font-weight: 600; color: #aaa;
-            cursor: pointer; padding: 6px 0;
+            cursor: pointer; padding: 4px 0;
         }
         .privacy-toggle.selected { color: var(--accent); }
         .privacy-icon { font-size: 18px; }
@@ -208,23 +247,32 @@
             cursor: pointer;
         }
 
-        /* --- DICE (SHUFFLE) --- */
-        .dice-btn {
-            position: absolute; bottom: 25px; right: 25px;
-            width: 45px; height: 45px; background: rgba(255,255,255,0.1);
+        /* --- ACTIONS (Dice, Texture) --- */
+        .actions-float {
+            position: absolute; bottom: 20px; right: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+            z-index: 100;
+        }
+
+        .float-btn {
+            width: 44px; height: 44px; background: rgba(255,255,255,0.1);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             backdrop-filter: blur(10px); cursor: pointer; border: 1px solid rgba(255,255,255,0.15);
-            z-index: 100; transition: 0.3s;
+            transition: 0.3s;
         }
-        .dice-btn:active { transform: rotate(180deg) scale(0.9); background: #fff; color: #000 !important; }
-        .dice-btn .material-icons-round { color: #fff; transition: 0.3s; }
-        .dice-btn:active .material-icons-round { color: #000; }
+        .float-btn:active { transform: scale(0.9); background: #fff; color: #000 !important; }
+        .float-btn .material-icons-round { color: #fff; transition: 0.3s; }
+        .float-btn:active .material-icons-round { color: #000; }
+        
+        .float-btn.active-tex { background: var(--accent); border-color: var(--accent); }
 
     </style>
 </head>
 <body>
 
     <div id="preview-bg"></div>
+    <div id="preview-texture"></div>
+    <div id="preview-grid"></div>
     <div id="preview-overlay"></div>
 
     <header>
@@ -251,8 +299,16 @@
             <img class="note-pfp" id="user-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
         </div>
 
-        <div class="dice-btn" onclick="randomizeStyle()">
-            <span class="material-icons-round" style="font-size: 22px;">casino</span>
+        <div class="actions-float">
+            <div class="float-btn" onclick="toggleGlass()" id="glass-btn">
+                <span class="material-icons-round" style="font-size: 20px;">opacity</span>
+            </div>
+             <div class="float-btn" onclick="toggleTexture()" id="tex-btn">
+                <span class="material-icons-round" style="font-size: 20px;">grain</span>
+            </div>
+            <div class="float-btn" onclick="randomizeStyle()">
+                <span class="material-icons-round" style="font-size: 22px;">casino</span>
+            </div>
         </div>
     </div>
 
@@ -305,22 +361,23 @@
     let isPosting = false; 
 
     // --- CONFIG ---
+    // metaColor added for Dynamic Top Toolbar
     const bgColors = [
-        { bg: '#ffffff', text: '#000000' }, 
-        { bg: '#1c1c1e', text: '#ffffff' }, 
-        { bg: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', text: '#5e2d35' },
-        { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', text: '#4a2d5e' },
-        { bg: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', text: '#1d5a44' },
-        { bg: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)', text: '#582d1c' },
-        { bg: 'linear-gradient(45deg, #85FFBD 0%, #FFFB7D 100%)', text: '#3c5e1a' },
-        { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355' },
-        { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366' },
-        { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a' },
-        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff' },
-        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff' },
-        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff' },
-        { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff'},
-        { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff' }
+        { bg: '#ffffff', text: '#000000', meta: '#ffffff' }, 
+        { bg: '#1c1c1e', text: '#ffffff', meta: '#1c1c1e' }, 
+        { bg: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)', text: '#5e2d35', meta: '#FF9A9E' },
+        { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', text: '#4a2d5e', meta: '#a18cd1' },
+        { bg: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)', text: '#1d5a44', meta: '#84fab0' },
+        { bg: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)', text: '#582d1c', meta: '#fccb90' },
+        { bg: 'linear-gradient(45deg, #85FFBD 0%, #FFFB7D 100%)', text: '#3c5e1a', meta: '#85FFBD' },
+        { bg: 'linear-gradient(180deg, #2AF598 0%, #009EFD 100%)', text: '#003355', meta: '#2AF598' },
+        { bg: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)', text: '#003366', meta: '#4facfe' },
+        { bg: 'linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%)', text: '#4a4a4a', meta: '#a6c1ee' },
+        { bg: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)', text: '#fff', meta: '#0ba360' },
+        { bg: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)', text: '#fff', meta: '#13547a' },
+        { bg: 'linear-gradient(to top, #ff0844 0%, #ffb199 100%)', text: '#fff', meta: '#ff0844' },
+        { bg: 'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)', text:'#fff', meta:'#3f5efb'},
+        { bg: 'url("https://www.transparenttextures.com/patterns/stardust.png"), linear-gradient(to right, #434343 0%, black 100%)', text: '#00d2ff', meta:'#434343' }
     ];
 
     const fonts = [
@@ -344,6 +401,8 @@
         colorIdx: 0,
         fontIdx: 0,
         effectIdx: 0,
+        texture: false, 
+        glass: false, // NEW: Glass State
         align: 'center', 
         song: null,
         audience: 'public' 
@@ -360,7 +419,11 @@
         audIcon: document.getElementById('audience-icon'),
         audText: document.getElementById('audience-text'),
         bg: document.getElementById('preview-bg'),
-        pfp: document.getElementById('user-pfp')
+        texLayer: document.getElementById('preview-texture'),
+        texBtn: document.getElementById('tex-btn'),
+        glassBtn: document.getElementById('glass-btn'),
+        pfp: document.getElementById('user-pfp'),
+        meta: document.getElementById('theme-color-meta')
     };
 
     // --- INIT ---
@@ -396,6 +459,8 @@
             els.input.innerText = draft.text || "";
             if(draft.colorIdx !== undefined) setColor(draft.colorIdx);
             if(draft.fontIdx !== undefined) setFont(draft.fontIdx);
+            if(draft.texture) toggleTexture();
+            if(draft.glass) toggleGlass();
             if(draft.song) setSong(draft.song);
             updateState();
         }
@@ -427,6 +492,8 @@
             text: state.text,
             colorIdx: state.colorIdx,
             fontIdx: state.fontIdx,
+            texture: state.texture,
+            glass: state.glass,
             song: state.song
         }));
     }
@@ -440,15 +507,15 @@
         els.bubble.style.color = theme.text;
         els.input.style.color = theme.text;
         
-        // Sync PFP Border to Bubble Color (Professional look)
-        // If gradient, we can't set border color easily to gradient, so use white or black
-        // Simple logic: Is text white? Then background is likely dark. Use dark border.
         els.pfp.style.borderColor = theme.text === '#ffffff' ? '#000' : '#fff';
 
         // Update Full Screen Background (Export Logic)
         els.bg.style.background = theme.bg;
         
-        // Slight Zoom Effect on BG change
+        // Update Browser Toolbar (Meta Theme Color)
+        els.meta.setAttribute('content', theme.meta || theme.bg);
+        
+        // Slight Zoom Effect
         els.bg.style.transform = "scale(1.05)";
         setTimeout(() => els.bg.style.transform = "scale(1)", 300);
 
@@ -464,6 +531,31 @@
         document.querySelectorAll('.font-pill').forEach((p, i) => {
             p.classList.toggle('active', i === idx);
         });
+    }
+
+    function toggleTexture() {
+        state.texture = !state.texture;
+        if(state.texture) {
+            els.texLayer.classList.add('active');
+            els.texBtn.classList.add('active-tex');
+        } else {
+            els.texLayer.classList.remove('active');
+            els.texBtn.classList.remove('active-tex');
+        }
+        if(navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // NEW: Glass Toggle
+    function toggleGlass() {
+        state.glass = !state.glass;
+        if(state.glass) {
+            els.bubble.classList.add('glass-mode');
+            els.glassBtn.classList.add('active-tex'); // reuse active class
+        } else {
+            els.bubble.classList.remove('glass-mode');
+            els.glassBtn.classList.remove('active-tex');
+        }
+        if(navigator.vibrate) navigator.vibrate(10);
     }
 
     function toggleAlign() {
@@ -535,6 +627,9 @@
         const rFont = Math.floor(Math.random() * fonts.length);
         setFont(rFont);
         
+        if(Math.random() > 0.5) toggleTexture();
+        if(Math.random() > 0.7) toggleGlass();
+        
         // Randomly align
         const alignModes = ['center', 'left', 'right'];
         state.align = alignModes[Math.floor(Math.random() * 3)];
@@ -571,11 +666,13 @@
                 // Visual Data (Exported for Viewer)
                 text: state.text,
                 bgColor: theme.bg,         // Bubble Background
-                bgStyle: theme.bg,         // Full Screen Background (For viewer consistency)
+                bgStyle: theme.bg,         // Full Screen Background (Saved!)
+                bgTexture: state.texture,  // SAVED: Texture State
+                isGlass: state.glass,      // SAVED: Glass State
                 textColor: theme.text,
                 textAlign: state.align,
                 font: fonts[state.fontIdx],
-                effect: effects[state.effectIdx].name, // Export text effect
+                effect: effects[state.effectIdx].name,
                 
                 // Audio Data
                 songName: state.song?.trackName || null,
