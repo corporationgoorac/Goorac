@@ -8,9 +8,14 @@
     <title>Pulse Lobby | Goorac</title>
     
     <script src="config.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script> <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script src="components/presence.js"></script>
+    <script src="components/call-notifier.js"></script>
+    <script src="components/chatLoader.js"></script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700&display=swap" rel="stylesheet">
@@ -171,9 +176,98 @@
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); transform: scale(1); }
         }
 
+        /* --- PROFESSIONAL INVITE MODAL --- */
+        #invite-modal {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
+        #invite-modal.active { opacity: 1; pointer-events: auto; }
+
+        .invite-card {
+            background: #111; border: 1px solid #222;
+            width: 90%; max-width: 320px; border-radius: 30px;
+            padding: 35px 25px; text-align: center;
+            transform: scale(0.9); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            position: relative; overflow: hidden;
+        }
+        #invite-modal.active .invite-card { transform: scale(1); }
+
+        .invite-ring {
+            width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 20px;
+            position: relative; padding: 4px;
+            background: linear-gradient(135deg, var(--accent), #ff00cc);
+        }
+        .invite-ring img { 
+            width: 100%; height: 100%; border-radius: 50%; 
+            object-fit: cover; border: 4px solid #000; display: block;
+        }
+        
+        /* Ring Animation */
+        .invite-ring::before {
+            content: ''; position: absolute; inset: -10px; border-radius: 50%;
+            border: 2px solid var(--accent); opacity: 0;
+            animation: pulse-out 1.5s infinite;
+        }
+        @keyframes pulse-out { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+        .invite-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
+        .invite-name { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        .invite-sub { font-size: 14px; color: #666; margin-bottom: 30px; }
+
+        .invite-actions { display: flex; gap: 15px; justify-content: center; }
+        
+        .btn-decline {
+            width: 50px; height: 50px; border-radius: 50%;
+            background: #222; color: #fff; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .btn-accept {
+            height: 50px; padding: 0 30px; border-radius: 50px;
+            background: #fff; color: #000; border: none;
+            font-weight: 800; font-size: 14px; letter-spacing: 0.5px;
+            display: flex; align-items: center; gap: 8px; cursor: pointer;
+            box-shadow: 0 5px 20px rgba(255,255,255,0.2);
+            animation: bounce-gentle 2s infinite;
+        }
+        @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+
+        /* --- ONBOARDING MODAL --- */
+        #onboarding-sheet {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2000; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            background: rgba(0,0,0,0.6); opacity: 0; transition: 0.4s;
+        }
+        #onboarding-sheet.active { pointer-events: auto; opacity: 1; }
+        
+        .sheet-content {
+            background: #111; border-radius: 24px 24px 0 0;
+            padding: 30px 24px 40px; transform: translateY(100%);
+            transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            border-top: 1px solid #333;
+        }
+        #onboarding-sheet.active .sheet-content { transform: translateY(0); }
+
+        .sheet-icon { font-size: 40px; color: var(--accent); margin-bottom: 15px; }
+        .sheet-h1 { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+        .sheet-p { font-size: 14px; color: #999; line-height: 1.5; margin-bottom: 25px; }
+        .sheet-btn {
+            width: 100%; padding: 16px; border-radius: 12px;
+            background: #fff; color: #000; font-weight: 700; border: none;
+            font-size: 14px; cursor: pointer;
+        }
+
     </style>
 </head>
 <body>
+
+    <call-notifier></call-notifier>
+    <chat-loader></chat-loader>
 
     <script>
         // Instant load cached PFP
@@ -225,6 +319,41 @@
         <div class="loader-pill" id="scroll-loader" style="display:none; text-align:center; padding:20px; font-size:12px; color:#444;">SYNCING...</div>
     </div>
 
+    <div id="invite-modal">
+        <div class="invite-card">
+            <div class="invite-title">INCOMING PULSE</div>
+            <div class="invite-ring">
+                <img id="inviter-img" src="">
+            </div>
+            <div class="invite-name" id="inviter-name">User</div>
+            <div class="invite-sub">Is waiting for you in session...</div>
+            
+            <div class="invite-actions">
+                <button class="btn-decline" onclick="closeInviteModal()">
+                    <span class="material-icons-round">close</span>
+                </button>
+                <button class="btn-accept" id="btn-accept-pulse">
+                    <span class="material-icons-round">bolt</span> JOIN NOW
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="onboarding-sheet">
+        <div class="sheet-content">
+            <span class="material-icons-round sheet-icon">graphic_eq</span>
+            <h1 class="sheet-h1">Welcome to Pulse</h1>
+            <p class="sheet-p">
+                Pulse lets you listen to music synchronously with friends. 
+                <br><br>
+                1. Pick a mutual friend.<br>
+                2. Take turns being the DJ.<br>
+                3. Vibe together in real-time.
+            </p>
+            <button class="sheet-btn" onclick="closeOnboarding()">Got it, let's vibe</button>
+        </div>
+    </div>
+
     <script>
         if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
         else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
@@ -238,6 +367,7 @@
         const BATCH_SIZE = 15;
         let mutualsCache = []; 
         let activePresenceListener = null;
+        let inviteListener = null;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -262,13 +392,28 @@
                     else setMyPresence(true);
                 });
 
+                checkOnboarding(); // Check if we need to show tutorial
                 initLobby();
+                listenForIncomingPulses(); // START LISTENING FOR INVITES
             } else {
                 window.location.href = 'login.html';
             }
         });
 
-        // --- PRESENCE SYSTEM (Own Idea: Heartbeat for "Waiting") ---
+        // --- ONBOARDING LOGIC ---
+        function checkOnboarding() {
+            const hasSeen = localStorage.getItem('pulse_onboarding_seen');
+            if(!hasSeen) {
+                document.getElementById('onboarding-sheet').classList.add('active');
+            }
+        }
+
+        function closeOnboarding() {
+            document.getElementById('onboarding-sheet').classList.remove('active');
+            localStorage.setItem('pulse_onboarding_seen', 'true');
+        }
+
+        // --- PRESENCE SYSTEM ---
         function setMyPresence(isOnline) {
             const presenceRef = db.collection('pulse_active').doc(myUid);
             if(isOnline) {
@@ -310,17 +455,13 @@
                 await loadMoreMutuals(); // Load first batch
 
                 // LISTEN FOR ACTIVE USERS (Realtime Presence)
-                // Constraint: Only listen to changes, don't read entire DB. 
-                // Since Firestore doesn't support "in array" for huge lists well, we just listen to recent 'pulse_active'.
-                // Ideally this collection is small (only people currently on THIS page).
                 activePresenceListener = db.collection('pulse_active')
-                    .where('lastSeen', '>', new Date(Date.now() - 1000 * 60 * 5)) // Active in last 5 mins
+                    .where('lastSeen', '>', new Date(Date.now() - 1000 * 60 * 5)) 
                     .onSnapshot(snapshot => {
                         const activeUids = new Set();
                         snapshot.forEach(doc => activeUids.add(doc.id));
                         updateActiveStatus(activeUids);
                     });
-
 
                 // Scroll Loader
                 const container = document.getElementById('mutuals-container');
@@ -343,6 +484,76 @@
             } catch (e) { console.error(e); }
         }
 
+        // --- INCOMING INVITE LISTENER ---
+        function listenForIncomingPulses() {
+            // We listen to the global rooms, ordered by activity. 
+            // We then filter locally to see if WE are involved.
+            // This detects if someone has created a room [Me, Them] and is waiting.
+            
+            inviteListener = db.collection('pulse_rooms')
+                .orderBy('lastActive', 'desc')
+                .limit(10)
+                .onSnapshot(snapshot => {
+                    snapshot.forEach(doc => {
+                        const roomId = doc.id; // Format: uid1_uid2
+                        
+                        // Check if this room involves ME
+                        if (roomId.includes(myUid)) {
+                            const data = doc.data();
+                            
+                            // Determine who is who
+                            // Room ID is sorted strings. 
+                            const ids = roomId.split('_');
+                            const otherUid = (ids[0] === myUid) ? ids[1] : ids[0];
+                            
+                            // Determine the fields for status
+                            const myField = (ids[0] === myUid) ? 'userA' : 'userB';
+                            const otherField = (ids[0] === myUid) ? 'userB' : 'userA';
+                            
+                            // LOGIC: If OTHER is 'online' AND I am 'offline' (or not joined), they are waiting!
+                            if (data[otherField] === 'online' && (!data[myField] || data[myField] === 'offline')) {
+                                
+                                // Fetch their details to show modal
+                                // We likely have them in cache or mutuals list
+                                let otherUser = mutualsCache.find(u => u.uid === otherUid);
+                                
+                                if (otherUser) {
+                                    showInviteModal(otherUser);
+                                } else {
+                                    // Fallback fetch
+                                    db.collection('users').doc(otherUid).get().then(uDoc => {
+                                        if(uDoc.exists) showInviteModal(uDoc.data());
+                                    });
+                                }
+                            }
+                        }
+                    });
+                });
+        }
+
+        function showInviteModal(user) {
+            // Prevent spamming active modal
+            if (document.getElementById('invite-modal').classList.contains('active')) return;
+            
+            // Vibrate
+            if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+            document.getElementById('inviter-img').src = user.photoURL || 'https://via.placeholder.com/150';
+            document.getElementById('inviter-name').innerText = user.name || 'Friend';
+            
+            const btn = document.getElementById('btn-accept-pulse');
+            btn.onclick = () => {
+                window.location.assign(`pulse.html?user=${user.username}`);
+            };
+
+            document.getElementById('invite-modal').classList.add('active');
+        }
+
+        function closeInviteModal() {
+            document.getElementById('invite-modal').classList.remove('active');
+        }
+
+
         // --- RENDERING & LOGIC ---
 
         function updateActiveStatus(activeSet) {
@@ -351,12 +562,10 @@
             
             let activeCount = 0;
 
-            // 1. Mark cards as active/inactive
             cards.forEach(card => {
                 const uid = card.dataset.uid;
                 if (activeSet.has(uid)) {
                     card.classList.add('is-active');
-                    // Change icon to Pulse for active users
                     card.querySelector('.m-btn span').innerText = 'graphic_eq'; 
                     activeCount++;
                 } else {
@@ -365,17 +574,14 @@
                 }
             });
 
-            // 2. Sort: Active users to top
             const sortedCards = cards.sort((a, b) => {
                 const aActive = a.classList.contains('is-active') ? 1 : 0;
                 const bActive = b.classList.contains('is-active') ? 1 : 0;
                 return bActive - aActive;
             });
 
-            // Re-append in new order (DOM manipulation is cheap here)
             sortedCards.forEach(card => container.appendChild(card));
 
-            // 3. Update Label
             const countEl = document.getElementById('active-count');
             if (activeCount > 0) {
                 countEl.innerText = `${activeCount} ONLINE`;
@@ -387,7 +593,6 @@
 
         function renderList(list) {
             const container = document.getElementById('mutuals-container');
-            // Don't clear innerHTML if we are appending, only if refreshing
             if (loadedCount === 0) container.innerHTML = ''; 
             
             list.forEach(uData => {
@@ -405,11 +610,8 @@
             const nextBatchIds = mutualList.slice(loadedCount, loadedCount + BATCH_SIZE);
             let fetchedData = [];
 
-            // Firebase Limit Protection: Fetch individual docs is heavy if list is huge.
-            // Using 'in' query for batches of 10 is standard optimization.
             if(nextBatchIds.length > 0) {
                 try {
-                    // Split into chunks of 10 for 'in' query constraint
                     const chunks = [];
                     for (let i=0; i<nextBatchIds.length; i+=10) {
                          chunks.push(nextBatchIds.slice(i, i+10));
@@ -423,22 +625,18 @@
                             fetchedData.push(d);
                         });
                     }
-                } catch(e) {
-                    console.log("Fallback fetching due to error", e);
-                }
+                } catch(e) { console.log(e); }
             }
 
-            // Update Cache & Render
             if(loadedCount === 0) {
                 mutualsCache = fetchedData;
             } else {
-                // Dedup before adding
                 const newItems = fetchedData.filter(newU => !mutualsCache.some(oldU => oldU.uid === newU.uid));
                 mutualsCache = [...mutualsCache, ...newItems];
             }
             
             localStorage.setItem('pulse_mutuals_cache', JSON.stringify(mutualsCache));
-            renderList(fetchedData); // Only render new ones
+            renderList(fetchedData); 
 
             loadedCount += nextBatchIds.length;
             loader.style.display = 'none';
@@ -468,7 +666,6 @@
 
             div.onclick = () => {
                 if(navigator.vibrate) navigator.vibrate(10);
-                // Redirects to the session page
                 window.location.assign(`pulse.html?user=${uData.username}`); 
             };
             return div;
