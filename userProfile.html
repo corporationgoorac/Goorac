@@ -51,7 +51,13 @@
             --safe-bottom: env(safe-area-inset-bottom);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        /* FIX 1: Prevent text selection globally */
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none; 
+            -webkit-user-select: none; 
+        }
 
         body {
             background-color: var(--bg);
@@ -122,7 +128,13 @@
         }
         .id-pill:active { background: var(--surface-press); transform: scale(0.97); }
         .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
-        .id-value { font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); }
+        
+        /* FIX 1: Allow copy only on ID */
+        .id-value { 
+            font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); 
+            user-select: text; -webkit-user-select: text;
+        }
+        
         .copy-icon { font-size: 14px; color: var(--secondary); }
 
         .bio {
@@ -524,12 +536,13 @@
         updateFollowButton(isFollowing, doIBlock);
         removeBtnSkeletons();
 
+        const notesArea = document.getElementById('notes-area');
         if(doIBlock) {
-            document.getElementById('notes-area').style.opacity = '0.3';
-            document.getElementById('notes-area').style.pointerEvents = 'none';
+            notesArea.style.opacity = '0.3';
+            notesArea.style.pointerEvents = 'none';
         } else {
-            document.getElementById('notes-area').style.opacity = '1';
-            document.getElementById('notes-area').style.pointerEvents = 'auto';
+            notesArea.style.opacity = '1';
+            notesArea.style.pointerEvents = 'auto';
         }
 
         const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
@@ -552,6 +565,30 @@
             } else {
                 txt.innerText = "Follow";
                 btn.className = "btn btn-follow";
+            }
+        }
+    }
+
+    // FIX 2: Helper to refresh notes visibility/data
+    function refreshNotesComponent() {
+        if(targetUid) {
+            const notesComp = document.getElementById('profile-notes');
+            if(notesComp) {
+                // Resetting UID usually triggers the component to re-fetch/re-render
+                const current = notesComp.uid;
+                notesComp.uid = null;
+                setTimeout(() => {
+                    notesComp.uid = current;
+                }, 50);
+            }
+            // Update UI visibility immediately
+            const notesArea = document.getElementById('notes-area');
+            if(doIBlock) {
+                notesArea.style.opacity = '0.3';
+                notesArea.style.pointerEvents = 'none';
+            } else {
+                notesArea.style.opacity = '1';
+                notesArea.style.pointerEvents = 'auto';
             }
         }
     }
@@ -659,6 +696,8 @@
                 });
             }
             updateFollowButton(!isCurrentlyFollowing, false); 
+            // FIX 2: Reload notes after follow/unfollow
+            refreshNotesComponent();
         } catch (e) { 
             console.error("Follow Error:", e);
             showToast("Error updating relationship"); 
@@ -732,9 +771,15 @@
                 }
             });
             
+            // Local state update for blocking
+            doIBlock = isBlocking;
+            
             showToast(isBlocking ? "User Blocked & Chat Deleted" : "User Unblocked");
             if(isBlocking) toggleMenu(false);
+            
+            // FIX 2: Reload notes after block/unblock and run checks
             checkRelation(targetUserData);
+            refreshNotesComponent();
         } catch (e) { 
             console.error("Block Error:", e); 
             showToast("Action failed"); 
