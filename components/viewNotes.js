@@ -20,7 +20,8 @@ class ViewNotes extends HTMLElement {
             isDragging: false,
             startY: 0,
             currentY: 0,
-            sheetHeight: 0
+            sheetHeight: 0,
+            startTime: 0 // Added for velocity calculation
         };
         
         this.lastTap = 0;
@@ -55,8 +56,9 @@ class ViewNotes extends HTMLElement {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
-            star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#00ba7c"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`
+            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:2px;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
+            // FIX: Sleek Green Star for Close Friends
+            star: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#00ba7c" style="filter: drop-shadow(0 0 2px rgba(0,255,100,0.5)); margin-left:4px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`
         };
     }
 
@@ -81,13 +83,15 @@ class ViewNotes extends HTMLElement {
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 90dvh; 
+                height: 90dvh; /* Taller height for better visibility */
                 max-height: 850px;
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
                 overflow: hidden;
                 box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
                 will-change: transform;
+                /* FIX: Important for smooth dragging */
+                touch-action: pan-y;
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
             
@@ -118,7 +122,7 @@ class ViewNotes extends HTMLElement {
                 position: absolute; top: 0; left: 0; width: 100%;
                 height: 60px;
                 display: flex; justify-content: center; align-items: center;
-                z-index: 50; 
+                z-index: 50; /* Ensure header is on top */
             }
             
             .vn-drag-handle { 
@@ -177,7 +181,7 @@ class ViewNotes extends HTMLElement {
                 word-break: break-word; width: 100%; white-space: pre-wrap;
             }
             
-            /* PFP STICKER */
+            /* PFP STICKER - BOTTOM RIGHT LIKE NOTES.HTML */
             .vn-pfp-sticker {
                 position: absolute; 
                 bottom: -15px; 
@@ -213,7 +217,6 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
-            /* SONG PILL - FIXED LAYOUT */
             .vn-music-pill { 
                 position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
                 display: inline-flex; align-items: center; gap: 8px; 
@@ -222,11 +225,14 @@ class ViewNotes extends HTMLElement {
                 border: 1px solid rgba(255,255,255,0.2);
                 backdrop-filter: blur(10px); color: #fff; z-index: 12;
                 white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                /* Fix Overflow */
-                max-width: 80%;
+                
+                /* FIX: Layout overflow for Song Name */
+                max-width: 85%;
             }
+            
             .vn-music-pill span {
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                max-width: 150px; display: inline-block;
             }
 
             .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
@@ -342,12 +348,14 @@ class ViewNotes extends HTMLElement {
         const dragTarget = sheet; 
 
         dragTarget.addEventListener('touchstart', (e) => {
-            // Prevent drag if scrolling content inside likers list
-            if(e.target.closest('.vn-likers-section') || e.target.closest('.vn-footer')) return;
+            // Prevent drag if scrolling content inside likers list - FIX for physics
+            if(e.target.closest('.vn-likers-section') && e.target.closest('.vn-likers-section').scrollTop > 0) return;
+            if(e.target.closest('.vn-footer')) return;
             
             this.state.isDragging = true;
             this.state.startY = e.touches[0].clientY;
             this.state.sheetHeight = sheet.offsetHeight;
+            this.state.startTime = new Date().getTime();
             sheet.style.transition = 'none';
         }, {passive: true});
 
@@ -359,8 +367,11 @@ class ViewNotes extends HTMLElement {
             
             // Only allow dragging DOWN
             if (delta > 0) {
-                // Add resistance
-                const resistance = 1; // 1:1 movement feels best for sheets
+                // FIX: Prevent browser scrolling (Stuck Issue)
+                if(e.cancelable) e.preventDefault();
+                
+                // Add resistance - Smooth physics
+                const resistance = 0.8; 
                 const translateY = delta * resistance;
                 sheet.style.transform = `translateY(${translateY}px)`;
             }
@@ -371,10 +382,15 @@ class ViewNotes extends HTMLElement {
             this.state.isDragging = false;
             
             const delta = this.state.currentY - this.state.startY;
+            const timeDiff = new Date().getTime() - this.state.startTime;
+            
             sheet.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
             // Threshold to close: 20% of sheet height or fast flick
-            if (delta > (this.state.sheetHeight * 0.2)) {
+            const isFlick = delta > 50 && timeDiff < 200;
+            const isDragThreshold = delta > (this.state.sheetHeight * 0.2);
+
+            if (isFlick || isDragThreshold) {
                 this.close();
             } else {
                 sheet.style.transform = `translateY(0)`;
@@ -402,14 +418,9 @@ class ViewNotes extends HTMLElement {
 
         const overlay = this.querySelector('#vn-overlay');
         overlay.classList.add('open');
-        
-        // FIX: Ensure Modal doesn't get struck (Force reflow/wait for paint)
-        requestAnimationFrame(() => {
-            overlay.classList.add('open');
-        });
-
         window.history.pushState({ vnOpen: true }, "", "#view-note");
-        if(navigator.vibrate) navigator.vibrate(15);
+        // FIX: Standardize vibration
+        if(navigator.vibrate) navigator.vibrate(10);
         
         const mainNav = document.querySelector('main-navbar');
         if(mainNav) mainNav.classList.add('hidden');
@@ -481,7 +492,7 @@ class ViewNotes extends HTMLElement {
         const displayName = note.username || this.currentUserProfile?.name || user?.displayName || 'You';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         
-        // CF Badge Check
+        // CF Badge Check - FIX
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
@@ -568,7 +579,7 @@ class ViewNotes extends HTMLElement {
         const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
         
-        // CF Badge Check
+        // CF Badge Check - FIX
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
@@ -686,7 +697,7 @@ class ViewNotes extends HTMLElement {
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    // FIX: Double Vibration
+                    // FIX: Double Vibration Cleaned up
                     if(navigator.vibrate) navigator.vibrate([10, 30]);
 
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
@@ -747,8 +758,8 @@ class ViewNotes extends HTMLElement {
         const likeBtn = this.querySelector('#like-toggle-btn');
         if(likeBtn) {
             likeBtn.onclick = async () => {
-                // FIX: Double Vibration on Like
-                if(navigator.vibrate) navigator.vibrate([10, 30]);
+                // FIX: Single Vibration on click interaction
+                if(navigator.vibrate) navigator.vibrate(10);
                 
                 // 1. Optimistic UI Toggle
                 const isCurrentlyLiked = likeBtn.innerHTML.includes('#ff3b30');
@@ -888,7 +899,9 @@ class ViewNotes extends HTMLElement {
             // NEW METADATA FOR VISUAL REPLICATION
             bgTexture: this.currentNote.bgTexture || false,
             isGlass: this.currentNote.isGlass || false,
-            effect: this.currentNote.effect || 'none'
+            effect: this.currentNote.effect || 'none',
+            // FIX: Ensure Audience is passed
+            audience: this.currentNote.audience || 'public'
         };
 
         try {
@@ -1013,27 +1026,24 @@ const NotesManager = {
             
             /* Close Friends Indicator in List - Fixed for visibility */
             .note-bubble.cf-note {
-                border: 2px solid #00D26A !important; /* Green Solid Border for better visibility */
-                box-shadow: 0 0 8px rgba(0, 210, 106, 0.4);
+                border: 2px solid #00ba7c !important; /* Green Solid Border for better visibility */
+                box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
             }
-            
-            /* Sleek Green Star Badge */
-            .cf-badge {
+            /* Add tiny green star badge to outer bubble for CF */
+            .note-bubble.cf-note::before {
+                content: '★';
                 position: absolute;
-                top: -6px;
-                right: -6px;
-                width: 18px;
-                height: 18px;
-                background: #00D26A;
+                top: -8px; right: -8px;
+                width: 18px; height: 18px;
+                background: #00ba7c;
                 border-radius: 50%;
-                border: 2px solid #121212;
-                display: flex;
-                align-items: center;
-                justify-content: center;
                 color: #000;
-                font-size: 10px;
+                font-size: 11px;
+                display: flex; align-items: center; justify-content: center;
                 z-index: 20;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                border: 2px solid #121212;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                pointer-events: none;
             }
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
@@ -1148,14 +1158,8 @@ const NotesManager = {
                     preview.style.background = data.bgColor || '#262626'; 
                     preview.style.color = data.textColor || '#fff';
                     
-                    const isCF = data.audience === 'close_friends';
-                    const cfClass = isCF ? 'cf-note' : '';
-                    if(isCF) preview.classList.add('cf-note');
-                    else preview.classList.remove('cf-note');
-
                     // FIX: Single Quotes for font-family in preview
                     preview.innerHTML = `
-                        ${isCF ? '<div class="cf-badge">★</div>' : ''}
                         ${data.text ? `<div class="note-text-content" style='text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}'>${data.text}</div>` : ''}
                         ${data.songName ? `
                             <div class="note-music-tag">
@@ -1174,7 +1178,6 @@ const NotesManager = {
                 } else {
                     preview.style.background = 'rgba(255,255,255,0.1)';
                     preview.style.color = 'rgba(255,255,255,0.7)';
-                    preview.classList.remove('cf-note');
                     preview.innerHTML = `<div class="note-text-content" style="font-size:0.7rem; font-weight:400;">What's on your mind?</div>`;
                     btn.classList.remove('has-note');
                     btn.onclick = () => window.location.href = 'notes.html';
@@ -1251,7 +1254,6 @@ const NotesManager = {
                                 // FIX: Single Quotes for Style in outer bubble to fix Font Issue
                                 div.innerHTML = `
                                     <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
-                                        ${isCF ? '<div class="cf-badge">★</div>' : ''}
                                         <div class="note-text-content" style='text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}'>${noteData.text}</div>
                                         ${noteData.songName ? `
                                             <div class="note-music-tag">
@@ -1263,4 +1265,26 @@ const NotesManager = {
                                     <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
                                     ${isLiked ? `
                                         <div class="note-like-indicator">
-                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76
+                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                        </div>` : ''}
+                                    <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
+                                `;
+                                div.onclick = () => {
+                                    const viewer = document.querySelector('view-notes');
+                                    const nav = document.querySelector('main-navbar');
+                                    if(nav) nav.classList.add('hidden');
+                                    if(navigator.vibrate) navigator.vibrate(10);
+                                    // Pass note data with the Firestore Doc ID
+                                    viewer.open({ ...noteData, id: noteId }, false);
+                                };
+                                container.appendChild(div);
+                            }
+                        });
+                    });
+            });
+
+        } catch (e) { console.error("Error loading notes:", e); }
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => NotesManager.init());
