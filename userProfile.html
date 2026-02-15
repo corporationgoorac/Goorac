@@ -51,7 +51,7 @@
             --safe-bottom: env(safe-area-inset-bottom);
         }
 
-        /* FIX 1: Prevent text selection globally */
+        /* FIX 1: Globally disable text selection */
         * { 
             margin: 0; padding: 0; box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
@@ -129,10 +129,10 @@
         .id-pill:active { background: var(--surface-press); transform: scale(0.97); }
         .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
         
-        /* FIX 1: Allow copy only on ID */
+        /* FIX 2: Allow copy only on the ID value */
         .id-value { 
             font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); 
-            user-select: text; -webkit-user-select: text;
+            user-select: text; -webkit-user-select: text; 
         }
         
         .copy-icon { font-size: 14px; color: var(--secondary); }
@@ -569,27 +569,28 @@
         }
     }
 
-    // FIX 2: Helper to refresh notes visibility/data
+    // FIX 3: Helper to refresh notes visibility/data and visibility
     function refreshNotesComponent() {
-        if(targetUid) {
-            const notesComp = document.getElementById('profile-notes');
-            if(notesComp) {
-                // Resetting UID usually triggers the component to re-fetch/re-render
-                const current = notesComp.uid;
-                notesComp.uid = null;
-                setTimeout(() => {
-                    notesComp.uid = current;
-                }, 50);
-            }
-            // Update UI visibility immediately
-            const notesArea = document.getElementById('notes-area');
-            if(doIBlock) {
-                notesArea.style.opacity = '0.3';
-                notesArea.style.pointerEvents = 'none';
-            } else {
-                notesArea.style.opacity = '1';
-                notesArea.style.pointerEvents = 'auto';
-            }
+        if(!targetUid) return;
+        
+        // Force component refresh
+        const notesComp = document.getElementById('profile-notes');
+        if(notesComp) {
+            const current = notesComp.uid;
+            notesComp.uid = null;
+            setTimeout(() => {
+                notesComp.uid = current;
+            }, 50);
+        }
+
+        // Force visibility update
+        const notesArea = document.getElementById('notes-area');
+        if(doIBlock) {
+            notesArea.style.opacity = '0.3';
+            notesArea.style.pointerEvents = 'none';
+        } else {
+            notesArea.style.opacity = '1';
+            notesArea.style.pointerEvents = 'auto';
         }
     }
 
@@ -695,9 +696,8 @@
                     });
                 });
             }
-            updateFollowButton(!isCurrentlyFollowing, false); 
-            // FIX 2: Reload notes after follow/unfollow
-            refreshNotesComponent();
+            updateFollowButton(!isCurrentlyFollowing, false);
+            refreshNotesComponent(); // Trigger refresh on follow/unfollow
         } catch (e) { 
             console.error("Follow Error:", e);
             showToast("Error updating relationship"); 
@@ -771,15 +771,14 @@
                 }
             });
             
-            // Local state update for blocking
+            // Local state update
             doIBlock = isBlocking;
             
             showToast(isBlocking ? "User Blocked & Chat Deleted" : "User Unblocked");
             if(isBlocking) toggleMenu(false);
             
-            // FIX 2: Reload notes after block/unblock and run checks
             checkRelation(targetUserData);
-            refreshNotesComponent();
+            refreshNotesComponent(); // Trigger refresh on block/unblock
         } catch (e) { 
             console.error("Block Error:", e); 
             showToast("Action failed"); 
