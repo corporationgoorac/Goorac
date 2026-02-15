@@ -256,13 +256,40 @@
         .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* --- EMOJI & ANIMATIONS --- */
+        /* --- UPDATED EMOJI MODAL (HALF SCREEN) --- */
         #emoji-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-            z-index: 200; display: none; align-items: center; justify-content: center;
-            backdrop-filter: blur(5px);
+            position: fixed; 
+            top: auto; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 50vh; /* Half screen */
+            background: #1a1a1a; 
+            border-radius: 24px 24px 0 0;
+            z-index: 200; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: flex-start;
+            padding-top: 20px;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            visibility: hidden; /* Hide completely when not active */
         }
-        #emoji-modal.active { display: flex; }
+
+        #emoji-modal.active { 
+            transform: translateY(0); 
+            visibility: visible;
+        }
+
+        /* Make the picker fill the modal */
+        emoji-picker {
+            width: 100%;
+            height: 100%;
+            --background: transparent;
+            --border-color: transparent;
+        }
 
         .seated-emoji {
             position: absolute; font-size: 40px; z-index: 50;
@@ -443,6 +470,7 @@
         let isMyTurn = false;
         let currentSongId = null;
         let hasPickedEmoji = false;
+        let emojiTimer = null; // Timer for 5s delay
 
         // --- 2. AUTH FLOW ---
         auth.onAuthStateChanged(async (user) => {
@@ -656,7 +684,6 @@
             roomRef.set({ 
                 [updateField]: 'online', 
                 lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                // Cycle Logic defaults if new
             }, { merge: true });
 
             // Initialize turn if undefined (User A starts)
@@ -664,7 +691,8 @@
                if(doc.exists && !doc.data().turn) {
                    roomRef.update({ 
                        turn: (myUid < targetUid) ? myUid : targetUid,
-                       cycleStatus: 'picking' // picking, playing
+                       cycleStatus: 'picking',
+                       audioFinished: { [myUid]: false, [targetUid]: false }
                    });
                } 
             });
@@ -676,14 +704,24 @@
                 if (document.hidden) leaveSession();
             });
 
-            // Emoji Picker Event
+            // --- FIX: EMOJI LISTENER ---
+            // We attach it here to ensure it only binds once per session
             const picker = document.getElementById('cycle-emoji-picker');
-            picker.addEventListener('emoji-click', (e) => {
-                handleEmojiSelection(e.detail.emoji);
+            // Remove old listeners to prevent duplicates if function re-runs
+            const newPicker = picker.cloneNode(true);
+            picker.parentNode.replaceChild(newPicker, picker);
+            
+            newPicker.addEventListener('emoji-click', (e) => {
+                // e.detail is standard for emoji-picker-element
+                if (e.detail && e.detail.unicode) {
+                    handleEmojiSelection(e.detail.unicode);
+                } else if (e.detail && e.detail.emoji) {
+                    handleEmojiSelection(e.detail.emoji); // Fallback
+                }
             });
 
             // Audio Events
-            audio.addEventListener('ended', handleAudioEnded);
+            audio.onended = handleAudioEnded; // Assign direct to avoid duplicates
 
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
@@ -716,11 +754,27 @@
                 resetEmojiState();
             }
 
+            // --- FIX: TURN LOGIC (Check if both finished) ---
+            if (status === 'playing') {
+                const finished = data.audioFinished || {};
+                const amIFinished = finished[myUid];
+                const isThemFinished = finished[targetUid];
+
+                // If I am the DJ and BOTH have finished, I swap the turn
+                if (isMyTurn && amIFinished && isThemFinished) {
+                    swapTurn();
+                }
+            }
+
             // Controls Display
             const controls = document.getElementById('controls-container');
             const emojiModal = document.getElementById('emoji-modal');
 
             if (status === 'picking') {
+                // Hide emoji modal immediately if we go back to picking
+                emojiModal.classList.remove('active');
+                clearTimeout(emojiTimer);
+
                 if (isMyTurn) {
                     // It is my turn to pick
                     controls.innerHTML = '';
@@ -736,13 +790,8 @@
                     controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is choosing...</p>`;
                     document.getElementById('active-song-artist').innerText = "Waiting for track...";
                 }
-                emojiModal.classList.remove('active'); // Hide emoji picker during selection
             } 
             else if (status === 'playing') {
-                // Show Emoji Picker immediately when song starts
-                if (!hasPickedEmoji) {
-                    emojiModal.classList.add('active');
-                }
                 controls.innerHTML = ''; // Clean controls
             }
 
@@ -754,8 +803,14 @@
         }
 
         function playSong(song) {
+            // Stop any previous timers
+            clearTimeout(emojiTimer);
+            document.getElementById('emoji-modal').classList.remove('active');
+            hasPickedEmoji = false;
+
             audio.src = song.previewUrl;
-            audio.loop = false; // Normal play first
+            audio.loop = false; // --- FIX: Do not loop, so onended fires
+            audio.currentTime = 0;
             audio.play().catch(e => console.log("Autoplay blocked"));
             
             // Reset completion status
@@ -769,6 +824,13 @@
             
             const hue = (song.artistName.length * 50) % 360;
             document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
+
+            // --- FIX: 5 SECOND DELAY FOR EMOJI PICKER ---
+            emojiTimer = setTimeout(() => {
+                if (!hasPickedEmoji) {
+                    document.getElementById('emoji-modal').classList.add('active');
+                }
+            }, 5000); 
         }
 
         function handleEmojiSelection(emoji) {
@@ -805,13 +867,7 @@
         }
 
         function showSeatedEmoji(who, emoji) {
-            // "who" is 'me' or 'them'. We visualize this on the overlay or corner
-            // For now, let's just create a small badge on the album art or top corner
-            // Simpler: Show it floating permanently near the top nav
-            // (Implementation choice: simple toast for now to ensure robustness)
-            // OR reuse the session-avatars logic if we were in waiting room, but we are in active.
-            
-            // Let's float it near the track info
+            // "who" is 'me' or 'them'.
             const id = `seated-${who}`;
             let el = document.getElementById(id);
             if(!el) {
@@ -838,36 +894,30 @@
 
         function handleAudioEnded() {
             // Song ended logic
+            console.log("Audio Ended");
+            
             // 1. Mark my audio as finished in DB
             roomRef.set({
                 audioFinished: { [myUid]: true }
             }, { merge: true });
 
-            // 2. Loop locally UNTIL the turn flips
-            audio.currentTime = 0;
-            audio.loop = true;
-            audio.play();
+            // 2. STOP audio. 
+            audio.pause();
+            document.getElementById('active-album-art').classList.remove('playing');
 
-            // 3. Check if both finished (This logic usually runs on both clients)
-            // But to be safe, we use a transaction or simple check inside the snapshot listener 
-            // OR we do a check here if we have the latest data
-            roomRef.get().then(doc => {
-                const d = doc.data();
-                const finished = d.audioFinished || {};
-                // If both users have marked finished (or just me if testing alone)
-                if (finished[myUid] && finished[targetUid]) {
-                    // BOTH ENDED -> SWAP TURN
-                    if (isMyTurn) {
-                        // I was DJ, now I hand over
-                        const nextDj = targetUid;
-                        roomRef.update({
-                            turn: nextDj,
-                            cycleStatus: 'picking',
-                            audioFinished: { [myUid]: false, [targetUid]: false }, // Reset
-                            emojis: {} // Clear emojis
-                        });
-                    }
-                }
+            // The 'syncCycle' function will detect when both are finished and trigger swapTurn()
+        }
+
+        function swapTurn() {
+            // Logic to calculate next turn
+            const nextDj = targetUid; 
+            
+            roomRef.update({
+                turn: nextDj,
+                cycleStatus: 'picking',
+                currentSong: firebase.firestore.FieldValue.delete(), // Clear song
+                audioFinished: { [myUid]: false, [targetUid]: false }, 
+                emojis: {} 
             });
         }
 
