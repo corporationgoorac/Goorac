@@ -65,7 +65,7 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             opacity: 0; pointer-events: none;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.3s ease;
             z-index: 10;
         }
         .screen.active { opacity: 1; pointer-events: auto; }
@@ -88,6 +88,7 @@
             position: relative; z-index: 2;
             transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+            background: #222; /* Skeleton color */
         }
         .s-bubble img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #111; }
         
@@ -119,12 +120,21 @@
             box-shadow: 0 30px 80px rgba(0,0,0,0.6);
             transform: scale(0.95); transition: 0.5s; overflow: hidden;
             position: relative;
+            display: flex; align-items: center; justify-content: center;
         }
         .album-box.playing { transform: scale(1.05); box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
         .album-box.buffering { animation: pulseDim 1s infinite alternate; }
         @keyframes pulseDim { from { opacity: 1; transform: scale(0.95); } to { opacity: 0.7; transform: scale(0.92); } }
 
-        .album-box img { width: 100%; height: 100%; object-fit: cover; }
+        .album-box img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .album-box img.loaded { display: block; }
+        
+        /* Default Text Art */
+        #default-art {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px; color: #333; letter-spacing: 4px;
+            font-weight: 900;
+        }
 
         .track-info { text-align: center; margin-bottom: 20px; padding: 0 30px; }
         .track-name { font-size: 24px; font-weight: 800; margin-bottom: 8px; text-shadow: 0 5px 20px rgba(0,0,0,0.5); }
@@ -188,7 +198,7 @@
 <body>
 
     <script>
-        // Instant load cached PFP
+        // Instant load cached PFP (Skeleton pre-fill)
         try {
             const profile = localStorage.getItem('my_goorac_profile');
             if(profile) {
@@ -201,11 +211,6 @@
 
     <div id="session-view">
         
-        <div class="screen active" id="screen-loading">
-            <div class="pulse-wave" style="width:60px; height:60px; background:var(--accent); border-radius:50%; margin-bottom:20px;"></div>
-            <p style="font-size:12px; letter-spacing:2px; font-weight:700; opacity:0.6;">ESTABLISHING LINK...</p>
-        </div>
-
         <div class="screen" id="screen-error">
             <div class="err-box">
                 <span class="material-icons-round error-icon">lock</span>
@@ -215,7 +220,7 @@
             </div>
         </div>
 
-        <div class="screen" id="screen-waiting">
+        <div class="screen active" id="screen-waiting">
             <div class="top-nav">
                 <div class="back-btn" onclick="leaveSession()">
                     <span class="material-icons-round">close</span>
@@ -229,14 +234,13 @@
                     <div id="my-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
                 </div>
                 <div class="s-bubble them" id="target-bubble">
-                    <img id="target-avatar" src="">
-                    <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
+                    <img id="target-avatar" src=""> <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
                     <div id="their-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
                 </div>
             </div>
 
-            <h1 id="status-text" style="font-size:20px; font-weight:800; text-align:center;">Waiting for signal...</h1>
-            <p style="font-size:13px; color:#666; margin-top:8px;">They must join this page.</p>
+            <h1 id="status-text" style="font-size:20px; font-weight:800; text-align:center;">Connecting...</h1>
+            <p style="font-size:13px; color:#666; margin-top:8px;">Waiting for signal...</p>
         </div>
 
         <div class="screen" id="screen-active">
@@ -253,6 +257,7 @@
 
             <div class="player-ui">
                 <div class="album-box" id="album-container">
+                    <div id="default-art">PULSE</div>
                     <img id="active-album-art" src="">
                 </div>
 
@@ -289,7 +294,24 @@
         const auth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
         
+        // --- 1. INSTANT TARGET CACHE LOAD ---
         const targetUsername = params.get('user');
+        
+        // Try to load target info instantly from localStorage if we visited them before
+        if (targetUsername) {
+            try {
+                // We don't have username-to-uid mapping in localstorage easily unless we cached it.
+                // But we can check if we have a profile cached by username or if we previously saved it.
+                // For now, we will wait for the Auth check to get UID, but if we have a key "pulse_last_target_data", use it.
+                const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
+                if (cachedTarget) {
+                    const data = JSON.parse(cachedTarget);
+                    document.getElementById('target-avatar').src = data.photoURL || 'https://via.placeholder.com/150';
+                    document.getElementById('status-text').innerText = `Waiting for ${data.name.split(' ')[0]}...`;
+                }
+            } catch(e) {}
+        }
+
         let targetUid = null;
 
         // State
@@ -327,6 +349,13 @@
                         const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
                         if (!snap.empty) {
                             targetUid = snap.docs[0].id;
+                            targetProfile = snap.docs[0].data();
+                            
+                            // CACHE TARGET DATA FOR NEXT TIME (INSTANT LOAD)
+                            localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
+                            renderTargetProfile(targetProfile);
+
+                            // Proceed to verify and connect
                             const allowed = await verifyMutuals(myUid, targetUid);
                             if (allowed) initPulseSession();
                             else showError("You are not mutual friends.");
@@ -337,7 +366,6 @@
                         showError("Connection failed.");
                     }
                 } else {
-                    // No user param? Go back to lobby.
                     window.location.href = 'pulseLobby.html';
                 }
             } else {
@@ -346,23 +374,12 @@
         });
 
         async function verifyMutuals(me, them) {
-            const cachedTarget = JSON.parse(localStorage.getItem(`pulse_profile_${them}`));
-            if(cachedTarget) {
-                targetProfile = cachedTarget;
-                renderTargetProfile(targetProfile);
-            }
-
+            // We already loaded targetProfile above to speed things up
+            // Just double check friendship logic
             try {
                 const myDoc = await db.collection('users').doc(me).get();
-                const theirDoc = await db.collection('users').doc(them).get();
-                
-                if (!myDoc.exists || !theirDoc.exists) return false;
-
+                if (!myDoc.exists) return false;
                 myProfile = myDoc.data(); 
-                targetProfile = theirDoc.data();
-                
-                localStorage.setItem(`pulse_profile_${them}`, JSON.stringify(targetProfile));
-                renderTargetProfile(targetProfile);
 
                 const myF = (myProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
                 const theirF = (targetProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
@@ -380,8 +397,8 @@
             const roomId = [myUid, targetUid].sort().join('_');
             roomRef = db.collection('pulse_rooms').doc(roomId);
 
-            showScreen('screen-waiting');
-
+            // We are already on screen-waiting by default, no need to toggle
+            
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
@@ -417,7 +434,7 @@
             });
 
             audio.onended = () => {
-                 document.getElementById('active-album-art').classList.remove('playing');
+                 // Song ended logic if needed
             };
 
             roomUnsub = roomRef.onSnapshot(snapshot => {
@@ -460,7 +477,7 @@
                     currentSongId = null;
                     audio.pause();
                     audio.src = "";
-                    document.getElementById('active-album-art').classList.remove('playing');
+                    resetSongDisplay(); // RESET ART TO TEXT
                     resetEmojiState();
                 }
 
@@ -481,7 +498,7 @@
                     
                     document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
                 } else {
-                    controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile.name.split(' ')[0]} is choosing...</p>`;
+                    controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile ? targetProfile.name.split(' ')[0] : 'Partner'} is choosing...</p>`;
                     document.getElementById('active-song-artist').innerText = "Waiting for track...";
                 }
             }
@@ -489,11 +506,8 @@
             // 2. STATE: BUFFERING
             else if (status === 'buffering' && data.currentSong) {
                 const song = data.currentSong;
+                updateSongDisplay(song); // SHOW ART
                 
-                const highRes = song.artworkUrl100.replace('100x100', '600x600');
-                document.getElementById('active-album-art').src = highRes;
-                document.getElementById('active-song-title').innerText = song.trackName;
-                document.getElementById('active-song-artist').innerText = song.artistName;
                 document.getElementById('active-album-art').classList.add('buffering'); 
                 document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:#666;">SYNCING...</p>`;
                 
@@ -526,6 +540,7 @@
                 if (currentSongId !== data.currentSong.id) {
                     currentSongId = data.currentSong.id;
                     audio.src = data.currentSong.previewUrl;
+                    updateSongDisplay(data.currentSong);
                 }
 
                 document.getElementById('active-album-art').classList.remove('buffering');
@@ -573,6 +588,28 @@
             }
         }
 
+        // --- UI HELPERS ---
+        function updateSongDisplay(song) {
+            const highRes = song.artworkUrl100.replace('100x100', '600x600');
+            const img = document.getElementById('active-album-art');
+            const def = document.getElementById('default-art');
+            
+            img.src = highRes;
+            img.onload = () => { img.classList.add('loaded'); def.style.display = 'none'; };
+            
+            document.getElementById('active-song-title').innerText = song.trackName;
+            document.getElementById('active-song-artist').innerText = song.artistName;
+        }
+
+        function resetSongDisplay() {
+            const img = document.getElementById('active-album-art');
+            const def = document.getElementById('default-art');
+            img.classList.remove('loaded', 'playing', 'buffering');
+            img.src = "";
+            def.style.display = 'block';
+            document.getElementById('active-song-title').innerText = "Pulse Active";
+        }
+
         function resumeAudio() {
             audio.play();
             document.getElementById('sync-overlay').classList.remove('active');
@@ -580,7 +617,6 @@
 
         function swapTurn() {
             const nextDj = targetUid; 
-            
             roomRef.update({
                 turn: nextDj,
                 cycleStatus: 'picking',
@@ -659,7 +695,13 @@
                 roomRef.update({ [updateField]: 'offline' });
             }
             audio.pause(); audio.src = ""; 
-            window.location.href = "pulseLobby.html"; 
+            
+            // Smart Back Navigation
+            if(history.length > 1) {
+                history.back();
+            } else {
+                window.location.href = "pulseLobby.html"; 
+            }
         }
 
         function showScreen(id) {
