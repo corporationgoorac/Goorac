@@ -44,11 +44,11 @@ class ViewNotes extends HTMLElement {
 
         if (diffInSeconds < 60) return 'Just now';
         const diffInMinutes = Math.floor(diffInSeconds / 60);
-        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+        if (diffInMinutes < 60) return `${diffInMinutes}m`;
         const diffInHours = Math.floor(diffInMinutes / 60);
-        if (diffInHours < 24) return `${diffInHours}h ago`;
+        if (diffInHours < 24) return `${diffInHours}h`;
         const diffInDays = Math.floor(diffInHours / 24);
-        return `${diffInDays}d ago`;
+        return `${diffInDays}d`;
     }
 
     getIcons() {
@@ -56,9 +56,9 @@ class ViewNotes extends HTMLElement {
             heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
             send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<svg width="14" height="14" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:2px;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
-            // FIX: Sleek Green Star for Close Friends (Visible in Modal)
-            star: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#00ba7c" style="filter: drop-shadow(0 0 2px rgba(0,255,100,0.5)); margin-left:4px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`
+            verified: `<svg width="16" height="16" viewBox="0 0 24 24" fill="#0095f6" style="margin-left:4px; vertical-align:text-bottom;"><path d="M22.5 12.5l-2.5 2.5 0.5 3.5-3.5 0.5-2.5 2.5-3-1.5-3 1.5-2.5-2.5-3.5-0.5 0.5-3.5-2.5-2.5 2.5-2.5-0.5-3.5 3.5-0.5 2.5-2.5 3 1.5 3-1.5 2.5 2.5 3.5 0.5-0.5 3.5z"></path><path d="M10 16l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" fill="white"></path></svg>`,
+            // Green Circle with Star for Close Friends (Inside Modal)
+            closeFriendsBadge: `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:18px; height:18px; margin-left:6px; box-shadow:0 0 5px rgba(0,186,124,0.4);"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`
         };
     }
 
@@ -70,7 +70,7 @@ class ViewNotes extends HTMLElement {
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.7); display: none; z-index: 2000;
                 justify-content: center; align-items: flex-end;
-                backdrop-filter: blur(4px); 
+                backdrop-filter: blur(8px); 
                 opacity: 0; transition: opacity 0.3s ease;
                 touch-action: none; 
             }
@@ -83,14 +83,13 @@ class ViewNotes extends HTMLElement {
                 transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 position: absolute; bottom: 0; left: 0; right: 0; margin: 0 auto;
-                height: 90dvh; /* Taller height for better visibility */
+                height: 90dvh; 
                 max-height: 850px;
                 border-top: 1px solid rgba(255,255,255,0.1);
                 display: flex; flex-direction: column;
                 overflow: hidden;
                 box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
                 will-change: transform;
-                /* FIX: Important for smooth dragging */
                 touch-action: pan-y;
             }
             .vn-overlay.open .vn-sheet { transform: translateY(0); }
@@ -122,7 +121,7 @@ class ViewNotes extends HTMLElement {
                 position: absolute; top: 0; left: 0; width: 100%;
                 height: 60px;
                 display: flex; justify-content: center; align-items: center;
-                z-index: 50; /* Ensure header is on top */
+                z-index: 50;
             }
             
             .vn-drag-handle { 
@@ -151,15 +150,15 @@ class ViewNotes extends HTMLElement {
             .vn-bubble-wrapper { 
                 position: relative; 
                 width: auto; max-width: 85%;
-                margin-bottom: 15px;
+                margin-bottom: 20px;
                 overflow: visible; 
             }
 
             .vn-bubble {
-                min-width: 220px; min-height: 220px; /* Big Note Size */
+                min-width: 220px; min-height: 220px;
                 border-radius: 42px;
                 display: flex; align-items: center; justify-content: center;
-                text-align: center; padding: 25px;
+                text-align: center; padding: 30px;
                 position: relative; z-index: 2;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
                 transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -170,23 +169,23 @@ class ViewNotes extends HTMLElement {
             /* Glass Mode Logic */
             .vn-bubble.glass {
                 background: rgba(255, 255, 255, 0.15) !important;
-                backdrop-filter: blur(15px) !important;
-                -webkit-backdrop-filter: blur(15px) !important;
+                backdrop-filter: blur(20px) !important;
+                -webkit-backdrop-filter: blur(20px) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
             }
 
             .vn-note-text { 
-                font-size: 1.6rem; font-weight: 600; line-height: 1.3; z-index: 2;
+                font-size: 1.7rem; font-weight: 600; line-height: 1.35; z-index: 2;
                 word-break: break-word; width: 100%; white-space: pre-wrap;
             }
             
             /* PFP STICKER - BOTTOM RIGHT LIKE NOTES.HTML */
             .vn-pfp-sticker {
                 position: absolute; 
-                bottom: -15px; 
-                right: -15px;
-                width: 55px; height: 55px; 
+                bottom: -18px; 
+                right: -10px;
+                width: 60px; height: 60px; 
                 border-radius: 50%;
                 border: 3px solid #000;
                 background: #333; object-fit: cover; z-index: 10;
@@ -196,11 +195,29 @@ class ViewNotes extends HTMLElement {
             /* INFO BELOW NOTE */
             .vn-info-bar {
                 display: flex; flex-direction: column; align-items: center; gap: 4px;
-                margin-top: 10px; z-index: 10;
+                margin-top: 15px; z-index: 10;
                 text-shadow: 0 2px 4px rgba(0,0,0,0.8);
             }
-            .vn-username { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 4px; color: #fff; }
-            .vn-timestamp { font-size: 0.8rem; opacity: 0.7; color: #eee; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+            .vn-display-name { 
+                font-weight: 700; font-size: 1.15rem; 
+                display: flex; align-items: center; justify-content: center;
+                color: #fff; letter-spacing: 0.3px;
+            }
+            .vn-timestamp { 
+                font-size: 0.8rem; opacity: 0.7; color: #eee; 
+                font-weight: 500; text-transform: uppercase; letter-spacing: 1px; 
+                display: flex; align-items: center; gap: 6px;
+            }
+            
+            /* Close Friends Tag styled as a text badge */
+            .vn-cf-tag {
+                background: rgba(0, 186, 124, 0.2);
+                color: #00ba7c;
+                border: 1px solid rgba(0, 186, 124, 0.4);
+                padding: 2px 8px; border-radius: 12px;
+                font-size: 0.7rem; font-weight: 700;
+                text-transform: none;
+            }
 
             /* TEXT EFFECTS */
             .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
@@ -217,40 +234,54 @@ class ViewNotes extends HTMLElement {
                 100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
 
+            /* NEW MUSIC PILL WITH SCROLLING TEXT */
             .vn-music-pill { 
-                position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
-                display: inline-flex; align-items: center; gap: 8px; 
-                background: rgba(0,0,0,0.8); padding: 6px 14px; 
-                border-radius: 100px; font-size: 0.7rem; font-weight: 600;
+                position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+                display: inline-flex; align-items: center; gap: 10px; 
+                background: rgba(15, 15, 15, 0.9); padding: 6px 16px; 
+                border-radius: 100px; font-size: 0.75rem; font-weight: 600;
                 border: 1px solid rgba(255,255,255,0.2);
-                backdrop-filter: blur(10px); color: #fff; z-index: 12;
-                white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                
-                /* FIX: Layout overflow for Song Name */
-                max-width: 85%;
-                overflow: hidden; /* Ensure text marquee hides within */
+                backdrop-filter: blur(15px); color: #fff; z-index: 12;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+                max-width: 200px;
+                overflow: hidden;
             }
             
-            /* Running Text Logic */
-            .vn-music-pill span {
-                display: inline-block;
-                white-space: nowrap;
+            .vn-eq {
+                display: flex; align-items: flex-end; gap: 2px; height: 12px;
+                flex-shrink: 0;
             }
+            .vn-eq span { width: 2px; background: #00d2ff; border-radius: 2px; }
+            .vn-eq span:nth-child(1) { height: 60%; animation: eq-1 0.8s infinite ease-in-out; }
+            .vn-eq span:nth-child(2) { height: 100%; animation: eq-2 0.6s infinite ease-in-out; } 
+            .vn-eq span:nth-child(3) { height: 50%; animation: eq-3 1s infinite ease-in-out; } 
             
-            .vn-music-pill span.scrolling {
-                animation: vn-scroll-text 10s linear infinite;
-                padding-left: 10px; /* Init spacing */
-            }
-            
-            @keyframes vn-scroll-text {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-50%); } /* Assumes duplicate text approach or enough space */
-            }
+            @keyframes eq-1 { 0%,100%{height:40%} 50%{height:90%} }
+            @keyframes eq-2 { 0%,100%{height:100%} 50%{height:50%} }
+            @keyframes eq-3 { 0%,100%{height:30%} 50%{height:70%} }
 
-            .vn-eq span { display: inline-block; width: 2px; height: 10px; background: #00d2ff; animation: vn-eq 1s infinite; margin-right: 1px; }
-            .vn-eq span:nth-child(2) { animation-delay: 0.2s; } 
-            .vn-eq span:nth-child(3) { animation-delay: 0.4s; } 
-            @keyframes vn-eq { 0%, 100% { height: 40%; } 50% { height: 100%; } }
+            .vn-song-marquee {
+                white-space: nowrap;
+                overflow: hidden;
+                mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+                flex: 1;
+            }
+            
+            .vn-song-content {
+                display: inline-block;
+                padding-left: 0;
+                animation: marquee 8s linear infinite;
+            }
+            
+            /* If text is short, don't scroll */
+            .vn-song-content.short { animation: none; text-align: center; width: 100%; }
+
+            @keyframes marquee {
+                0% { transform: translateX(0); }
+                20% { transform: translateX(0); } /* Pause at start */
+                100% { transform: translateX(-100%); }
+            }
 
             /* --- FOOTER ACTIONS --- */
             .vn-footer {
@@ -298,7 +329,7 @@ class ViewNotes extends HTMLElement {
                 margin-top: auto; 
                 border-top: 1px solid rgba(255,255,255,0.1); 
                 padding: 20px 20px calc(40px + env(safe-area-inset-bottom));
-                background: #141414; /* Solid color to fix blur issue */
+                background: #141414; 
                 z-index: 100; position: relative;
                 max-height: 40vh; overflow-y: auto; 
             }
@@ -431,7 +462,7 @@ class ViewNotes extends HTMLElement {
         const overlay = this.querySelector('#vn-overlay');
         overlay.classList.add('open');
         window.history.pushState({ vnOpen: true }, "", "#view-note");
-        // FIX: Standardize vibration
+        
         if(navigator.vibrate) navigator.vibrate(10);
         
         const mainNav = document.querySelector('main-navbar');
@@ -501,10 +532,13 @@ class ViewNotes extends HTMLElement {
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || user?.photoURL || 'https://via.placeholder.com/85';
-        const displayName = note.username || this.currentUserProfile?.name || user?.displayName || 'You';
+        
+        // PRIORITY: Display Name -> Username -> 'You'
+        const displayName = note.displayName || this.currentUserProfile?.name || note.username || user?.displayName || 'You';
+        
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true; 
         
-        // CF Badge Check - FIX
+        // CF Badge Logic
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
@@ -521,15 +555,12 @@ class ViewNotes extends HTMLElement {
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
 
-        // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
+        // UI text color safety
         const uiColor = note.textColor || '#ffffff';
-
-        // Prepare running text if song name is long
-        const songLabel = note.songName || '';
-        const isLongText = songLabel.length > 20;
-        const songHtml = isLongText 
-            ? `<span class="scrolling">${songLabel} &nbsp;&nbsp; • &nbsp;&nbsp; ${songLabel}</span>` 
-            : `<span>${songLabel}</span>`;
+        
+        // Song Text Logic (Marquee)
+        const songText = note.songName ? `${note.songName}` : '';
+        const isLongText = songText.length > 20;
 
         return `
             <div class="vn-content">
@@ -537,7 +568,11 @@ class ViewNotes extends HTMLElement {
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
-                            ${songHtml}
+                            <div class="vn-song-marquee">
+                                <div class="vn-song-content ${isLongText ? '' : 'short'}">
+                                    ${songText} ${isLongText ? `&nbsp;&nbsp;•&nbsp;&nbsp; ${songText}` : ''}
+                                </div>
+                            </div>
                         </div>
                     ` : ''}
 
@@ -549,12 +584,14 @@ class ViewNotes extends HTMLElement {
                 </div>
 
                 <div class="vn-info-bar">
-                     <div class="vn-username" style="color: ${uiColor};">
+                     <div class="vn-display-name" style="color: ${uiColor};">
                         ${displayName} (You)
                         ${isVerified ? icons.verified : ''}
-                        ${isCF ? icons.star : ''}
                     </div>
-                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">${timeAgo}</div>
+                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">
+                        ${timeAgo} 
+                        ${isCF ? icons.closeFriendsBadge : ''}
+                    </div>
                 </div>
             </div>
 
@@ -594,11 +631,12 @@ class ViewNotes extends HTMLElement {
         const icons = this.getIcons();
         
         const displayPfp = note.pfp || this.currentUserProfile?.photoURL || 'https://via.placeholder.com/85';
-        const displayName = note.username || this.currentUserProfile?.name || 'User';
-        const displayHandle = note.handle ? `@${note.handle}` : (this.currentUserProfile?.username ? `@${this.currentUserProfile.username}` : '');
+        
+        // PRIORITY: Display Name -> Username -> 'User'
+        const displayName = note.displayName || this.currentUserProfile?.name || note.username || 'User';
         const isVerified = note.verified === true || this.currentUserProfile?.verified === true;
         
-        // CF Badge Check - FIX
+        // CF Badge Check
         const isCF = note.audience === 'close_friends';
 
         const textAlign = note.textAlign || 'center';
@@ -614,15 +652,11 @@ class ViewNotes extends HTMLElement {
         const effectClass = (note.effect && note.effect !== 'none') ? `fx-${note.effect}` : '';
         const glassClass = note.isGlass ? 'glass' : '';
 
-        // FIX: Ensure UI text is visible against background by using same color as note text or a safe contrast
         const uiColor = note.textColor || '#ffffff';
 
-        // Prepare running text if song name is long
-        const fullSongInfo = `${note.songName || ''} • ${note.songArtist || ''}`;
-        const isLongText = fullSongInfo.length > 25;
-        const songHtml = isLongText 
-            ? `<span class="scrolling">${fullSongInfo} &nbsp;&nbsp; • &nbsp;&nbsp; ${fullSongInfo}</span>` 
-            : `<span>${fullSongInfo}</span>`;
+        // Song Text Logic (Marquee)
+        const songText = note.songName ? `${note.songName} • ${note.songArtist || 'Unknown'}` : '';
+        const isLongText = songText.length > 20;
 
         return `
             <div class="vn-content">
@@ -630,7 +664,11 @@ class ViewNotes extends HTMLElement {
                     ${note.songName ? `
                         <div class="vn-music-pill">
                             <div class="vn-eq"><span></span><span></span><span></span></div>
-                            ${songHtml}
+                            <div class="vn-song-marquee">
+                                <div class="vn-song-content ${isLongText ? '' : 'short'}">
+                                    ${songText} ${isLongText ? `&nbsp;&nbsp;•&nbsp;&nbsp; ${songText}` : ''}
+                                </div>
+                            </div>
                         </div>
                     ` : ''}
 
@@ -643,12 +681,14 @@ class ViewNotes extends HTMLElement {
                 </div>
 
                 <div class="vn-info-bar">
-                     <div class="vn-username" style="color: ${uiColor};">
+                     <div class="vn-display-name" style="color: ${uiColor};">
                         ${displayName}
                         ${isVerified ? icons.verified : ''}
-                        ${isCF ? icons.star : ''}
                     </div>
-                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">${timeAgo}</div>
+                    <div class="vn-timestamp" style="color: ${uiColor}; opacity: 0.8;">
+                        ${timeAgo}
+                        ${isCF ? icons.closeFriendsBadge : ''}
+                    </div>
                 </div>
             </div>
 
@@ -723,7 +763,7 @@ class ViewNotes extends HTMLElement {
                     popHeart.classList.add('animate');
                     setTimeout(() => popHeart.classList.remove('animate'), 1000);
                     
-                    // FIX: Double Vibration Cleaned up
+                    // Double Pulse Vibration
                     if(navigator.vibrate) navigator.vibrate([10, 30]);
 
                     if(likeBtn && likeBtn.innerHTML.includes('fill="none"')) {
@@ -768,14 +808,14 @@ class ViewNotes extends HTMLElement {
                 if(navigator.vibrate) navigator.vibrate(10);
                 if(confirm("Delete permanently? This cannot be undone.")) {
                     try {
-                         if (this.currentNote && this.currentNote.id) {
+                          if (this.currentNote && this.currentNote.id) {
                             await this.db.collection("notes").doc(this.currentNote.id).delete();
                             this.close();
                             // Force refresh
                             window.location.reload(); 
-                         } else {
+                          } else {
                             console.error("Cannot delete: No Note ID found");
-                         }
+                          }
                     } catch(e) { console.error("Error deleting note:", e); }
                 }
             };
@@ -918,6 +958,7 @@ class ViewNotes extends HTMLElement {
             textAlign: this.currentNote.textAlign || 'center',
             songName: this.currentNote.songName || null,
             username: this.currentNote.username || "User",
+            displayName: this.currentNote.displayName || this.currentNote.username || "User",
             pfp: this.currentNote.pfp || null,
             verified: this.currentNote.verified || false,
             uid: this.currentNote.uid,
@@ -926,7 +967,6 @@ class ViewNotes extends HTMLElement {
             bgTexture: this.currentNote.bgTexture || false,
             isGlass: this.currentNote.isGlass || false,
             effect: this.currentNote.effect || 'none',
-            // FIX: Ensure Audience is passed
             audience: this.currentNote.audience || 'public'
         };
 
@@ -1050,29 +1090,11 @@ const NotesManager = {
                 background-position: center;
             }
             
-            /* Close Friends Indicator in List - Fixed for visibility */
+            /* Close Friends Border Logic - BUT NO BADGE HERE */
             .note-bubble.cf-note {
-                border: 2px solid #00ba7c !important; /* Green Solid Border for better visibility */
+                border: 2px solid #00ba7c !important; /* Green Solid Border */
                 box-shadow: 0 0 8px rgba(0, 186, 124, 0.4);
             }
-            /* REMOVED OUTER BADGE AS REQUESTED */
-            /*
-            .note-bubble.cf-note::before {
-                content: '★';
-                position: absolute;
-                top: -8px; right: -8px;
-                width: 18px; height: 18px;
-                background: #00ba7c;
-                border-radius: 50%;
-                color: #000;
-                font-size: 11px;
-                display: flex; align-items: center; justify-content: center;
-                z-index: 20;
-                border: 2px solid #121212;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                pointer-events: none;
-            }
-            */
             
             .note-bubble.visible, #my-note-preview.visible { display: flex !important; }
             
@@ -1276,7 +1298,7 @@ const NotesManager = {
                                 
                                 const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
                                 
-                                // NEW: Add .cf-note class if it's a Close Friends note
+                                // NEW: Add .cf-note class for border coloring only
                                 const cfClass = isCF ? 'cf-note' : '';
 
                                 // FIX: Single Quotes for Style in outer bubble to fix Font Issue
@@ -1301,8 +1323,10 @@ const NotesManager = {
                                     const viewer = document.querySelector('view-notes');
                                     const nav = document.querySelector('main-navbar');
                                     if(nav) nav.classList.add('hidden');
-                                    // DOUBLE VIBRATION HERE
-                                    if(navigator.vibrate) navigator.vibrate([10, 30]);
+                                    
+                                    // Double Pulse on selection
+                                    if(navigator.vibrate) navigator.vibrate([10, 40]);
+                                    
                                     // Pass note data with the Firestore Doc ID
                                     viewer.open({ ...noteData, id: noteId }, false);
                                 };
