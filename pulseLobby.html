@@ -9,9 +9,12 @@
 
     <script>
         window.onerror = function(msg, url, line, col, error) {
+            // Ignore benign resize observer errors
+            if (msg.includes("ResizeObserver")) return;
+            
             const box = document.createElement('div');
             box.style.cssText = "position:fixed; top:10px; left:10px; right:10px; z-index:99999; background:#330000; color:#ffcccc; padding:15px; border:1px solid #ff0000; border-radius:8px; font-family:monospace; font-size:12px; box-shadow:0 10px 40px #000;";
-            box.innerHTML = `<strong>System Error:</strong><br>${msg}<br><br><em>${url}:${line}</em>`;
+            box.innerHTML = `<strong>System Error:</strong><br>${msg}<br><br><em>Line: ${line}</em>`;
             document.body.appendChild(box);
             console.error("Global Error Caught:", error);
             return false;
@@ -25,11 +28,6 @@
 
     <script src="config.js"></script>
     <script>
-        // Safety check to ensure Firestore loaded before components run
-        if (typeof firebase !== 'undefined' && !firebase.firestore) {
-            console.error("Firebase loaded but Firestore SDK is missing.");
-            throw new Error("firebase.firestore is not a function (SDK Missing)");
-        }
         // Initialize Core here if config.js defined the function
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
@@ -387,8 +385,9 @@
             firebase.initializeApp(window.firebaseConfig);
         }
 
-        const db = firebase.firestore();
-        const auth = firebase.auth();
+        // FIXED: Renamed variables to avoid conflict with presence.js globals
+        const lobbyDb = firebase.firestore();
+        const lobbyAuth = firebase.auth();
 
         let myUid = null;
         let mutualList = [];
@@ -398,12 +397,12 @@
         let activePresenceListener = null;
         let inviteListener = null;
 
-        auth.onAuthStateChanged(async (user) => {
+        lobbyAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
                 
                 // 1. UPDATE PROFILE CACHE
-                db.collection('users').doc(user.uid).get().then(doc => {
+                lobbyDb.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
@@ -444,7 +443,7 @@
 
         // --- PRESENCE SYSTEM ---
         function setMyPresence(isOnline) {
-            const presenceRef = db.collection('pulse_active').doc(myUid);
+            const presenceRef = lobbyDb.collection('pulse_active').doc(myUid);
             if(isOnline) {
                 presenceRef.set({
                     uid: myUid,
@@ -466,7 +465,7 @@
 
             try {
                 // Fetch Graphs
-                const doc = await db.collection('users').doc(myUid).get();
+                const doc = await lobbyDb.collection('users').doc(myUid).get();
                 const data = doc.data();
                 const following = (data.following || []).map(u => typeof u === 'string' ? u : u.uid);
                 const followers = (data.followers || []).map(u => typeof u === 'string' ? u : u.uid);
@@ -484,7 +483,7 @@
                 await loadMoreMutuals(); // Load first batch
 
                 // LISTEN FOR ACTIVE USERS (Realtime Presence)
-                activePresenceListener = db.collection('pulse_active')
+                activePresenceListener = lobbyDb.collection('pulse_active')
                     .where('lastSeen', '>', new Date(Date.now() - 1000 * 60 * 5)) 
                     .onSnapshot(snapshot => {
                         const activeUids = new Set();
@@ -519,7 +518,7 @@
             // We then filter locally to see if WE are involved.
             // This detects if someone has created a room [Me, Them] and is waiting.
             
-            inviteListener = db.collection('pulse_rooms')
+            inviteListener = lobbyDb.collection('pulse_rooms')
                 .orderBy('lastActive', 'desc')
                 .limit(10)
                 .onSnapshot(snapshot => {
@@ -550,7 +549,7 @@
                                     showInviteModal(otherUser);
                                 } else {
                                     // Fallback fetch
-                                    db.collection('users').doc(otherUid).get().then(uDoc => {
+                                    lobbyDb.collection('users').doc(otherUid).get().then(uDoc => {
                                         if(uDoc.exists) showInviteModal(uDoc.data());
                                     });
                                 }
@@ -647,7 +646,7 @@
                     }
 
                     for (const chunk of chunks) {
-                        const snap = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+                        const snap = await lobbyDb.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
                         snap.forEach(doc => {
                             const d = doc.data();
                             d.uid = doc.id;
