@@ -1,7 +1,7 @@
 /**
  * =======================================================
- * GOORAC QUANTUM - VIEW NOTES ENGINE v3.0
- * Handles: Viewer Modal, Swipe Logic, Audio, Feed & Privacy
+ * GOORAC QUANTUM - VIEW NOTES ENGINE v4.0 (Final)
+ * Handles: Viewer Modal, Swipe Physics, Audio, Feed & Privacy
  * =======================================================
  */
 
@@ -67,10 +67,16 @@ class ViewNotes extends HTMLElement {
     // Determine if text should be Black or White based on BG brightness
     getContrastColor(hexColor) {
         if(!hexColor || hexColor.includes('gradient') || hexColor.includes('url')) return 'light';
+        
+        // Remove hash
         const hex = hexColor.replace('#', '');
+        
+        // Parse RGB
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
+        
+        // YIQ equation
         const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
         return (yiq >= 128) ? 'dark' : 'light';
     }
@@ -611,6 +617,7 @@ class ViewNotes extends HTMLElement {
 
         const textAlign = note.textAlign || 'center';
         const alignItems = textAlign === 'left' ? 'flex-start' : 'center';
+        const fontStyle = note.font || 'system-ui';
         
         const bgColor = note.bgColor || '#262626';
         const txtColor = note.textColor || '#fff';
@@ -636,7 +643,7 @@ class ViewNotes extends HTMLElement {
                 <div class="vn-bubble-container">
                     <div class="vn-bubble ${glassClass}" id="vn-active-card" style="background:${bgColor}; color:${txtColor}; align-items:${alignItems};">
                         <div class="vn-pop-heart" id="vn-pop-heart">${icons.heartFilled}</div>
-                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${note.font}; text-shadow:${textShadow};">${note.text}</div>
+                        <div class="vn-note-text ${effectClass}" style="text-align:${textAlign}; font-family:${fontStyle}; text-shadow:${textShadow};">${note.text}</div>
                     </div>
                     
                     ${note.songName ? `
@@ -960,8 +967,3 @@ const NotesManager = {
                                 // --- STRICT CLOSE FRIENDS LOGIC FIXED ---
                                 if (noteData.audience === 'close_friends') {
                                     // Fetch Author's Profile using noteData.uid (NOT uid which is Note ID)
-                                    db.collection('users').doc(noteData.uid).get().then(doc => {
-                                        if (doc.exists) {
-                                            const authorCF = doc.data().closeFriends || [];
-                                            // Check if I am in their list
-                                            if (authorCF.includes(user.uid
