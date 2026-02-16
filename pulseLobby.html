@@ -250,7 +250,7 @@
         @keyframes pulse-out { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 
         .invite-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
-        .invite-name { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        .invite-name { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .invite-sub { font-size: 14px; color: #666; margin-bottom: 30px; }
 
         .invite-actions { display: flex; gap: 15px; justify-content: center; }
@@ -361,11 +361,14 @@
             <div class="invite-ring">
                 <img id="inviter-img" src="">
             </div>
-            <div class="invite-name" id="inviter-name">User</div>
+            <div class="invite-name">
+                <span id="inviter-name">User</span>
+                <span id="inviter-badge" class="material-icons-round" style="color:#0095f6; font-size:20px; display:none;">verified</span>
+            </div>
             <div class="invite-sub">Is waiting for you in session...</div>
             
             <div class="invite-actions">
-                <button class="btn-decline" onclick="closeInviteModal()">
+                <button class="btn-decline" onclick="closeInviteModalWithBack()">
                     <span class="material-icons-round">close</span>
                 </button>
                 <button class="btn-accept" id="btn-accept-pulse">
@@ -386,7 +389,7 @@
                 2. Take turns being the DJ.<br>
                 3. Vibe together in real-time.
             </p>
-            <button class="sheet-btn" onclick="closeOnboarding()">Got it, let's vibe</button>
+            <button class="sheet-btn" onclick="closeOnboardingWithBack()">Got it, let's vibe</button>
         </div>
     </div>
 
@@ -446,10 +449,24 @@
             }
         });
 
+        // --- BACK BUTTON HANDLING (NEW) ---
+        window.addEventListener('popstate', (e) => {
+            // Check if Invite Modal is open
+            if(document.getElementById('invite-modal').classList.contains('active')) {
+                closeInviteModal();
+            }
+            // Check if Onboarding is open
+            if(document.getElementById('onboarding-sheet').classList.contains('active')) {
+                closeOnboarding();
+            }
+        });
+
         // --- ONBOARDING LOGIC ---
         function checkOnboarding() {
             const hasSeen = localStorage.getItem('pulse_onboarding_seen');
             if(!hasSeen) {
+                // Push state so back button works
+                history.pushState({modal: 'onboarding'}, null, window.location.href);
                 document.getElementById('onboarding-sheet').classList.add('active');
             }
         }
@@ -457,6 +474,14 @@
         function closeOnboarding() {
             document.getElementById('onboarding-sheet').classList.remove('active');
             localStorage.setItem('pulse_onboarding_seen', 'true');
+        }
+
+        function closeOnboardingWithBack() {
+            closeOnboarding();
+            // Go back in history to remove the pushState we added
+            if (history.state && history.state.modal === 'onboarding') {
+                history.back();
+            }
         }
 
         // --- PRESENCE SYSTEM ---
@@ -581,11 +606,22 @@
             // Prevent spamming active modal
             if (document.getElementById('invite-modal').classList.contains('active')) return;
             
+            // Push state so back button works
+            history.pushState({modal: 'invite'}, null, window.location.href);
+
             // Vibrate
             if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
             document.getElementById('inviter-img').src = user.photoURL || 'https://via.placeholder.com/150';
             document.getElementById('inviter-name').innerText = user.name || 'Friend';
+            
+            // SHOW BADGE IF VERIFIED
+            const badgeEl = document.getElementById('inviter-badge');
+            if (user.verified) {
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
             
             const btn = document.getElementById('btn-accept-pulse');
             btn.onclick = () => {
@@ -597,6 +633,14 @@
 
         function closeInviteModal() {
             document.getElementById('invite-modal').classList.remove('active');
+        }
+
+        function closeInviteModalWithBack() {
+            closeInviteModal();
+            // Go back in history to remove the pushState we added
+            if (history.state && history.state.modal === 'invite') {
+                history.back();
+            }
         }
 
 
