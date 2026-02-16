@@ -816,6 +816,8 @@
         let audio = new Audio();
         // FORCE ANONYMOUS FOR VISUALIZER - CRITICAL
         audio.crossOrigin = "anonymous";
+        // FASTER BUFFERING FIX
+        audio.preload = "auto";
         
         // Visualizer Vars
         let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
@@ -831,12 +833,15 @@
         let emojiTimer = null; 
         let emojiCloseTimer = null; 
         let turnTimer = null; 
+        let lastSyncTime = 0; // Debounce for sync logic
 
         // Radio State
         let isRadioMode = false;
         let isRadioHost = false;
 
         // Vibe Match State
+        let lastReactionMe = null;
+        let lastReactionThem = null;
         let lastReactionTimeMe = 0;
         let lastReactionTimeThem = 0;
 
@@ -1020,9 +1025,9 @@
         function cleanSessionStart() {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
             roomRef.set({ 
-                turn: startingTurn,             
+                turn: startingTurn,               
                 cycleStatus: 'picking',
-                currentSong: null,              
+                currentSong: null,                
                 emojis: {},
                 ready: {},
                 radioMode: false,
@@ -1092,12 +1097,13 @@
                 if (currentSongId !== song.id) {
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
-                    audio.load();
+                    audio.load(); // Faster buffering triggers
                     
                     // CRITICAL: Reset emoji state so the picker pops up again
                     resetEmojiState();
 
                     // Ready Logic
+                    // FIX: Changed readiness check to be more aggressive for instant play
                     audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
                     if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
                 }
@@ -1107,7 +1113,8 @@
                 if (isMyTurn || isRadioHost) {
                     const readyMap = data.ready || {};
                     const elapsed = Date.now() - (data.timestamp || Date.now());
-                    const timeout = isRadioMode ? 4000 : 8000;
+                    // FIX: Reduced timeout for "Instant Buffer" feel
+                    const timeout = isRadioMode ? 1000 : 2000;
                     if ((readyMap[myUid] && readyMap[targetUid]) || elapsed > timeout) {
                         roomRef.update({ cycleStatus: 'playing' });
                     }
@@ -1119,9 +1126,12 @@
                 if (currentSongId !== data.currentSong.id) {
                     currentSongId = data.currentSong.id;
                     audio.src = data.currentSong.previewUrl;
+                    audio.load();
                     updateSongDisplay(data.currentSong);
                     // FIXED: Double check reset if missed during buffering
                     resetEmojiState();
+                    // GLITCH FIX: Add grace period when new song starts so sync doesn't jump
+                    lastSyncTime = Date.now() + 5000;
                 }
 
                 document.getElementById('album-container').classList.remove('buffering');
@@ -1152,14 +1162,27 @@
                         turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
                     }
                 } else {
-                    // ENHANCED SYNC: Drift Correction
-                    const serverStart = data.timestamp;
-                    const now = Date.now();
-                    const idealTime = (now - serverStart) / 1000;
-                    // If drift is > 1.5s, seek
-                    if (Math.abs(audio.currentTime - idealTime) > 1.5) {
-                        // console.log("Resyncing audio drift");
-                        audio.currentTime = idealTime;
+                    // =========================================================
+                    // BUG FIX: GLITCH PREVENTION LOGIC
+                    // =========================================================
+                    // Only run sync logic if enough time has passed since last check
+                    // This prevents emoji rapid-fire updates from causing "random point" seeking
+                    const SYNC_THROTTLE = 2000; // 2 seconds
+                    if (Date.now() - lastSyncTime > SYNC_THROTTLE) {
+                        lastSyncTime = Date.now();
+
+                        // ENHANCED SYNC: Drift Correction
+                        const serverStart = data.timestamp;
+                        const now = Date.now();
+                        const idealTime = (now - serverStart) / 1000;
+                        
+                        // FIX: Increased threshold to 4.0s to prevent
+                        // slight UI lags (particle rendering) from triggering unnecessary seeks.
+                        // Also checks if serverStart exists to prevent seeking to Infinity/NaN.
+                        if (serverStart && Math.abs(audio.currentTime - idealTime) > 4.0) {
+                            console.log("Syncing audio drift...");
+                            audio.currentTime = idealTime;
+                        }
                     }
                 }
 
@@ -1518,7 +1541,12 @@
         function handleEmojiSelection(emoji) {
             hasPickedEmoji = true;
             closeEmojiModal();
-            // Send to DB
+            
+            // GLITCH FIX: Add grace period to prevent immediate self-sync glitches
+            // when the snapshot fires back with my own emoji selection.
+            lastSyncTime = Date.now() + 5000;
+
+            // Send to DB - using merge:true to be safe
             roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
         }
 
