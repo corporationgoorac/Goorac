@@ -58,12 +58,11 @@ class SongPicker extends HTMLElement {
 
             :host(.active) .picker-container { transform: translateY(0); }
 
-            /* --- 2. HEADER SECTION (Glassmorphism) --- */
+            /* --- 2. HEADER SECTION (FIXED: TRUE BLACK) --- */
             .header-area { 
                 padding: calc(20px + var(--safe-area-top)) 20px 16px 20px;
-                background: var(--surface-glass);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
+                /* CHANGED FROM GLASS TO SOLID BLACK AS REQUESTED */
+                background: var(--bg-color); 
                 z-index: 40; 
                 border-bottom: 1px solid var(--border-color); 
                 position: relative; 
@@ -90,6 +89,8 @@ class SongPicker extends HTMLElement {
                 width: 100%; font-size: 16px; margin-left: 10px; font-weight: 400;
                 letter-spacing: 0.3px;
             }
+            /* Removes the 'X' cancel button in some browsers to keep style consistent */
+            .search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
             .search-input::placeholder { color: #8e8e93; }
 
             /* Tabs */
@@ -204,7 +205,18 @@ class SongPicker extends HTMLElement {
                     <span class="text-gray">
                         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                     </span>
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search artists, songs, lyrics..." autocomplete="off">
+                    <input 
+                        type="search" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="Search artists, songs, lyrics..." 
+                        autocomplete="off" 
+                        autocorrect="off" 
+                        autocapitalize="off" 
+                        spellcheck="false"
+                        inputmode="search"
+                        name="query_ignore_autofill"
+                    >
                 </div>
 
                 <div class="tabs">
@@ -280,14 +292,14 @@ class SongPicker extends HTMLElement {
                 localStorage.setItem('picker_history', JSON.stringify(history.slice(0, 50)));
             },
 
-            // --- UPGRADED ML PROFILE STORAGE (V5) ---
-            getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v5')) || { 
+            // --- UPGRADED ML PROFILE STORAGE (V6) ---
+            getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v6')) || { 
                 artists: {}, 
                 genres: {},
                 timeContext: {}, // Tracks what genre is played at what hour (0-23)
                 explicitPref: false // Tracks if user clicks explicit songs
             },
-            setUserProfile: (data) => localStorage.setItem('picker_user_profile_v5', JSON.stringify(data)),
+            setUserProfile: (data) => localStorage.setItem('picker_user_profile_v6', JSON.stringify(data)),
 
             // --- ADVANCED WEIGHTING SYSTEM ---
             trackInteraction: (song, weight) => {
@@ -313,7 +325,7 @@ class SongPicker extends HTMLElement {
                 this.DB.setUserProfile(profile);
             },
 
-            // --- INTELLIGENT SUGGESTION ENGINE ---
+            // --- INTELLIGENT SUGGESTION ENGINE V2 (More Dynamic) ---
             getRecommendationQuery: () => {
                 const profile = this.DB.getUserProfile();
                 const history = this.DB.getHistory();
@@ -331,25 +343,31 @@ class SongPicker extends HTMLElement {
                 let query = "";
                 let reason = "Top Hits";
 
-                // ML Strategy:
+                // ML Strategy V2:
                 // 1. Time Relevance (30%)
                 if (dice < 0.3 && timeSpecificGenres.length > 0) {
                     query = timeSpecificGenres[0] + " hits";
                     reason = getTimeGreeting() + " • " + timeSpecificGenres[0];
                 } 
-                // 2. Artist Affinity (30%)
+                // 2. Artist Affinity (30%) - ADDED RANDOMIZATION FOR FRESHNESS
                 else if (dice < 0.6 && topArtists.length > 0) {
-                    const artist = topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 3))];
+                    // Pick from top 5 instead of top 3 to keep it fresh
+                    const artist = topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 5))];
                     query = "Best of " + artist;
                     reason = "Because you like " + artist;
                 } 
-                // 3. Genre Affinity (20%)
-                else if (dice < 0.8 && topGenres.length > 0) {
+                // 3. Discovery Mode (10%) - NEW: Suggest trending genre if user has history
+                else if (dice < 0.7 && history.length > 0) {
+                   query = "Trending " + new Date().getFullYear();
+                   reason = "Discover New Music";
+                }
+                // 4. Genre Affinity (20%)
+                else if (dice < 0.9 && topGenres.length > 0) {
                     const genre = topGenres[0];
                     query = "Best " + genre + " songs";
                     reason = "Your favorite: " + genre;
                 } 
-                // 4. History (20%)
+                // 5. History (10%)
                 else if (history.length > 0) {
                     query = history[0].artistName;
                     reason = "Jump back in";
@@ -535,7 +553,7 @@ class SongPicker extends HTMLElement {
                     this.DB.setCache(cacheKey, results);
                 }
                 
-                // Render only the first batch (20)
+                // Render only the first batch (20) - INSTANTLY
                 this.renderInitialList(results, subHeadingTitle);
 
             } else {
@@ -546,7 +564,7 @@ class SongPicker extends HTMLElement {
         }
     }
 
-    // --- NEW: LAZY LOADING LOGIC ---
+    // --- NEW: LAZY LOADING LOGIC (FIXED DELAY) ---
     renderInitialList(songs, title) {
         this.list.innerHTML = ''; // Clear skeleton/previous
         
@@ -563,8 +581,8 @@ class SongPicker extends HTMLElement {
         this.renderedCount = 0;
         this.isLoadingMore = false;
         
-        // Initial render of first batch
-        this.appendBatch();
+        // FIX: CALL SYNCHRONOUSLY FOR FIRST BATCH TO REMOVE DELAY
+        this.appendBatch(); 
     }
 
     loadMoreItems() {
