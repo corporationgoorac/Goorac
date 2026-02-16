@@ -688,9 +688,9 @@
                 this.emoji = emoji;
                 this.w = w; this.h = h;
                 
-                // Start near bottom center but with some horizontal spread
+                // FIXED: Start visible near bottom (minus padding) instead of potentially off-screen
                 this.x = w / 2 + (Math.random() - 0.5) * (w * 0.3);
-                this.y = h + Math.random() * 100;
+                this.y = h - Math.random() * 50; 
                 
                 // Physics for smooth rising
                 this.vy = -(Math.random() * 3 + 2); // Constant slow upward float
@@ -720,16 +720,17 @@
             }
 
             draw(ctx) {
+                if(!ctx) return;
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.globalAlpha = Math.max(0, this.alpha);
-                // UPDATED: Font stack includes Noto Color Emoji for compatibility
-                ctx.font = `${this.size}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", Arial`;
+                // FIXED: Font stack strictness for consistency
+                ctx.font = `${this.size}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", Arial, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 // Subtle glow for professional feel
-                ctx.shadowColor = "rgba(255,255,255,0.3)";
-                ctx.shadowBlur = 10;
+                ctx.shadowColor = "rgba(0,0,0,0.5)"; // Darker shadow for visibility on light/dark
+                ctx.shadowBlur = 4;
                 ctx.fillText(this.emoji, 0, 0);
                 ctx.restore();
             }
@@ -1009,12 +1010,12 @@
 
                 // RADIO MODE: Auto pick if Host, else waiting
                 if (isRadioMode) {
-                     document.getElementById('active-song-artist').innerText = "Loading next radio track...";
-                     controls.innerHTML = `<p style="font-size:12px; color:var(--radio-color); letter-spacing:1px; font-weight:700;">RADIO LIVE</p>`;
-                     if (isRadioHost) {
-                         // Host logic triggers next song in radio loop
-                         // Handled in handleRadioUpdates or via end event
-                     }
+                      document.getElementById('active-song-artist').innerText = "Loading next radio track...";
+                      controls.innerHTML = `<p style="font-size:12px; color:var(--radio-color); letter-spacing:1px; font-weight:700;">RADIO LIVE</p>`;
+                      if (isRadioHost) {
+                          // Host logic triggers next song in radio loop
+                          // Handled in handleRadioUpdates or via end event
+                      }
                 } else {
                     // STANDARD MODE
                     if (isMyTurn) {
@@ -1040,10 +1041,15 @@
                 document.getElementById('album-container').classList.add('buffering'); 
                 document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:var(--accent);">SYNCING...</p>`;
                 
+                // FIXED: Explicitly reset emoji state when a new song loads in buffering phase
                 if (currentSongId !== song.id) {
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
                     audio.load();
+                    
+                    // CRITICAL: Reset emoji state so the picker pops up again
+                    resetEmojiState();
+
                     // Ready Logic
                     audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
                     if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
@@ -1067,6 +1073,8 @@
                     currentSongId = data.currentSong.id;
                     audio.src = data.currentSong.previewUrl;
                     updateSongDisplay(data.currentSong);
+                    // FIXED: Double check reset if missed during buffering
+                    resetEmojiState();
                 }
 
                 document.getElementById('album-container').classList.remove('buffering');
@@ -1074,9 +1082,9 @@
                 
                 // Controls
                 if (isRadioMode) {
-                     document.getElementById('controls-container').innerHTML = `<p style="font-size:10px; color:var(--radio-color); letter-spacing:2px; font-weight:800;">AUTO-LOOP ACTIVE</p>`;
+                      document.getElementById('controls-container').innerHTML = `<p style="font-size:10px; color:var(--radio-color); letter-spacing:2px; font-weight:800;">AUTO-LOOP ACTIVE</p>`;
                 } else {
-                     document.getElementById('controls-container').innerHTML = '';
+                      document.getElementById('controls-container').innerHTML = '';
                 }
 
                 // Dynamic Background
@@ -1109,6 +1117,7 @@
                 }
 
                 clearTimeout(emojiTimer);
+                // FIXED: This logic now works for Radio too because we reset hasPickedEmoji
                 if (!hasPickedEmoji) {
                     emojiTimer = setTimeout(openEmojiModal, 5000); 
                 }
@@ -1298,11 +1307,14 @@
 
             const song = queue[nextIndex];
             
+            // FIXED: Added emojis: {} to reset reactions for the new song
+            // This ensures the picker logic detects "new song, no pick yet"
             roomRef.update({
                 currentSong: song,
                 cycleStatus: 'buffering',
                 timestamp: Date.now(),
                 ready: {},
+                emojis: {}, 
                 radioIndex: nextIndex + 1
             });
         }
@@ -1476,11 +1488,14 @@
             }
 
             // 1. Show Waiting Screen Seated Emoji (Legacy support)
-            const id = `seated-${who}`;
+            // FIXED: Added safety check for DOM existence
             const targetId = (who === 'me') ? 'my-seated-emoji' : 'their-seated-emoji';
             const el = document.getElementById(targetId);
             if(el) {
                 el.innerText = emoji;
+                // Force Reflow trick to restart animation
+                el.classList.remove('show');
+                void el.offsetWidth; 
                 el.classList.add('show');
             }
 
