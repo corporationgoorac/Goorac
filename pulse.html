@@ -834,6 +834,7 @@
         let emojiCloseTimer = null; 
         let turnTimer = null; 
         let lastSyncTime = 0; // Debounce for sync logic
+        let ignoreAudioSync = false; // Lock flag for emoji interactions
 
         // Radio State
         let isRadioMode = false;
@@ -1025,9 +1026,9 @@
         function cleanSessionStart() {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
             roomRef.set({ 
-                turn: startingTurn,               
+                turn: startingTurn,                
                 cycleStatus: 'picking',
-                currentSong: null,                
+                currentSong: null,                 
                 emojis: {},
                 ready: {},
                 radioMode: false,
@@ -1165,10 +1166,12 @@
                     // =========================================================
                     // BUG FIX: GLITCH PREVENTION LOGIC
                     // =========================================================
-                    // Only run sync logic if enough time has passed since last check
-                    // This prevents emoji rapid-fire updates from causing "random point" seeking
+                    // We only run sync logic if ignoreAudioSync is FALSE (no recent emoji)
+                    // and enough time has passed.
+                    
                     const SYNC_THROTTLE = 2000; // 2 seconds
-                    if (Date.now() - lastSyncTime > SYNC_THROTTLE) {
+                    
+                    if (!ignoreAudioSync && (Date.now() - lastSyncTime > SYNC_THROTTLE)) {
                         lastSyncTime = Date.now();
 
                         // ENHANCED SYNC: Drift Correction
@@ -1176,9 +1179,7 @@
                         const now = Date.now();
                         const idealTime = (now - serverStart) / 1000;
                         
-                        // FIX: Increased threshold to 4.0s to prevent
-                        // slight UI lags (particle rendering) from triggering unnecessary seeks.
-                        // Also checks if serverStart exists to prevent seeking to Infinity/NaN.
+                        // FIX: Added safety check for serverStart existence
                         if (serverStart && Math.abs(audio.currentTime - idealTime) > 4.0) {
                             console.log("Syncing audio drift...");
                             audio.currentTime = idealTime;
@@ -1539,6 +1540,10 @@
         }
 
         function handleEmojiSelection(emoji) {
+            // FIX: Lock audio sync specifically when emoji is selected
+            ignoreAudioSync = true;
+            setTimeout(() => { ignoreAudioSync = false; }, 2500);
+
             hasPickedEmoji = true;
             closeEmojiModal();
             
@@ -1547,6 +1552,7 @@
             lastSyncTime = Date.now() + 5000;
 
             // Send to DB - using merge:true to be safe
+            // Changed to update to be specific, but set merge is also fine.
             roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
         }
 
