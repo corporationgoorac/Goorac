@@ -10,10 +10,14 @@
     <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <script src="components/songPicker.js"></script>
     <script src="components/emojiPicker.js"></script>
+    <script src="components/presence.js"></script>
+    <script src="components/call-notifier.js"></script>
+    <script src="components/chatLoader.js"></script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700&display=swap" rel="stylesheet">
@@ -30,16 +34,13 @@
             --text-dim: #888;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
+            --verified-color: #0095f6;
         }
 
         * { 
             margin: 0; padding: 0; box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent;
-            /* DISABLE SELECTION & COPY */
-            user-select: none; 
-            -webkit-user-select: none; 
-            -moz-user-select: none; 
-            -ms-user-select: none;
+            user-select: none; -webkit-user-select: none; 
         }
 
         body {
@@ -50,6 +51,7 @@
             transition: background 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
+        /* --- HEADER --- */
         .top-nav {
             position: absolute; top: 0; left: 0; width: 100%;
             padding: calc(15px + var(--safe-top)) 20px 15px;
@@ -65,7 +67,7 @@
         }
         .back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
 
-        /* SESSION UI */
+        /* --- SESSION UI --- */
         #session-view { display: block; height: 100%; }
 
         .screen {
@@ -88,26 +90,35 @@
         /* Waiting Room Layout */
         .session-avatars {
             display: flex; align-items: center; justify-content: center;
-            gap: 25px; width: 100%; height: 300px; position: relative;
+            gap: 30px; width: 100%; position: relative;
+            margin-bottom: 20px;
         }
         
-        .s-bubble {
-            width: 95px; height: 95px; border-radius: 50%;
+        .avatar-group {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
             position: relative; z-index: 2;
+        }
+
+        .s-bubble {
+            width: 85px; height: 85px; border-radius: 50%;
+            position: relative; 
             transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 15px 40px rgba(0,0,0,0.5);
-            background: #222; /* Skeleton color */
+            background: #222; border: 3px solid #111;
         }
-        .s-bubble img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #111; }
+        .s-bubble img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
         
-        .s-bubble.me { transform: translateX(15px) scale(1); }
-        .s-bubble.them { transform: translateX(-15px) scale(0.9); opacity: 0.6; filter: grayscale(100%); }
-        
+        .avatar-group.them { opacity: 0.6; filter: grayscale(100%); transition: 0.3s; }
+        .avatar-group.them.active { opacity: 1; filter: grayscale(0%); }
+
+        .u-name { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .verified-badge { font-size: 14px; color: var(--verified-color); }
+
         .s-line {
-            position: absolute; height: 2px; width: 0%; background: var(--accent);
-            left: 50%; transform: translateX(-50%); transition: width 0.6s ease;
-            box-shadow: 0 0 10px var(--accent);
+            position: absolute; height: 2px; width: 60px; background: #333;
+            top: 42px; left: 50%; transform: translateX(-50%); z-index: 1;
         }
+        .s-line.connected { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 
         .pulse-wave::after {
             content: ''; position: absolute; inset: -10px; border-radius: 50%;
@@ -116,7 +127,7 @@
         }
         @keyframes pulse-out { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 
-        /* Active Player */
+        /* --- PLAYER UI --- */
         .player-ui {
             width: 100%; flex: 1; display: flex; flex-direction: column; 
             align-items: center; justify-content: center; position: relative; z-index: 20;
@@ -124,10 +135,10 @@
 
         .album-box {
             width: 280px; height: 280px; border-radius: 30px;
-            background: #222; margin-bottom: 40px;
+            background: #222; margin-bottom: 30px;
             box-shadow: 0 30px 80px rgba(0,0,0,0.6);
             transform: scale(0.95); transition: 0.5s; overflow: hidden;
-            position: relative;
+            position: relative; z-index: 5;
             display: flex; align-items: center; justify-content: center;
         }
         .album-box.playing { transform: scale(1.05); box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
@@ -137,19 +148,25 @@
         .album-box img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .album-box img.loaded { display: block; }
         
-        /* Default Text Art */
         #default-art {
             font-family: 'Orbitron', sans-serif;
-            font-size: 24px; color: #333; letter-spacing: 4px;
-            font-weight: 900;
+            font-size: 24px; color: #333; letter-spacing: 4px; font-weight: 900;
         }
 
-        .track-info { text-align: center; margin-bottom: 20px; padding: 0 30px; }
+        /* Visualizer Canvas */
+        #visualizer {
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            width: 320px; height: 320px; z-index: 1;
+            pointer-events: none; opacity: 0.6;
+        }
+
+        .track-info { text-align: center; margin-bottom: 20px; padding: 0 30px; position: relative; z-index: 10; }
         .track-name { font-size: 24px; font-weight: 800; margin-bottom: 8px; text-shadow: 0 5px 20px rgba(0,0,0,0.5); }
         .track-artist { font-size: 15px; opacity: 0.8; font-weight: 600; letter-spacing: 0.5px; }
 
         /* Controls */
-        .controls-area { width: 100%; display: flex; justify-content: center; height: 80px; align-items: center; }
+        .controls-area { width: 100%; display: flex; justify-content: center; height: 80px; align-items: center; position: relative; z-index: 10; }
         
         .dj-btn {
             background: #fff; color: #000; border: none;
@@ -181,7 +198,7 @@
         }
         #sync-overlay.active { opacity: 1; pointer-events: auto; }
 
-        /* MODALS */
+        /* --- MODALS --- */
         #emoji-modal {
             position: fixed; top: auto; bottom: 0; left: 0; width: 100%; height: 50vh;
             background: #1a1a1a; border-radius: 24px 24px 0 0; z-index: 200; 
@@ -193,25 +210,48 @@
         #emoji-modal.active { transform: translateY(0); visibility: visible; }
         emoji-picker { width: 100%; height: 100%; --background: transparent; --border-color: transparent; }
 
+        /* --- REACTION ANIMATIONS --- */
         .seated-emoji {
             position: absolute; font-size: 40px; z-index: 50;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: all 0.5s ease;
         }
+        
         .flying-emoji {
-            position: fixed; font-size: 48px; z-index: 300; pointer-events: none;
-            transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            position: fixed; font-size: 60px; z-index: 300; pointer-events: none;
+            animation: bigPopFly 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
+
+        @keyframes bigPopFly {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            40% { transform: translate(-50%, -50%) scale(3); opacity: 1; } /* HUGE POP */
+            60% { transform: translate(-50%, -50%) scale(1); opacity: 1; } /* SETTLE */
+            100% { transform: translate(-50%, -150px) scale(1.5); opacity: 0; } /* FLY AWAY */
+        }
+
+        /* --- TOP BAR DUO UI --- */
+        .duo-header {
+            position: absolute; top: calc(60px + var(--safe-top));
+            left: 0; width: 100%; display: flex; justify-content: center; gap: 40px;
+            z-index: 15;
+        }
+        .duo-user { display: flex; flex-direction: column; align-items: center; opacity: 0.5; transition: 0.3s; }
+        .duo-user.active { opacity: 1; transform: scale(1.1); }
+        .duo-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #222; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .duo-name { font-size: 10px; font-weight: 700; margin-top: 4px; text-shadow: 0 2px 4px #000; }
+
     </style>
 </head>
 <body>
 
+    <call-notifier></call-notifier>
+    <chat-loader></chat-loader>
     <script>
         // BLOCK COPY AND SELECTION
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('selectstart', event => event.preventDefault());
         document.addEventListener('dragstart', event => event.preventDefault());
 
-        // Instant load cached PFP (Skeleton pre-fill)
+        // Instant load cached PFP
         try {
             const profile = localStorage.getItem('my_goorac_profile');
             if(profile) {
@@ -242,13 +282,24 @@
 
             <div class="session-avatars">
                 <div class="s-line" id="connect-line"></div>
-                <div class="s-bubble me">
-                    <img id="my-avatar" src="">
-                    <div id="my-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
+                <div class="avatar-group me">
+                    <div class="s-bubble">
+                        <img id="my-avatar" src="">
+                        <div id="my-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
+                    </div>
+                    <div class="u-name">
+                        You
+                    </div>
                 </div>
-                <div class="s-bubble them" id="target-bubble">
-                    <img id="target-avatar" src=""> <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
-                    <div id="their-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
+                <div class="avatar-group them" id="target-group">
+                    <div class="s-bubble">
+                        <img id="target-avatar" src=""> 
+                        <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
+                        <div id="their-seated-emoji" class="seated-emoji" style="top:-10px; right:-10px; opacity:0;"></div>
+                    </div>
+                    <div class="u-name" id="target-name-display">
+                        Waiting...
+                    </div>
                 </div>
             </div>
 
@@ -263,12 +314,25 @@
             </div>
 
             <div class="top-nav">
-                 <div style="width:40px;"></div> <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4);">
-                    <span class="material-icons-round" style="color:#ff3b30;">power_settings_new</span>
+                 <div style="width:40px;"></div> 
+                 <div class="back-btn" onclick="leaveSession()" style="background:rgba(0,0,0,0.4); color:#ff3b30;">
+                    <span class="material-icons-round">power_settings_new</span>
+                </div>
+            </div>
+
+            <div class="duo-header">
+                <div class="duo-user" id="duo-me">
+                    <img id="duo-me-img" class="duo-img" src="">
+                    <div class="duo-name">YOU</div>
+                </div>
+                <div class="duo-user" id="duo-them">
+                    <img id="duo-them-img" class="duo-img" src="">
+                    <div class="duo-name" id="duo-them-name">THEM</div>
                 </div>
             </div>
 
             <div class="player-ui">
+                <canvas id="visualizer"></canvas>
                 <div class="album-box" id="album-container">
                     <div id="default-art">PULSE</div>
                     <img id="active-album-art" src="">
@@ -280,7 +344,6 @@
                 </div>
 
                 <div class="controls-area" id="controls-container"></div>
-                
             </div>
 
             <div id="sync-overlay" onclick="resumeAudio()">
@@ -307,31 +370,32 @@
         const auth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
         
-        // --- 1. INSTANT TARGET CACHE LOAD ---
         const targetUsername = params.get('user');
         
+        // --- INSTANT CACHE LOAD ---
         if (targetUsername) {
             try {
                 const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
                 if (cachedTarget) {
                     const data = JSON.parse(cachedTarget);
-                    document.getElementById('target-avatar').src = data.photoURL || 'https://via.placeholder.com/150';
-                    document.getElementById('status-text').innerText = `Waiting for ${data.name.split(' ')[0]}...`;
+                    updateTargetUI(data);
                 }
             } catch(e) {}
         }
 
         let targetUid = null;
-
-        // State
         let myUid = null;
         let myProfile = null;
         let targetProfile = null;
         let roomRef = null;
         let roomUnsub = null;
         let audio = new Audio();
+        audio.crossOrigin = "anonymous"; // Enable visualizer data
         
-        // Cycle Logic State
+        // Audio Visualizer
+        let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
+
+        // Cycle State
         let currentTurnUid = null;
         let isMyTurn = false;
         let currentSongId = null;
@@ -347,8 +411,10 @@
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
+                        myProfile = data;
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
                         document.getElementById('my-avatar').src = pfp;
+                        document.getElementById('duo-me-img').src = pfp; // Update active header
                     }
                 });
 
@@ -360,7 +426,7 @@
                             targetProfile = snap.docs[0].data();
                             
                             localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
-                            renderTargetProfile(targetProfile);
+                            updateTargetUI(targetProfile);
 
                             const allowed = await verifyMutuals(myUid, targetUid);
                             if (allowed) initPulseSession();
@@ -372,12 +438,27 @@
                         showError("Connection failed.");
                     }
                 } else {
-                    window.location.href = 'pulseLobby.html';
+                    window.location.replace('pulseLobby.html');
                 }
             } else {
                 window.location.href = 'login.html';
             }
         });
+
+        function updateTargetUI(data) {
+            const pfp = data.photoURL || 'https://via.placeholder.com/150';
+            const name = data.name.split(' ')[0];
+            const badge = data.verified ? `<span class="material-icons-round verified-badge">verified</span>` : '';
+
+            // Waiting Screen
+            document.getElementById('target-avatar').src = pfp;
+            document.getElementById('status-text').innerText = `Waiting for ${name}...`;
+            document.getElementById('target-name-display').innerHTML = `${name} ${badge}`;
+
+            // Active Screen
+            document.getElementById('duo-them-img').src = pfp;
+            document.getElementById('duo-them-name').innerHTML = `${name} ${badge}`;
+        }
 
         async function verifyMutuals(me, them) {
             try {
@@ -392,12 +473,6 @@
             } catch (e) { return false; }
         }
 
-        function renderTargetProfile(profile) {
-            document.getElementById('target-avatar').src = profile.photoURL || 'https://via.placeholder.com/150';
-            document.getElementById('status-text').innerText = `Waiting for ${profile.name.split(' ')[0]}...`;
-        }
-
-        // FIXED INIT PULSE SESSION (RACE CONDITION PROOF)
         function initPulseSession() {
             const roomId = [myUid, targetUid].sort().join('_');
             roomRef = db.collection('pulse_rooms').doc(roomId);
@@ -405,16 +480,14 @@
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
-            // 1. Always mark myself online first (Safe Merge)
-            // This prevents the "overwriting" issue when two people join at once.
+            // Mark online via MERGE to avoid race conditions
             roomRef.set({ 
                 [myField]: 'online',
+                sessionStatus: 'active', // Revive session if marked ended
                 lastActive: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true }).then(() => {
-                // 2. Then check if room needs initialization (Defaults)
                 roomRef.get().then(doc => {
                     const data = doc.data();
-                    // Only clean start if the room is missing core data or really stale
                     if (!doc.exists || !data.cycleStatus) {
                         cleanSessionStart(myField);
                     }
@@ -428,6 +501,14 @@
                 if (document.hidden) leaveSession();
             });
 
+            // BACK BUTTON CLOSES MODAL logic
+            window.addEventListener('popstate', (event) => {
+                const modal = document.getElementById('emoji-modal');
+                if (modal.classList.contains('active')) {
+                    modal.classList.remove('active');
+                } 
+            });
+
             // EMOJI LISTENER
             const picker = document.getElementById('cycle-emoji-picker');
             const newPicker = picker.cloneNode(true);
@@ -439,33 +520,36 @@
                 }
             });
 
-            audio.onended = () => {
-                 // Song ended logic if needed
-            };
-
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
                 
-                // If other person is online, we are good to go
+                // 1. CHECK IF SESSION ENDED
+                if (data.sessionStatus === 'ended') {
+                    audio.pause();
+                    window.location.replace("pulseLobby.html");
+                    return;
+                }
+
+                // 2. CONNECTION STATUS
                 if (data[otherField] === 'online') {
+                    document.getElementById('target-group').classList.add('active');
+                    document.querySelector('.s-line').classList.add('connected');
                     if (!document.getElementById('screen-active').classList.contains('active')) {
                          showScreen('screen-active');
+                         setupVisualizer(); // Init Visualizer
                     }
                     syncCycle(data);
                 } else {
-                    // They are offline, stay in waiting room
+                    document.getElementById('target-group').classList.remove('active');
+                    document.querySelector('.s-line').classList.remove('connected');
                     deactivatePulse();
                 }
             });
         }
 
-        // FIXED CLEAN START (MERGE ONLY)
         function cleanSessionStart(myField) {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
-            
-            // We use merge: true so we NEVER overwrite the other user's status 
-            // if they joined milliseconds after us.
             roomRef.set({ 
                 turn: startingTurn,          
                 cycleStatus: 'picking',
@@ -480,23 +564,24 @@
             isMyTurn = (myUid === currentTurnUid);
             const status = data.cycleStatus;
 
-            // 1. STATE: PICKING
+            // Highlight who is DJ in active header
+            document.getElementById('duo-me').classList.toggle('active', isMyTurn);
+            document.getElementById('duo-them').classList.toggle('active', !isMyTurn);
+
+            // PICKING
             if (status === 'picking') {
                 if (currentSongId !== null) {
                     currentSongId = null;
-                    audio.pause();
-                    audio.src = "";
-                    resetSongDisplay(); // RESET ART TO TEXT
+                    audio.pause(); audio.src = "";
+                    resetSongDisplay();
                     resetEmojiState();
                 }
 
-                document.getElementById('emoji-modal').classList.remove('active');
+                closeEmojiModal();
                 clearTimeout(emojiTimer);
-                clearTimeout(emojiCloseTimer);
                 clearTimeout(turnTimer);
 
                 const controls = document.getElementById('controls-container');
-                
                 if (isMyTurn) {
                     controls.innerHTML = '';
                     const btn = document.createElement('button');
@@ -504,7 +589,6 @@
                     btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Song`;
                     btn.onclick = () => document.getElementById('song-picker').open();
                     controls.appendChild(btn);
-                    
                     document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
                 } else {
                     controls.innerHTML = `<p style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase;">${targetProfile ? targetProfile.name.split(' ')[0] : 'Partner'} is choosing...</p>`;
@@ -512,11 +596,10 @@
                 }
             }
             
-            // 2. STATE: BUFFERING
+            // BUFFERING
             else if (status === 'buffering' && data.currentSong) {
                 const song = data.currentSong;
-                updateSongDisplay(song); // SHOW ART
-                
+                updateSongDisplay(song);
                 document.getElementById('active-album-art').classList.add('buffering'); 
                 document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:#666;">SYNCING...</p>`;
                 
@@ -524,27 +607,19 @@
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
                     audio.load();
-                    
-                    audio.oncanplaythrough = () => {
-                         roomRef.update({ [`ready.${myUid}`]: true });
-                    };
-                    if(audio.readyState >= 3) {
-                         roomRef.update({ [`ready.${myUid}`]: true });
-                    }
+                    audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
+                    if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
                 }
 
                 if (isMyTurn) {
                     const readyMap = data.ready || {};
-                    const meReady = readyMap[myUid];
-                    const themReady = readyMap[targetUid];
-                    
-                    if ((meReady && themReady) || (Date.now() - (data.timestamp || Date.now()) > 8000)) {
+                    if ((readyMap[myUid] && readyMap[targetUid]) || (Date.now() - (data.timestamp || Date.now()) > 8000)) {
                         roomRef.update({ cycleStatus: 'playing' });
                     }
                 }
             }
 
-            // 3. STATE: PLAYING
+            // PLAYING
             else if (status === 'playing' && data.currentSong) {
                 if (currentSongId !== data.currentSong.id) {
                     currentSongId = data.currentSong.id;
@@ -556,56 +631,123 @@
                 document.getElementById('active-album-art').classList.add('playing');
                 document.getElementById('controls-container').innerHTML = '';
 
+                // Background Dynamic
                 const hue = (data.currentSong.artistName.length * 50) % 360;
                 document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 60%, 15%), #000)`;
 
                 if (audio.paused) {
-                    const playPromise = audio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
-                        });
-                    }
+                    audio.play().catch(() => {
+                        if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
+                    });
                     
                     clearTimeout(turnTimer);
-                    turnTimer = setTimeout(() => {
-                        if (isMyTurn) swapTurn();
-                    }, 30000); 
+                    turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
                 }
 
                 clearTimeout(emojiTimer);
                 if (!hasPickedEmoji) {
-                    emojiTimer = setTimeout(() => {
-                        const modal = document.getElementById('emoji-modal');
-                        modal.classList.add('active');
-                        history.pushState({modal: 'emoji'}, "");
-                        
-                        emojiCloseTimer = setTimeout(() => {
-                            if (modal.classList.contains('active')) {
-                                if (history.state && history.state.modal === 'emoji') history.back();
-                                else modal.classList.remove('active');
-                            }
-                        }, 10000); 
-                    }, 5000); 
+                    emojiTimer = setTimeout(openEmojiModal, 5000); 
                 }
             }
 
-            // Emoji Sync
+            // Realtime Reactions
             if (data.emojis) {
                 if(data.emojis[myUid]) showSeatedEmoji('me', data.emojis[myUid]);
                 if(data.emojis[targetUid]) showSeatedEmoji('them', data.emojis[targetUid]);
             }
         }
 
-        // --- UI HELPERS ---
+        // --- AUDIO VISUALIZER ---
+        function setupVisualizer() {
+            if (audioCtx) return; // Already setup
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                const source = audioCtx.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                analyser.fftSize = 64;
+                
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                canvas = document.getElementById('visualizer');
+                canvasCtx = canvas.getContext('2d');
+                canvas.width = 320;
+                canvas.height = 320;
+                
+                drawVisualizer();
+            } catch(e) { console.log("Visualizer failed:", e); }
+        }
+
+        function drawVisualizer() {
+            visualizerAnimation = requestAnimationFrame(drawVisualizer);
+            analyser.getByteFrequencyData(dataArray);
+            
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = 140; // Outside album art
+
+            canvasCtx.beginPath();
+            for (let i = 0; i < dataArray.length; i++) {
+                const barHeight = dataArray[i] / 2;
+                const rads = (Math.PI * 2) / dataArray.length;
+                const x = cx + Math.cos(rads * i) * (radius + barHeight);
+                const y = cy + Math.sin(rads * i) * (radius + barHeight);
+                
+                canvasCtx.strokeStyle = `rgba(255, 59, 48, ${dataArray[i]/255})`;
+                canvasCtx.lineWidth = 4;
+                canvasCtx.lineTo(x, y);
+            }
+            canvasCtx.closePath();
+            canvasCtx.stroke();
+        }
+
+        // --- EMOJI & MODAL LOGIC ---
+        function openEmojiModal() {
+            const modal = document.getElementById('emoji-modal');
+            modal.classList.add('active');
+            
+            history.pushState({modal: 'emoji'}, "");
+
+            clearTimeout(emojiCloseTimer);
+            emojiCloseTimer = setTimeout(() => {
+                closeEmojiModal();
+            }, 20000); 
+        }
+
+        function closeEmojiModal() {
+            const modal = document.getElementById('emoji-modal');
+            if (modal.classList.contains('active')) {
+                modal.classList.remove('active');
+                if (history.state && history.state.modal === 'emoji') {
+                    history.back();
+                }
+            }
+        }
+
+        function handleEmojiSelection(emoji) {
+            hasPickedEmoji = true;
+            closeEmojiModal();
+
+            // Big Animation
+            const flyer = document.createElement('div');
+            flyer.className = 'flying-emoji';
+            flyer.innerText = emoji;
+            flyer.style.top = '50%'; flyer.style.left = '50%';
+            document.body.appendChild(flyer);
+
+            setTimeout(() => flyer.remove(), 1500);
+
+            roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
+        }
+
+        // --- HELPERS ---
         function updateSongDisplay(song) {
             const highRes = song.artworkUrl100.replace('100x100', '600x600');
             const img = document.getElementById('active-album-art');
             const def = document.getElementById('default-art');
-            
             img.src = highRes;
             img.onload = () => { img.classList.add('loaded'); def.style.display = 'none'; };
-            
             document.getElementById('active-song-title').innerText = song.trackName;
             document.getElementById('active-song-artist').innerText = song.artistName;
         }
@@ -620,6 +762,7 @@
         }
 
         function resumeAudio() {
+            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             audio.play();
             document.getElementById('sync-overlay').classList.remove('active');
         }
@@ -635,50 +778,16 @@
             });
         }
 
-        function handleEmojiSelection(emoji) {
-            hasPickedEmoji = true;
-            const modal = document.getElementById('emoji-modal');
-            modal.classList.remove('active');
-            
-            clearTimeout(emojiTimer);
-            clearTimeout(emojiCloseTimer);
-            if (history.state && history.state.modal === 'emoji') history.back();
-
-            const flyer = document.createElement('div');
-            flyer.className = 'flying-emoji';
-            flyer.innerText = emoji;
-            flyer.style.top = '50%'; flyer.style.left = '50%';
-            flyer.style.transform = 'translate(-50%, -50%) scale(0.5)';
-            document.body.appendChild(flyer);
-
-            setTimeout(() => {
-                flyer.style.top = '100px'; flyer.style.left = '20px';
-                flyer.style.transform = 'scale(1)'; flyer.style.opacity = '0';
-            }, 50);
-
-            setTimeout(() => flyer.remove(), 1200);
-
-            roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
-        }
-
         function showSeatedEmoji(who, emoji) {
             const id = `seated-${who}`;
             let el = document.getElementById(id);
-            if(!el) {
-                el = document.createElement('div'); el.id = id;
-                el.style.position = 'absolute'; el.style.fontSize = '24px'; el.style.zIndex = '50';
-                if(who === 'me') { el.style.bottom = '120px'; el.style.left = '40px'; }
-                else { el.style.bottom = '120px'; el.style.right = '40px'; }
-                document.querySelector('.player-ui').appendChild(el);
-            }
-            el.innerText = emoji;
+            if(el) el.innerText = emoji;
         }
 
         function resetEmojiState() {
             hasPickedEmoji = false;
-            const e1 = document.getElementById('seated-me');
-            const e2 = document.getElementById('seated-them');
-            if(e1) e1.remove(); if(e2) e2.remove();
+            showSeatedEmoji('me', '');
+            showSeatedEmoji('them', '');
         }
 
         function deactivatePulse() {
@@ -698,16 +807,19 @@
             if(navigator.vibrate) navigator.vibrate(20);
         });
 
-        // FIXED EXIT LOGIC: FORCE REDIRECT TO LOBBY
+        // --- EXIT LOGIC (FORCED GLOBAL EXIT) ---
         function leaveSession() {
             if(roomRef) {
-                const updateField = (myUid < targetUid) ? 'userA' : 'userB';
-                // Set myself to offline
-                roomRef.update({ [updateField]: 'offline' });
+                // Setting sessionStatus to 'ended' triggers the snapshot listener for BOTH users
+                // to redirect to pulseLobby.html
+                roomRef.update({ 
+                    sessionStatus: 'ended',
+                    [`userA`]: 'offline', 
+                    [`userB`]: 'offline' 
+                });
             }
-            audio.pause(); audio.src = ""; 
-            
-            // Forces redirect back to parent lobby, avoiding random history state issues
+            audio.pause(); 
+            // Explicit replacement to kill history loop
             window.location.replace("pulseLobby.html");
         }
 
