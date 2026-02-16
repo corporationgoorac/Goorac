@@ -5,494 +5,1166 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>My Profile | Goorac</title>
-    
-    <script src="config.js"></script>
+    <title>Pulse Session | Goorac</title>
 
+    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
-
-    <script src="components/chatLoader.js" defer></script>
-    <chat-loader></chat-loader>
-    <script type="module" src="components/presence.js"></script>
-    <script src="components/navbar.js" defer></script>
-    <script src="components/call-notifier.js" defer></script>
-    <script src="components/viewNotes.js" defer></script>
-    <script src="components/profileNotes.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
-    <script src="components/closeFriends.js" defer></script>
-
-    <style>
-        :root {
-            --bg: #000000;
-            --surface: #0a0a0a;
-            --surface-press: #151515;
-            --border: #1f1f1f;
-            --primary: #FFFFFF;
-            --secondary: #888888;
-            --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.15);
-            --danger: #ff4444;
-            --safe-top: env(safe-area-inset-top);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            background-color: var(--bg);
-            color: var(--primary);
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
-            padding-bottom: 80px;
-            user-select: none; -webkit-user-select: none;
-            -webkit-font-smoothing: antialiased;
-            min-height: 100vh;
-            display: flex; flex-direction: column;
-        }
-
-        header {
-            position: sticky; top: 0; z-index: 50;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            padding: calc(10px + var(--safe-top)) 16px 10px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .header-left { display: flex; align-items: center; gap: 12px; }
-        .back-arrow { font-size: 24px; color: var(--primary); cursor: pointer; }
-        .header-title { font-weight: 800; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--secondary); }
-        
-        .icon-btn {
-            background: transparent; border: none; color: var(--primary);
-            width: 38px; height: 38px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.2s;
-        }
-
-        .menu-bars { display: flex; flex-direction: column; gap: 5px; width: 22px; }
-        .menu-bars span { display: block; height: 2px; width: 100%; background: var(--primary); border-radius: 2px; }
-        .menu-bars span:nth-child(2) { width: 60%; align-self: flex-end; }
-
-        /* MODAL STYLES */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            z-index: 1000; display: none; backdrop-filter: blur(10px);
-        }
-        .bottom-modal {
-            position: fixed; bottom: -100%; left: 0; width: 100%;
-            background: var(--surface); border-top: 1px solid var(--border);
-            border-radius: 24px 24px 0 0; z-index: 1001;
-            padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
-            transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            min-height: 55vh; 
-        }
-        .bottom-modal.active { bottom: 0; }
-        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 10px; margin: 0 auto 20px; }
-        
-        /* FULLSCREEN MODAL (BLOCKED LIST) */
-        .fullscreen-modal {
-            position: fixed; inset: 0; background: var(--bg);
-            z-index: 1002; display: none; flex-direction: column;
-            padding-top: var(--safe-top);
-        }
-        .fullscreen-modal.active { display: flex; animation: slideInUp 0.3s ease; }
-        @keyframes slideInUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-        /* TOGGLE SWITCH CSS */
-        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-        .setting-row:active { background: var(--surface-press); }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--accent); }
-        input:checked + .slider:before { transform: translateX(20px); }
-
-        /* BLOCKED LIST ITEMS */
-        .blocked-list { padding: 0 20px; overflow-y: auto; flex: 1; }
-        .blocked-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid var(--border); }
-        .blocked-user-info { display: flex; align-items: center; gap: 12px; }
-        .blocked-pfp { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: #111; }
-        .unblock-btn { 
-            padding: 8px 16px; border-radius: 10px; border: 1px solid var(--danger); 
-            color: var(--danger); font-size: 12px; font-weight: 700; background: transparent; 
-            cursor: pointer; position: relative; min-width: 80px; text-align: center;
-        }
-        .unblock-btn.loading { color: transparent; pointer-events: none; }
-        .unblock-btn.loading::after {
-            content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
-            margin: -7px 0 0 -7px; border: 2px solid var(--danger); border-top-color: transparent;
-            border-radius: 50%; animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .profile-top-section {
-            background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
-            padding: 20px 24px 30px;
-            display: flex; flex-direction: column; align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .avatar-wrapper { width: 90px; height: 90px; margin-bottom: 15px; position: relative; padding: 3px; background: linear-gradient(135deg, var(--border), transparent); border-radius: 50%; }
-        .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--surface); display: block; border: 2px solid var(--bg); }
-
-        .user-name { font-size: 22px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; letter-spacing: -0.5px; min-height: 32px; }
-        .verified { color: var(--accent); font-size: 20px; }
-        .user-handle { color: var(--secondary); font-size: 14px; font-weight: 500; min-height: 20px; }
-
-        .id-pill { margin: 15px 0 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 6px 14px; border-radius: 100px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s; min-height: 32px; }
-        .id-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
-        .id-value { font-family: 'Inter', monospace; font-size: 13px; font-weight: 600; color: var(--primary); }
-
-        .bio { font-size: 13px; line-height: 1.5; color: #a0a0a0; text-align: center; max-width: 90%; margin-bottom: 25px; min-height: 38px; }
-
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 25px; }
-        .stat-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 12px; border-radius: 16px; text-align: center; text-decoration: none; color: inherit; transition: 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .stat-num { font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
-        .stat-label { font-size: 10px; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
-
-        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; }
-        .btn { height: 44px; border-radius: 14px; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
-        .btn-edit { background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
-        .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
-
-        .notes-section { flex: 1; padding: 0 24px; margin-top: 10px; }
-
-        .skeleton { background: #111 !important; position: relative; overflow: hidden; border: none !important; }
-        .skeleton::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.5s infinite; }
-        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-
-        #toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.4s; z-index: 3000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px; }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    
-        .header-title { font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px; background: linear-gradient(to right, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    </style>
+    <script src="components/songPicker.js"></script>
+    <script src="components/emojiPicker.js"></script>
+    <script src="components/presence.js"></script>
+    <script src="components/call-notifier.js"></script>
+    <script src="components/chatLoader.js"></script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           CORE VARIABLES & RESET
+           ========================================= */
+        :root {
+            --bg: #050505;
+            --surface: #0f0f0f;
+            --surface-glass: rgba(20, 20, 20, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #ff3b30;
+            --accent-glow: rgba(255, 59, 48, 0.5);
+            --text: #ffffff;
+            --text-secondary: #a1a1a1;
+            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --verified-color: #3897f0;
+            --ease-out-back: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            user-select: none; -webkit-user-select: none; 
+            outline: none;
+        }
+
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            height: 100dvh; width: 100vw; overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: background 1.2s ease;
+        }
+
+        /* =========================================
+           PARTICLE ENGINE CANVAS
+           ========================================= */
+        #particle-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999; /* On top of everything */
+        }
+
+        /* =========================================
+           NAVIGATION
+           ========================================= */
+        .top-nav {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: calc(10px + var(--safe-top)) 24px 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            z-index: 100;
+        }
+        
+        .back-btn {
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; cursor: pointer; 
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .back-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.15); }
+        .back-btn span { font-size: 20px; }
+
+        /* =========================================
+           SCREENS MANAGER
+           ========================================= */
+        #session-view { position: relative; width: 100%; height: 100%; }
+
+        .screen {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            transform: scale(0.98);
+            z-index: 10;
+        }
+        .screen.active { 
+            opacity: 1; pointer-events: auto; 
+            transform: scale(1);
+        }
+
+        /* =========================================
+           ERROR SCREEN
+           ========================================= */
+        .err-box {
+            background: rgba(20,20,20,0.85); 
+            border: 1px solid var(--border);
+            padding: 40px 32px; border-radius: 32px; 
+            text-align: center; max-width: 320px;
+            backdrop-filter: blur(30px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            animation: shake 0.5s var(--ease-out-back);
+        }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+        
+        .err-box h2 { font-family:'Orbitron'; color: var(--accent); margin: 15px 0 10px; }
+
+        /* =========================================
+           WAITING ROOM
+           ========================================= */
+        .session-avatars {
+            display: flex; align-items: center; justify-content: center;
+            gap: 40px; width: 100%; position: relative;
+            margin-bottom: 40px;
+        }
+        
+        .avatar-group {
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            position: relative; z-index: 2; transition: 0.5s var(--ease-out-back);
+        }
+
+        .s-bubble {
+            width: 100px; height: 100px; border-radius: 50%;
+            position: relative; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            background: #1a1a1a; border: 2px solid #333;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+        .s-bubble img { 
+            width: 100%; height: 100%; border-radius: 50%; 
+            object-fit: cover; opacity: 0; transition: opacity 0.5s; 
+        }
+        .s-bubble img.loaded { opacity: 1; }
+        
+        .avatar-group.them { opacity: 0.5; filter: grayscale(100%); transform: scale(0.9); }
+        .avatar-group.them.active { opacity: 1; filter: grayscale(0%); transform: scale(1); }
+        .avatar-group.them.active .s-bubble { border-color: var(--verified-color); box-shadow: 0 0 20px rgba(56, 151, 240, 0.3); }
+
+        .u-name { 
+            font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+            display: flex; align-items: center; gap: 4px; 
+            text-shadow: 0 2px 10px rgba(0,0,0,1); 
+            background: rgba(0,0,0,0.3); padding: 4px 12px; border-radius: 20px;
+        }
+
+        .s-line {
+            position: absolute; height: 2px; width: 60px; background: #333;
+            top: 50px; left: 50%; transform: translateX(-50%); z-index: 1;
+            overflow: hidden; border-radius: 2px;
+        }
+        .s-line::after {
+            content:''; position: absolute; top:0; left:-100%; width:100%; height:100%;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: flowLine 2s infinite linear; opacity: 0;
+        }
+        .s-line.connected { background: #444; }
+        .s-line.connected::after { opacity: 1; }
+        @keyframes flowLine { 0% { left: -100%; } 100% { left: 100%; } }
+
+        /* =========================================
+           ACTIVE PLAYER UI
+           ========================================= */
+        #screen-active {
+            justify-content: flex-start; padding-top: 100px;
+        }
+
+        .status-pill {
+            position: absolute; top: calc(15px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+            background: rgba(10,10,10,0.6); backdrop-filter: blur(10px);
+            padding: 6px 16px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.05);
+            font-family: 'Orbitron', sans-serif; font-size: 10px; color: var(--accent);
+            display: flex; align-items: center; gap: 8px; letter-spacing: 2px; font-weight: 700;
+            z-index: 110; box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 8px currentColor; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Duo Header (Who is listening) */
+        .duo-header {
+            width: 100%; display: flex; justify-content: center; gap: 60px;
+            margin-bottom: 20px; position: relative; z-index: 20;
+        }
+        .duo-user { 
+            display: flex; flex-direction: column; align-items: center; 
+            opacity: 0.4; transition: 0.4s var(--ease-smooth); 
+            transform: scale(0.9);
+        }
+        .duo-user.active { opacity: 1; transform: scale(1.1); }
+        .duo-user.active .duo-img { border-color: #fff; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        
+        .duo-img { 
+            width: 42px; height: 42px; border-radius: 50%; 
+            border: 2px solid transparent; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); object-fit: cover; 
+            transition: 0.3s;
+        }
+        .duo-name { 
+            font-size: 9px; font-weight: 800; margin-top: 8px; 
+            letter-spacing: 1px; text-transform: uppercase;
+        }
+
+        /* Player Container */
+        .player-ui {
+            width: 100%; flex: 1; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; position: relative; z-index: 20;
+        }
+
+        /* Visualizer */
+        #visualizer {
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            width: 90vw; max-width: 400px; height: 90vw; max-height: 400px; 
+            z-index: 1; pointer-events: none; opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        /* Album Art */
+        .album-box {
+            width: 70vw; height: 70vw; max-width: 320px; max-height: 320px;
+            border-radius: 24px; background: #111;
+            margin-bottom: 40px; position: relative; z-index: 5;
+            box-shadow: 0 30px 60px -10px rgba(0,0,0,0.8);
+            transform: scale(0.95); transition: 0.6s var(--ease-out-back);
+            overflow: hidden; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .album-box.playing { transform: scale(1); box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9); border-color: rgba(255,255,255,0.1); }
+        .album-box.buffering { animation: breathe 2s infinite ease-in-out; }
+        @keyframes breathe { 0%, 100% { opacity: 1; transform: scale(0.95); } 50% { opacity: 0.7; transform: scale(0.93); } }
+
+        .album-box img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s; }
+        .album-box img.loaded { opacity: 1; }
+        
+        #default-art {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px; color: #333; letter-spacing: 4px; font-weight: 900;
+            width: 100%; text-align: center;
+        }
+
+        /* Track Info */
+        .track-info { text-align: center; margin-bottom: 30px; padding: 0 40px; position: relative; z-index: 10; width: 100%; }
+        .track-name { 
+            font-size: 26px; font-weight: 800; margin-bottom: 8px; 
+            text-shadow: 0 10px 30px rgba(0,0,0,0.8); line-height: 1.2;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .track-artist { 
+            font-size: 16px; color: var(--text-secondary); font-weight: 500; 
+            letter-spacing: 0.5px;
+        }
+
+        /* Controls */
+        .controls-area { 
+            width: 100%; min-height: 80px; 
+            display: flex; justify-content: center; align-items: center; 
+            position: relative; z-index: 30; padding-bottom: var(--safe-bottom);
+        }
+        
+        .dj-btn {
+            background: #fff; color: #000; border: none;
+            padding: 18px 36px; border-radius: 100px;
+            font-weight: 700; font-size: 15px; letter-spacing: 0.5px;
+            box-shadow: 0 10px 40px rgba(255,255,255,0.15);
+            display: flex; align-items: center; gap: 10px;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+            animation: popIn 0.4s var(--ease-out-back);
+        }
+        .dj-btn:active { transform: scale(0.95); box-shadow: 0 5px 20px rgba(255,255,255,0.1); }
+        .dj-btn span { font-size: 20px; }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* Sync Overlay */
+        #sync-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(15px);
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
+        #sync-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .sync-btn {
+            background: var(--accent); width: 70px; height: 70px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px var(--accent-glow); margin-bottom: 20px;
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(255, 59, 48, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); } }
+
+        /* =========================================
+           EMOJI PICKER MODAL
+           ========================================= */
+        #emoji-modal {
+            position: fixed; top: auto; bottom: 0; left: 0; width: 100%; height: 45vh;
+            background: #121212; border-radius: 30px 30px 0 0; z-index: 500; 
+            display: flex; flex-direction: column; align-items: center;
+            padding-top: 10px; box-shadow: 0 -20px 60px rgba(0,0,0,0.9);
+            transform: translateY(110%); transition: transform 0.5s var(--ease-out-back);
+            visibility: hidden; border-top: 1px solid var(--border);
+        }
+        #emoji-modal.active { transform: translateY(0); visibility: visible; }
+        
+        .modal-handle { width: 40px; height: 5px; background: #333; border-radius: 10px; margin: 10px 0 20px; }
+        emoji-picker { width: 100%; height: 100%; --background: #121212; --border-color: transparent; }
+
+        /* =========================================
+           REACTION UI
+           ========================================= */
+        /* Seated Emojis (Last sent) */
+        .seated-emoji {
+            position: absolute; font-size: 32px; z-index: 50;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); 
+            transition: all 0.5s var(--ease-out-back);
+            top: -10px; right: -10px; opacity: 0; transform: scale(0);
+        }
+        .seated-emoji.show { opacity: 1; transform: scale(1) rotate(10deg); }
+        
+        /* Floating Simple Emojis (Generic) */
+        .flying-emoji {
+            position: fixed; font-size: 60px; z-index: 999; pointer-events: none;
+            animation: bigPopFly 1.8s forwards;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+
+        @keyframes bigPopFly {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 0; }
+            20% { transform: translate(-50%, -50%) scale(1.5) rotate(0deg); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -250px) scale(1.2) rotate(20deg); opacity: 0; }
+        }
+
+    </style>
 </head>
 <body>
 
-    <header>
-        <div class="header-left">
-            <span class="material-icons-round back-arrow" onclick="history.back()">west</span>
-            <div class="header-title">My Profile</div>
-        </div>
-        <button class="icon-btn" onclick="toggleMenu(true)">
-            <div class="menu-bars">
-                <span></span>
-                <span></span>
-            </div>
-        </button>
-    </header>
+    <canvas id="particle-canvas"></canvas>
 
-    <div class="modal-overlay" id="modal-overlay" onclick="toggleMenu(false)"></div>
-    
-    <div class="bottom-modal" id="bottom-modal">
-        <div class="modal-handle"></div>
-        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span class="material-icons-round" onclick="toggleMenu(false)" style="cursor:pointer; color:var(--primary);">west</span>
-            <span class="header-title">Privacy & Settings</span>
-            <div style="width:24px;"></div>
-        </div>
-
-        <div class="setting-row">
-            <span style="font-size:14px; font-weight:600;">Activity Status</span>
-            <label class="switch">
-                <input type="checkbox" id="activity-toggle" onchange="updateActivityPref(this.checked)">
-                <span class="slider"></span>
-            </label>
-        </div>
-
-        <div class="setting-row" onclick="history.back(); setTimeout(() => document.getElementById('cf-selector').open(), 50);">
-            <span style="font-size:14px; font-weight:600;">Close Friends</span>
-            <span class="material-icons-round" style="color:var(--secondary);">chevron_right</span>
-        </div>
-
-        <div class="setting-row" onclick="openBlockedList()">
-            <span style="font-size:14px; font-weight:600;">Blocked Accounts</span>
-            <span class="material-icons-round" style="color:var(--secondary);">chevron_right</span>
-        </div>
-
-        <div style="padding:40px 0; text-align:center; color:var(--secondary); font-size:11px; letter-spacing:1px; font-weight:800;">
-            ADVANCED COMMANDS ACTIVE
-        </div>
-    </div>
-
-    <div class="fullscreen-modal" id="blocked-modal">
-        <header>
-            <div class="header-left">
-                <span class="material-icons-round back-arrow" onclick="closeBlockedList()">west</span>
-                <div class="header-title">Restricted Agents</div>
-            </div>
-        </header>
-        <div class="blocked-list" id="blocked-user-container">
-            <p style="text-align:center; padding:50px; color:var(--secondary); font-size:13px;">Frequency scanning...</p>
-        </div>
-    </div>
-
-    <div class="profile-top-section">
-        <div class="avatar-wrapper" id="pfp-container">
-            <img id="pfp" class="avatar skeleton" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
-        </div>
-
-        <div class="user-name">
-            <span id="display-name" class="skeleton" style="width:160px; height:28px; border-radius: 6px;"></span>
-            <span id="verified-badge" class="material-icons-round verified" style="display:none;">verified</span>
-        </div>
-        
-        <div class="user-handle skeleton" id="username" style="width: 90px; height:16px; margin-top: 8px; border-radius: 4px;"></div>
-
-        <div class="id-pill skeleton" id="id-pill-container" onclick="copyID()" style="width: 140px; border-radius: 12px;">
-            <span class="id-label" id="id-label-text" style="visibility: hidden;">ID</span>
-            <span class="id-value" id="goorac-id"></span>
-            <span class="material-icons-round copy-icon" id="id-copy-icon" style="visibility: hidden;">content_copy</span>
-        </div>
-
-        <p class="bio skeleton" id="bio" style="width: 80%; height: 36px; border-radius: 8px;"></p>
-
-        <div class="stats-grid">
-            <a href="followers.html" class="stat-card skeleton" id="stat-fol">
-                <span class="stat-num" id="count-followers" style="visibility: hidden;">0</span>
-                <span class="stat-label" style="visibility: hidden;">Followers</span>
-            </a>
-            <a href="following.html" class="stat-card skeleton" id="stat-fing">
-                <span class="stat-num" id="count-following" style="visibility: hidden;">0</span>
-                <span class="stat-label" style="visibility: hidden;">Following</span>
-            </a>
-        </div>
-
-        <div class="action-row">
-            <a href="setup.html" class="btn btn-edit">Edit Profile</a>
-            <button onclick="logout()" class="btn btn-logout">
-                <span class="material-icons-round" style="font-size: 18px;">logout</span> Logout
-            </button>
-        </div>
-    </div>
-
-    <div class="notes-section" id="notes-container-wrapper">
-        <profile-notes id="profile-notes"></profile-notes>
-    </div>
-
-    <view-notes id="view-notes-modal"></view-notes>
     <call-notifier></call-notifier>
-    
-    <close-friends-selector id="cf-selector"></close-friends-selector>
-    
-    <div id="toast">
-        <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
-        ID Copied
+    <chat-loader></chat-loader>
+
+    <script>
+        // BLOCK COPY AND SELECTION FOR APP-LIKE FEEL
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.addEventListener('selectstart', event => event.preventDefault());
+        document.addEventListener('dragstart', event => event.preventDefault());
+
+        // PRELOAD PROFILE IMAGE
+        try {
+            const profile = localStorage.getItem('my_goorac_profile');
+            if(profile) {
+                const data = JSON.parse(profile);
+                const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
+                document.write(`<style>#my-avatar-img { content: url("${pfpUrl}"); } #duo-me-img { content: url("${pfpUrl}"); }</style>`);
+            }
+        } catch(e) {}
+    </script>
+
+    <div id="session-view">
+        
+        <div class="screen" id="screen-error">
+            <div class="err-box">
+                <span class="material-icons-round" style="font-size:40px; color:var(--accent); margin-bottom:10px;">gpp_bad</span>
+                <h2 style="font-size:18px;">Access Denied</h2>
+                <p id="error-msg" style="font-size:13px; color:#888; line-height:1.5;">Connection failure.</p>
+                <button onclick="leaveSession()" style="margin-top:25px; padding:12px 30px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px; cursor:pointer;">Exit</button>
+            </div>
+        </div>
+
+        <div class="screen active" id="screen-waiting">
+            <div class="top-nav">
+                <div class="back-btn" onclick="leaveSession()">
+                    <span class="material-icons-round">close</span>
+                </div>
+            </div>
+
+            <div class="session-avatars">
+                <div class="s-line" id="connect-line"></div>
+                
+                <div class="avatar-group me">
+                    <div class="s-bubble">
+                        <img id="my-avatar-img" src="" class="loaded">
+                        <div id="my-seated-emoji" class="seated-emoji"></div>
+                    </div>
+                    <div class="u-name">You</div>
+                </div>
+
+                <div class="avatar-group them" id="target-group">
+                    <div class="s-bubble">
+                        <img id="target-avatar" src=""> 
+                        <div id="their-seated-emoji" class="seated-emoji"></div>
+                    </div>
+                    <div class="u-name" id="target-name-display">...</div>
+                </div>
+            </div>
+
+            <h1 id="status-text" style="font-size:22px; font-family:'Orbitron'; font-weight:900; text-align:center; letter-spacing:1px; margin-bottom:5px;">CONNECTING</h1>
+            <p style="font-size:13px; color:#666;">Establishing secure link...</p>
+        </div>
+
+        <div class="screen" id="screen-active">
+            
+            <div class="status-pill">
+                <div class="status-dot"></div> LIVE
+            </div>
+
+            <div class="top-nav">
+                 <div style="width:44px;"></div> 
+                 <div class="back-btn" onclick="leaveSession()" style="background:rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.3); color:#ff3b30;">
+                    <span class="material-icons-round">power_settings_new</span>
+                </div>
+            </div>
+
+            <div class="duo-header">
+                <div class="duo-user" id="duo-me">
+                    <img id="duo-me-img" class="duo-img" src="">
+                    <div class="duo-name">YOU</div>
+                </div>
+                <div class="duo-user" id="duo-them">
+                    <img id="duo-them-img" class="duo-img" src="">
+                    <div class="duo-name" id="duo-them-name">THEM</div>
+                </div>
+            </div>
+
+            <div class="player-ui">
+                <canvas id="visualizer"></canvas>
+                <div class="album-box" id="album-container">
+                    <div id="default-art">PULSE</div>
+                    <img id="active-album-art" src="">
+                </div>
+
+                <div class="track-info">
+                    <div class="track-name" id="active-song-title">Pulse Active</div>
+                    <div class="track-artist" id="active-song-artist">Waiting for selection...</div>
+                </div>
+
+                <div class="controls-area" id="controls-container"></div>
+            </div>
+
+            <div id="sync-overlay" onclick="resumeAudio()">
+                <div class="sync-btn">
+                    <span class="material-icons-round" style="color:#fff; font-size:32px;">play_arrow</span>
+                </div>
+                <h3 style="font-weight:800; letter-spacing:1px; font-family:'Orbitron'">TAP TO SYNC</h3>
+                <p style="font-size:12px; color:#aaa; margin-top:5px;">Audio stream interrupted</p>
+            </div>
+        </div>
     </div>
 
-<script>
-    // --- FIREBASE INIT ---
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } else if (!firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
+    <song-picker id="song-picker"></song-picker>
     
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-    const rdb = firebase.database();
+    <div id="emoji-modal">
+        <div class="modal-handle"></div>
+        <emoji-picker id="cycle-emoji-picker"></emoji-picker>
+    </div>
 
-    // --- UI CONTROLS ---
-    function toggleMenu(show) {
-        const overlay = document.getElementById('modal-overlay');
-        const modal = document.getElementById('bottom-modal');
-        if (show) {
-            history.pushState({modal: 'settings'}, ""); 
-            overlay.style.display = 'block';
-            setTimeout(() => modal.classList.add('active'), 10);
-            if(navigator.vibrate) navigator.vibrate(20);
-        } else {
-            modal.classList.remove('active');
-            setTimeout(() => overlay.style.display = 'none', 400);
-        }
-    }
-
-    function openBlockedList() {
-        history.pushState({modal: 'blocked'}, "");
-        document.getElementById('blocked-modal').classList.add('active');
-        fetchBlockedUsers();
-    }
-
-    function closeBlockedList() {
-        document.getElementById('blocked-modal').classList.remove('active');
-        if(window.history.state && window.history.state.modal === 'blocked') {
-            history.back();
-        }
-    }
-
-    // Fixed Back Button Logic
-    window.onpopstate = function(e) {
-        if(document.getElementById('blocked-modal').classList.contains('active')) {
-            document.getElementById('blocked-modal').classList.remove('active');
-        } else if(document.getElementById('bottom-modal').classList.contains('active')) {
-            toggleMenu(false);
-        }
-    };
-
-    // --- ACTIVITY TOGGLE ---
-    async function updateActivityPref(isEnabled) {
-        const user = auth.currentUser;
-        if (!user) return;
-        await db.collection("users").doc(user.uid).update({ showActivityStatus: isEnabled });
-        const statusRef = rdb.ref('/status/' + user.uid);
-        await statusRef.set({ state: isEnabled ? 'online' : 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
-        if (navigator.vibrate) navigator.vibrate(30);
-    }
-
-    // --- BLOCKED USERS LOGIC ---
-    async function fetchBlockedUsers() {
-        const container = document.getElementById('blocked-user-container');
-        const user = auth.currentUser;
-        if (!user) return;
-
-        db.collection("users").doc(user.uid).onSnapshot(async (doc) => {
-            const blockedArray = doc.data().blocked || [];
-            if (blockedArray.length === 0) {
-                container.innerHTML = `<p style="text-align:center; padding:50px; color:var(--secondary); font-size:13px;">No agents currently restricted.</p>`;
-                return;
+    <script>
+        // =================================================================
+        // PARTICLE ENGINE (FULL SCREEN EFFECTS)
+        // Handles: 🖤 ❤️ ❣️ 😍 🥰 💎 🔥
+        // =================================================================
+        
+        class ParticleEngine {
+            constructor() {
+                this.canvas = document.getElementById('particle-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.particles = [];
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.animate();
             }
 
-            container.innerHTML = "";
-            for (const bEntry of blockedArray) {
-                const bId = typeof bEntry === 'string' ? bEntry : bEntry.uid;
-                const bDoc = await db.collection("users").doc(bId).get();
-                if (bDoc.exists) {
-                    const bData = bDoc.data();
-                    const div = document.createElement('div');
-                    div.className = 'blocked-item';
-                    div.innerHTML = `
-                        <div class="blocked-user-info">
-                            <img src="${bData.photoURL || 'https://via.placeholder.com/150/111/fff'}" class="blocked-pfp">
-                            <div>
-                                <div style="font-weight:700; font-size:14px;">${bData.name}</div>
-                                <div style="color:var(--secondary); font-size:12px;">@${bData.username}</div>
-                            </div>
-                        </div>
-                        <button class="unblock-btn" onclick="handleUnblock(this, '${bId}')">Unblock</button>
-                    `;
-                    container.appendChild(div);
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            spawn(emoji) {
+                const count = (emoji === '🔥' || emoji === '💎') ? 60 : 40;
+                const type = this.getEffectType(emoji);
+                
+                for (let i = 0; i < count; i++) {
+                    this.particles.push(new Particle(this.canvas.width, this.canvas.height, emoji, type));
                 }
+            }
+
+            getEffectType(emoji) {
+                if (emoji === '🔥') return 'fire';
+                if (emoji === '💎') return 'shimmer';
+                if (['❤️', '🖤', '❣️'].includes(emoji)) return 'float-up';
+                return 'explode';
+            }
+
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                for (let i = 0; i < this.particles.length; i++) {
+                    this.particles[i].update();
+                    this.particles[i].draw(this.ctx);
+                    
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                        i--;
+                    }
+                }
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        class Particle {
+            constructor(w, h, emoji, type) {
+                this.emoji = emoji;
+                this.type = type;
+                this.w = w;
+                this.h = h;
+                
+                // Defaults
+                this.x = w / 2;
+                this.y = h * 0.8; // Start near bottom/player
+                this.size = Math.random() * 20 + 20;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() * -5) - 2;
+                this.life = 100;
+                this.alpha = 1;
+                this.rotation = (Math.random() - 0.5) * 0.5;
+                this.angle = 0;
+
+                // Type Specifics
+                if (type === 'fire') {
+                    this.y = h;
+                    this.vy = (Math.random() * -8) - 3;
+                    this.vx = (Math.random() - 0.5) * 2;
+                    this.life = Math.random() * 60 + 40;
+                } 
+                else if (type === 'shimmer') {
+                    this.x = Math.random() * w;
+                    this.y = Math.random() * h;
+                    this.vx = 0;
+                    this.vy = -1;
+                    this.life = 80;
+                    this.size = Math.random() * 30 + 10;
+                }
+                else if (type === 'explode') {
+                    this.x = w / 2;
+                    this.y = h / 2;
+                    this.vx = (Math.random() - 0.5) * 15;
+                    this.vy = (Math.random() - 0.5) * 15;
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.angle += this.rotation;
+                this.life--;
+                this.alpha = this.life / 100;
+
+                if (this.type === 'float-up') {
+                    this.vx += (Math.random() - 0.5) * 0.2; // Wiggle
+                } else if (this.type === 'fire') {
+                    this.size *= 0.96; // Shrink
+                } else if (this.type === 'explode') {
+                    this.vy += 0.5; // Gravity
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.globalAlpha = this.alpha;
+                ctx.font = `${this.size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.emoji, 0, 0);
+                ctx.restore();
+            }
+        }
+
+        const particleEngine = new ParticleEngine();
+
+        // =================================================================
+        // APPLICATION LOGIC
+        // =================================================================
+
+        const sessionDb = firebase.firestore();
+        const sessionAuth = firebase.auth();
+        const params = new URLSearchParams(window.location.search);
+        
+        const targetUsername = params.get('user');
+        let wakeLock = null;
+
+        // ZERO-LATENCY CACHE
+        if (targetUsername) {
+            try {
+                const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
+                if (cachedTarget) {
+                    const data = JSON.parse(cachedTarget);
+                    updateTargetUI(data);
+                }
+            } catch(e) {}
+        }
+
+        let targetUid = null;
+        let myUid = null;
+        let myProfile = null;
+        let targetProfile = null;
+        let roomRef = null;
+        let roomUnsub = null;
+        let audio = new Audio();
+        audio.crossOrigin = "anonymous";
+        
+        // Visualizer Vars
+        let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
+
+        // State
+        let currentTurnUid = null;
+        let isMyTurn = false;
+        let currentSongId = null;
+        let hasPickedEmoji = false;
+        let emojiTimer = null; 
+        let emojiCloseTimer = null; 
+        let turnTimer = null; 
+
+        // -----------------------------------------------------------------
+        // AUTHENTICATION & SETUP
+        // -----------------------------------------------------------------
+        sessionAuth.onAuthStateChanged(async (user) => {
+            if (user) {
+                myUid = user.uid;
+                
+                // Fetch My Profile
+                sessionDb.collection('users').doc(user.uid).get().then(doc => {
+                    if(doc.exists) {
+                        const data = doc.data();
+                        myProfile = data;
+                        localStorage.setItem('my_goorac_profile', JSON.stringify(data));
+                        
+                        const pfp = data.photoURL || 'https://via.placeholder.com/150';
+                        const myImg = document.getElementById('my-avatar-img');
+                        if(myImg) myImg.src = pfp; 
+                        const duoImg = document.getElementById('duo-me-img');
+                        if(duoImg) duoImg.src = pfp;
+                    }
+                });
+
+                // Fetch Target Profile
+                if (targetUsername) {
+                    try {
+                        const snap = await sessionDb.collection('users').where('username', '==', targetUsername).limit(1).get();
+                        if (!snap.empty) {
+                            targetUid = snap.docs[0].id;
+                            targetProfile = snap.docs[0].data();
+                            
+                            localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
+                            updateTargetUI(targetProfile);
+
+                            const allowed = await verifyMutuals(myUid, targetUid);
+                            if (allowed) initPulseSession();
+                            else showError("Mutual friendship required.");
+                        } else {
+                            showError("User not found.");
+                        }
+                    } catch (e) {
+                        showError("Network error.");
+                    }
+                } else {
+                    window.location.replace('pulseLobby.html');
+                }
+            } else {
+                window.location.href = 'login.html';
             }
         });
-    }
 
-    async function handleUnblock(btn, targetUid) {
-        btn.classList.add('loading');
-        const user = auth.currentUser;
-        
-        try {
-            // Firestore array remove logic (try simple ID)
-            await db.collection("users").doc(user.uid).update({
-                blocked: firebase.firestore.FieldValue.arrayRemove(targetUid)
-            }).catch(async () => {
-                // Fallback: If blocking stored complex objects, verify and remove
-                const myDoc = await db.collection("users").doc(user.uid).get();
-                const currentBlocked = myDoc.data().blocked || [];
-                const entryToRemove = currentBlocked.find(i => (typeof i === 'string' ? i : i.uid) === targetUid);
-                
-                if(entryToRemove) {
-                    await db.collection("users").doc(user.uid).update({
-                        blocked: firebase.firestore.FieldValue.arrayRemove(entryToRemove)
-                    });
-                }
+        // -----------------------------------------------------------------
+        // WAKE LOCK
+        // -----------------------------------------------------------------
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {});
+                } catch (err) { console.warn("Wake Lock failed", err); }
+            }
+        }
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
+        });
+
+        // -----------------------------------------------------------------
+        // UI HELPERS
+        // -----------------------------------------------------------------
+        function updateTargetUI(data) {
+            const pfp = data.photoURL || 'https://via.placeholder.com/150';
+            const name = data.name.split(' ')[0].toUpperCase();
+            const badge = data.verified ? `<span class="material-icons-round verified-badge" style="font-size:14px; color:var(--verified-color);">verified</span>` : '';
+
+            // Waiting
+            const tImg = document.getElementById('target-avatar');
+            if(tImg) { tImg.src = pfp; tImg.classList.add('loaded'); }
+            
+            document.getElementById('status-text').innerText = `WAITING FOR ${name}`;
+            document.getElementById('target-name-display').innerHTML = `${name} ${badge}`;
+
+            // Active
+            document.getElementById('duo-them-img').src = pfp;
+            document.getElementById('duo-them-name').innerHTML = `${name}`;
+        }
+
+        async function verifyMutuals(me, them) {
+            try {
+                const myDoc = await sessionDb.collection('users').doc(me).get();
+                if (!myDoc.exists) return false;
+                myProfile = myDoc.data(); 
+
+                const myF = (myProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
+                const theirF = (targetProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
+
+                return myF.includes(them) && theirF.includes(me);
+            } catch (e) { return false; }
+        }
+
+        // -----------------------------------------------------------------
+        // CORE SESSION LOGIC
+        // -----------------------------------------------------------------
+        function initPulseSession() {
+            const roomId = [myUid, targetUid].sort().join('_');
+            roomRef = sessionDb.collection('pulse_rooms').doc(roomId);
+
+            const myField = (myUid < targetUid) ? 'userA' : 'userB';
+            const otherField = (myUid < targetUid) ? 'userB' : 'userA';
+            
+            roomRef.set({ 
+                [myField]: 'online',
+                sessionStatus: 'active', 
+                lastActive: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).then(() => {
+                roomRef.get().then(doc => {
+                    const data = doc.data();
+                    if (!doc.exists || !data.cycleStatus) {
+                        cleanSessionStart();
+                    }
+                });
             });
 
-            showToast("Agent restored to network");
-        } catch (e) {
-            console.error(e);
-            showToast("Frequency clear failed");
-        } finally {
-            btn.classList.remove('loading');
-        }
-    }
+            requestWakeLock();
 
-    // --- 1. IMMEDIATE CACHE LOAD ---
-    (function loadCache() {
-        const cached = localStorage.getItem('my_goorac_profile');
-        if (cached) {
-            try { renderUI(JSON.parse(cached)); } catch (e) { console.error(e); }
-        }
-    })();
+            // Setup Listeners
+            window.addEventListener('beforeunload', leaveSession);
+            window.addEventListener('pagehide', leaveSession);
+            document.addEventListener('visibilitychange', () => { if (document.hidden) leaveSession(); });
 
-    // --- 2. AUTH & REALTIME SYNC ---
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            const notesComp = document.getElementById('profile-notes');
-            if(notesComp) {
-                notesComp.uid = user.uid;
-                notesComp.setAttribute('uid', user.uid);
-                customElements.whenDefined('profile-notes').then(() => { if(notesComp.init) notesComp.init(); });
+            // Modals
+            window.addEventListener('popstate', (event) => {
+                const modal = document.getElementById('emoji-modal');
+                if (modal.classList.contains('active')) modal.classList.remove('active');
+            });
+
+            // Emoji Picker Events
+            const picker = document.getElementById('cycle-emoji-picker');
+            const newPicker = picker.cloneNode(true);
+            picker.parentNode.replaceChild(newPicker, picker);
+            newPicker.addEventListener('emoji-click', (e) => {
+                const em = e.detail.unicode || e.detail.emoji;
+                if(em) handleEmojiSelection(em);
+            });
+
+            // REALTIME LISTENER
+            roomUnsub = roomRef.onSnapshot(snapshot => {
+                if (!snapshot.exists) return;
+                const data = snapshot.data();
+                
+                if (data.sessionStatus === 'ended') {
+                    audio.pause();
+                    window.location.replace("pulseLobby.html");
+                    return;
+                }
+
+                if (data[otherField] === 'online') {
+                    document.getElementById('target-group').classList.add('active');
+                    document.querySelector('.s-line').classList.add('connected');
+                    
+                    if (!document.getElementById('screen-active').classList.contains('active')) {
+                         showScreen('screen-active');
+                         setupVisualizer();
+                         requestWakeLock();
+                    }
+                    syncCycle(data);
+                } else {
+                    document.getElementById('target-group').classList.remove('active');
+                    document.querySelector('.s-line').classList.remove('connected');
+                    deactivatePulse();
+                }
+            });
+        }
+
+        function cleanSessionStart() {
+            const startingTurn = (myUid < targetUid) ? myUid : targetUid;
+            roomRef.set({ 
+                turn: startingTurn,          
+                cycleStatus: 'picking',
+                currentSong: null,           
+                emojis: {},
+                ready: {} 
+            }, { merge: true });
+        }
+
+        function syncCycle(data) {
+            currentTurnUid = data.turn;
+            isMyTurn = (myUid === currentTurnUid);
+            const status = data.cycleStatus;
+
+            // Highlight Turn
+            document.getElementById('duo-me').classList.toggle('active', isMyTurn);
+            document.getElementById('duo-them').classList.toggle('active', !isMyTurn);
+
+            // 1. PICKING PHASE
+            if (status === 'picking') {
+                if (currentSongId !== null) {
+                    currentSongId = null;
+                    audio.pause(); audio.src = "";
+                    resetSongDisplay();
+                    resetEmojiState();
+                }
+
+                closeEmojiModal();
+                clearTimeout(emojiTimer);
+                clearTimeout(turnTimer);
+
+                const controls = document.getElementById('controls-container');
+                controls.innerHTML = ''; // Clear
+
+                if (isMyTurn) {
+                    const btn = document.createElement('button');
+                    btn.className = "dj-btn";
+                    btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
+                    btn.onclick = () => document.getElementById('song-picker').open();
+                    controls.appendChild(btn);
+                    document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
+                } else {
+                    const name = targetProfile ? targetProfile.name.split(' ')[0] : 'Partner';
+                    controls.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">${name} IS CHOOSING...</p>`;
+                    document.getElementById('active-song-artist').innerText = "Waiting for track...";
+                }
             }
-            initRealtimeListener(user.uid);
-        } else {
-            window.location.replace('login.html');
+            
+            // 2. BUFFERING PHASE
+            else if (status === 'buffering' && data.currentSong) {
+                const song = data.currentSong;
+                updateSongDisplay(song);
+                document.getElementById('album-container').classList.add('buffering'); 
+                document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:var(--accent);">SYNCING...</p>`;
+                
+                if (currentSongId !== song.id) {
+                    currentSongId = song.id;
+                    audio.src = song.previewUrl;
+                    audio.load();
+                    // Ready Logic
+                    audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
+                    if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
+                }
+
+                // If host sees both ready or timeout
+                if (isMyTurn) {
+                    const readyMap = data.ready || {};
+                    const elapsed = Date.now() - (data.timestamp || Date.now());
+                    if ((readyMap[myUid] && readyMap[targetUid]) || elapsed > 8000) {
+                        roomRef.update({ cycleStatus: 'playing' });
+                    }
+                }
+            }
+
+            // 3. PLAYING PHASE
+            else if (status === 'playing' && data.currentSong) {
+                if (currentSongId !== data.currentSong.id) {
+                    currentSongId = data.currentSong.id;
+                    audio.src = data.currentSong.previewUrl;
+                    updateSongDisplay(data.currentSong);
+                }
+
+                document.getElementById('album-container').classList.remove('buffering');
+                document.getElementById('album-container').classList.add('playing');
+                document.getElementById('controls-container').innerHTML = '';
+
+                // Dynamic Background
+                const hue = (data.currentSong.artistName.length * 40) % 360;
+                document.body.style.background = `radial-gradient(circle at center, hsla(${hue}, 60%, 10%, 1), #050505 90%)`;
+
+                if (audio.paused) {
+                    audio.play().catch(() => {
+                        if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
+                    });
+                    
+                    // Auto-end turn after 30s
+                    clearTimeout(turnTimer);
+                    turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
+                }
+
+                clearTimeout(emojiTimer);
+                if (!hasPickedEmoji) {
+                    emojiTimer = setTimeout(openEmojiModal, 5000); 
+                }
+            }
+
+            // REACTION HANDLING
+            if (data.emojis) {
+                if(data.emojis[myUid]) handleIncomingReaction('me', data.emojis[myUid]);
+                if(data.emojis[targetUid]) handleIncomingReaction('them', data.emojis[targetUid]);
+            }
         }
-    });
 
-    function initRealtimeListener(uid) {
-        db.collection("users").doc(uid).onSnapshot((doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-                localStorage.setItem('my_goorac_profile', JSON.stringify(data));
-                renderUI(data);
-            } else { window.location.replace("setup.html"); }
-        });
-    }
-
-    // --- 3. RENDER ENGINE ---
-    function renderUI(data) {
-        const skeletons = ['pfp', 'display-name', 'username', 'bio', 'id-pill-container', 'stat-fol', 'stat-fing'];
-        skeletons.forEach(id => {
-            const el = document.getElementById(id);
-            if(el) { el.classList.remove('skeleton'); el.style.width = ""; el.style.height = ""; }
-        });
-
-        document.querySelectorAll('.stat-card span, .id-pill span').forEach(s => s.style.visibility = "visible");
-
-        safeText('display-name', data.name || "User");
-        safeText('username', `@${data.username || 'user'}`);
-        safeText('bio', data.bio || "Welcome to Goorac.");
-        safeText('goorac-id', data.gooracNumber || "-------");
-
-        const pfp = document.getElementById('pfp');
-        if(pfp) pfp.src = data.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
-
-        const badge = document.getElementById('verified-badge');
-        if(badge) badge.style.display = data.verified ? 'inline-block' : 'none';
-
-        safeText('count-followers', (data.followers || []).length);
-        safeText('count-following', (data.following || []).length);
-
-        const toggle = document.getElementById('activity-toggle');
-        if(toggle) toggle.checked = data.showActivityStatus !== false;
-    }
-
-    function safeText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
-
-    function copyID() {
-        const txt = document.getElementById('goorac-id').innerText;
-        if(!txt || txt.includes('-')) return;
-        navigator.clipboard.writeText(txt).then(() => { if(navigator.vibrate) navigator.vibrate(50); showToast("ID Copied"); });
-    }
-
-    function logout() {
-        if(confirm("Log out of Goorac?")) {
-            auth.signOut().then(() => { localStorage.clear(); window.location.replace("login.html"); });
+        // -----------------------------------------------------------------
+        // AUDIO VISUALIZER
+        // -----------------------------------------------------------------
+        function setupVisualizer() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                const source = audioCtx.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                analyser.fftSize = 128;
+                
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                canvas = document.getElementById('visualizer');
+                canvasCtx = canvas.getContext('2d');
+                
+                // HiDPI Scaling
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                canvasCtx.scale(dpr, dpr);
+                
+                drawVisualizer();
+            } catch(e) { console.log("Audio Context Error", e); }
         }
-    }
 
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerHTML = `<span class="material-icons-round" style="font-size:16px;">check_circle</span> ${msg}`;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2000);
-    }
-</script>
+        function drawVisualizer() {
+            visualizerAnimation = requestAnimationFrame(drawVisualizer);
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Clear based on CSS size, not internal
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height); 
+            
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            const cx = w / 2;
+            const cy = h / 2;
+            const radius = w * 0.36; // Just outside the album art
+
+            canvasCtx.beginPath();
+            for (let i = 0; i < dataArray.length; i++) {
+                // Ignore high freq noise
+                if (i > dataArray.length * 0.7) break; 
+
+                const val = dataArray[i];
+                const barHeight = (val / 255) * 40; 
+                const rads = (Math.PI * 2) / (dataArray.length * 0.7) * i - (Math.PI / 2);
+                
+                // Outer point
+                const x = cx + Math.cos(rads) * (radius + barHeight);
+                const y = cy + Math.sin(rads) * (radius + barHeight);
+                
+                // Inner point (base)
+                const x0 = cx + Math.cos(rads) * radius;
+                const y0 = cy + Math.sin(rads) * radius;
+
+                canvasCtx.moveTo(x0, y0);
+                canvasCtx.lineTo(x, y);
+            }
+            
+            canvasCtx.strokeStyle = `rgba(255, 59, 48, 0.6)`;
+            canvasCtx.lineWidth = 3;
+            canvasCtx.lineCap = 'round';
+            canvasCtx.stroke();
+        }
+
+        // -----------------------------------------------------------------
+        // EMOJI & MODAL CONTROLS
+        // -----------------------------------------------------------------
+        function openEmojiModal() {
+            document.getElementById('emoji-modal').classList.add('active');
+            history.pushState({modal: 'emoji'}, "");
+            
+            clearTimeout(emojiCloseTimer);
+            emojiCloseTimer = setTimeout(closeEmojiModal, 20000); 
+        }
+
+        function closeEmojiModal() {
+            const modal = document.getElementById('emoji-modal');
+            if (modal.classList.contains('active')) {
+                modal.classList.remove('active');
+                if (history.state && history.state.modal === 'emoji') history.back();
+            }
+        }
+
+        function handleEmojiSelection(emoji) {
+            hasPickedEmoji = true;
+            closeEmojiModal();
+            // Send to DB
+            roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
+        }
+
+        let lastReactionMe = null;
+        let lastReactionThem = null;
+
+        function handleIncomingReaction(who, emoji) {
+            // Check deduplication
+            if (who === 'me') {
+                if (lastReactionMe === emoji) return;
+                lastReactionMe = emoji;
+            } else {
+                if (lastReactionThem === emoji) return;
+                lastReactionThem = emoji;
+            }
+
+            // 1. Show Seated Emoji
+            const id = `seated-${who}`;
+            const targetId = (who === 'me') ? 'my-seated-emoji' : 'their-seated-emoji';
+            const el = document.getElementById(targetId);
+            
+            if(el) {
+                el.innerText = emoji;
+                el.classList.add('show');
+            }
+
+            // 2. Trigger Full Screen Effect
+            const specialEmojis = ['🖤','❤️','❣️','😍','🥰','💎','🔥'];
+            if (specialEmojis.includes(emoji)) {
+                particleEngine.spawn(emoji);
+            } else {
+                // Generic floating for others
+                const flyer = document.createElement('div');
+                flyer.className = 'flying-emoji';
+                flyer.innerText = emoji;
+                flyer.style.top = '50%'; flyer.style.left = '50%';
+                document.body.appendChild(flyer);
+                setTimeout(() => flyer.remove(), 2000);
+            }
+        }
+
+        function resetEmojiState() {
+            hasPickedEmoji = false;
+            lastReactionMe = null;
+            lastReactionThem = null;
+            document.querySelectorAll('.seated-emoji').forEach(el => {
+                el.classList.remove('show');
+                el.innerText = '';
+            });
+        }
+
+        // -----------------------------------------------------------------
+        // PLAYER HELPERS
+        // -----------------------------------------------------------------
+        function updateSongDisplay(song) {
+            const highRes = song.artworkUrl100.replace('100x100', '600x600');
+            const img = document.getElementById('active-album-art');
+            const def = document.getElementById('default-art');
+            
+            // Preload logic
+            const temp = new Image();
+            temp.src = highRes;
+            temp.onload = () => {
+                img.src = highRes;
+                img.classList.add('loaded');
+                def.style.display = 'none';
+            };
+            
+            document.getElementById('active-song-title').innerText = song.trackName;
+            document.getElementById('active-song-artist').innerText = song.artistName;
+        }
+
+        function resetSongDisplay() {
+            const img = document.getElementById('active-album-art');
+            const def = document.getElementById('default-art');
+            img.classList.remove('loaded', 'playing', 'buffering');
+            setTimeout(() => { img.src = ""; }, 500); // Wait for fade out
+            def.style.display = 'block';
+            document.getElementById('active-song-title').innerText = "Pulse Active";
+        }
+
+        function resumeAudio() {
+            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            audio.play();
+            requestWakeLock();
+            document.getElementById('sync-overlay').classList.remove('active');
+        }
+
+        function swapTurn() {
+            const nextDj = targetUid; 
+            roomRef.update({
+                turn: nextDj,
+                cycleStatus: 'picking',
+                currentSong: firebase.firestore.FieldValue.delete(), 
+                emojis: {},
+                ready: {}
+            });
+        }
+
+        function deactivatePulse() {
+            showScreen('screen-waiting');
+            audio.pause(); audio.src = "";
+            document.body.style.background = "#050505";
+            if(visualizerAnimation) cancelAnimationFrame(visualizerAnimation);
+        }
+
+        // Event from <song-picker>
+        document.addEventListener('song-selected', (e) => {
+            const song = e.detail;
+            roomRef.update({ 
+                currentSong: song, 
+                cycleStatus: 'buffering', 
+                timestamp: Date.now(),
+                ready: {} 
+            });
+            if(navigator.vibrate) navigator.vibrate(20);
+        });
+
+        // -----------------------------------------------------------------
+        // CLEANUP & EXIT
+        // -----------------------------------------------------------------
+        function leaveSession() {
+            try {
+                if(roomRef) {
+                    // Attempt to set offline
+                    roomRef.update({ 
+                        sessionStatus: 'ended',
+                        [`userA`]: 'offline', 
+                        [`userB`]: 'offline' 
+                    }).catch(e => console.log("Offline update skipped"));
+                }
+                if(audio) audio.pause();
+                if(wakeLock) wakeLock.release();
+            } catch(e) {
+                console.error("Cleanup error", e);
+            } finally {
+                window.location.replace("pulseLobby.html");
+            }
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            showScreen('screen-error');
+        }
+    </script>
 </body>
 </html>
