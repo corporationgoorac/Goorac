@@ -291,7 +291,7 @@
             letter-spacing: 1px; text-transform: uppercase;
         }
 
-        /* REACTION POP BUBBLE (Big Emoji Style) */
+        /* REACTION POP BUBBLE (PERSISTENT) */
         .reaction-pop {
             position: absolute;
             top: -50px; /* Above the avatar */
@@ -300,14 +300,13 @@
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
             opacity: 0; pointer-events: none; z-index: 100;
         }
-        .reaction-pop.pop { animation: bounceUp 1.5s var(--ease-out-back) forwards; }
+        /* Changed animation to settle at opacity 1 (visible) */
+        .reaction-pop.pop { animation: bounceUp 0.8s var(--ease-out-back) forwards; }
         
         @keyframes bounceUp {
             0% { opacity: 0; transform: translateX(-50%) scale(0) translateY(10px); }
-            20% { opacity: 1; transform: translateX(-50%) scale(1.2) translateY(0); }
-            40% { transform: translateX(-50%) scale(1) translateY(0); }
-            80% { opacity: 1; transform: translateX(-50%) scale(1) translateY(-10px); }
-            100% { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(-30px); }
+            50% { opacity: 1; transform: translateX(-50%) scale(1.2) translateY(-10px); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(-20px); } /* Stay Visible */
         }
 
         /* Controls */
@@ -671,6 +670,7 @@
         let roomRef = null;
         let roomUnsub = null;
         let audio = new Audio();
+        // FORCE ANONYMOUS FOR VISUALIZER
         audio.crossOrigin = "anonymous";
         
         // Visualizer Vars
@@ -1052,6 +1052,13 @@
             canvasCtx.stroke();
         }
 
+        // GLOBAL CLICK TO UNLOCK AUDIO
+        document.body.addEventListener('click', () => {
+             if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+             }
+        }, { once: false });
+
         // -----------------------------------------------------------------
         // EMOJI & MODAL CONTROLS
         // -----------------------------------------------------------------
@@ -1100,7 +1107,7 @@
                 el.classList.add('show');
             }
 
-            // 2. BIG EMOJI POP on Active Screen
+            // 2. BIG EMOJI POP on Active Screen (PERSISTENT NOW)
             const popId = (who === 'me') ? 'emoji-me-pop' : 'emoji-them-pop';
             const popEl = document.getElementById(popId);
             if (popEl) {
@@ -1134,7 +1141,7 @@
                 el.innerText = '';
             });
             document.querySelectorAll('.reaction-pop').forEach(el => {
-                el.classList.remove('pop');
+                el.classList.remove('pop'); // This clears the persistent emoji
                 el.innerText = '';
             });
         }
