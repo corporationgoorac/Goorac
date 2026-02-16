@@ -40,6 +40,7 @@
             --verified-color: #3897f0;
             --ease-out-back: cubic-bezier(0.175, 0.885, 0.32, 1.275);
             --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --radio-color: #00ff88; /* New Radio Green */
         }
 
         * { 
@@ -88,6 +89,27 @@
         }
         .back-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.15); }
         .back-btn span { font-size: 20px; }
+
+        /* RADIO TOGGLE STYLES */
+        .radio-switch-container {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .radio-switch {
+            width: 50px; height: 28px; background: rgba(255,255,255,0.1);
+            border-radius: 50px; position: relative; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;
+        }
+        .radio-switch::after {
+            content: ''; position: absolute; left: 3px; top: 3px;
+            width: 20px; height: 20px; background: #fff; border-radius: 50%;
+            transition: 0.3s var(--ease-out-back);
+        }
+        .radio-switch.active { background: rgba(0, 255, 136, 0.2); border-color: var(--radio-color); }
+        .radio-switch.active::after { left: 25px; background: var(--radio-color); box-shadow: 0 0 10px var(--radio-color); }
+        
+        .radio-icon { font-size: 16px; color: #666; transition: 0.3s; }
+        .radio-switch.active + .radio-icon { color: var(--radio-color); text-shadow: 0 0 10px var(--radio-color); }
+
 
         /* =========================================
            SCREENS MANAGER
@@ -192,7 +214,9 @@
             font-family: 'Orbitron', sans-serif; font-size: 9px; color: var(--accent);
             display: flex; align-items: center; gap: 6px; letter-spacing: 2px; font-weight: 700;
             z-index: 110; box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            transition: color 0.3s;
         }
+        .status-pill.radio-mode { color: var(--radio-color); }
         .status-dot { width: 5px; height: 5px; background: currentColor; border-radius: 50%; box-shadow: 0 0 8px currentColor; animation: blink 1.5s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
@@ -415,6 +439,46 @@
             100% { transform: translate(-50%, -250px) scale(1.2) rotate(20deg); opacity: 0; }
         }
 
+        /* =========================================
+           RADIO POPUP MODALS
+           ========================================= */
+        .radio-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 1000; display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
+        .radio-modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .radio-popup {
+            background: #141414; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px; padding: 30px 24px; width: 90%; max-width: 340px;
+            text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            transform: scale(0.95); transition: 0.3s var(--ease-out-back);
+        }
+        .radio-modal-overlay.active .radio-popup { transform: scale(1); }
+
+        .radio-popup h3 { font-family: 'Orbitron'; margin-bottom: 10px; letter-spacing: 1px; }
+        .radio-popup p { color: #888; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+        
+        .radio-input {
+            width: 100%; background: #0a0a0a; border: 1px solid #333;
+            color: #fff; padding: 12px 16px; border-radius: 12px;
+            font-size: 14px; margin-bottom: 20px;
+        }
+        .radio-input:focus { border-color: var(--radio-color); }
+
+        .popup-btns { display: flex; gap: 10px; justify-content: center; }
+        .popup-btn {
+            flex: 1; padding: 12px 0; border-radius: 50px; border: none;
+            font-weight: 700; font-size: 13px; cursor: pointer;
+        }
+        .popup-btn.primary { background: #fff; color: #000; }
+        .popup-btn.cancel { background: rgba(255,255,255,0.1); color: #fff; }
+        .popup-btn.confirm-radio { background: var(--radio-color); color: #000; box-shadow: 0 4px 15px rgba(0,255,136,0.3); }
+
+        .req-avatar { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 15px; border: 2px solid var(--radio-color); object-fit: cover; }
+
     </style>
 </head>
 <body>
@@ -485,12 +549,15 @@
 
         <div class="screen" id="screen-active">
             
-            <div class="status-pill">
+            <div class="status-pill" id="live-status-pill">
                 <div class="status-dot"></div> LIVE
             </div>
 
             <div class="top-nav">
-                 <div style="width:44px;"></div> 
+                 <div class="radio-switch-container">
+                    <div class="radio-switch" id="radio-toggle-btn" onclick="toggleRadioSetup()"></div>
+                    <span class="material-icons-round radio-icon">radio</span>
+                 </div>
                  <div class="back-btn" onclick="handleExit('back')" style="background:rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.3); color:#ff3b30;">
                     <span class="material-icons-round">power_settings_new</span>
                 </div>
@@ -543,6 +610,31 @@
     <div id="emoji-modal">
         <div class="modal-handle"></div>
         <emoji-picker id="cycle-emoji-picker"></emoji-picker>
+    </div>
+
+    <div class="radio-modal-overlay" id="radio-setup-modal">
+        <div class="radio-popup">
+            <span class="material-icons-round" style="font-size:32px; color:var(--radio-color); margin-bottom:10px;">radio</span>
+            <h3>START RADIO</h3>
+            <p>Enter keywords (Artist, Playlist, Moods) separated by commas to generate a 200+ song loop.</p>
+            <input type="text" class="radio-input" id="radio-keywords" placeholder="e.g. The Weeknd, Chill, Lo-Fi">
+            <div class="popup-btns">
+                <button class="popup-btn cancel" onclick="closeRadioModals()">CANCEL</button>
+                <button class="popup-btn confirm-radio" onclick="sendRadioRequest()">REQUEST</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="radio-modal-overlay" id="radio-incoming-modal">
+        <div class="radio-popup">
+            <img id="req-avatar-img" class="req-avatar" src="">
+            <h3 id="req-title">RADIO REQUEST</h3>
+            <p id="req-desc">User wants to start a radio session.</p>
+            <div class="popup-btns">
+                <button class="popup-btn cancel" onclick="respondToRadio(false)">DISMISS</button>
+                <button class="popup-btn confirm-radio" onclick="respondToRadio(true)">TUNE IN</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -691,6 +783,10 @@
         let emojiTimer = null; 
         let emojiCloseTimer = null; 
         let turnTimer = null; 
+
+        // Radio State
+        let isRadioMode = false;
+        let isRadioHost = false;
 
         // Vibe Match State
         let lastReactionTimeMe = 0;
@@ -852,6 +948,9 @@
                     return;
                 }
 
+                // RADIO LOGIC INTEGRATION
+                handleRadioUpdates(data);
+
                 if (data[otherField] === 'online') {
                     document.getElementById('target-group').classList.add('active');
                     document.querySelector('.s-line').classList.add('connected');
@@ -873,11 +972,13 @@
         function cleanSessionStart() {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
             roomRef.set({ 
-                turn: startingTurn,            
+                turn: startingTurn,             
                 cycleStatus: 'picking',
                 currentSong: null,              
                 emojis: {},
-                ready: {} 
+                ready: {},
+                radioMode: false,
+                radioRequest: null
             }, { merge: true });
         }
 
@@ -886,7 +987,7 @@
             isMyTurn = (myUid === currentTurnUid);
             const status = data.cycleStatus;
 
-            // Highlight Turn
+            // Highlight Turn (Turn logic still visual in Radio mode but irrelevant for control)
             document.getElementById('duo-me').classList.toggle('active', isMyTurn);
             document.getElementById('duo-them').classList.toggle('active', !isMyTurn);
 
@@ -906,19 +1007,29 @@
                 const controls = document.getElementById('controls-container');
                 controls.innerHTML = ''; // Clear
 
-                if (isMyTurn) {
-                    const btn = document.createElement('button');
-                    btn.className = "dj-btn";
-                    btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
-                    btn.onclick = () => document.getElementById('song-picker').open();
-                    controls.appendChild(btn);
-                    document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
+                // RADIO MODE: Auto pick if Host, else waiting
+                if (isRadioMode) {
+                     document.getElementById('active-song-artist').innerText = "Loading next radio track...";
+                     controls.innerHTML = `<p style="font-size:12px; color:var(--radio-color); letter-spacing:1px; font-weight:700;">RADIO LIVE</p>`;
+                     if (isRadioHost) {
+                         // Host logic triggers next song in radio loop
+                         // Handled in handleRadioUpdates or via end event
+                     }
                 } else {
-                    // UPDATED PARTNER TEXT LOGIC WITH BADGE
-                    const name = targetProfile ? targetProfile.name.split(' ')[0].toUpperCase() : 'THEM';
-                    const badge = (targetProfile && targetProfile.verified) ? `<span class="material-icons-round" style="font-size:12px; color:var(--verified-color); vertical-align:middle; margin-left:2px;">verified</span>` : '';
-                    controls.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">${name} ${badge} IS CHOOSING...</p>`;
-                    document.getElementById('active-song-artist').innerText = "Waiting for track...";
+                    // STANDARD MODE
+                    if (isMyTurn) {
+                        const btn = document.createElement('button');
+                        btn.className = "dj-btn";
+                        btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
+                        btn.onclick = () => document.getElementById('song-picker').open();
+                        controls.appendChild(btn);
+                        document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
+                    } else {
+                        const name = targetProfile ? targetProfile.name.split(' ')[0].toUpperCase() : 'THEM';
+                        const badge = (targetProfile && targetProfile.verified) ? `<span class="material-icons-round" style="font-size:12px; color:var(--verified-color); vertical-align:middle; margin-left:2px;">verified</span>` : '';
+                        controls.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">${name} ${badge} IS CHOOSING...</p>`;
+                        document.getElementById('active-song-artist').innerText = "Waiting for track...";
+                    }
                 }
             }
             
@@ -939,10 +1050,12 @@
                 }
 
                 // If host sees both ready or timeout
-                if (isMyTurn) {
+                // In Radio Mode, Host forces play faster
+                if (isMyTurn || isRadioHost) {
                     const readyMap = data.ready || {};
                     const elapsed = Date.now() - (data.timestamp || Date.now());
-                    if ((readyMap[myUid] && readyMap[targetUid]) || elapsed > 8000) {
+                    const timeout = isRadioMode ? 4000 : 8000;
+                    if ((readyMap[myUid] && readyMap[targetUid]) || elapsed > timeout) {
                         roomRef.update({ cycleStatus: 'playing' });
                     }
                 }
@@ -958,10 +1071,15 @@
 
                 document.getElementById('album-container').classList.remove('buffering');
                 document.getElementById('album-container').classList.add('playing');
-                document.getElementById('controls-container').innerHTML = '';
+                
+                // Controls
+                if (isRadioMode) {
+                     document.getElementById('controls-container').innerHTML = `<p style="font-size:10px; color:var(--radio-color); letter-spacing:2px; font-weight:800;">AUTO-LOOP ACTIVE</p>`;
+                } else {
+                     document.getElementById('controls-container').innerHTML = '';
+                }
 
-                // Dynamic Background handled by Beat Detection now
-                // Initial set
+                // Dynamic Background
                 const hue = (data.currentSong.artistName.length * 40) % 360;
                 document.body.dataset.baseHue = hue;
 
@@ -969,12 +1087,25 @@
                     audio.play().then(() => {
                         resumeAudio(); // Ensure context is running
                     }).catch(() => {
-                        if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
+                        if(!isMyTurn && !isRadioHost) document.getElementById('sync-overlay').classList.add('active');
                     });
                     
-                    // Auto-end turn after 30s
-                    clearTimeout(turnTimer);
-                    turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
+                    // Auto-end turn after 30s (Duration of preview)
+                    // In Radio Mode, this is handled by audio.onended
+                    if (!isRadioMode) {
+                        clearTimeout(turnTimer);
+                        turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
+                    }
+                } else {
+                    // ENHANCED SYNC: Drift Correction
+                    const serverStart = data.timestamp;
+                    const now = Date.now();
+                    const idealTime = (now - serverStart) / 1000;
+                    // If drift is > 1.5s, seek
+                    if (Math.abs(audio.currentTime - idealTime) > 1.5) {
+                        // console.log("Resyncing audio drift");
+                        audio.currentTime = idealTime;
+                    }
                 }
 
                 clearTimeout(emojiTimer);
@@ -990,9 +1121,211 @@
             }
         }
 
-        // -----------------------------------------------------------------
+        // =================================================================
+        // PULSE RADIO LOGIC (NEW FEATURE)
+        // =================================================================
+        
+        // 1. UI Toggles
+        function toggleRadioSetup() {
+            if (isRadioMode) {
+                // If on, turn off
+                if (confirm("Disconnect Radio Stream?")) {
+                    roomRef.update({ 
+                        radioMode: false, 
+                        radioQueue: [],
+                        radioHost: null,
+                        cycleStatus: 'picking' // Reset
+                    });
+                }
+            } else {
+                // Open Setup Modal
+                document.getElementById('radio-setup-modal').classList.add('active');
+            }
+        }
+
+        function closeRadioModals() {
+            document.querySelectorAll('.radio-modal-overlay').forEach(el => el.classList.remove('active'));
+        }
+
+        // 2. Request Flow
+        function sendRadioRequest() {
+            const input = document.getElementById('radio-keywords').value;
+            if (!input.trim()) return;
+
+            closeRadioModals();
+            
+            // Send request to DB
+            roomRef.update({
+                radioRequest: {
+                    from: myUid,
+                    keywords: input.trim(),
+                    timestamp: Date.now(),
+                    status: 'pending'
+                }
+            });
+        }
+
+        // 3. Handle Updates
+        function handleRadioUpdates(data) {
+            const toggleBtn = document.getElementById('radio-toggle-btn');
+            const statusPill = document.getElementById('live-status-pill');
+
+            // Mode Sync
+            isRadioMode = data.radioMode || false;
+            isRadioHost = (data.radioHost === myUid);
+            
+            if (isRadioMode) {
+                toggleBtn.classList.add('active');
+                statusPill.innerHTML = `<div class="status-dot"></div> RADIO`;
+                statusPill.classList.add('radio-mode');
+            } else {
+                toggleBtn.classList.remove('active');
+                statusPill.innerHTML = `<div class="status-dot"></div> LIVE`;
+                statusPill.classList.remove('radio-mode');
+            }
+
+            // Incoming Request Handling
+            if (data.radioRequest && data.radioRequest.status === 'pending' && data.radioRequest.from !== myUid) {
+                // Show Popup to Partner
+                const reqModal = document.getElementById('radio-incoming-modal');
+                if (!reqModal.classList.contains('active')) {
+                    const name = targetProfile ? targetProfile.name : "User";
+                    const badge = (targetProfile && targetProfile.verified) ? "Verified" : "";
+                    
+                    document.getElementById('req-avatar-img').src = targetProfile ? targetProfile.photoURL : "";
+                    document.getElementById('req-title').innerText = `${name.toUpperCase()} WANTS RADIO`;
+                    document.getElementById('req-desc').innerText = `${name} ${badge ? '(Verified)' : ''} wants to start a radio station based on: "${data.radioRequest.keywords}"`;
+                    
+                    reqModal.classList.add('active');
+                }
+            } else {
+                document.getElementById('radio-incoming-modal').classList.remove('active');
+            }
+
+            // Host Logic: If request accepted, Start Engine
+            if (data.radioRequest && data.radioRequest.status === 'accepted' && data.radioRequest.from === myUid && !isRadioMode) {
+                // I am the requester, and it was accepted. I become HOST.
+                startRadioEngine(data.radioRequest.keywords);
+            }
+        }
+
+        function respondToRadio(accept) {
+            closeRadioModals();
+            if (accept) {
+                // Accept Request
+                roomRef.update({
+                    'radioRequest.status': 'accepted'
+                });
+            } else {
+                // Decline
+                roomRef.update({
+                    radioRequest: null
+                });
+            }
+        }
+
+        // 4. Radio Engine (iTunes API + ML Vibe Algo)
+        async function startRadioEngine(keywords) {
+            // Set DB state first
+            await roomRef.update({
+                radioMode: true,
+                radioHost: myUid,
+                radioRequest: null, // clear request
+                radioIndex: 0
+            });
+
+            // Fetch Songs
+            const terms = keywords.split(',').map(k => k.trim()).join('+');
+            const url = `https://itunes.apple.com/search?term=${terms}&limit=200&entity=song&explicit=Yes`;
+            
+            try {
+                const res = await fetch(url);
+                const json = await res.json();
+                
+                if (json.resultCount > 0) {
+                    let tracks = json.results;
+                    
+                    // "Machine Learning" Vibe Algo (Client Side)
+                    // 1. Deduplicate
+                    const seen = new Set();
+                    tracks = tracks.filter(t => {
+                        const duplicate = seen.has(t.trackId);
+                        seen.add(t.trackId);
+                        return !duplicate && t.previewUrl; // Must have preview
+                    });
+
+                    // 2. Shuffle (Fisher-Yates)
+                    for (let i = tracks.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+                    }
+
+                    // 3. Save Queue to DB
+                    // We only save minimal data to avoid Firestore limits
+                    const minimalQueue = tracks.map(t => ({
+                        id: t.trackId,
+                        trackName: t.trackName,
+                        artistName: t.artistName,
+                        artworkUrl100: t.artworkUrl100,
+                        previewUrl: t.previewUrl
+                    }));
+
+                    await roomRef.update({
+                        radioQueue: minimalQueue,
+                        cycleStatus: 'picking' // Triggers next song logic
+                    });
+
+                    // Start First Song
+                    playNextRadioTrack(minimalQueue, 0);
+
+                } else {
+                    alert("No songs found for these keywords.");
+                    roomRef.update({ radioMode: false });
+                }
+            } catch(e) {
+                console.error("Radio Error", e);
+                alert("Could not start radio.");
+                roomRef.update({ radioMode: false });
+            }
+        }
+
+        function playNextRadioTrack(queue, index) {
+            if (!queue || queue.length === 0) return;
+            
+            // Loop if end
+            let nextIndex = index;
+            if (nextIndex >= queue.length) nextIndex = 0;
+
+            const song = queue[nextIndex];
+            
+            roomRef.update({
+                currentSong: song,
+                cycleStatus: 'buffering',
+                timestamp: Date.now(),
+                ready: {},
+                radioIndex: nextIndex + 1
+            });
+        }
+
+        // Hook into Audio Ended for Radio Loop
+        audio.onended = () => {
+             if (isRadioMode && isRadioHost) {
+                 // Fetch current queue info to play next
+                 roomRef.get().then(doc => {
+                     const data = doc.data();
+                     if (data.radioQueue) {
+                         playNextRadioTrack(data.radioQueue, data.radioIndex || 0);
+                     }
+                 });
+             } else if (isMyTurn && !isRadioMode) {
+                 // Standard mode swap
+                 swapTurn();
+             }
+        };
+
+        // =================================================================
         // NEW PERFECT CIRCULAR VISUALIZER
-        // -----------------------------------------------------------------
+        // =================================================================
         function setupVisualizer() {
             if (audioCtx) return; 
             
@@ -1130,9 +1463,6 @@
             roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
         }
 
-        let lastReactionMe = null;
-        let lastReactionThem = null;
-
         function handleIncomingReaction(who, emoji) {
             // Check deduplication
             if (who === 'me') {
@@ -1261,6 +1591,8 @@
             audio.pause(); audio.src = "";
             document.body.style.background = "#050505";
             if(visualizerAnimation) cancelAnimationFrame(visualizerAnimation);
+            // Close Radio if active
+            isRadioMode = false;
         }
 
         // Event from <song-picker>
