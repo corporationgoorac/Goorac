@@ -176,10 +176,10 @@
         @keyframes flowLine { 0% { left: -100%; } 100% { left: 100%; } }
 
         /* =========================================
-           ACTIVE PLAYER UI (FIXED)
+           ACTIVE PLAYER UI (FIXED LAYOUT)
            ========================================= */
         #screen-active {
-            justify-content: space-between; /* Push content to top/bottom */
+            justify-content: space-between; 
             padding-top: var(--safe-top);
             padding-bottom: var(--safe-bottom);
         }
@@ -204,22 +204,22 @@
             justify-content: center;
             position: relative;
             width: 100%;
-            max-height: 65vh; /* Keep it in the upper portion */
+            max-height: 65vh; 
         }
 
-        /* Visualizer - Resized */
+        /* Visualizer - Resized & Behind Album */
         #visualizer {
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%);
-            width: 80vw; max-width: 300px; height: 80vw; max-height: 300px; 
-            z-index: 1; pointer-events: none; opacity: 0.5;
+            width: 80vw; max-width: 320px; height: 80vw; max-height: 320px; 
+            z-index: 1; pointer-events: none; opacity: 0.6;
             transition: opacity 0.3s;
         }
 
         /* Album Art - Resized Smaller */
         .album-box {
             width: 55vw; height: 55vw; 
-            max-width: 220px; max-height: 220px; /* Capped for better fit */
+            max-width: 220px; max-height: 220px; 
             border-radius: 20px; background: #111;
             margin-bottom: 25px; position: relative; z-index: 5;
             box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
@@ -240,10 +240,10 @@
             width: 100%; text-align: center;
         }
 
-        /* Track Info - Smaller & Tighter */
+        /* Track Info */
         .track-info { text-align: center; padding: 0 20px; position: relative; z-index: 10; width: 100%; margin-top: 0; }
         .track-name { 
-            font-size: 18px; /* Smaller font */
+            font-size: 18px; 
             font-weight: 700; margin-bottom: 6px; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.8); line-height: 1.2;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -253,7 +253,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* Bottom Section Container (Profiles + Controls) */
+        /* Bottom Section Container */
         .bottom-cluster {
             width: 100%;
             display: flex;
@@ -263,10 +263,10 @@
             padding-bottom: calc(10px + var(--safe-bottom));
             position: relative;
             z-index: 20;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); /* Readability fade */
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
         }
 
-        /* Duo Header (Now at Bottom) */
+        /* Duo Header */
         .duo-header {
             width: 100%; display: flex; justify-content: center; gap: 40px;
             margin-bottom: 20px; position: relative;
@@ -274,13 +274,13 @@
         .duo-user { 
             display: flex; flex-direction: column; align-items: center; 
             opacity: 0.5; transition: 0.4s var(--ease-smooth); 
-            transform: scale(0.9);
+            transform: scale(0.9); position: relative;
         }
         .duo-user.active { opacity: 1; transform: scale(1.05); }
         .duo-user.active .duo-img { border-color: #fff; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
         
         .duo-img { 
-            width: 36px; height: 36px; /* Smaller Avatars */
+            width: 36px; height: 36px;
             border-radius: 50%; 
             border: 2px solid transparent; 
             box-shadow: 0 5px 15px rgba(0,0,0,0.5); object-fit: cover; 
@@ -289,6 +289,25 @@
         .duo-name { 
             font-size: 8px; font-weight: 800; margin-top: 6px; 
             letter-spacing: 1px; text-transform: uppercase;
+        }
+
+        /* REACTION POP BUBBLE (Big Emoji Style) */
+        .reaction-pop {
+            position: absolute;
+            top: -50px; /* Above the avatar */
+            left: 50%; transform: translateX(-50%) scale(0);
+            font-size: 40px; /* Big emoji */
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+            opacity: 0; pointer-events: none; z-index: 100;
+        }
+        .reaction-pop.pop { animation: bounceUp 1.5s var(--ease-out-back) forwards; }
+        
+        @keyframes bounceUp {
+            0% { opacity: 0; transform: translateX(-50%) scale(0) translateY(10px); }
+            20% { opacity: 1; transform: translateX(-50%) scale(1.2) translateY(0); }
+            40% { transform: translateX(-50%) scale(1) translateY(0); }
+            80% { opacity: 1; transform: translateX(-50%) scale(1) translateY(-10px); }
+            100% { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(-30px); }
         }
 
         /* Controls */
@@ -347,7 +366,7 @@
         /* =========================================
            REACTION UI
            ========================================= */
-        /* Seated Emojis (Last sent) */
+        /* Seated Emojis (Waiting Screen) */
         .seated-emoji {
             position: absolute; font-size: 24px; z-index: 50;
             filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); 
@@ -467,10 +486,12 @@
             <div class="bottom-cluster">
                 <div class="duo-header">
                     <div class="duo-user" id="duo-me">
+                        <div class="reaction-pop" id="emoji-me-pop"></div>
                         <img id="duo-me-img" class="duo-img" src="">
                         <div class="duo-name">YOU</div>
                     </div>
                     <div class="duo-user" id="duo-them">
+                        <div class="reaction-pop" id="emoji-them-pop"></div>
                         <img id="duo-them-img" class="duo-img" src="">
                         <div class="duo-name" id="duo-them-name">THEM</div>
                     </div>
@@ -654,6 +675,7 @@
         
         // Visualizer Vars
         let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
+        let audioSourceNode = null; // Fix for multiple connection attempts
 
         // State
         let currentTurnUid = null;
@@ -824,7 +846,7 @@
                     
                     if (!document.getElementById('screen-active').classList.contains('active')) {
                          showScreen('screen-active');
-                         setupVisualizer();
+                         setupVisualizer(); // Safe to call multiple times now
                          requestWakeLock();
                     }
                     syncCycle(data);
@@ -929,7 +951,9 @@
                 document.body.style.background = `radial-gradient(circle at center, hsla(${hue}, 60%, 10%, 1), #050505 90%)`;
 
                 if (audio.paused) {
-                    audio.play().catch(() => {
+                    audio.play().then(() => {
+                        resumeAudio(); // Ensure context is running
+                    }).catch(() => {
                         if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
                     });
                     
@@ -952,28 +976,39 @@
         }
 
         // -----------------------------------------------------------------
-        // AUDIO VISUALIZER
+        // AUDIO VISUALIZER (FIXED)
         // -----------------------------------------------------------------
         function setupVisualizer() {
-            if (audioCtx) return;
+            if (audioCtx) return; // Already setup
+            
             try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
                 analyser = audioCtx.createAnalyser();
-                const source = audioCtx.createMediaElementSource(audio);
-                source.connect(analyser);
-                analyser.connect(audioCtx.destination);
-                analyser.fftSize = 128;
                 
+                // CRITICAL FIX: Only create MediaElementSource ONCE per audio element
+                if (!audioSourceNode) {
+                    audioSourceNode = audioCtx.createMediaElementSource(audio);
+                    audioSourceNode.connect(analyser);
+                    analyser.connect(audioCtx.destination);
+                }
+
+                analyser.fftSize = 128;
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
                 canvas = document.getElementById('visualizer');
                 canvasCtx = canvas.getContext('2d');
                 
                 // HiDPI Scaling
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                canvasCtx.scale(dpr, dpr);
+                
+                // Ensure canvas has size
+                if (rect.width > 0) {
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    canvasCtx.scale(dpr, dpr);
+                }
                 
                 drawVisualizer();
             } catch(e) { console.log("Audio Context Error", e); }
@@ -981,31 +1016,29 @@
 
         function drawVisualizer() {
             visualizerAnimation = requestAnimationFrame(drawVisualizer);
+            if (!analyser) return;
+
             analyser.getByteFrequencyData(dataArray);
             
-            // Clear based on CSS size, not internal
+            // Clear based on internal size
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height); 
             
             const w = canvas.width / (window.devicePixelRatio || 1);
             const h = canvas.height / (window.devicePixelRatio || 1);
             const cx = w / 2;
             const cy = h / 2;
-            const radius = w * 0.36; // Just outside the album art
+            const radius = w * 0.36; 
 
             canvasCtx.beginPath();
             for (let i = 0; i < dataArray.length; i++) {
-                // Ignore high freq noise
                 if (i > dataArray.length * 0.7) break; 
 
                 const val = dataArray[i];
                 const barHeight = (val / 255) * 40; 
                 const rads = (Math.PI * 2) / (dataArray.length * 0.7) * i - (Math.PI / 2);
                 
-                // Outer point
                 const x = cx + Math.cos(rads) * (radius + barHeight);
                 const y = cy + Math.sin(rads) * (radius + barHeight);
-                
-                // Inner point (base)
                 const x0 = cx + Math.cos(rads) * radius;
                 const y0 = cy + Math.sin(rads) * radius;
 
@@ -1058,17 +1091,26 @@
                 lastReactionThem = emoji;
             }
 
-            // 1. Show Seated Emoji
+            // 1. Show Waiting Screen Seated Emoji (Legacy support)
             const id = `seated-${who}`;
             const targetId = (who === 'me') ? 'my-seated-emoji' : 'their-seated-emoji';
             const el = document.getElementById(targetId);
-            
             if(el) {
                 el.innerText = emoji;
                 el.classList.add('show');
             }
 
-            // 2. Trigger Full Screen Effect
+            // 2. BIG EMOJI POP on Active Screen
+            const popId = (who === 'me') ? 'emoji-me-pop' : 'emoji-them-pop';
+            const popEl = document.getElementById(popId);
+            if (popEl) {
+                popEl.innerText = emoji;
+                popEl.classList.remove('pop'); 
+                void popEl.offsetWidth; // Trigger reflow to restart animation
+                popEl.classList.add('pop');
+            }
+
+            // 3. Trigger Full Screen Effect
             const specialEmojis = ['🖤','❤️','❣️','😍','🥰','💎','🔥'];
             if (specialEmojis.includes(emoji)) {
                 particleEngine.spawn(emoji);
@@ -1089,6 +1131,10 @@
             lastReactionThem = null;
             document.querySelectorAll('.seated-emoji').forEach(el => {
                 el.classList.remove('show');
+                el.innerText = '';
+            });
+            document.querySelectorAll('.reaction-pop').forEach(el => {
+                el.classList.remove('pop');
                 el.innerText = '';
             });
         }
@@ -1124,7 +1170,10 @@
         }
 
         function resumeAudio() {
-            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            // FIX: Ensure AudioContext resumes on user interaction
+            if(audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
             audio.play();
             requestWakeLock();
             document.getElementById('sync-overlay').classList.remove('active');
