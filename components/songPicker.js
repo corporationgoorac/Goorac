@@ -9,6 +9,10 @@ class SongPicker extends HTMLElement {
         this.initLogic();
         // Immediately try to restore state when attached to DOM
         this.restoreState(); 
+        
+        // Start the silent background brain
+        // It waits 2 seconds to let the UI settle, then starts thinking
+        setTimeout(() => this.runBackgroundUpdate(), 2000);
     }
 
     render() {
@@ -262,6 +266,7 @@ class SongPicker extends HTMLElement {
         this.allFetchedSongs = []; 
         this.renderedCount = 0; 
         this.isLoadingMore = false; 
+        this.pendingBackgroundUpdate = null; // Stores data fetched silently
         
         this.DB = {
             getSaved: () => JSON.parse(localStorage.getItem('insta_saved')) || [],
@@ -269,6 +274,10 @@ class SongPicker extends HTMLElement {
             
             getCache: (key) => JSON.parse(localStorage.getItem('picker_cache_' + key)) || null,
             setCache: (key, data) => localStorage.setItem('picker_cache_' + key, JSON.stringify(data)),
+            
+            // New: Separate cache for "Next Up" background data
+            getNextCache: () => JSON.parse(localStorage.getItem('picker_cache_next_foryou')) || null,
+            setNextCache: (data) => localStorage.setItem('picker_cache_next_foryou', JSON.stringify(data)),
             
             globalCache: {}, 
             addToGlobal: (songs) => songs.forEach(s => this.DB.globalCache[s.trackId] = s),
@@ -316,6 +325,7 @@ class SongPicker extends HTMLElement {
             },
             setUserProfile: (data) => localStorage.setItem('picker_user_profile_v5', JSON.stringify(data)),
 
+            // --- DEEP LEARNING TRACKING ---
             trackInteraction: (song, weight) => {
                 if(!song) return;
                 const profile = this.DB.getUserProfile();
@@ -329,6 +339,9 @@ class SongPicker extends HTMLElement {
                     profile.timeContext[currentHour][genre] = (profile.timeContext[currentHour][genre] || 0) + weight;
                 }
                 this.DB.setUserProfile(profile);
+                
+                // Trigger a silent background re-calculation since preferences changed
+                setTimeout(() => this.runBackgroundUpdate(), 1000);
             },
 
             getRecommendationQuery: () => {
@@ -344,6 +357,7 @@ class SongPicker extends HTMLElement {
                 let query = "";
                 let reason = "Top Hits";
 
+                // Refined Logic: Add variety if user has high repetition
                 if (dice < 0.3 && timeSpecificGenres.length > 0) {
                     query = timeSpecificGenres[0] + " hits";
                     reason = getTimeGreeting() + " • " + timeSpecificGenres[0];
@@ -359,7 +373,9 @@ class SongPicker extends HTMLElement {
                     reason = "Your favorite: " + genre;
                 } 
                 else if (history.length > 0) {
-                    query = history[0].artistName;
+                    // Sometimes pick the 2nd most recent to avoid loops
+                    const hIndex = history.length > 2 && Math.random() > 0.5 ? 1 : 0;
+                    query = history[hIndex].artistName;
                     reason = "Jump back in";
                 } 
                 else {
@@ -448,7 +464,6 @@ class SongPicker extends HTMLElement {
             }, 0);
 
             // Preload assets for instant play
-            // requestIdleCallback is good for background tasks
             if('requestIdleCallback' in window) {
                 window.requestIdleCallback(() => this.DB.preloadAssets(this.allFetchedSongs));
             } else {
@@ -458,6 +473,43 @@ class SongPicker extends HTMLElement {
             return true;
         }
         return false;
+    }
+
+    // --- NEW: SILENT BACKGROUND BRAIN ---
+    async runBackgroundUpdate() {
+        // This calculates the NEXT recommendation silently
+        const rec = this.DB.getRecommendationQuery();
+        
+        // Don't fetch if it's the same as what we already have on screen
+        if (this.currentHeaderTitle && this.currentHeaderTitle.includes(rec.query)) return;
+
+        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
+        
+        const fetchWithProxy = async (proxyUrl) => {
+            const res = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+            if (!res.ok) throw new Error('Proxy failed');
+            return res.json();
+        };
+
+        try {
+            // Fetch silently
+            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p)));
+            if(data.results && data.results.length > 0) {
+                // Shuffle & Filter
+                const savedIds = this.DB.getSaved().map(s => s.trackId);
+                let results = data.results.filter(s => !savedIds.includes(s.trackId));
+                results = results.sort(() => Math.random() - 0.5);
+
+                // Store in "Next Cache" (Waiting Room)
+                const cacheData = { songs: results, header: rec.reason };
+                this.DB.setNextCache(cacheData);
+                
+                // Preload assets NOW so they are ready LATER
+                this.DB.preloadAssets(results);
+            }
+        } catch (e) {
+            // Silent fail is fine in background
+        }
     }
 
     open() {
@@ -471,10 +523,8 @@ class SongPicker extends HTMLElement {
         if (!restored) {
             this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
         } else {
-            // 3. SILENT BACKGROUND UPDATE if restored
-            if(this.activeTab !== 'Saved' && this.activeTab !== 'search') {
-                this.refreshInBackground();
-            }
+            // 3. Trigger background update for next time
+            this.runBackgroundUpdate();
         }
     }
 
@@ -506,21 +556,6 @@ class SongPicker extends HTMLElement {
         }
     }
 
-    async refreshInBackground() {
-        // Silent update: Fetches new data, checks if it's different.
-        // If different, we update the cache but maybe don't force re-render to avoid jumpiness
-        // unless it's a "fresh" start context.
-        // For this optimized version, we will pre-fetch and update cache for next time.
-        if(this.activeTab === 'For You') {
-            const rec = this.DB.getRecommendationQuery();
-            // We fetch but don't render immediately if user is scrolling
-            // Just cache it for next time or if list is empty
-            if(this.allFetchedSongs.length === 0) {
-                 this.loadData(rec.query, false, 'foryou', true, rec.reason);
-            }
-        }
-    }
-
     async switchTab(name, btn) {
         this.activeTab = name;
         this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));
@@ -544,6 +579,23 @@ class SongPicker extends HTMLElement {
         let subHeading = "Trending Now";
 
         if (name === 'For You') {
+            // INTELLIGENT SWITCH:
+            // Check if we have a "Next Up" cache prepared from background
+            const nextCache = this.DB.getNextCache();
+            if (nextCache && nextCache.songs.length > 0) {
+                // Use the fresh background data instantly
+                this.allFetchedSongs = nextCache.songs;
+                this.currentHeaderTitle = nextCache.header;
+                this.renderInitialList(nextCache.songs, nextCache.header);
+                
+                // Clear the "Next Cache" as we consumed it
+                this.DB.setNextCache(null);
+                
+                // Trigger generation of the *next* batch in background
+                this.runBackgroundUpdate();
+                return;
+            }
+
             cacheKey = 'foryou';
             const rec = this.DB.getRecommendationQuery();
             query = rec.query;
@@ -552,12 +604,11 @@ class SongPicker extends HTMLElement {
 
         const cachedData = this.DB.getCache(cacheKey);
         
-        // INSTANT RENDER from Cache
+        // Standard Cache Fallback
         if (cachedData && cachedData.length > 0 && name !== 'For You') { 
             this.allFetchedSongs = cachedData;
             this.currentHeaderTitle = subHeading;
             this.renderInitialList(cachedData, subHeading); 
-            // Preload assets for cached items
             this.DB.preloadAssets(cachedData);
         } else {
             this.renderSkeletonLoading();
@@ -614,6 +665,11 @@ class SongPicker extends HTMLElement {
 
                 // BACKGROUND: Cache Audio/Images for instant play
                 this.DB.preloadAssets(results);
+                
+                // If this was a fresh load, prepare the next batch in background
+                if(isRecommendation) {
+                     setTimeout(() => this.runBackgroundUpdate(), 5000);
+                }
 
             } else {
                 if(!silent) this.list.innerHTML = `<div class="text-center">No results found for "${query}"</div>`;
