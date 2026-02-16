@@ -2,17 +2,19 @@ class SongPicker extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+        // SPEED: Controller to kill network requests instantly
+        this.fetchController = null; 
     }
 
     connectedCallback() {
         this.render();
         this.initLogic();
-        // Immediately try to restore state when attached to DOM
         this.restoreState(); 
         
-        // Start the silent background brain
-        // It waits 2 seconds to let the UI settle, then starts thinking
-        setTimeout(() => this.runBackgroundUpdate(), 2000);
+        // SPEED: Only start background brain if internet is decent
+        if (navigator.connection && navigator.connection.saveData === false) {
+            setTimeout(() => this.runBackgroundUpdate(), 3000);
+        }
     }
 
     render() {
@@ -21,7 +23,7 @@ class SongPicker extends HTMLElement {
             /* --- 1. RESET & CORE STYLES --- */
             :host {
                 --bg-color: #000000;
-                --surface-glass: rgba(20, 20, 20, 0.85); /* Modern Glass Effect */
+                --surface-glass: rgba(20, 20, 20, 0.95); /* Increased opacity for performance */
                 --surface-highlight: #2c2c2e;
                 --accent-color: #0a84ff;
                 --accent-gradient: linear-gradient(135deg, #0a84ff, #5ac8fa);
@@ -56,6 +58,7 @@ class SongPicker extends HTMLElement {
                 transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
                 position: relative;
                 box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+                will-change: transform; /* GPU Acceleration */
             }
             
             @media (min-width: 600px) {
@@ -64,7 +67,7 @@ class SongPicker extends HTMLElement {
 
             :host(.active) .picker-container { transform: translateY(0); }
 
-            /* --- 2. HEADER SECTION (Glassmorphism) --- */
+            /* --- 2. HEADER SECTION --- */
             .header-area { 
                 padding: calc(20px + var(--safe-area-top)) 20px 16px 20px;
                 background: var(--surface-glass);
@@ -120,6 +123,7 @@ class SongPicker extends HTMLElement {
                 flex: 1; overflow-y: auto; 
                 padding: 10px 20px calc(100px + var(--safe-area-bottom)) 20px; 
                 scrollbar-width: none; 
+                contain: content; /* Rendering Optimization */
             }
             .scroll-container::-webkit-scrollbar { display: none; }
 
@@ -153,7 +157,7 @@ class SongPicker extends HTMLElement {
             .bookmark-btn:active { transform: scale(1.2); }
             .song-row:hover .bookmark-btn { opacity: 1; }
 
-            /* --- 4. MINI PLAYER (Glassmorphism) --- */
+            /* --- 4. MINI PLAYER --- */
             .mini-player {
                 position: absolute; bottom: 0; left: 0; right: 0; z-index: 50;
                 background: var(--surface-glass);
@@ -196,7 +200,6 @@ class SongPicker extends HTMLElement {
             
             .text-center { text-align: center; color: var(--text-secondary); padding: 60px 20px; font-size: 15px; font-weight: 500; }
             
-            /* Dynamic Greeting Styles */
             .greeting { font-size: 13px; color: var(--accent-color); font-weight: 600; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
         </style>
 
@@ -255,7 +258,7 @@ class SongPicker extends HTMLElement {
         // --- CONFIGURATION ---
         this.API_URL = "https://itunes.apple.com/search";
         this.PAGE_SIZE = 20; 
-        this.MAX_LIMIT = 50; // OPTIMIZED: Down to 50 for speed
+        this.MAX_LIMIT = 40; 
         this.PROXIES = [
             "https://api.allorigins.win/raw?url=",
             "https://corsproxy.io/?",
@@ -266,22 +269,16 @@ class SongPicker extends HTMLElement {
         this.allFetchedSongs = []; 
         this.renderedCount = 0; 
         this.isLoadingMore = false; 
-        this.pendingBackgroundUpdate = null; // Stores data fetched silently
         
         this.DB = {
             getSaved: () => JSON.parse(localStorage.getItem('insta_saved')) || [],
             setSaved: (data) => localStorage.setItem('insta_saved', JSON.stringify(data)),
-            
             getCache: (key) => JSON.parse(localStorage.getItem('picker_cache_' + key)) || null,
             setCache: (key, data) => localStorage.setItem('picker_cache_' + key, JSON.stringify(data)),
-            
-            // New: Separate cache for "Next Up" background data
             getNextCache: () => JSON.parse(localStorage.getItem('picker_cache_next_foryou')) || null,
             setNextCache: (data) => localStorage.setItem('picker_cache_next_foryou', JSON.stringify(data)),
-            
             globalCache: {}, 
             addToGlobal: (songs) => songs.forEach(s => this.DB.globalCache[s.trackId] = s),
-
             getHistory: () => JSON.parse(localStorage.getItem('picker_history')) || [],
             addToHistory: (song) => {
                 let history = this.DB.getHistory();
@@ -289,43 +286,30 @@ class SongPicker extends HTMLElement {
                 history.unshift(song);
                 localStorage.setItem('picker_history', JSON.stringify(history.slice(0, 50)));
             },
-
-            // --- SESSION RESTORATION LOGIC ---
             saveSession: (tab, list, scroll, query, header) => {
                 const session = { 
-                    tab, 
-                    list: list.slice(0, 50), // Save strict snapshot
-                    scroll, 
-                    query, 
-                    header,
-                    timestamp: Date.now() 
+                    tab, list: list.slice(0, 50), scroll, query, header, timestamp: Date.now() 
                 };
                 localStorage.setItem('picker_last_session', JSON.stringify(session));
             },
             getLastSession: () => JSON.parse(localStorage.getItem('picker_last_session')),
-
-            // --- ASSET PRELOADER (BACKGROUND DOWNLOAD) ---
+            
+            // SPEED: Only preload if not on slow connection
             preloadAssets: (songs) => {
                 if(!songs || songs.length === 0) return;
-                // Preload top 5 songs' audio and images into browser cache
-                const top5 = songs.slice(0, 5);
-                top5.forEach(s => {
-                    // Force browser to cache image
+                // If data saver is on, do NOT preload audio
+                if(navigator.connection && navigator.connection.saveData) return;
+
+                const top3 = songs.slice(0, 3);
+                top3.forEach(s => {
                     const img = new Image();
                     img.src = s.artworkUrl100.replace('100x100bb', '300x300bb');
-                    // Force browser to cache audio (without playing)
-                    const audio = new Audio();
-                    audio.preload = 'auto';
-                    audio.src = s.previewUrl;
                 });
             },
 
-            getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v5')) || { 
-                artists: {}, genres: {}, timeContext: {}, explicitPref: false 
-            },
+            getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v5')) || { artists: {}, genres: {}, timeContext: {}, explicitPref: false },
             setUserProfile: (data) => localStorage.setItem('picker_user_profile_v5', JSON.stringify(data)),
 
-            // --- DEEP LEARNING TRACKING ---
             trackInteraction: (song, weight) => {
                 if(!song) return;
                 const profile = this.DB.getUserProfile();
@@ -339,9 +323,6 @@ class SongPicker extends HTMLElement {
                     profile.timeContext[currentHour][genre] = (profile.timeContext[currentHour][genre] || 0) + weight;
                 }
                 this.DB.setUserProfile(profile);
-                
-                // Trigger a silent background re-calculation since preferences changed
-                setTimeout(() => this.runBackgroundUpdate(), 1000);
             },
 
             getRecommendationQuery: () => {
@@ -357,7 +338,6 @@ class SongPicker extends HTMLElement {
                 let query = "";
                 let reason = "Top Hits";
 
-                // Refined Logic: Add variety if user has high repetition
                 if (dice < 0.3 && timeSpecificGenres.length > 0) {
                     query = timeSpecificGenres[0] + " hits";
                     reason = getTimeGreeting() + " • " + timeSpecificGenres[0];
@@ -373,7 +353,6 @@ class SongPicker extends HTMLElement {
                     reason = "Your favorite: " + genre;
                 } 
                 else if (history.length > 0) {
-                    // Sometimes pick the 2nd most recent to avoid loops
                     const hIndex = history.length > 2 && Math.random() > 0.5 ? 1 : 0;
                     query = history[hIndex].artistName;
                     reason = "Jump back in";
@@ -410,6 +389,9 @@ class SongPicker extends HTMLElement {
 
         let searchTimer;
         this.searchInput.addEventListener('input', (e) => {
+            // SPEED: Abort any pending requests immediately
+            if (this.fetchController) this.fetchController.abort();
+            
             clearTimeout(searchTimer);
             let val = e.target.value.trim();
             val = val.replace(/\s+/g, ' ').replace(/[^\w\s]/gi, '');
@@ -439,97 +421,68 @@ class SongPicker extends HTMLElement {
         });
     }
 
-    // --- NEW: RESTORE EXACT STATE ON OPEN ---
     restoreState() {
         const lastSession = this.DB.getLastSession();
-        // If session exists and is less than 24h old
         if (lastSession && (Date.now() - lastSession.timestamp < 86400000)) {
-            // Restore Tab UI
             this.activeTab = lastSession.tab;
             this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => {
                 b.classList.toggle('active', b.innerText === lastSession.tab || (lastSession.tab === 'Charts' && b.id === 'tabTrending'));
             });
-
-            // Restore Data
             this.allFetchedSongs = lastSession.list;
             this.searchInput.value = lastSession.query || "";
             this.currentHeaderTitle = lastSession.header;
-
-            // Render
             this.renderInitialList(this.allFetchedSongs, lastSession.header);
-            
-            // Restore Scroll Position
-            setTimeout(() => {
-                if(this.list) this.list.scrollTop = lastSession.scroll;
-            }, 0);
-
-            // Preload assets for instant play
-            if('requestIdleCallback' in window) {
-                window.requestIdleCallback(() => this.DB.preloadAssets(this.allFetchedSongs));
-            } else {
-                setTimeout(() => this.DB.preloadAssets(this.allFetchedSongs), 1000);
-            }
-
+            setTimeout(() => { if(this.list) this.list.scrollTop = lastSession.scroll; }, 0);
             return true;
         }
         return false;
     }
 
-    // --- NEW: SILENT BACKGROUND BRAIN ---
     async runBackgroundUpdate() {
-        // This calculates the NEXT recommendation silently
+        // SPEED: Do not run background tasks if hidden
+        if (!this.classList.contains('active')) return;
+
         const rec = this.DB.getRecommendationQuery();
-        
-        // Don't fetch if it's the same as what we already have on screen
         if (this.currentHeaderTitle && this.currentHeaderTitle.includes(rec.query)) return;
 
-        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
+        // SPEED: Only fetch a small amount in background
+        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=15`;
         
-        const fetchWithProxy = async (proxyUrl) => {
-            const res = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-            if (!res.ok) throw new Error('Proxy failed');
-            return res.json();
-        };
-
         try {
-            // Fetch silently
-            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p)));
-            if(data.results && data.results.length > 0) {
-                // Shuffle & Filter
+             // Basic fetch without abort controller for background
+             const fetchRaw = async (url) => {
+                const res = await fetch(url);
+                return res.json();
+             }
+             // Use just one proxy for background to save bandwidth, fallback if needed
+             const data = await fetchRaw(this.PROXIES[1] + encodeURIComponent(targetUrl));
+             
+             if(data.results && data.results.length > 0) {
                 const savedIds = this.DB.getSaved().map(s => s.trackId);
                 let results = data.results.filter(s => !savedIds.includes(s.trackId));
                 results = results.sort(() => Math.random() - 0.5);
-
-                // Store in "Next Cache" (Waiting Room)
                 const cacheData = { songs: results, header: rec.reason };
                 this.DB.setNextCache(cacheData);
-                
-                // Preload assets NOW so they are ready LATER
-                this.DB.preloadAssets(results);
             }
-        } catch (e) {
-            // Silent fail is fine in background
-        }
+        } catch (e) {}
     }
 
     open() {
         this.classList.add('active');
         history.pushState({ modalOpen: true }, "", "");
-        
-        // 1. Try to restore exact place
         const restored = this.restoreState();
-
-        // 2. If not restored, default to For You
         if (!restored) {
             this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
-        } else {
-            // 3. Trigger background update for next time
-            this.runBackgroundUpdate();
         }
     }
 
     close() {
-        // Save state before closing
+        // SPEED: KILL ALL NETWORK ACTIVITY INSTANTLY
+        if (this.fetchController) {
+            this.fetchController.abort();
+            this.fetchController = null;
+        }
+
         this.DB.saveSession(
             this.activeTab, 
             this.allFetchedSongs, 
@@ -557,6 +510,9 @@ class SongPicker extends HTMLElement {
     }
 
     async switchTab(name, btn) {
+        // SPEED: Kill previous tab requests
+        if (this.fetchController) this.fetchController.abort();
+
         this.activeTab = name;
         this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -579,23 +535,14 @@ class SongPicker extends HTMLElement {
         let subHeading = "Trending Now";
 
         if (name === 'For You') {
-            // INTELLIGENT SWITCH:
-            // Check if we have a "Next Up" cache prepared from background
             const nextCache = this.DB.getNextCache();
             if (nextCache && nextCache.songs.length > 0) {
-                // Use the fresh background data instantly
                 this.allFetchedSongs = nextCache.songs;
                 this.currentHeaderTitle = nextCache.header;
                 this.renderInitialList(nextCache.songs, nextCache.header);
-                
-                // Clear the "Next Cache" as we consumed it
                 this.DB.setNextCache(null);
-                
-                // Trigger generation of the *next* batch in background
-                this.runBackgroundUpdate();
                 return;
             }
-
             cacheKey = 'foryou';
             const rec = this.DB.getRecommendationQuery();
             query = rec.query;
@@ -604,12 +551,10 @@ class SongPicker extends HTMLElement {
 
         const cachedData = this.DB.getCache(cacheKey);
         
-        // Standard Cache Fallback
         if (cachedData && cachedData.length > 0 && name !== 'For You') { 
             this.allFetchedSongs = cachedData;
             this.currentHeaderTitle = subHeading;
             this.renderInitialList(cachedData, subHeading); 
-            this.DB.preloadAssets(cachedData);
         } else {
             this.renderSkeletonLoading();
             this.loadData(query, false, cacheKey, name === 'For You', subHeading);
@@ -618,7 +563,7 @@ class SongPicker extends HTMLElement {
 
     renderSkeletonLoading() {
         let html = '';
-        for(let i=0; i<8; i++) {
+        for(let i=0; i<6; i++) {
             html += `
             <div class="loading-skeleton">
                 <div class="sk-img"></div>
@@ -631,18 +576,59 @@ class SongPicker extends HTMLElement {
         this.list.innerHTML = html;
     }
 
+    // --- SPEED OPTIMIZED DATA LOADING ---
     async loadData(query, silent = false, cacheKey = null, isRecommendation = false, subHeadingTitle = "") {
-        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
+        // 1. Kill any existing request
+        if (this.fetchController) this.fetchController.abort();
         
-        const fetchWithProxy = async (proxyUrl) => {
-            const res = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-            if (!res.ok) throw new Error('Proxy failed');
-            return res.json();
+        // 2. Create new controller for this specific request
+        this.fetchController = new AbortController();
+        const signal = this.fetchController.signal;
+
+        // 3. SPEED: FIRST FETCH - Get only 6 items (Tiny payload, fast render)
+        // This simulates "One by One" visual speed
+        const limitSmall = 8;
+        const targetUrlSmall = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${limitSmall}`;
+        
+        const fetchWithProxy = async (proxyUrl, url) => {
+            // SPEED: Timeout after 4 seconds to try next proxy
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 4000);
+            
+            try {
+                // Merge external abort signal with timeout signal
+                const combinedSignal = anySignal([signal, controller.signal]);
+                
+                const res = await fetch(proxyUrl + encodeURIComponent(url), { signal: combinedSignal });
+                clearTimeout(id);
+                if (!res.ok) throw new Error('Proxy failed');
+                return res.json();
+            } catch (e) {
+                clearTimeout(id);
+                throw e;
+            }
         };
 
+        // Helper to combine signals
+        function anySignal(signals) {
+            const controller = new AbortController();
+            for (const signal of signals) {
+                if (signal.aborted) {
+                    controller.abort();
+                    return signal;
+                }
+                signal.addEventListener("abort", () => controller.abort(), { once: true });
+            }
+            return controller.signal;
+        }
+
         try {
-            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p)));
+            // --- STAGE 1: Fast Render (First 8 items) ---
+            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p, targetUrlSmall)));
             
+            // Check if aborted during await
+            if (signal.aborted) return;
+
             if(data.results && data.results.length > 0) {
                 let results = data.results;
                 this.DB.addToGlobal(results);
@@ -650,32 +636,70 @@ class SongPicker extends HTMLElement {
                 if (isRecommendation) {
                     const savedIds = this.DB.getSaved().map(s => s.trackId);
                     results = results.filter(s => !savedIds.includes(s.trackId));
-                    results = results.sort(() => Math.random() - 0.5);
                 }
 
                 this.allFetchedSongs = results;
                 this.currentHeaderTitle = subHeadingTitle;
                 
-                if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
-                    this.DB.setCache(cacheKey, results);
-                }
-                
-                // Render
+                // Render immediately so user sees something
                 this.renderInitialList(results, subHeadingTitle);
-
-                // BACKGROUND: Cache Audio/Images for instant play
-                this.DB.preloadAssets(results);
                 
-                // If this was a fresh load, prepare the next batch in background
-                if(isRecommendation) {
-                     setTimeout(() => this.runBackgroundUpdate(), 5000);
+                // --- STAGE 2: Fetch the rest in background if still open ---
+                // Wait 100ms to let UI settle
+                if (!signal.aborted) {
+                     this.fetchRestInBackground(query, cacheKey, isRecommendation, signal);
                 }
 
             } else {
-                if(!silent) this.list.innerHTML = `<div class="text-center">No results found for "${query}"</div>`;
+                if(!silent) this.list.innerHTML = `<div class="text-center">No results found.</div>`;
             }
         } catch (error) {
-            if (!silent) this.list.innerHTML = `<div class="text-center" style="color: #ff453a;">Unable to connect to music service.</div>`;
+            if (signal.aborted) return;
+            if (!silent) this.list.innerHTML = `<div class="text-center" style="color: #ff453a;">Weak connection. Retrying...</div>`;
+        }
+    }
+
+    async fetchRestInBackground(query, cacheKey, isRecommendation, signal) {
+        // Fetch 40 items now
+        const targetUrlBig = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
+        
+        try {
+             const fetchRaw = async (p) => {
+                 const res = await fetch(p + encodeURIComponent(targetUrlBig), { signal });
+                 return res.json();
+             }
+             
+             // Use Promise.any again for the big batch
+             const data = await Promise.any(this.PROXIES.map(p => fetchRaw(p)));
+             
+             if (signal.aborted) return;
+
+             if(data.results && data.results.length > 0) {
+                 let results = data.results;
+                 
+                 // Deduplicate against what we already showed
+                 const existingIds = this.allFetchedSongs.map(s => s.trackId);
+                 let newSongs = results.filter(s => !existingIds.includes(s.trackId));
+                 
+                 if (isRecommendation) {
+                     const savedIds = this.DB.getSaved().map(s => s.trackId);
+                     newSongs = newSongs.filter(s => !savedIds.includes(s.trackId));
+                 }
+                 
+                 // Append new songs to our list
+                 this.allFetchedSongs = [...this.allFetchedSongs, ...newSongs];
+                 
+                 // Update Cache now that we have full list
+                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
+                    this.DB.setCache(cacheKey, this.allFetchedSongs);
+                 }
+                 
+                 // The scroll listener will pick these up automatically,
+                 // but we can trigger a check just in case screen isn't full
+                 this.loadMoreItems();
+             }
+        } catch (e) {
+            // Background fetch failed, that's fine, user has at least 8 songs
         }
     }
 
@@ -701,6 +725,7 @@ class SongPicker extends HTMLElement {
         if (this.isLoadingMore || this.renderedCount >= this.allFetchedSongs.length) return;
         this.isLoadingMore = true;
         
+        // SPEED: Use Animation Frame for smoother scrolling during render
         requestAnimationFrame(() => {
             this.appendBatch();
             this.isLoadingMore = false;
@@ -721,6 +746,7 @@ class SongPicker extends HTMLElement {
 
         songs.forEach(song => {
             const isSaved = savedIds.includes(song.trackId);
+            // SPEED: Lazy loading image string
             const art = song.artworkUrl100.replace('100x100bb', '300x300bb'); 
             
             const item = document.createElement('div');
@@ -732,7 +758,7 @@ class SongPicker extends HTMLElement {
 
             item.innerHTML = `
                 <div class="song-info">
-                    <img src="${art}" class="song-art" loading="lazy">
+                    <img src="${art}" class="song-art" loading="lazy" decoding="async">
                     <div class="song-text">
                         <span class="song-title">${song.trackName}</span>
                         <span class="song-artist">${song.artistName}</span>
@@ -761,8 +787,6 @@ class SongPicker extends HTMLElement {
             if(song) {
                 saved.push(song);
                 this.DB.trackInteraction(song, 10);
-                // Also cache saved songs
-                this.DB.preloadAssets([song]);
             }
         }
         
