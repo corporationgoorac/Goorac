@@ -314,6 +314,27 @@
             100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(-20px); } /* Stay Visible */
         }
 
+        /* VIBE MATCH OVERLAY */
+        .vibe-match-text {
+            position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            font-family: 'Orbitron', sans-serif; font-weight: 900; font-style: italic;
+            font-size: 32px; letter-spacing: -1px;
+            background: linear-gradient(45deg, #ff3b30, #ff9500);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            z-index: 9999; pointer-events: none;
+            filter: drop-shadow(0 0 20px rgba(255, 59, 48, 0.8));
+            text-align: center; width: 100%;
+        }
+        .vibe-match-text.animate { animation: vibeExplode 3s ease-out forwards; }
+
+        @keyframes vibeExplode {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-10deg); opacity: 0; }
+            15% { transform: translate(-50%, -50%) scale(1.5) rotate(5deg); opacity: 1; }
+            30% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+            80% { transform: translate(-50%, -50%) scale(1.1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(3) rotate(0deg); opacity: 0; }
+        }
+
         /* Controls */
         .controls-area { 
             width: 100%; min-height: 60px; 
@@ -485,6 +506,8 @@
                     <div class="track-name" id="active-song-title">Pulse Active</div>
                     <div class="track-artist" id="active-song-artist">Waiting for selection...</div>
                 </div>
+                
+                <div id="vibe-match-text" class="vibe-match-text">VIBE MATCH!</div>
             </div>
 
             <div class="bottom-cluster">
@@ -688,6 +711,10 @@
         let emojiCloseTimer = null; 
         let turnTimer = null; 
 
+        // Vibe Match State
+        let lastReactionTimeMe = 0;
+        let lastReactionTimeThem = 0;
+
         // -----------------------------------------------------------------
         // AUTHENTICATION & SETUP
         // -----------------------------------------------------------------
@@ -865,9 +892,9 @@
         function cleanSessionStart() {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
             roomRef.set({ 
-                turn: startingTurn,          
+                turn: startingTurn,           
                 cycleStatus: 'picking',
-                currentSong: null,            
+                currentSong: null,             
                 emojis: {},
                 ready: {} 
             }, { merge: true });
@@ -906,8 +933,10 @@
                     controls.appendChild(btn);
                     document.getElementById('active-song-artist').innerText = "It's your turn to pick.";
                 } else {
-                    const name = targetProfile ? targetProfile.name.split(' ')[0] : 'Partner';
-                    controls.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">${name} IS CHOOSING...</p>`;
+                    // UPDATED PARTNER TEXT LOGIC WITH BADGE
+                    const name = targetProfile ? targetProfile.name.split(' ')[0].toUpperCase() : 'THEM';
+                    const badge = (targetProfile && targetProfile.verified) ? `<span class="material-icons-round" style="font-size:12px; color:var(--verified-color); vertical-align:middle; margin-left:2px;">verified</span>` : '';
+                    controls.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">${name} ${badge} IS CHOOSING...</p>`;
                     document.getElementById('active-song-artist').innerText = "Waiting for track...";
                 }
             }
@@ -1128,9 +1157,11 @@
             if (who === 'me') {
                 if (lastReactionMe === emoji) return;
                 lastReactionMe = emoji;
+                lastReactionTimeMe = Date.now(); // UPDATE TIMESTAMP
             } else {
                 if (lastReactionThem === emoji) return;
                 lastReactionThem = emoji;
+                lastReactionTimeThem = Date.now(); // UPDATE TIMESTAMP
             }
 
             // 1. Show Waiting Screen Seated Emoji (Legacy support)
@@ -1154,12 +1185,35 @@
 
             // 3. Trigger Full Screen Physics Effect
             particleEngine.spawn(emoji);
+
+            // 4. VIBE MATCH LOGIC
+            if (lastReactionMe && lastReactionThem && lastReactionMe === lastReactionThem) {
+                const diff = Math.abs(lastReactionTimeMe - lastReactionTimeThem);
+                if (diff < 5000) { // Same emoji within 5 seconds
+                    triggerVibeMatch();
+                }
+            }
+        }
+
+        function triggerVibeMatch() {
+            const el = document.getElementById('vibe-match-text');
+            el.classList.remove('animate');
+            void el.offsetWidth;
+            el.classList.add('animate');
+            
+            // Extra visual flair
+            particleEngine.spawn(lastReactionMe);
+            if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
         }
 
         function resetEmojiState() {
             hasPickedEmoji = false;
             lastReactionMe = null;
             lastReactionThem = null;
+            lastReactionTimeMe = 0;
+            lastReactionTimeThem = 0;
+            document.getElementById('vibe-match-text').classList.remove('animate');
+            
             document.querySelectorAll('.seated-emoji').forEach(el => {
                 el.classList.remove('show');
                 el.innerText = '';
@@ -1266,6 +1320,7 @@
             cleanupSessionData();
 
             if (mode === 'back') {
+                // Tries to go back in history, falls back to lobby if history is empty
                 if (window.history.length > 1) {
                     window.history.back();
                 } else {
