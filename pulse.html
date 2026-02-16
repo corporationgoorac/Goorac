@@ -1092,32 +1092,61 @@
                 const song = data.currentSong;
                 updateSongDisplay(song);
                 document.getElementById('album-container').classList.add('buffering'); 
-                document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:var(--accent);">SYNCING...</p>`;
                 
-                // FIXED: Explicitly reset emoji state when a new song loads in buffering phase
+                // Show status text based on who is ready
+                const readyMap = data.ready || {};
+                const amIReady = readyMap[myUid];
+                const isThemReady = readyMap[targetUid];
+
+                if (!amIReady) {
+                    document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:var(--accent); animation: pulse 1s infinite;">BUFFERING MEDIA...</p>`;
+                } else if (!isThemReady) {
+                     // Fast internet user sees this
+                    document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:#fff;">WAITING FOR PARTNER...</p>`;
+                } else {
+                    document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:var(--radio-color);">STARTING...</p>`;
+                }
+                
+                // Load Audio if new song
                 if (currentSongId !== song.id) {
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
-                    audio.load(); // Faster buffering triggers
+                    audio.load(); 
                     
-                    // CRITICAL: Reset emoji state so the picker pops up again
                     resetEmojiState();
 
-                    // Ready Logic
-                    // FIX: Changed readiness check to be more aggressive for instant play
-                    audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
-                    if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
+                    // EVENT: When MY internet finishes downloading the buffer
+                    // "canplaythrough" means we have enough data to play without stopping
+                    audio.oncanplaythrough = () => { 
+                        if(!readyMap[myUid]) {
+                            roomRef.update({ [`ready.${myUid}`]: true }); 
+                        }
+                    };
+                    
+                    // Fallback: Sometimes canplaythrough doesn't fire if already loaded
+                    if(audio.readyState >= 3 && !readyMap[myUid]) { 
+                        roomRef.update({ [`ready.${myUid}`]: true }); 
+                    }
                 }
 
-                // If host sees both ready or timeout
-                // In Radio Mode, Host forces play faster
+                // HOST LOGIC: Decide when to start
                 if (isMyTurn || isRadioHost) {
-                    const readyMap = data.ready || {};
                     const elapsed = Date.now() - (data.timestamp || Date.now());
-                    // FIX: Reduced timeout for "Instant Buffer" feel
-                    const timeout = isRadioMode ? 1000 : 2000;
-                    if ((readyMap[myUid] && readyMap[targetUid]) || elapsed > timeout) {
-                        roomRef.update({ cycleStatus: 'playing' });
+                    
+                    // FIX: Increased timeout to 15 seconds for slow 4G internet
+                    // This allows the slow user time to download the song
+                    const TIMEOUT_LIMIT = 15000; 
+                    
+                    const bothReady = (readyMap[myUid] && readyMap[targetUid]);
+                    const timedOut = elapsed > TIMEOUT_LIMIT;
+
+                    if (bothReady || timedOut) {
+                        // CRITICAL FIX: Reset the timestamp when we actually start playing.
+                        // This ensures the slow user doesn't start "behind" and glitch.
+                        roomRef.update({ 
+                            cycleStatus: 'playing',
+                            timestamp: Date.now() 
+                        });
                     }
                 }
             }
