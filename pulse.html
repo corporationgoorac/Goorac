@@ -54,7 +54,7 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             height: 100dvh; width: 100vw; overflow: hidden;
             display: flex; flex-direction: column;
-            transition: background 1.2s ease;
+            transition: background 0.1s linear; /* Faster transition for beat pulse */
         }
 
         /* =========================================
@@ -207,26 +207,31 @@
             max-height: 65vh; 
         }
 
-        /* Visualizer - Resized & Behind Album */
+        /* NEW VISUALIZER STYLES */
         #visualizer {
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%);
-            width: 80vw; max-width: 320px; height: 80vw; max-height: 320px; 
-            z-index: 1; pointer-events: none; opacity: 0.6;
+            width: 120vw; max-width: 450px; /* Slightly larger to halo the album */
+            height: 120vw; max-height: 450px; 
+            z-index: 1; pointer-events: none; opacity: 1;
             transition: opacity 0.3s;
         }
 
-        /* Album Art - Resized Smaller */
+        /* Album Art */
         .album-box {
-            width: 55vw; height: 55vw; 
-            max-width: 220px; max-height: 220px; 
-            border-radius: 20px; background: #111;
+            width: 60vw; height: 60vw; 
+            max-width: 240px; max-height: 240px; 
+            border-radius: 50%; /* Circle Album Art */
+            background: #111;
             margin-bottom: 25px; position: relative; z-index: 5;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
-            transform: scale(0.95); transition: 0.6s var(--ease-out-back);
-            overflow: hidden; border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 0 50px rgba(0,0,0,0.6);
+            transform: scale(0.95); transition: transform 0.1s cubic-bezier(0,0,0.2,1); /* Faster for beat bounce */
+            overflow: hidden; border: 2px solid rgba(255,255,255,0.1);
         }
-        .album-box.playing { transform: scale(1); box-shadow: 0 30px 60px -20px rgba(0,0,0,0.9); border-color: rgba(255,255,255,0.1); }
+        .album-box.playing { 
+            /* transform is handled by JS for beat matching now */
+            border-color: rgba(255,255,255,0.2); 
+        }
         .album-box.buffering { animation: breathe 2s infinite ease-in-out; }
         @keyframes breathe { 0%, 100% { opacity: 1; transform: scale(0.95); } 50% { opacity: 0.7; transform: scale(0.93); } }
 
@@ -241,15 +246,15 @@
         }
 
         /* Track Info */
-        .track-info { text-align: center; padding: 0 20px; position: relative; z-index: 10; width: 100%; margin-top: 0; }
+        .track-info { text-align: center; padding: 0 20px; position: relative; z-index: 10; width: 100%; margin-top: 20px; }
         .track-name { 
-            font-size: 18px; 
+            font-size: 20px; 
             font-weight: 700; margin-bottom: 6px; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.8); line-height: 1.2;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
         .track-artist { 
-            font-size: 13px; color: var(--text-secondary); font-weight: 500; 
+            font-size: 14px; color: var(--text-secondary); font-weight: 500; 
             letter-spacing: 0.5px;
         }
 
@@ -518,8 +523,7 @@
 
     <script>
         // =================================================================
-        // PARTICLE ENGINE (FULL SCREEN EFFECTS)
-        // Handles: 🖤 ❤️ ❣️ 😍 🥰 💎 🔥
+        // UPGRADED PARTICLE ENGINE (PHYSICS & EXPLOSIONS)
         // =================================================================
         
         class ParticleEngine {
@@ -538,29 +542,27 @@
             }
 
             spawn(emoji) {
-                const count = (emoji === '🔥' || emoji === '💎') ? 60 : 40;
-                const type = this.getEffectType(emoji);
+                // Determine effect type based on emoji
+                let type = 'explode'; // Default
+                if (['❤️', '😍', '🥰', '💕'].includes(emoji)) type = 'heart-fountain';
+                if (['🔥', '💎', '✨', '⚡️'].includes(emoji)) type = 'rain';
+                
+                const count = (type === 'rain') ? 60 : 40;
                 
                 for (let i = 0; i < count; i++) {
                     this.particles.push(new Particle(this.canvas.width, this.canvas.height, emoji, type));
                 }
             }
 
-            getEffectType(emoji) {
-                if (emoji === '🔥') return 'fire';
-                if (emoji === '💎') return 'shimmer';
-                if (['❤️', '🖤', '❣️'].includes(emoji)) return 'float-up';
-                return 'explode';
-            }
-
             animate() {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 
                 for (let i = 0; i < this.particles.length; i++) {
-                    this.particles[i].update();
-                    this.particles[i].draw(this.ctx);
+                    const p = this.particles[i];
+                    p.update();
+                    p.draw(this.ctx);
                     
-                    if (this.particles[i].life <= 0) {
+                    if (p.life <= 0 || p.y > this.canvas.height + 100) {
                         this.particles.splice(i, 1);
                         i--;
                     }
@@ -573,57 +575,55 @@
             constructor(w, h, emoji, type) {
                 this.emoji = emoji;
                 this.type = type;
-                this.w = w;
-                this.h = h;
-                
-                // Defaults
-                this.x = w / 2;
-                this.y = h * 0.8; // Start near bottom/player
-                this.size = Math.random() * 20 + 20;
-                this.vx = (Math.random() - 0.5) * 4;
-                this.vy = (Math.random() * -5) - 2;
-                this.life = 100;
+                this.w = w; this.h = h;
+                this.life = 100 + Math.random() * 50;
                 this.alpha = 1;
-                this.rotation = (Math.random() - 0.5) * 0.5;
-                this.angle = 0;
+                this.size = Math.random() * 25 + 15; // Bigger emojis
+                this.angle = Math.random() * Math.PI * 2;
+                this.spin = (Math.random() - 0.5) * 0.2;
 
-                // Type Specifics
-                if (type === 'fire') {
-                    this.y = h;
-                    this.vy = (Math.random() * -8) - 3;
-                    this.vx = (Math.random() - 0.5) * 2;
-                    this.life = Math.random() * 60 + 40;
-                } 
-                else if (type === 'shimmer') {
-                    this.x = Math.random() * w;
-                    this.y = Math.random() * h;
-                    this.vx = 0;
-                    this.vy = -1;
-                    this.life = 80;
-                    this.size = Math.random() * 30 + 10;
-                }
-                else if (type === 'explode') {
+                if (type === 'explode') {
+                    // Start center, explode outward
                     this.x = w / 2;
                     this.y = h / 2;
-                    this.vx = (Math.random() - 0.5) * 15;
-                    this.vy = (Math.random() - 0.5) * 15;
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 10 + 5;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.gravity = 0.3;
+                    this.drag = 0.96;
+                } 
+                else if (type === 'heart-fountain') {
+                    // Start bottom center, shoot up
+                    this.x = w / 2;
+                    this.y = h;
+                    this.vx = (Math.random() - 0.5) * 6;
+                    this.vy = -(Math.random() * 15 + 10);
+                    this.gravity = 0.4;
+                    this.drag = 0.98;
+                }
+                else if (type === 'rain') {
+                    // Start top, fall down
+                    this.x = Math.random() * w;
+                    this.y = -50;
+                    this.vx = (Math.random() - 0.5) * 2;
+                    this.vy = Math.random() * 5 + 5;
+                    this.gravity = 0.1;
+                    this.drag = 1;
                 }
             }
 
             update() {
                 this.x += this.vx;
                 this.y += this.vy;
-                this.angle += this.rotation;
+                this.vy += this.gravity;
+                this.vx *= this.drag;
+                this.vy *= this.drag;
+                this.angle += this.spin;
                 this.life--;
-                this.alpha = this.life / 100;
-
-                if (this.type === 'float-up') {
-                    this.vx += (Math.random() - 0.5) * 0.2; // Wiggle
-                } else if (this.type === 'fire') {
-                    this.size *= 0.96; // Shrink
-                } else if (this.type === 'explode') {
-                    this.vy += 0.5; // Gravity
-                }
+                
+                // Fade out near end
+                if (this.life < 20) this.alpha = this.life / 20;
             }
 
             draw(ctx) {
@@ -631,7 +631,7 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
                 ctx.globalAlpha = this.alpha;
-                ctx.font = `${this.size}px Arial`;
+                ctx.font = `${this.size}px "Apple Color Emoji", "Segoe UI Emoji", Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.emoji, 0, 0);
@@ -670,12 +670,14 @@
         let roomRef = null;
         let roomUnsub = null;
         let audio = new Audio();
-        // FORCE ANONYMOUS FOR VISUALIZER
+        // FORCE ANONYMOUS FOR VISUALIZER - CRITICAL
         audio.crossOrigin = "anonymous";
         
         // Visualizer Vars
         let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
-        let audioSourceNode = null; // Fix for multiple connection attempts
+        let audioSourceNode = null; 
+        let rotationAngle = 0; // For rotating the visualizer
+        let bassHistory = []; // For beat detection
 
         // State
         let currentTurnUid = null;
@@ -810,7 +812,6 @@
             requestWakeLock();
 
             // Setup Listeners
-            // REPLACED: Only clean data on unload, don't force redirect loop
             window.addEventListener('beforeunload', cleanupSessionData);
             window.addEventListener('pagehide', cleanupSessionData);
             document.addEventListener('visibilitychange', () => { 
@@ -866,7 +867,7 @@
             roomRef.set({ 
                 turn: startingTurn,          
                 cycleStatus: 'picking',
-                currentSong: null,           
+                currentSong: null,            
                 emojis: {},
                 ready: {} 
             }, { merge: true });
@@ -949,9 +950,10 @@
                 document.getElementById('album-container').classList.add('playing');
                 document.getElementById('controls-container').innerHTML = '';
 
-                // Dynamic Background
+                // Dynamic Background handled by Beat Detection now
+                // Initial set
                 const hue = (data.currentSong.artistName.length * 40) % 360;
-                document.body.style.background = `radial-gradient(circle at center, hsla(${hue}, 60%, 10%, 1), #050505 90%)`;
+                document.body.dataset.baseHue = hue;
 
                 if (audio.paused) {
                     audio.play().then(() => {
@@ -979,24 +981,25 @@
         }
 
         // -----------------------------------------------------------------
-        // AUDIO VISUALIZER (FIXED)
+        // NEW PERFECT CIRCULAR VISUALIZER
         // -----------------------------------------------------------------
         function setupVisualizer() {
-            if (audioCtx) return; // Already setup
+            if (audioCtx) return; 
             
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 analyser = audioCtx.createAnalyser();
                 
-                // CRITICAL FIX: Only create MediaElementSource ONCE per audio element
+                // CRITICAL: Only create MediaElementSource ONCE per audio element
                 if (!audioSourceNode) {
                     audioSourceNode = audioCtx.createMediaElementSource(audio);
                     audioSourceNode.connect(analyser);
                     analyser.connect(audioCtx.destination);
                 }
 
-                analyser.fftSize = 128;
+                // Higher FFT size for smoother circle
+                analyser.fftSize = 256; 
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
                 
                 canvas = document.getElementById('visualizer');
@@ -1006,7 +1009,6 @@
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 
-                // Ensure canvas has size
                 if (rect.width > 0) {
                     canvas.width = rect.width * dpr;
                     canvas.height = rect.height * dpr;
@@ -1023,36 +1025,66 @@
 
             analyser.getByteFrequencyData(dataArray);
             
-            // Clear based on internal size
+            // 1. BEAT DETECTION ALGORITHM (Bass Frequencies: 0-10)
+            let bassTotal = 0;
+            for(let i=0; i<8; i++) { bassTotal += dataArray[i]; }
+            const bassAvg = bassTotal / 8;
+            
+            // A. Pulse Background Brightness
+            const baseHue = document.body.dataset.baseHue || 200;
+            const lightness = 5 + (bassAvg / 255) * 15; // Pulse between 5% and 20%
+            document.body.style.background = `radial-gradient(circle at center, hsla(${baseHue}, 60%, ${lightness}%, 1), #000 90%)`;
+
+            // B. Pulse Album Art
+            const scale = 0.95 + (bassAvg / 255) * 0.15; // Scale from 0.95 to 1.10
+            document.getElementById('album-container').style.transform = `scale(${scale})`;
+
+            // 2. DRAW CIRCULAR SPECTRUM
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height); 
             
             const w = canvas.width / (window.devicePixelRatio || 1);
             const h = canvas.height / (window.devicePixelRatio || 1);
             const cx = w / 2;
             const cy = h / 2;
-            const radius = w * 0.36; 
+            const radius = w * 0.28; // Radius just outside the album art
 
-            canvasCtx.beginPath();
-            for (let i = 0; i < dataArray.length; i++) {
-                if (i > dataArray.length * 0.7) break; 
+            // Rotate the whole visualizer slowly
+            rotationAngle += 0.002;
 
-                const val = dataArray[i];
-                const barHeight = (val / 255) * 40; 
-                const rads = (Math.PI * 2) / (dataArray.length * 0.7) * i - (Math.PI / 2);
+            const bars = dataArray.length; // 128
+            const step = (Math.PI * 2) / bars;
+
+            canvasCtx.save();
+            canvasCtx.translate(cx, cy);
+            canvasCtx.rotate(rotationAngle);
+
+            for (let i = 0; i < bars; i++) {
+                const value = dataArray[i];
+                const barHeight = (value / 255) * 60; // Max height of bars
+
+                // Color based on frequency
+                const hue = (i / bars) * 360 + baseHue;
+                canvasCtx.fillStyle = `hsla(${hue}, 80%, 60%, 0.8)`;
                 
-                const x = cx + Math.cos(rads) * (radius + barHeight);
-                const y = cy + Math.sin(rads) * (radius + barHeight);
-                const x0 = cx + Math.cos(rads) * radius;
-                const y0 = cy + Math.sin(rads) * radius;
+                // Draw symmetrical bars (Mirrored)
+                // We draw 2 bars per loop to make it symmetrical circle
+                const rads = i * step;
+                
+                // Draw Round cap line
+                const x = Math.cos(rads) * (radius + barHeight);
+                const y = Math.sin(rads) * (radius + barHeight);
+                const xStart = Math.cos(rads) * radius;
+                const yStart = Math.sin(rads) * radius;
 
-                canvasCtx.moveTo(x0, y0);
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(xStart, yStart);
                 canvasCtx.lineTo(x, y);
+                canvasCtx.lineWidth = 3;
+                canvasCtx.lineCap = 'round';
+                canvasCtx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.8)`;
+                canvasCtx.stroke();
             }
-            
-            canvasCtx.strokeStyle = `rgba(255, 59, 48, 0.6)`;
-            canvasCtx.lineWidth = 3;
-            canvasCtx.lineCap = 'round';
-            canvasCtx.stroke();
+            canvasCtx.restore();
         }
 
         // GLOBAL CLICK TO UNLOCK AUDIO
@@ -1120,19 +1152,8 @@
                 popEl.classList.add('pop');
             }
 
-            // 3. Trigger Full Screen Effect
-            const specialEmojis = ['🖤','❤️','❣️','😍','🥰','💎','🔥'];
-            if (specialEmojis.includes(emoji)) {
-                particleEngine.spawn(emoji);
-            } else {
-                // Generic floating for others
-                const flyer = document.createElement('div');
-                flyer.className = 'flying-emoji';
-                flyer.innerText = emoji;
-                flyer.style.top = '50%'; flyer.style.left = '50%';
-                document.body.appendChild(flyer);
-                setTimeout(() => flyer.remove(), 2000);
-            }
+            // 3. Trigger Full Screen Physics Effect
+            particleEngine.spawn(emoji);
         }
 
         function resetEmojiState() {
@@ -1144,7 +1165,7 @@
                 el.innerText = '';
             });
             document.querySelectorAll('.reaction-pop').forEach(el => {
-                el.classList.remove('pop'); // This clears the persistent emoji
+                el.classList.remove('pop'); 
                 el.innerText = '';
             });
         }
@@ -1220,12 +1241,10 @@
         });
 
         // -----------------------------------------------------------------
-        // CLEANUP & EXIT (REVISED LOGIC)
+        // CLEANUP & EXIT
         // -----------------------------------------------------------------
-        
         let isLeaving = false;
 
-        // SEPARATE: Clean up DB/Audio without navigation
         function cleanupSessionData() {
             try {
                 if(roomRef) {
@@ -1233,16 +1252,13 @@
                         sessionStatus: 'ended',
                         [`userA`]: 'offline', 
                         [`userB`]: 'offline' 
-                    }).catch(e => console.log("Offline update skipped or permission denied"));
+                    }).catch(e => console.log("Offline update skipped"));
                 }
                 if(audio) audio.pause();
                 if(wakeLock) wakeLock.release();
-            } catch(e) {
-                console.error("Cleanup error", e);
-            }
+            } catch(e) { console.error("Cleanup error", e); }
         }
 
-        // HANDLER: User triggered exit via UI
         function handleExit(mode) {
             if (isLeaving) return;
             isLeaving = true;
@@ -1250,14 +1266,12 @@
             cleanupSessionData();
 
             if (mode === 'back') {
-                // Try normal back navigation, fallback to lobby
                 if (window.history.length > 1) {
                     window.history.back();
                 } else {
                     window.location.replace("pulseLobby.html");
                 }
             } else {
-                // Force lobby (Power button or Error)
                 window.location.replace("pulseLobby.html");
             }
         }
