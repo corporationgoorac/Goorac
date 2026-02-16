@@ -7,12 +7,21 @@
     <meta name="theme-color" content="#000000">
     <title>Pulse Session | Goorac</title>
     
-    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
+    <script src="config.js"></script>
+    <script>
+        // Initialize Core safely
+        if (typeof window.initFirebaseCore === 'function') {
+            window.initFirebaseCore();
+        } else if (!firebase.apps.length && window.firebaseConfig) {
+            firebase.initializeApp(window.firebaseConfig);
+        }
+    </script>
+
     <script src="components/songPicker.js"></script>
     <script src="components/emojiPicker.js"></script>
     <script src="components/presence.js"></script>
@@ -236,8 +245,8 @@
         }
         .duo-user { display: flex; flex-direction: column; align-items: center; opacity: 0.5; transition: 0.3s; }
         .duo-user.active { opacity: 1; transform: scale(1.1); }
-        .duo-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #222; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .duo-name { font-size: 10px; font-weight: 700; margin-top: 4px; text-shadow: 0 2px 4px #000; }
+        .duo-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #222; box-shadow: 0 4px 10px rgba(0,0,0,0.5); object-fit: cover; }
+        .duo-name { font-size: 10px; font-weight: 700; margin-top: 4px; text-shadow: 0 2px 4px #000; display:flex; gap:2px; align-items:center;}
 
     </style>
 </head>
@@ -245,19 +254,20 @@
 
     <call-notifier></call-notifier>
     <chat-loader></chat-loader>
+
     <script>
         // BLOCK COPY AND SELECTION
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('selectstart', event => event.preventDefault());
         document.addEventListener('dragstart', event => event.preventDefault());
 
-        // Instant load cached PFP
+        // ZERO-LATENCY LOAD: MY AVATAR
         try {
             const profile = localStorage.getItem('my_goorac_profile');
             if(profile) {
                 const data = JSON.parse(profile);
                 const pfpUrl = data.photoURL || 'https://via.placeholder.com/150';
-                document.write(`<style>#my-avatar { content: url("${pfpUrl}"); }</style>`);
+                document.write(`<style>#my-avatar { content: url("${pfpUrl}"); } #duo-me-img { content: url("${pfpUrl}"); }</style>`);
             }
         } catch(e) {}
     </script>
@@ -363,16 +373,15 @@
     </div>
 
     <script>
-        if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
-        else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
-
-        const db = firebase.firestore();
-        const auth = firebase.auth();
+        // --- RENAMED VARIABLES TO PREVENT CONFLICTS ---
+        const sessionDb = firebase.firestore();
+        const sessionAuth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
         
         const targetUsername = params.get('user');
-        
-        // --- INSTANT CACHE LOAD ---
+        let wakeLock = null; // Screen Wake Lock
+
+        // --- ZERO-LATENCY: INSTANT TARGET CACHE LOAD ---
         if (targetUsername) {
             try {
                 const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
@@ -404,27 +413,31 @@
         let emojiCloseTimer = null; 
         let turnTimer = null; 
 
-        auth.onAuthStateChanged(async (user) => {
+        sessionAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
                 
-                db.collection('users').doc(user.uid).get().then(doc => {
+                // Fetch & Cache My Data
+                sessionDb.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
                         myProfile = data;
+                        localStorage.setItem('my_goorac_profile', JSON.stringify(data));
+                        
                         const pfp = data.photoURL || 'https://via.placeholder.com/150';
                         document.getElementById('my-avatar').src = pfp;
-                        document.getElementById('duo-me-img').src = pfp; // Update active header
+                        document.getElementById('duo-me-img').src = pfp; 
                     }
                 });
 
                 if (targetUsername) {
                     try {
-                        const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
+                        const snap = await sessionDb.collection('users').where('username', '==', targetUsername).limit(1).get();
                         if (!snap.empty) {
                             targetUid = snap.docs[0].id;
                             targetProfile = snap.docs[0].data();
                             
+                            // Cache Target Data
                             localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
                             updateTargetUI(targetProfile);
 
@@ -445,6 +458,28 @@
             }
         });
 
+        // --- WAKE LOCK API ---
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    // console.log('Screen Wake Lock active');
+                    wakeLock.addEventListener('release', () => {
+                        // console.log('Screen Wake Lock released');
+                    });
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                }
+            }
+        }
+
+        // Re-acquire lock if tab becomes visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
         function updateTargetUI(data) {
             const pfp = data.photoURL || 'https://via.placeholder.com/150';
             const name = data.name.split(' ')[0];
@@ -462,7 +497,7 @@
 
         async function verifyMutuals(me, them) {
             try {
-                const myDoc = await db.collection('users').doc(me).get();
+                const myDoc = await sessionDb.collection('users').doc(me).get();
                 if (!myDoc.exists) return false;
                 myProfile = myDoc.data(); 
 
@@ -475,7 +510,7 @@
 
         function initPulseSession() {
             const roomId = [myUid, targetUid].sort().join('_');
-            roomRef = db.collection('pulse_rooms').doc(roomId);
+            roomRef = sessionDb.collection('pulse_rooms').doc(roomId);
 
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
@@ -493,6 +528,9 @@
                     }
                 });
             });
+
+            // Trigger Wake Lock (Needs gesture, usually fits in init flow)
+            requestWakeLock();
 
             // Listeners
             window.addEventListener('beforeunload', leaveSession);
@@ -538,6 +576,7 @@
                     if (!document.getElementById('screen-active').classList.contains('active')) {
                          showScreen('screen-active');
                          setupVisualizer(); // Init Visualizer
+                         requestWakeLock(); // Re-request lock on session start
                     }
                     syncCycle(data);
                 } else {
@@ -764,6 +803,7 @@
         function resumeAudio() {
             if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             audio.play();
+            requestWakeLock(); // Ensure screen stays on
             document.getElementById('sync-overlay').classList.remove('active');
         }
 
@@ -819,19 +859,4 @@
                 });
             }
             audio.pause(); 
-            // Explicit replacement to kill history loop
-            window.location.replace("pulseLobby.html");
-        }
-
-        function showScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function showError(msg) {
-            document.getElementById('error-msg').innerText = msg;
-            showScreen('screen-error');
-        }
-    </script>
-</body>
-</html>
+            if(wake
