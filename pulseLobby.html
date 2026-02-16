@@ -10,7 +10,7 @@
     <script>
         window.onerror = function(msg, url, line, col, error) {
             // Ignore benign resize observer errors
-            if (msg.includes("ResizeObserver")) return;
+            if (msg && msg.includes("ResizeObserver")) return;
             
             const box = document.createElement('div');
             box.style.cssText = "position:fixed; top:10px; left:10px; right:10px; z-index:99999; background:#330000; color:#ffcccc; padding:15px; border:1px solid #ff0000; border-radius:8px; font-family:monospace; font-size:12px; box-shadow:0 10px 40px #000;";
@@ -28,6 +28,11 @@
 
     <script src="config.js"></script>
     <script>
+        // Safety check to ensure Firestore loaded before components run
+        if (typeof firebase !== 'undefined' && !firebase.firestore) {
+            console.error("Firebase loaded but Firestore SDK is missing.");
+            throw new Error("firebase.firestore is not a function (SDK Missing)");
+        }
         // Initialize Core here if config.js defined the function
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
@@ -58,7 +63,15 @@
             --live-color: #00ff88;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            /* DISABLE SELECTION */
+            user-select: none; 
+            -webkit-user-select: none; 
+            -moz-user-select: none; 
+            -ms-user-select: none;
+        }
 
         body {
             background: var(--bg); color: var(--text);
@@ -378,6 +391,11 @@
     </div>
 
     <script>
+        // BLOCK COPY AND SELECTION
+        document.oncontextmenu = () => false;
+        document.onselectstart = () => false;
+        document.ondragstart = () => false;
+
         // Ensure firebase initialized if not already
         if (typeof window.initFirebaseCore === 'function') {
             window.initFirebaseCore();
