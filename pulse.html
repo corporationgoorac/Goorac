@@ -67,6 +67,16 @@
             pointer-events: none; z-index: 9999; /* On top of everything */
         }
 
+        /* SCREEN SHAKE EFFECT FOR SPECIAL EMOJIS */
+        @keyframes screen-thump {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .thump-active {
+            animation: screen-thump 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
         /* =========================================
            NAVIGATION
            ========================================= */
@@ -425,7 +435,7 @@
         }
         .seated-emoji.show { opacity: 1; transform: scale(1) rotate(10deg); }
         
-        /* Floating Simple Emojis (Generic) */
+        /* Flying Simple Emojis (Generic) */
         .flying-emoji {
             position: fixed; font-size: 60px; z-index: 999; pointer-events: none;
             animation: bigPopFly 1.8s forwards;
@@ -639,7 +649,7 @@
 
     <script>
         // =================================================================
-        // UPGRADED PARTICLE ENGINE (PROFESSIONAL SMOOTH FLOATING EFFECT)
+        // UPGRADED PARTICLE ENGINE (ONE NEAT ANIMATION & FULL SCREEN FX)
         // =================================================================
         
         class ParticleEngine {
@@ -658,11 +668,29 @@
             }
 
             spawn(emoji) {
-                // Professional "Champagne Bubble" stream effect
-                const count = 25; // Less chaotic, more elegant count
-                
-                for (let i = 0; i < count; i++) {
-                    this.particles.push(new Particle(this.canvas.width, this.canvas.height, emoji));
+                // Emojis that trigger FULL SCREEN BURST EFFECT
+                const isFullScreenTrigger = ['❤️','❣️','🖤','😍','🥰','🤩','💃','🔥'].includes(emoji);
+
+                if (isFullScreenTrigger) {
+                    // FULL SCREEN EFFECT: Burst from center
+                    const centerX = this.canvas.width / 2;
+                    const centerY = this.canvas.height / 2;
+                    
+                    // Create multiple large particles exploding outward
+                    for (let i = 0; i < 14; i++) {
+                        this.particles.push(new Particle(this.canvas.width, this.canvas.height, emoji, 'burst', centerX, centerY));
+                    }
+
+                    // CSS Screen Thump
+                    const screen = document.getElementById('session-view');
+                    screen.classList.remove('thump-active');
+                    void screen.offsetWidth; // trigger reflow
+                    screen.classList.add('thump-active');
+
+                } else {
+                    // STANDARD: One Neat Animation (Single, large, elegant floater)
+                    // No multiple messy emojis. Just one high-quality particle.
+                    this.particles.push(new Particle(this.canvas.width, this.canvas.height, emoji, 'neat-float'));
                 }
             }
 
@@ -674,7 +702,7 @@
                     p.update();
                     p.draw(this.ctx);
                     
-                    if (p.alpha <= 0.05) {
+                    if (p.alpha <= 0.01) {
                         this.particles.splice(i, 1);
                         i--;
                     }
@@ -684,39 +712,55 @@
         }
 
         class Particle {
-            constructor(w, h, emoji) {
+            constructor(w, h, emoji, type, startX, startY) {
                 this.emoji = emoji;
+                this.type = type;
                 this.w = w; this.h = h;
                 
-                // FIXED: Start visible near bottom (minus padding) instead of potentially off-screen
-                this.x = w / 2 + (Math.random() - 0.5) * (w * 0.3);
-                this.y = h - Math.random() * 50; 
+                if (type === 'burst') {
+                    // Full Screen Burst Config
+                    this.x = startX;
+                    this.y = startY;
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 10 + 5; // Fast explosion
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.size = Math.random() * 40 + 40; // Big
+                    this.decay = 0.02;
+                    this.gravity = 0;
+                } else {
+                    // 'neat-float' Config (Single elegant floater)
+                    this.x = w / 2; // Start exactly center-bottom
+                    this.y = h - 80; 
+                    this.vx = (Math.random() - 0.5) * 1.5; // Very slight drift
+                    this.vy = -3; // Consistent slow rise
+                    this.size = 60; // Single Large Emoji
+                    this.decay = 0.008; // Long life
+                    this.gravity = 0;
+                }
                 
-                // Physics for smooth rising
-                this.vy = -(Math.random() * 3 + 2); // Constant slow upward float
-                this.vx = (Math.random() - 0.5) * 1; // Slight initial drift
-                
-                // Wiggle properties (Sine wave motion)
-                this.swaySpeed = Math.random() * 0.05 + 0.02;
+                // Common Sine Wave Sway
+                this.swaySpeed = 0.05;
                 this.swayOffset = Math.random() * Math.PI * 2;
-                this.swayAmp = Math.random() * 1.5;
-
-                this.life = 1.0;
-                this.decay = Math.random() * 0.005 + 0.002;
                 this.alpha = 1;
-                this.size = Math.random() * 20 + 24; // Normalized elegant size
             }
 
             update() {
+                this.x += this.vx;
                 this.y += this.vy;
-                // Add smooth sine wave sway
-                this.x += Math.sin(this.y * this.swaySpeed + this.swayOffset) * this.swayAmp;
+
+                if (this.type === 'burst') {
+                    // Drag effect for explosion
+                    this.vx *= 0.95;
+                    this.vy *= 0.95;
+                    this.size *= 1.02; // Grow as they fly out
+                } else {
+                    // Sine wave for neat float
+                    this.x += Math.sin(this.y * this.swaySpeed + this.swayOffset) * 0.5;
+                    this.size *= 1.002; // Very slight growth
+                }
                 
-                // Fade out elegantly
                 this.alpha -= this.decay;
-                
-                // Slight size pulsing
-                if(this.alpha > 0.5) this.size += 0.05;
             }
 
             draw(ctx) {
@@ -724,13 +768,16 @@
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.globalAlpha = Math.max(0, this.alpha);
-                // FIXED: Font stack strictness for consistency
+                
+                // No lag: Standard font drawing
                 ctx.font = `${this.size}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", Arial, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                // Subtle glow for professional feel
-                ctx.shadowColor = "rgba(0,0,0,0.5)"; // Darker shadow for visibility on light/dark
-                ctx.shadowBlur = 4;
+                
+                // Subtle Glow
+                ctx.shadowColor = "rgba(0,0,0,0.3)";
+                ctx.shadowBlur = 10;
+                
                 ctx.fillText(this.emoji, 0, 0);
                 ctx.restore();
             }
