@@ -421,13 +421,13 @@
                 <span class="material-icons-round" style="font-size:40px; color:var(--accent); margin-bottom:10px;">gpp_bad</span>
                 <h2 style="font-size:18px;">Access Denied</h2>
                 <p id="error-msg" style="font-size:13px; color:#888; line-height:1.5;">Connection failure.</p>
-                <button onclick="leaveSession()" style="margin-top:25px; padding:12px 30px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px; cursor:pointer;">Exit</button>
+                <button onclick="handleExit('lobby')" style="margin-top:25px; padding:12px 30px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px; cursor:pointer;">Exit</button>
             </div>
         </div>
 
         <div class="screen active" id="screen-waiting">
             <div class="top-nav">
-                <div class="back-btn" onclick="leaveSession()">
+                <div class="back-btn" onclick="handleExit('back')">
                     <span class="material-icons-round">close</span>
                 </div>
             </div>
@@ -464,7 +464,7 @@
 
             <div class="top-nav">
                  <div style="width:44px;"></div> 
-                 <div class="back-btn" onclick="leaveSession()" style="background:rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.3); color:#ff3b30;">
+                 <div class="back-btn" onclick="handleExit('lobby')" style="background:rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.3); color:#ff3b30;">
                     <span class="material-icons-round">power_settings_new</span>
                 </div>
             </div>
@@ -810,9 +810,12 @@
             requestWakeLock();
 
             // Setup Listeners
-            window.addEventListener('beforeunload', leaveSession);
-            window.addEventListener('pagehide', leaveSession);
-            document.addEventListener('visibilitychange', () => { if (document.hidden) leaveSession(); });
+            // REPLACED: Only clean data on unload, don't force redirect loop
+            window.addEventListener('beforeunload', cleanupSessionData);
+            window.addEventListener('pagehide', cleanupSessionData);
+            document.addEventListener('visibilitychange', () => { 
+                if (document.hidden) cleanupSessionData(); 
+            });
 
             // Modals
             window.addEventListener('popstate', (event) => {
@@ -1217,23 +1220,44 @@
         });
 
         // -----------------------------------------------------------------
-        // CLEANUP & EXIT
+        // CLEANUP & EXIT (REVISED LOGIC)
         // -----------------------------------------------------------------
-        function leaveSession() {
+        
+        let isLeaving = false;
+
+        // SEPARATE: Clean up DB/Audio without navigation
+        function cleanupSessionData() {
             try {
                 if(roomRef) {
-                    // Attempt to set offline
                     roomRef.update({ 
                         sessionStatus: 'ended',
                         [`userA`]: 'offline', 
                         [`userB`]: 'offline' 
-                    }).catch(e => console.log("Offline update skipped"));
+                    }).catch(e => console.log("Offline update skipped or permission denied"));
                 }
                 if(audio) audio.pause();
                 if(wakeLock) wakeLock.release();
             } catch(e) {
                 console.error("Cleanup error", e);
-            } finally {
+            }
+        }
+
+        // HANDLER: User triggered exit via UI
+        function handleExit(mode) {
+            if (isLeaving) return;
+            isLeaving = true;
+
+            cleanupSessionData();
+
+            if (mode === 'back') {
+                // Try normal back navigation, fallback to lobby
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.replace("pulseLobby.html");
+                }
+            } else {
+                // Force lobby (Power button or Error)
                 window.location.replace("pulseLobby.html");
             }
         }
