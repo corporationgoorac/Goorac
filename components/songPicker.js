@@ -11,9 +11,9 @@ class SongPicker extends HTMLElement {
         this.initLogic();
         this.restoreState(); 
         
-        // SPEED: Only start background brain if internet is decent
+        // SPEED: Start background brain to prep "For You" (50 songs)
         if (navigator.connection && navigator.connection.saveData === false) {
-            setTimeout(() => this.runBackgroundUpdate(), 3000);
+            setTimeout(() => this.runBackgroundUpdate(), 2000);
         }
     }
 
@@ -23,7 +23,7 @@ class SongPicker extends HTMLElement {
             /* --- 1. RESET & CORE STYLES --- */
             :host {
                 --bg-color: #000000;
-                --surface-glass: rgba(20, 20, 20, 0.95); /* Increased opacity for performance */
+                --surface-glass: rgba(20, 20, 20, 0.95); /* High opacity for performance */
                 --surface-highlight: #2c2c2e;
                 --accent-color: #0a84ff;
                 --accent-gradient: linear-gradient(135deg, #0a84ff, #5ac8fa);
@@ -258,10 +258,10 @@ class SongPicker extends HTMLElement {
         // --- CONFIGURATION ---
         this.API_URL = "https://itunes.apple.com/search";
         this.PAGE_SIZE = 20; 
-        this.MAX_LIMIT = 40; 
+        this.MAX_LIMIT = 50; // Requested: 50 Songs
         this.PROXIES = [
+            "https://corsproxy.io/?", // Swapped to faster proxy first
             "https://api.allorigins.win/raw?url=",
-            "https://corsproxy.io/?",
             "https://api.codetabs.com/v1/proxy?quest="
         ];
         
@@ -294,17 +294,16 @@ class SongPicker extends HTMLElement {
             },
             getLastSession: () => JSON.parse(localStorage.getItem('picker_last_session')),
             
-            // SPEED: Only preload if not on slow connection
+            // SPEED: Preload Audio for Instant Playback
             preloadAssets: (songs) => {
                 if(!songs || songs.length === 0) return;
-                // If data saver is on, do NOT preload audio
-                if(navigator.connection && navigator.connection.saveData) return;
-
-                const top3 = songs.slice(0, 3);
-                top3.forEach(s => {
-                    const img = new Image();
-                    img.src = s.artworkUrl100.replace('100x100bb', '300x300bb');
-                });
+                // Preload just the FIRST song's audio for speed
+                const first = songs[0];
+                if(first && first.previewUrl) {
+                    const audio = new Audio();
+                    audio.src = first.previewUrl;
+                    audio.preload = "auto";
+                }
             },
 
             getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v5')) || { artists: {}, genres: {}, timeContext: {}, explicitPref: false },
@@ -331,7 +330,6 @@ class SongPicker extends HTMLElement {
                 const currentHour = new Date().getHours();
                 const getTop = (obj) => Object.entries(obj).sort(([,a], [,b]) => b - a).map(([k]) => k);
                 const topArtists = getTop(profile.artists);
-                const topGenres = getTop(profile.genres);
                 const timeSpecificGenres = profile.timeContext[currentHour] ? getTop(profile.timeContext[currentHour]) : [];
 
                 const dice = Math.random();
@@ -346,11 +344,6 @@ class SongPicker extends HTMLElement {
                     const artist = topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 3))];
                     query = "Best of " + artist;
                     reason = "Because you like " + artist;
-                } 
-                else if (dice < 0.8 && topGenres.length > 0) {
-                    const genre = topGenres[0];
-                    query = "Best " + genre + " songs";
-                    reason = "Your favorite: " + genre;
                 } 
                 else if (history.length > 0) {
                     const hIndex = history.length > 2 && Math.random() > 0.5 ? 1 : 0;
@@ -439,23 +432,20 @@ class SongPicker extends HTMLElement {
     }
 
     async runBackgroundUpdate() {
-        // SPEED: Do not run background tasks if hidden
         if (!this.classList.contains('active')) return;
 
         const rec = this.DB.getRecommendationQuery();
         if (this.currentHeaderTitle && this.currentHeaderTitle.includes(rec.query)) return;
 
-        // SPEED: Only fetch a small amount in background
-        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=15`;
+        // "FOR YOU": FETCH 50 SONGS IN BACKGROUND
+        const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=50`;
         
         try {
-             // Basic fetch without abort controller for background
              const fetchRaw = async (url) => {
                 const res = await fetch(url);
                 return res.json();
              }
-             // Use just one proxy for background to save bandwidth, fallback if needed
-             const data = await fetchRaw(this.PROXIES[1] + encodeURIComponent(targetUrl));
+             const data = await fetchRaw(this.PROXIES[0] + encodeURIComponent(targetUrl));
              
              if(data.results && data.results.length > 0) {
                 const savedIds = this.DB.getSaved().map(s => s.trackId);
@@ -499,6 +489,12 @@ class SongPicker extends HTMLElement {
 
     confirmSelection() {
         if (this.currentSongData) {
+            // SPEED: KILL NETWORK INSTANTLY ON TICK
+            if (this.fetchController) {
+                this.fetchController.abort();
+                this.fetchController = null;
+            }
+
             this.DB.trackInteraction(this.currentSongData, 15); 
             this.dispatchEvent(new CustomEvent('song-selected', { 
                 detail: this.currentSongData,
@@ -536,11 +532,14 @@ class SongPicker extends HTMLElement {
 
         if (name === 'For You') {
             const nextCache = this.DB.getNextCache();
+            // "FOR YOU" - USE THE 50 SONGS FROM BACKGROUND
             if (nextCache && nextCache.songs.length > 0) {
                 this.allFetchedSongs = nextCache.songs;
                 this.currentHeaderTitle = nextCache.header;
                 this.renderInitialList(nextCache.songs, nextCache.header);
                 this.DB.setNextCache(null);
+                // Trigger next batch for later
+                this.runBackgroundUpdate();
                 return;
             }
             cacheKey = 'foryou';
@@ -578,38 +577,35 @@ class SongPicker extends HTMLElement {
 
     // --- SPEED OPTIMIZED DATA LOADING ---
     async loadData(query, silent = false, cacheKey = null, isRecommendation = false, subHeadingTitle = "") {
-        // 1. Kill any existing request
         if (this.fetchController) this.fetchController.abort();
-        
-        // 2. Create new controller for this specific request
         this.fetchController = new AbortController();
         const signal = this.fetchController.signal;
 
-        // 3. SPEED: FIRST FETCH - Get only 6 items (Tiny payload, fast render)
-        // This simulates "One by One" visual speed
-        const limitSmall = 8;
-        const targetUrlSmall = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${limitSmall}`;
+        // WATERFALL STRATEGY: 4 -> 10 -> REST
         
-        const fetchWithProxy = async (proxyUrl, url) => {
-            // SPEED: Timeout after 4 seconds to try next proxy
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 4000);
+        // Helper to fetch with timeout
+        const fetchBatch = async (limit) => {
+            const targetUrl = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${limit}`;
             
-            try {
-                // Merge external abort signal with timeout signal
-                const combinedSignal = anySignal([signal, controller.signal]);
+            const fetchWithProxy = async (proxyUrl) => {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 2500); // Fast timeout 2.5s
                 
-                const res = await fetch(proxyUrl + encodeURIComponent(url), { signal: combinedSignal });
-                clearTimeout(id);
-                if (!res.ok) throw new Error('Proxy failed');
-                return res.json();
-            } catch (e) {
-                clearTimeout(id);
-                throw e;
-            }
+                try {
+                    const combinedSignal = anySignal([signal, controller.signal]);
+                    const res = await fetch(proxyUrl + encodeURIComponent(targetUrl), { signal: combinedSignal });
+                    clearTimeout(id);
+                    if (!res.ok) throw new Error('Proxy failed');
+                    return res.json();
+                } catch (e) {
+                    clearTimeout(id);
+                    throw e;
+                }
+            };
+            
+            return Promise.any(this.PROXIES.map(p => fetchWithProxy(p)));
         };
 
-        // Helper to combine signals
         function anySignal(signals) {
             const controller = new AbortController();
             for (const signal of signals) {
@@ -623,83 +619,62 @@ class SongPicker extends HTMLElement {
         }
 
         try {
-            // --- STAGE 1: Fast Render (First 8 items) ---
-            const data = await Promise.any(this.PROXIES.map(p => fetchWithProxy(p, targetUrlSmall)));
-            
-            // Check if aborted during await
+            // STEP 1: TINY BATCH (4 Songs) - INSTANT
+            let data = await fetchBatch(4);
             if (signal.aborted) return;
 
             if(data.results && data.results.length > 0) {
                 let results = data.results;
                 this.DB.addToGlobal(results);
-                
                 if (isRecommendation) {
                     const savedIds = this.DB.getSaved().map(s => s.trackId);
                     results = results.filter(s => !savedIds.includes(s.trackId));
                 }
-
+                
+                // Show first 4
                 this.allFetchedSongs = results;
                 this.currentHeaderTitle = subHeadingTitle;
-                
-                // Render immediately so user sees something
                 this.renderInitialList(results, subHeadingTitle);
                 
-                // --- STAGE 2: Fetch the rest in background if still open ---
-                // Wait 100ms to let UI settle
-                if (!signal.aborted) {
-                     this.fetchRestInBackground(query, cacheKey, isRecommendation, signal);
-                }
+                // Preload #1 Audio Immediately
+                this.DB.preloadAssets(results);
 
+                // STEP 2: MEDIUM BATCH (Next 12)
+                if (!signal.aborted) {
+                    data = await fetchBatch(16); // Fetch top 16 now
+                    if (data.results && !signal.aborted) {
+                        let newResults = data.results;
+                        // Filter duplicates
+                        const existingIds = this.allFetchedSongs.map(s => s.trackId);
+                        let fresh = newResults.filter(s => !existingIds.includes(s.trackId));
+                        
+                        this.allFetchedSongs = [...this.allFetchedSongs, ...fresh];
+                        this.loadMoreItems(); // Append to UI
+                        
+                        // STEP 3: FULL BATCH (Rest up to 50)
+                        if (!signal.aborted) {
+                             data = await fetchBatch(50);
+                             if (data.results && !signal.aborted) {
+                                 newResults = data.results;
+                                 const currentIds = this.allFetchedSongs.map(s => s.trackId);
+                                 fresh = newResults.filter(s => !currentIds.includes(s.trackId));
+                                 this.allFetchedSongs = [...this.allFetchedSongs, ...fresh];
+                                 this.loadMoreItems();
+                                 
+                                 // Cache Full List
+                                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
+                                    this.DB.setCache(cacheKey, this.allFetchedSongs);
+                                 }
+                             }
+                        }
+                    }
+                }
             } else {
                 if(!silent) this.list.innerHTML = `<div class="text-center">No results found.</div>`;
             }
         } catch (error) {
             if (signal.aborted) return;
             if (!silent) this.list.innerHTML = `<div class="text-center" style="color: #ff453a;">Weak connection. Retrying...</div>`;
-        }
-    }
-
-    async fetchRestInBackground(query, cacheKey, isRecommendation, signal) {
-        // Fetch 40 items now
-        const targetUrlBig = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
-        
-        try {
-             const fetchRaw = async (p) => {
-                 const res = await fetch(p + encodeURIComponent(targetUrlBig), { signal });
-                 return res.json();
-             }
-             
-             // Use Promise.any again for the big batch
-             const data = await Promise.any(this.PROXIES.map(p => fetchRaw(p)));
-             
-             if (signal.aborted) return;
-
-             if(data.results && data.results.length > 0) {
-                 let results = data.results;
-                 
-                 // Deduplicate against what we already showed
-                 const existingIds = this.allFetchedSongs.map(s => s.trackId);
-                 let newSongs = results.filter(s => !existingIds.includes(s.trackId));
-                 
-                 if (isRecommendation) {
-                     const savedIds = this.DB.getSaved().map(s => s.trackId);
-                     newSongs = newSongs.filter(s => !savedIds.includes(s.trackId));
-                 }
-                 
-                 // Append new songs to our list
-                 this.allFetchedSongs = [...this.allFetchedSongs, ...newSongs];
-                 
-                 // Update Cache now that we have full list
-                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
-                    this.DB.setCache(cacheKey, this.allFetchedSongs);
-                 }
-                 
-                 // The scroll listener will pick these up automatically,
-                 // but we can trigger a check just in case screen isn't full
-                 this.loadMoreItems();
-             }
-        } catch (e) {
-            // Background fetch failed, that's fine, user has at least 8 songs
         }
     }
 
@@ -717,7 +692,6 @@ class SongPicker extends HTMLElement {
 
         this.renderedCount = 0;
         this.isLoadingMore = false;
-        
         this.appendBatch();
     }
 
@@ -725,7 +699,6 @@ class SongPicker extends HTMLElement {
         if (this.isLoadingMore || this.renderedCount >= this.allFetchedSongs.length) return;
         this.isLoadingMore = true;
         
-        // SPEED: Use Animation Frame for smoother scrolling during render
         requestAnimationFrame(() => {
             this.appendBatch();
             this.isLoadingMore = false;
@@ -746,7 +719,6 @@ class SongPicker extends HTMLElement {
 
         songs.forEach(song => {
             const isSaved = savedIds.includes(song.trackId);
-            // SPEED: Lazy loading image string
             const art = song.artworkUrl100.replace('100x100bb', '300x300bb'); 
             
             const item = document.createElement('div');
