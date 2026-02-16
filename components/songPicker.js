@@ -12,6 +12,7 @@ class SongPicker extends HTMLElement {
         this.restoreState(); 
         
         // SPEED: Start background brain to prep "For You" (50 songs)
+        // Checks if connection info is available and not in data-saver mode
         if (navigator.connection && navigator.connection.saveData === false) {
             setTimeout(() => this.runBackgroundUpdate(), 2000);
         }
@@ -391,9 +392,10 @@ class SongPicker extends HTMLElement {
 
             if (val.length > 1) { 
                 this.renderSkeletonLoading();
+                // SMART TYPING: Increased delay to 700ms to ensure typing finished
                 searchTimer = setTimeout(() => {
                     this.loadData(val, false, 'search', false);
-                }, 500); 
+                }, 700); 
             } else if(val.length === 0) {
                 this.switchTab('For You', root.getElementById('tabForYou'));
             }
@@ -422,6 +424,7 @@ class SongPicker extends HTMLElement {
                 b.classList.toggle('active', b.innerText === lastSession.tab || (lastSession.tab === 'Charts' && b.id === 'tabTrending'));
             });
             this.allFetchedSongs = lastSession.list;
+            // CHECK: Restoring session query
             this.searchInput.value = lastSession.query || "";
             this.currentHeaderTitle = lastSession.header;
             this.renderInitialList(this.allFetchedSongs, lastSession.header);
@@ -473,13 +476,17 @@ class SongPicker extends HTMLElement {
             this.fetchController = null;
         }
 
+        // Save session state before clearing
         this.DB.saveSession(
             this.activeTab, 
             this.allFetchedSongs, 
             this.list.scrollTop, 
-            this.searchInput.value,
+            "", // Save empty string so next restore is clean
             this.currentHeaderTitle
         );
+        
+        // REQUESTED: REMOVE INPUT TEXT ONLY
+        this.searchInput.value = '';
 
         this.classList.remove('active');
         this.player.pause();
@@ -581,7 +588,8 @@ class SongPicker extends HTMLElement {
         this.fetchController = new AbortController();
         const signal = this.fetchController.signal;
 
-        // WATERFALL STRATEGY: 4 -> 10 -> REST
+        // WATERFALL STRATEGY: 4 -> 10 -> 16 -> 35 -> 50
+        // This ensures smooth loading and fast feedback
         
         // Helper to fetch with timeout
         const fetchBatch = async (limit) => {
@@ -619,7 +627,7 @@ class SongPicker extends HTMLElement {
         }
 
         try {
-            // STEP 1: TINY BATCH (4 Songs) - INSTANT
+            // STEP 1: TINY BATCH (4 Songs)
             let data = await fetchBatch(4);
             if (signal.aborted) return;
 
@@ -639,31 +647,44 @@ class SongPicker extends HTMLElement {
                 // Preload #1 Audio Immediately
                 this.DB.preloadAssets(results);
 
-                // STEP 2: MEDIUM BATCH (Next 12)
+                // Helper to Append Fresh Items only
+                const processAndAppend = (newResults) => {
+                    const existingIds = this.allFetchedSongs.map(s => s.trackId);
+                    const fresh = newResults.filter(s => !existingIds.includes(s.trackId));
+                    this.allFetchedSongs = [...this.allFetchedSongs, ...fresh];
+                    this.loadMoreItems(); 
+                };
+
+                // STEP 2: BATCH 10
                 if (!signal.aborted) {
-                    data = await fetchBatch(16); // Fetch top 16 now
+                    data = await fetchBatch(10);
                     if (data.results && !signal.aborted) {
-                        let newResults = data.results;
-                        // Filter duplicates
-                        const existingIds = this.allFetchedSongs.map(s => s.trackId);
-                        let fresh = newResults.filter(s => !existingIds.includes(s.trackId));
+                        processAndAppend(data.results);
                         
-                        this.allFetchedSongs = [...this.allFetchedSongs, ...fresh];
-                        this.loadMoreItems(); // Append to UI
-                        
-                        // STEP 3: FULL BATCH (Rest up to 50)
+                        // STEP 3: BATCH 16
                         if (!signal.aborted) {
-                             data = await fetchBatch(50);
+                             data = await fetchBatch(16);
                              if (data.results && !signal.aborted) {
-                                 newResults = data.results;
-                                 const currentIds = this.allFetchedSongs.map(s => s.trackId);
-                                 fresh = newResults.filter(s => !currentIds.includes(s.trackId));
-                                 this.allFetchedSongs = [...this.allFetchedSongs, ...fresh];
-                                 this.loadMoreItems();
-                                 
-                                 // Cache Full List
-                                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
-                                    this.DB.setCache(cacheKey, this.allFetchedSongs);
+                                 processAndAppend(data.results);
+
+                                 // STEP 4: BATCH 35
+                                 if (!signal.aborted) {
+                                     data = await fetchBatch(35);
+                                     if (data.results && !signal.aborted) {
+                                         processAndAppend(data.results);
+
+                                         // STEP 5: FINAL BATCH 50
+                                         if (!signal.aborted) {
+                                             data = await fetchBatch(50);
+                                             if (data.results && !signal.aborted) {
+                                                 processAndAppend(data.results);
+                                                 // Cache Full List
+                                                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
+                                                    this.DB.setCache(cacheKey, this.allFetchedSongs);
+                                                 }
+                                             }
+                                         }
+                                     }
                                  }
                              }
                         }
