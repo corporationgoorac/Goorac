@@ -7,6 +7,8 @@ class SongPicker extends HTMLElement {
     connectedCallback() {
         this.render();
         this.initLogic();
+        // Immediately try to restore state when attached to DOM
+        this.restoreState(); 
     }
 
     render() {
@@ -248,8 +250,8 @@ class SongPicker extends HTMLElement {
         
         // --- CONFIGURATION ---
         this.API_URL = "https://itunes.apple.com/search";
-        this.PAGE_SIZE = 20; // Load 20 at a time
-        this.MAX_LIMIT = 200; // Fetch maximum 200
+        this.PAGE_SIZE = 20; 
+        this.MAX_LIMIT = 50; // OPTIMIZED: Down to 50 for speed
         this.PROXIES = [
             "https://api.allorigins.win/raw?url=",
             "https://corsproxy.io/?",
@@ -257,9 +259,9 @@ class SongPicker extends HTMLElement {
         ];
         
         // --- STATE VARIABLES ---
-        this.allFetchedSongs = []; // Store the full 200 list here
-        this.renderedCount = 0; // Keep track of how many are on screen
-        this.isLoadingMore = false; // Debounce scroll events
+        this.allFetchedSongs = []; 
+        this.renderedCount = 0; 
+        this.isLoadingMore = false; 
         
         this.DB = {
             getSaved: () => JSON.parse(localStorage.getItem('insta_saved')) || [],
@@ -271,7 +273,6 @@ class SongPicker extends HTMLElement {
             globalCache: {}, 
             addToGlobal: (songs) => songs.forEach(s => this.DB.globalCache[s.trackId] = s),
 
-            // Real-time History tracking (Most Watched)
             getHistory: () => JSON.parse(localStorage.getItem('picker_history')) || [],
             addToHistory: (song) => {
                 let history = this.DB.getHistory();
@@ -280,76 +281,83 @@ class SongPicker extends HTMLElement {
                 localStorage.setItem('picker_history', JSON.stringify(history.slice(0, 50)));
             },
 
-            // --- UPGRADED ML PROFILE STORAGE (V5) ---
+            // --- SESSION RESTORATION LOGIC ---
+            saveSession: (tab, list, scroll, query, header) => {
+                const session = { 
+                    tab, 
+                    list: list.slice(0, 50), // Save strict snapshot
+                    scroll, 
+                    query, 
+                    header,
+                    timestamp: Date.now() 
+                };
+                localStorage.setItem('picker_last_session', JSON.stringify(session));
+            },
+            getLastSession: () => JSON.parse(localStorage.getItem('picker_last_session')),
+
+            // --- ASSET PRELOADER (BACKGROUND DOWNLOAD) ---
+            preloadAssets: (songs) => {
+                if(!songs || songs.length === 0) return;
+                // Preload top 5 songs' audio and images into browser cache
+                const top5 = songs.slice(0, 5);
+                top5.forEach(s => {
+                    // Force browser to cache image
+                    const img = new Image();
+                    img.src = s.artworkUrl100.replace('100x100bb', '300x300bb');
+                    // Force browser to cache audio (without playing)
+                    const audio = new Audio();
+                    audio.preload = 'auto';
+                    audio.src = s.previewUrl;
+                });
+            },
+
             getUserProfile: () => JSON.parse(localStorage.getItem('picker_user_profile_v5')) || { 
-                artists: {}, 
-                genres: {},
-                timeContext: {}, // Tracks what genre is played at what hour (0-23)
-                explicitPref: false // Tracks if user clicks explicit songs
+                artists: {}, genres: {}, timeContext: {}, explicitPref: false 
             },
             setUserProfile: (data) => localStorage.setItem('picker_user_profile_v5', JSON.stringify(data)),
 
-            // --- ADVANCED WEIGHTING SYSTEM ---
             trackInteraction: (song, weight) => {
                 if(!song) return;
                 const profile = this.DB.getUserProfile();
                 const currentHour = new Date().getHours();
-                
-                // Artist Weighting
                 const artistName = song.artistName ? song.artistName.split(',')[0].trim() : null;
-                if (artistName) {
-                    profile.artists[artistName] = (profile.artists[artistName] || 0) + weight;
-                }
-
-                // Genre Weighting & Time Context
+                if (artistName) profile.artists[artistName] = (profile.artists[artistName] || 0) + weight;
                 const genre = song.primaryGenreName;
                 if (genre) {
                     profile.genres[genre] = (profile.genres[genre] || 0) + weight;
-                    // Track time-of-day preference (e.g., Morning Jazz vs Night Pop)
                     if(!profile.timeContext[currentHour]) profile.timeContext[currentHour] = {};
                     profile.timeContext[currentHour][genre] = (profile.timeContext[currentHour][genre] || 0) + weight;
                 }
-
                 this.DB.setUserProfile(profile);
             },
 
-            // --- INTELLIGENT SUGGESTION ENGINE ---
             getRecommendationQuery: () => {
                 const profile = this.DB.getUserProfile();
                 const history = this.DB.getHistory();
                 const currentHour = new Date().getHours();
-                
                 const getTop = (obj) => Object.entries(obj).sort(([,a], [,b]) => b - a).map(([k]) => k);
-                
                 const topArtists = getTop(profile.artists);
                 const topGenres = getTop(profile.genres);
-                
-                // Get top genre for THIS specific time of day (e.g., Morning vs Night)
                 const timeSpecificGenres = profile.timeContext[currentHour] ? getTop(profile.timeContext[currentHour]) : [];
 
                 const dice = Math.random();
                 let query = "";
                 let reason = "Top Hits";
 
-                // ML Strategy:
-                // 1. Time Relevance (30%)
                 if (dice < 0.3 && timeSpecificGenres.length > 0) {
                     query = timeSpecificGenres[0] + " hits";
                     reason = getTimeGreeting() + " • " + timeSpecificGenres[0];
                 } 
-                // 2. Artist Affinity (30%)
                 else if (dice < 0.6 && topArtists.length > 0) {
                     const artist = topArtists[Math.floor(Math.random() * Math.min(topArtists.length, 3))];
                     query = "Best of " + artist;
                     reason = "Because you like " + artist;
                 } 
-                // 3. Genre Affinity (20%)
                 else if (dice < 0.8 && topGenres.length > 0) {
                     const genre = topGenres[0];
                     query = "Best " + genre + " songs";
                     reason = "Your favorite: " + genre;
                 } 
-                // 4. History (20%)
                 else if (history.length > 0) {
                     query = history[0].artistName;
                     reason = "Jump back in";
@@ -358,12 +366,10 @@ class SongPicker extends HTMLElement {
                     query = "Global Top 100";
                     reason = "Global Trends";
                 }
-                
                 return { query, reason };
             }
         };
 
-        // Helper for Time Greeting
         const getTimeGreeting = () => {
             const h = new Date().getHours();
             if (h < 12) return "Good Morning";
@@ -374,33 +380,27 @@ class SongPicker extends HTMLElement {
         this.currentView = [];
         this.activeTab = 'For You';
         this.currentSongData = null; 
+        this.currentHeaderTitle = "";
 
         this.player = root.getElementById('player');
         this.list = root.getElementById('songList');
         this.status = root.getElementById('statusMsg');
         this.searchInput = root.getElementById('searchInput');
 
-        // --- INFINITE SCROLL LISTENER ---
         this.list.addEventListener('scroll', () => {
             const { scrollTop, scrollHeight, clientHeight } = this.list;
-            // Load more when user is 50px from bottom
-            if (scrollTop + clientHeight >= scrollHeight - 50) {
-                this.loadMoreItems();
-            }
+            if (scrollTop + clientHeight >= scrollHeight - 50) this.loadMoreItems();
         });
 
         let searchTimer;
         this.searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimer);
             let val = e.target.value.trim();
-            
-            // Fuzzy/Spelling Prep: Remove double spaces, weird chars
             val = val.replace(/\s+/g, ' ').replace(/[^\w\s]/gi, '');
 
             if (val.length > 1) { 
                 this.renderSkeletonLoading();
                 searchTimer = setTimeout(() => {
-                    // ML: Searching for something gives it weight (1 point)
                     this.loadData(val, false, 'search', false);
                 }, 500); 
             } else if(val.length === 0) {
@@ -423,13 +423,71 @@ class SongPicker extends HTMLElement {
         });
     }
 
+    // --- NEW: RESTORE EXACT STATE ON OPEN ---
+    restoreState() {
+        const lastSession = this.DB.getLastSession();
+        // If session exists and is less than 24h old
+        if (lastSession && (Date.now() - lastSession.timestamp < 86400000)) {
+            // Restore Tab UI
+            this.activeTab = lastSession.tab;
+            this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => {
+                b.classList.toggle('active', b.innerText === lastSession.tab || (lastSession.tab === 'Charts' && b.id === 'tabTrending'));
+            });
+
+            // Restore Data
+            this.allFetchedSongs = lastSession.list;
+            this.searchInput.value = lastSession.query || "";
+            this.currentHeaderTitle = lastSession.header;
+
+            // Render
+            this.renderInitialList(this.allFetchedSongs, lastSession.header);
+            
+            // Restore Scroll Position
+            setTimeout(() => {
+                if(this.list) this.list.scrollTop = lastSession.scroll;
+            }, 0);
+
+            // Preload assets for instant play
+            // requestIdleCallback is good for background tasks
+            if('requestIdleCallback' in window) {
+                window.requestIdleCallback(() => this.DB.preloadAssets(this.allFetchedSongs));
+            } else {
+                setTimeout(() => this.DB.preloadAssets(this.allFetchedSongs), 1000);
+            }
+
+            return true;
+        }
+        return false;
+    }
+
     open() {
         this.classList.add('active');
         history.pushState({ modalOpen: true }, "", "");
-        this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
+        
+        // 1. Try to restore exact place
+        const restored = this.restoreState();
+
+        // 2. If not restored, default to For You
+        if (!restored) {
+            this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
+        } else {
+            // 3. SILENT BACKGROUND UPDATE if restored
+            if(this.activeTab !== 'Saved' && this.activeTab !== 'search') {
+                this.refreshInBackground();
+            }
+        }
     }
 
     close() {
+        // Save state before closing
+        this.DB.saveSession(
+            this.activeTab, 
+            this.allFetchedSongs, 
+            this.list.scrollTop, 
+            this.searchInput.value,
+            this.currentHeaderTitle
+        );
+
         this.classList.remove('active');
         this.player.pause();
         this.updateIcons(false);
@@ -438,13 +496,28 @@ class SongPicker extends HTMLElement {
 
     confirmSelection() {
         if (this.currentSongData) {
-            this.DB.trackInteraction(this.currentSongData, 15); // Selection is strong signal (15 pts)
+            this.DB.trackInteraction(this.currentSongData, 15); 
             this.dispatchEvent(new CustomEvent('song-selected', { 
                 detail: this.currentSongData,
                 bubbles: true,
                 composed: true
             }));
             this.close();
+        }
+    }
+
+    async refreshInBackground() {
+        // Silent update: Fetches new data, checks if it's different.
+        // If different, we update the cache but maybe don't force re-render to avoid jumpiness
+        // unless it's a "fresh" start context.
+        // For this optimized version, we will pre-fetch and update cache for next time.
+        if(this.activeTab === 'For You') {
+            const rec = this.DB.getRecommendationQuery();
+            // We fetch but don't render immediately if user is scrolling
+            // Just cache it for next time or if list is empty
+            if(this.allFetchedSongs.length === 0) {
+                 this.loadData(rec.query, false, 'foryou', true, rec.reason);
+            }
         }
     }
 
@@ -457,10 +530,10 @@ class SongPicker extends HTMLElement {
         if (name === 'Saved') {
             const s = this.DB.getSaved();
             this.DB.addToGlobal(s);
-            // Saved tab doesn't need infinite scroll from API, just render all
             if(s.length === 0) this.list.innerHTML = `<div class="text-center">No bookmarks found.<br>Save songs to see them here.</div>`;
             else {
                 this.allFetchedSongs = s;
+                this.currentHeaderTitle = "Your Library";
                 this.renderInitialList(s, "Your Library");
             }
             return;
@@ -479,10 +552,13 @@ class SongPicker extends HTMLElement {
 
         const cachedData = this.DB.getCache(cacheKey);
         
-        // ML: Force refresh For You every time to keep it dynamic based on new watches
+        // INSTANT RENDER from Cache
         if (cachedData && cachedData.length > 0 && name !== 'For You') { 
             this.allFetchedSongs = cachedData;
+            this.currentHeaderTitle = subHeading;
             this.renderInitialList(cachedData, subHeading); 
+            // Preload assets for cached items
+            this.DB.preloadAssets(cachedData);
         } else {
             this.renderSkeletonLoading();
             this.loadData(query, false, cacheKey, name === 'For You', subHeading);
@@ -505,7 +581,6 @@ class SongPicker extends HTMLElement {
     }
 
     async loadData(query, silent = false, cacheKey = null, isRecommendation = false, subHeadingTitle = "") {
-        // --- UPDATED: FETCH MAX 200 SONGS ---
         const targetUrl = `${this.API_URL}?term=${encodeURIComponent(query)}&country=IN&entity=song&limit=${this.MAX_LIMIT}`;
         
         const fetchWithProxy = async (proxyUrl) => {
@@ -523,20 +598,22 @@ class SongPicker extends HTMLElement {
                 
                 if (isRecommendation) {
                     const savedIds = this.DB.getSaved().map(s => s.trackId);
-                    // Filter out already saved from For You to keep it fresh
                     results = results.filter(s => !savedIds.includes(s.trackId));
-                    // Shuffle logic for freshness
                     results = results.sort(() => Math.random() - 0.5);
                 }
 
-                this.allFetchedSongs = results; // Store full 200 list
+                this.allFetchedSongs = results;
+                this.currentHeaderTitle = subHeadingTitle;
                 
                 if (cacheKey && cacheKey !== 'search' && !isRecommendation) {
                     this.DB.setCache(cacheKey, results);
                 }
                 
-                // Render only the first batch (20)
+                // Render
                 this.renderInitialList(results, subHeadingTitle);
+
+                // BACKGROUND: Cache Audio/Images for instant play
+                this.DB.preloadAssets(results);
 
             } else {
                 if(!silent) this.list.innerHTML = `<div class="text-center">No results found for "${query}"</div>`;
@@ -546,11 +623,9 @@ class SongPicker extends HTMLElement {
         }
     }
 
-    // --- NEW: LAZY LOADING LOGIC ---
     renderInitialList(songs, title) {
-        this.list.innerHTML = ''; // Clear skeleton/previous
+        this.list.innerHTML = ''; 
         
-        // Add Dynamic Header based on ML Context
         if(title) {
             const header = document.createElement('div');
             header.innerHTML = `
@@ -563,7 +638,6 @@ class SongPicker extends HTMLElement {
         this.renderedCount = 0;
         this.isLoadingMore = false;
         
-        // Initial render of first batch
         this.appendBatch();
     }
 
@@ -571,7 +645,6 @@ class SongPicker extends HTMLElement {
         if (this.isLoadingMore || this.renderedCount >= this.allFetchedSongs.length) return;
         this.isLoadingMore = true;
         
-        // Simulate slight network delay for UX or just process
         requestAnimationFrame(() => {
             this.appendBatch();
             this.isLoadingMore = false;
@@ -592,7 +665,7 @@ class SongPicker extends HTMLElement {
 
         songs.forEach(song => {
             const isSaved = savedIds.includes(song.trackId);
-            const art = song.artworkUrl100.replace('100x100bb', '300x300bb'); // Higher Quality
+            const art = song.artworkUrl100.replace('100x100bb', '300x300bb'); 
             
             const item = document.createElement('div');
             item.className = 'song-row';
@@ -631,14 +704,15 @@ class SongPicker extends HTMLElement {
             const song = this.DB.globalCache[id] || this.allFetchedSongs.find(s => s.trackId === id);
             if(song) {
                 saved.push(song);
-                // ML: Saving a song is high weight interaction (10 pts)
                 this.DB.trackInteraction(song, 10);
+                // Also cache saved songs
+                this.DB.preloadAssets([song]);
             }
         }
         
         this.DB.setSaved(saved);
         if (this.activeTab === 'Saved') {
-            this.allFetchedSongs = saved; // Reset buffer for saved tab
+            this.allFetchedSongs = saved; 
             this.renderInitialList(saved, "Your Library");
         }
         else {
@@ -658,7 +732,6 @@ class SongPicker extends HTMLElement {
         root.getElementById('mTitle').innerText = song.trackName;
         root.getElementById('mArtist').innerText = song.artistName;
         
-        // ML: Track play (3 pts) and add to History
         this.DB.trackInteraction(song, 3);
         this.DB.addToHistory(song); 
         
