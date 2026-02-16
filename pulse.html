@@ -32,7 +32,15 @@
             --safe-bottom: env(safe-area-inset-bottom);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            /* DISABLE SELECTION & COPY */
+            user-select: none; 
+            -webkit-user-select: none; 
+            -moz-user-select: none; 
+            -ms-user-select: none;
+        }
 
         body {
             background: var(--bg); color: var(--text);
@@ -198,6 +206,11 @@
 <body>
 
     <script>
+        // BLOCK COPY AND SELECTION
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.addEventListener('selectstart', event => event.preventDefault());
+        document.addEventListener('dragstart', event => event.preventDefault());
+
         // Instant load cached PFP (Skeleton pre-fill)
         try {
             const profile = localStorage.getItem('my_goorac_profile');
@@ -297,12 +310,8 @@
         // --- 1. INSTANT TARGET CACHE LOAD ---
         const targetUsername = params.get('user');
         
-        // Try to load target info instantly from localStorage if we visited them before
         if (targetUsername) {
             try {
-                // We don't have username-to-uid mapping in localstorage easily unless we cached it.
-                // But we can check if we have a profile cached by username or if we previously saved it.
-                // For now, we will wait for the Auth check to get UID, but if we have a key "pulse_last_target_data", use it.
                 const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
                 if (cachedTarget) {
                     const data = JSON.parse(cachedTarget);
@@ -335,7 +344,6 @@
             if (user) {
                 myUid = user.uid;
                 
-                // Update local profile visual
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         const data = doc.data();
@@ -351,11 +359,9 @@
                             targetUid = snap.docs[0].id;
                             targetProfile = snap.docs[0].data();
                             
-                            // CACHE TARGET DATA FOR NEXT TIME (INSTANT LOAD)
                             localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
                             renderTargetProfile(targetProfile);
 
-                            // Proceed to verify and connect
                             const allowed = await verifyMutuals(myUid, targetUid);
                             if (allowed) initPulseSession();
                             else showError("You are not mutual friends.");
@@ -374,8 +380,6 @@
         });
 
         async function verifyMutuals(me, them) {
-            // We already loaded targetProfile above to speed things up
-            // Just double check friendship logic
             try {
                 const myDoc = await db.collection('users').doc(me).get();
                 if (!myDoc.exists) return false;
@@ -393,26 +397,28 @@
             document.getElementById('status-text').innerText = `Waiting for ${profile.name.split(' ')[0]}...`;
         }
 
+        // FIXED INIT PULSE SESSION (RACE CONDITION PROOF)
         function initPulseSession() {
             const roomId = [myUid, targetUid].sort().join('_');
             roomRef = db.collection('pulse_rooms').doc(roomId);
 
-            // We are already on screen-waiting by default, no need to toggle
-            
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
-            // Check room status
-            roomRef.get().then(doc => {
-                const data = doc.exists ? doc.data() : {};
-                if (!doc.exists || data[otherField] === 'offline' || !data[otherField]) {
-                    cleanSessionStart(myField);
-                } else {
-                    roomRef.update({ 
-                        [myField]: 'online',
-                        lastActive: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
+            // 1. Always mark myself online first (Safe Merge)
+            // This prevents the "overwriting" issue when two people join at once.
+            roomRef.set({ 
+                [myField]: 'online',
+                lastActive: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).then(() => {
+                // 2. Then check if room needs initialization (Defaults)
+                roomRef.get().then(doc => {
+                    const data = doc.data();
+                    // Only clean start if the room is missing core data or really stale
+                    if (!doc.exists || !data.cycleStatus) {
+                        cleanSessionStart(myField);
+                    }
+                });
             });
 
             // Listeners
@@ -441,29 +447,32 @@
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
                 
+                // If other person is online, we are good to go
                 if (data[otherField] === 'online') {
                     if (!document.getElementById('screen-active').classList.contains('active')) {
                          showScreen('screen-active');
                     }
                     syncCycle(data);
                 } else {
+                    // They are offline, stay in waiting room
                     deactivatePulse();
                 }
             });
         }
 
+        // FIXED CLEAN START (MERGE ONLY)
         function cleanSessionStart(myField) {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
+            
+            // We use merge: true so we NEVER overwrite the other user's status 
+            // if they joined milliseconds after us.
             roomRef.set({ 
-                userA: (myUid < targetUid) ? 'online' : 'offline',
-                userB: (myUid > targetUid) ? 'online' : 'offline',
-                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
                 turn: startingTurn,          
                 cycleStatus: 'picking',
                 currentSong: null,           
                 emojis: {},
                 ready: {} 
-            });
+            }, { merge: true });
         }
 
         function syncCycle(data) {
