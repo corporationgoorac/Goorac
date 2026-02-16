@@ -9,13 +9,8 @@ class SongPicker extends HTMLElement {
     connectedCallback() {
         this.render();
         this.initLogic();
-        this.restoreState(); 
-        
-        // SPEED: Start background brain to prep "For You" (50 songs)
-        // Checks if connection info is available and not in data-saver mode
-        if (navigator.connection && navigator.connection.saveData === false) {
-            setTimeout(() => this.runBackgroundUpdate(), 2000);
-        }
+        // We do NOT trigger background update here anymore.
+        // We wait for open() to ensure no background data usage.
     }
 
     render() {
@@ -418,7 +413,12 @@ class SongPicker extends HTMLElement {
 
     restoreState() {
         const lastSession = this.DB.getLastSession();
+        // NOTE: We only restore session if it was recent AND not "For You"
+        // If it was "For You", we prefer the fresh 'already loaded' batch
         if (lastSession && (Date.now() - lastSession.timestamp < 86400000)) {
+            
+            // If the last session was 'For You', we allow restoring if it has content
+            // This is crucial for "load fastly" on re-open.
             this.activeTab = lastSession.tab;
             this.shadowRoot.querySelectorAll('.pill-tab').forEach(b => {
                 b.classList.toggle('active', b.innerText === lastSession.tab || (lastSession.tab === 'Charts' && b.id === 'tabTrending'));
@@ -434,11 +434,13 @@ class SongPicker extends HTMLElement {
         return false;
     }
 
-    async runBackgroundUpdate() {
-        if (!this.classList.contains('active')) return;
+    // UPDATED: Added force flag to allow running on close
+    async runBackgroundUpdate(force = false) {
+        if (!force && !this.classList.contains('active')) return;
 
         const rec = this.DB.getRecommendationQuery();
-        if (this.currentHeaderTitle && this.currentHeaderTitle.includes(rec.query)) return;
+        // If we are forcing (on close), we ignore current header check
+        if (!force && this.currentHeaderTitle && this.currentHeaderTitle.includes(rec.query)) return;
 
         // "FOR YOU": FETCH 50 SONGS IN BACKGROUND
         const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=50`;
@@ -464,6 +466,7 @@ class SongPicker extends HTMLElement {
         this.classList.add('active');
         history.pushState({ modalOpen: true }, "", "");
         const restored = this.restoreState();
+        // If NOT restored (cache expired or empty), switchTab will trigger fetch
         if (!restored) {
             this.switchTab('For You', this.shadowRoot.getElementById('tabForYou'));
         }
@@ -476,7 +479,7 @@ class SongPicker extends HTMLElement {
             this.fetchController = null;
         }
 
-        // Save session state before clearing
+        // Save session state explicitly so "open" can be fast next time
         this.DB.saveSession(
             this.activeTab, 
             this.allFetchedSongs, 
@@ -538,15 +541,15 @@ class SongPicker extends HTMLElement {
         let subHeading = "Trending Now";
 
         if (name === 'For You') {
+            // CHECK LOCAL CACHE FIRST (Fast Load Requirement)
             const nextCache = this.DB.getNextCache();
-            // "FOR YOU" - USE THE 50 SONGS FROM BACKGROUND
             if (nextCache && nextCache.songs.length > 0) {
                 this.allFetchedSongs = nextCache.songs;
                 this.currentHeaderTitle = nextCache.header;
                 this.renderInitialList(nextCache.songs, nextCache.header);
+                
+                // We consume the cache
                 this.DB.setNextCache(null);
-                // Trigger next batch for later
-                this.runBackgroundUpdate();
                 return;
             }
             cacheKey = 'foryou';
