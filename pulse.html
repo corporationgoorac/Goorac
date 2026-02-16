@@ -5,33 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
-    <title>Pulse Session | Pro</title>
+    <title>Pulse Session | Goorac Pro</title>
 
     <script>
-        // SYSTEM INTEGRITY CHECKS
         function showErrorPopup(title, msg) {
             const box = document.createElement('div');
-            box.style.cssText = "position:fixed; top:10px; left:10px; right:10px; z-index:99999; background:#1a0505; color:#ffcccc; padding:16px; border-left:4px solid #ff0000; border-radius:4px; font-family:'Inter',sans-serif; font-size:12px; box-shadow:0 10px 40px rgba(0,0,0,0.8); white-space:pre-wrap; word-break:break-word; backdrop-filter:blur(10px);";
-            box.innerHTML = `<strong style="text-transform:uppercase; letter-spacing:1px;">${title}</strong><br><span style="opacity:0.8">${msg}</span>`;
+            box.style.cssText = "position:fixed; top:10px; left:10px; right:10px; z-index:99999; background:#330000; color:#ffcccc; padding:15px; border:1px solid #ff0000; border-radius:8px; font-family:monospace; font-size:12px; box-shadow:0 10px 40px #000; white-space:pre-wrap; word-break:break-word;";
+            box.innerHTML = `<strong>${title}</strong><br>${msg}`;
             document.body.appendChild(box);
-            setTimeout(() => box.remove(), 5000);
         }
 
         window.onerror = function(msg, url, line, col, error) {
             if (msg && msg.includes("ResizeObserver")) return;
-            // Silent log for non-critical visualizer errors to prevent UI disruption
-            if (msg && (msg.includes("AudioContext") || msg.includes("canvas"))) {
-                console.warn("Visualizer Warning:", msg);
-                return true;
-            }
-            showErrorPopup("SYSTEM ERROR", `${msg}\nLine: ${line}`);
+            showErrorPopup("SYSTEM ERROR:", `${msg}\nLine: ${line}`);
             return false;
         };
 
         window.addEventListener('unhandledrejection', function(event) {
-            // Ignore benign network aborts
-            if(event.reason && event.reason.code === 'aborted') return;
-            showErrorPopup("NETWORK EVENT", event.reason);
+            showErrorPopup("FIREBASE/NETWORK ERROR:", event.reason);
         });
     </script>
     
@@ -48,87 +39,64 @@
     <script src="components/chatLoader.js"></script>
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg: #050505;
+            --bg: #000000;
             --surface: #0a0a0a;
-            --surface-glass: rgba(20, 20, 20, 0.6);
-            --border: rgba(255, 255, 255, 0.08);
+            --surface-light: #161616;
+            --border: #222;
             --accent: #ff3b30;
-            --accent-dim: rgba(255, 59, 48, 0.1);
+            --accent-glow: rgba(255, 59, 48, 0.4);
             --text: #ffffff;
-            --text-secondary: #98989f;
+            --text-dim: #888;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
-            --verified-color: #3897f0;
-            --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --verified-color: #0095f6;
+            --glass: rgba(20, 20, 20, 0.6);
         }
 
         * { 
             margin: 0; padding: 0; box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent;
             user-select: none; -webkit-user-select: none; 
-            outline: none;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
             background: var(--bg); color: var(--text);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            height: 100dvh; width: 100vw; overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            height: 100dvh; overflow: hidden;
             display: flex; flex-direction: column;
-            transition: background 0.8s var(--ease-smooth);
+            transition: background 1s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        /* --- IMMERSIVE BACKGROUND LAYERS --- */
-        #fx-layer {
-            position: absolute; inset: 0; z-index: 0;
-            pointer-events: none; overflow: hidden;
-        }
-        
-        #ambient-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0.4; mix-blend-mode: screen;
+        /* --- FULL SCREEN FX CANVAS --- */
+        #fx-canvas {
+            position: absolute; inset: 0; pointer-events: none; z-index: 90;
+            width: 100%; height: 100%;
         }
 
-        #particle-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 50; pointer-events: none;
-        }
-
-        #overlay-vignette {
-            position: absolute; inset: 0;
-            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%);
-            z-index: 1; pointer-events: none;
-            transition: box-shadow 0.5s ease;
-        }
-
-        /* Cinematic Filters */
-        .filter-love { box-shadow: inset 0 0 100px rgba(255, 50, 100, 0.3); }
-        .filter-fire { box-shadow: inset 0 0 100px rgba(255, 100, 0, 0.3); }
-        .filter-cool { box-shadow: inset 0 0 100px rgba(0, 100, 255, 0.2); }
-
-        /* --- UI LAYER STRUCTURE --- */
+        /* --- HEADER --- */
         .top-nav {
             position: absolute; top: 0; left: 0; width: 100%;
-            padding: calc(15px + var(--safe-top)) 24px 15px;
+            padding: calc(15px + var(--safe-top)) 20px 15px;
             display: flex; align-items: center; justify-content: space-between;
-            z-index: 100;
+            z-index: 150;
         }
-
         .back-btn {
-            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
             width: 44px; height: 44px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            color: #fff; cursor: pointer; backdrop-filter: blur(12px);
-            transition: all 0.2s var(--ease-smooth);
+            color: #fff; cursor: pointer; backdrop-filter: blur(15px);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .back-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.15); }
+        .back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.15); }
 
-        /* --- SCREENS --- */
-        #session-view { display: block; height: 100%; width: 100%; position: relative; z-index: 10; }
+        /* --- SESSION UI --- */
+        #session-view { display: block; height: 100%; position: relative; }
 
         .screen {
             position: absolute; inset: 0;
@@ -140,212 +108,250 @@
         }
         .screen.active { opacity: 1; pointer-events: auto; }
 
-        /* ERROR STATE */
+        /* Error */
         .err-box {
-            background: rgba(20,20,20,0.6); border: 1px solid var(--border);
-            padding: 40px 30px; border-radius: 32px; text-align: center;
-            backdrop-filter: blur(40px); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            background: rgba(20,20,20,0.85); border: 1px solid var(--border);
+            padding: 40px 30px; border-radius: 30px; text-align: center;
+            backdrop-filter: blur(40px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            max-width: 80%;
         }
 
-        /* WAITING ROOM */
+        /* Waiting Room Layout */
         .session-avatars {
             display: flex; align-items: center; justify-content: center;
             gap: 40px; width: 100%; position: relative;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
         
         .avatar-group {
             display: flex; flex-direction: column; align-items: center; gap: 12px;
-            position: relative; z-index: 2; transition: transform 0.3s var(--ease-elastic);
+            position: relative; z-index: 2; transition: all 0.5s ease;
         }
 
         .s-bubble {
-            width: 90px; height: 90px; border-radius: 50%;
+            width: 100px; height: 100px; border-radius: 50%;
             position: relative; 
-            transition: all 0.6s var(--ease-elastic);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
-            background: #111; border: 2px solid #222;
-            overflow: visible;
+            transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            background: #1a1a1a; border: 2px solid #333;
+            padding: 3px;
         }
         .s-bubble img { 
             width: 100%; height: 100%; border-radius: 50%; 
-            object-fit: cover; position: relative; z-index: 2;
+            object-fit: cover; transition: 0.3s;
         }
         
-        /* Connection Line */
+        /* INACTIVE / DOWN STATE */
+        .avatar-group.them { opacity: 0.5; filter: grayscale(100%); transition: 0.5s; transform: scale(0.95); }
+        .avatar-group.them.active { opacity: 1; filter: grayscale(0%); transform: scale(1); }
+        
+        /* OVERLAY EMOJI ON PROFILE (THE "BIG" LOGIC) */
+        .profile-emoji-overlay {
+            position: absolute; inset: 0; 
+            background: rgba(0,0,0,0.7);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px;
+            opacity: 0; transform: scale(0.5);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 10;
+            backdrop-filter: blur(2px);
+        }
+        .profile-emoji-overlay.visible { opacity: 1; transform: scale(1); }
+
+        .u-name { 
+            font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+            display: flex; align-items: center; gap: 4px; 
+            text-shadow: 0 4px 12px rgba(0,0,0,0.9); 
+            background: rgba(0,0,0,0.3); padding: 4px 12px;
+            border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .verified-badge { font-size: 14px; color: var(--verified-color); }
+
         .s-line {
-            position: absolute; height: 2px; width: 50px; background: #333;
-            top: 45px; left: 50%; transform: translateX(-50%); z-index: 1;
-            transition: width 0.5s ease, background 0.5s ease;
+            position: absolute; height: 2px; width: 60px; background: #333;
+            top: 50px; left: 50%; transform: translateX(-50%); z-index: 1;
+            overflow: hidden;
         }
         .s-line.connected { 
-            background: var(--accent); 
-            box-shadow: 0 0 15px var(--accent);
-            width: 60px;
+            background: #222; 
+            box-shadow: 0 0 15px var(--accent-glow); 
         }
+        .s-line.connected::after {
+            content:''; position: absolute; inset: 0;
+            background: var(--accent);
+            animation: flowLine 2s infinite linear;
+            transform: translateX(-100%);
+        }
+        @keyframes flowLine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
         .pulse-wave::after {
-            content: ''; position: absolute; inset: -4px; border-radius: 50%;
+            content: ''; position: absolute; inset: -10px; border-radius: 50%;
             border: 2px solid var(--accent); opacity: 0;
-            animation: pulse-out 2s infinite; z-index: 0;
+            animation: pulse-out 2s infinite;
         }
-        @keyframes pulse-out { 0% { transform: scale(0.9); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
+        @keyframes pulse-out { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
-        /* --- ACTIVE PLAYER UI --- */
+        /* --- PLAYER UI --- */
         .player-ui {
             width: 100%; flex: 1; display: flex; flex-direction: column; 
             align-items: center; justify-content: center; position: relative; z-index: 20;
-            padding-bottom: calc(20px + var(--safe-bottom));
-        }
-
-        /* The Main Album Art Container */
-        .visualizer-container {
-            position: relative;
-            width: 320px; height: 320px;
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 40px;
+            padding-bottom: 40px;
         }
 
         .album-box {
-            width: 260px; height: 260px; border-radius: 50%;
-            background: #151515; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            transform: scale(1); transition: transform 0.4s var(--ease-elastic);
-            overflow: hidden; position: relative; z-index: 10;
-            border: 4px solid #1a1a1a;
+            width: 300px; height: 300px; border-radius: 40px;
+            background: #111; margin-bottom: 40px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+            transform: scale(0.95); transition: 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+            overflow: hidden; position: relative; z-index: 5;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        
-        .album-box.playing { 
-            animation: breathe 4s ease-in-out infinite; 
-            box-shadow: 0 30px 80px rgba(0,0,0,0.8);
-            border-color: #222;
-        }
-        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        .album-box.playing { transform: scale(1.05); box-shadow: 0 50px 120px rgba(0,0,0,0.9); border-color: rgba(255,255,255,0.1); }
+        .album-box.buffering { animation: pulseDim 1s infinite alternate; }
+        @keyframes pulseDim { from { opacity: 1; transform: scale(0.95); } to { opacity: 0.7; transform: scale(0.93); } }
 
-        .album-box img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease; }
-        .album-box img.loaded { opacity: 1; }
+        .album-box img { width: 100%; height: 100%; object-fit: cover; display: none; filter: brightness(0.9); }
+        .album-box img.loaded { display: block; }
         
         #default-art {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             font-family: 'Orbitron', sans-serif;
-            font-size: 18px; color: #333; letter-spacing: 4px; font-weight: 900;
+            font-size: 24px; color: #333; letter-spacing: 6px; font-weight: 900;
+            text-shadow: 0 2px 0 rgba(255,255,255,0.1);
         }
 
-        /* Professional Visualizer Canvas (Circular) */
-        #pro-visualizer {
+        /* Visualizer Canvas - Replaced with Professional Version */
+        #visualizer {
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%);
-            width: 380px; height: 380px; z-index: 5;
-            pointer-events: none;
+            width: 380px; height: 380px; z-index: 1;
+            pointer-events: none; opacity: 1;
         }
 
-        /* Highlight Emoji Badge on Album Art */
-        .active-emoji-badge {
-            position: absolute; bottom: 15px; right: 15px;
-            width: 50px; height: 50px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-            z-index: 20;
-            transform: scale(0); transition: transform 0.4s var(--ease-elastic);
-        }
-        .active-emoji-badge.visible { transform: scale(1); }
-
-        /* Track Metadata */
-        .track-info { text-align: center; margin-bottom: 30px; padding: 0 40px; position: relative; z-index: 20; }
+        .track-info { text-align: center; margin-bottom: 25px; padding: 0 30px; position: relative; z-index: 10; }
         .track-name { 
-            font-size: 22px; font-weight: 800; margin-bottom: 6px; 
+            font-size: 26px; font-weight: 800; margin-bottom: 10px; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.8); 
-            background: linear-gradient(to bottom, #fff, #ccc);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            line-height: 1.1;
         }
-        .track-artist { font-size: 14px; color: var(--text-secondary); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+        .track-artist { 
+            font-size: 16px; opacity: 0.7; font-weight: 500; letter-spacing: 0.5px; 
+            text-transform: uppercase;
+        }
 
         /* Controls */
-        .controls-area { width: 100%; display: flex; justify-content: center; height: 80px; align-items: center; position: relative; z-index: 20; }
+        .controls-area { width: 100%; display: flex; justify-content: center; height: 90px; align-items: center; position: relative; z-index: 10; }
         
         .dj-btn {
-            background: #ffffff; color: #000; border: none;
+            background: rgba(255,255,255,0.95); color: #000; border: none;
             padding: 18px 36px; border-radius: 100px;
-            font-weight: 700; font-size: 14px; letter-spacing: 0.5px;
-            box-shadow: 0 10px 40px rgba(255,255,255,0.25);
+            font-weight: 800; font-size: 15px; letter-spacing: 0.5px;
+            box-shadow: 0 10px 40px rgba(255,255,255,0.2);
             display: flex; align-items: center; gap: 10px;
-            cursor: pointer; transition: transform 0.2s;
-            animation: popIn 0.4s var(--ease-elastic);
+            cursor: pointer; transition: 0.2s;
+            animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+        @keyframes popIn { 0% { transform: scale(0) translateY(20px); } 100% { transform: scale(1) translateY(0); } }
         .dj-btn:active { transform: scale(0.96); }
-        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
 
-        /* Status Pills */
         .status-pill {
             position: absolute; top: calc(20px + var(--safe-top)); left: 50%; transform: translateX(-50%);
-            background: rgba(10,10,10,0.7); backdrop-filter: blur(20px);
-            padding: 8px 18px; border-radius: 30px; border: 1px solid var(--border);
-            font-family: 'Orbitron', sans-serif; font-size: 10px; color: var(--accent);
-            display: flex; align-items: center; gap: 8px; letter-spacing: 2px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            z-index: 100;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            padding: 8px 18px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+            font-family: 'Orbitron', sans-serif; font-size: 11px; color: var(--accent);
+            display: flex; align-items: center; gap: 8px; letter-spacing: 1.5px;
+            z-index: 100; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
-        .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 10px currentColor; animation: blink 2s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 10px var(--accent); animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
 
-        /* Sync Overlay */
         #sync-overlay {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 100;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            backdrop-filter: blur(15px);
+            backdrop-filter: blur(25px);
             opacity: 0; pointer-events: none; transition: 0.3s;
         }
         #sync-overlay.active { opacity: 1; pointer-events: auto; }
 
-        /* Modals */
+        /* --- MODALS --- */
         #emoji-modal {
-            position: fixed; top: auto; bottom: 0; left: 0; width: 100%; height: 50vh;
-            background: rgba(22, 22, 22, 0.95); border-radius: 32px 32px 0 0; z-index: 300; 
+            position: fixed; top: auto; bottom: 0; left: 0; width: 100%; height: 55vh;
+            background: rgba(26,26,26,0.95); border-radius: 32px 32px 0 0; z-index: 200; 
             display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-            padding-top: 24px; box-shadow: 0 -20px 60px rgba(0,0,0,0.8);
-            transform: translateY(110%); transition: transform 0.5s var(--ease-elastic);
-            visibility: hidden; border-top: 1px solid var(--border);
+            padding-top: 25px; box-shadow: 0 -20px 60px rgba(0,0,0,0.9);
+            transform: translateY(110%); transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            visibility: hidden; border-top: 1px solid rgba(255,255,255,0.1);
             backdrop-filter: blur(20px);
         }
         #emoji-modal.active { transform: translateY(0); visibility: visible; }
         emoji-picker { width: 100%; height: 100%; --background: transparent; --border-color: transparent; }
 
-        /* Duo Header */
+        /* --- REACTION ANIMATIONS --- */
+        /* Removed old seated-emoji in favor of Canvas FX, but keeping structure for compat */
+        .seated-emoji {
+            display: none; /* Logic handled by canvas now for better "Professional" feel */
+        }
+        
+        .flying-emoji {
+            /* Legacy CSS fallbacks, actual rendering done in canvas mostly */
+            position: fixed; font-size: 80px; z-index: 300; pointer-events: none;
+            animation: bigPopFly 2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+        }
+
+        @keyframes bigPopFly {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 0; }
+            30% { transform: translate(-50%, -50%) scale(1.5) rotate(10deg); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -300px) scale(0.5); opacity: 0; }
+        }
+
+        /* --- TOP BAR DUO UI --- */
         .duo-header {
-            position: absolute; top: calc(75px + var(--safe-top));
-            left: 0; width: 100%; display: flex; justify-content: center; gap: 40px;
+            position: absolute; top: calc(70px + var(--safe-top));
+            left: 0; width: 100%; display: flex; justify-content: center; gap: 50px;
             z-index: 15;
         }
-        .duo-user { display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.4s ease; transform: scale(0.9); }
-        .duo-user.active { opacity: 1; transform: scale(1.1); }
-        .duo-img { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #222; box-shadow: 0 4px 15px rgba(0,0,0,0.5); object-fit: cover; }
-        .duo-name { font-size: 10px; font-weight: 700; margin-top: 6px; letter-spacing: 0.5px; }
+        .duo-user { 
+            display: flex; flex-direction: column; align-items: center; 
+            opacity: 0.4; transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1); 
+            filter: grayscale(100%);
+        }
+        .duo-user.active { opacity: 1; transform: scale(1.15); filter: grayscale(0%); }
+        .duo-img-wrap {
+            position: relative; width: 44px; height: 44px; margin-bottom: 6px;
+        }
+        .duo-img { 
+            width: 100%; height: 100%; border-radius: 50%; 
+            border: 2px solid rgba(255,255,255,0.2); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); object-fit: cover; 
+            background: #111;
+        }
+        .duo-name { 
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+            text-shadow: 0 2px 4px #000; display:flex; gap:2px; align-items:center;
+            color: rgba(255,255,255,0.8);
+        }
 
     </style>
 </head>
 <body>
 
-    <div id="fx-layer">
-        <div id="overlay-vignette"></div>
-        <canvas id="ambient-canvas"></canvas>
-        <canvas id="particle-canvas"></canvas>
-    </div>
-
     <call-notifier></call-notifier>
     <chat-loader></chat-loader>
+    
+    <canvas id="fx-canvas"></canvas>
 
     <script>
-        // CORE: DISABLE NATIVE BEHAVIORS
+        // BLOCK COPY AND SELECTION - STRICT
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('selectstart', event => event.preventDefault());
         document.addEventListener('dragstart', event => event.preventDefault());
+        document.addEventListener('touchstart', (e) => { if(e.touches.length > 1) e.preventDefault(); }, {passive: false});
 
-        // ZERO-LATENCY: PRELOAD AVATAR
+        // ZERO-LATENCY LOAD: MY AVATAR
         try {
             const profile = localStorage.getItem('my_goorac_profile');
             if(profile) {
@@ -360,10 +366,10 @@
         
         <div class="screen" id="screen-error">
             <div class="err-box">
-                <span class="material-icons-round" style="font-size:32px; color:#ff3b30; margin-bottom:15px;">lock_clock</span>
-                <h2 style="font-size:20px; font-weight:800; margin-bottom:10px;">Access Denied</h2>
-                <p id="error-msg" style="font-size:14px; color:#aaa; line-height:1.5;">Connection could not be established.</p>
-                <button onclick="leaveSession()" style="margin-top:30px; padding:14px 32px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px; box-shadow:0 10px 30px rgba(255,255,255,0.2);">Return to Lobby</button>
+                <span class="material-icons-round error-icon" style="font-size:40px; color:#ff3b30; margin-bottom:15px;">lock_person</span>
+                <h2 style="font-size:20px; font-weight:800; margin-bottom:10px;">Access Restricted</h2>
+                <p id="error-msg" style="font-size:14px; color:#aaa; line-height:1.6;">Mutual connection required.</p>
+                <button onclick="leaveSession()" style="margin-top:25px; padding:14px 35px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:800; font-size:13px; cursor:pointer; box-shadow:0 10px 20px rgba(255,255,255,0.1);">RETURN TO LOBBY</button>
             </div>
         </div>
 
@@ -376,29 +382,35 @@
 
             <div class="session-avatars">
                 <div class="s-line" id="connect-line"></div>
-                <div class="avatar-group me">
+                
+                <div class="avatar-group me" id="my-group">
                     <div class="s-bubble">
                         <img id="my-avatar" src="">
+                        <div id="my-overlay-emoji" class="profile-emoji-overlay"></div>
                     </div>
-                    <div class="u-name" style="font-size:12px; font-weight:700;">You</div>
+                    <div class="u-name">You</div>
                 </div>
-                <div class="avatar-group them" id="target-group" style="opacity:0.5; filter:grayscale(100%);">
+
+                <div class="avatar-group them" id="target-group">
                     <div class="s-bubble">
                         <img id="target-avatar" src=""> 
                         <div class="pulse-wave" style="position:absolute; inset:0; border-radius:50%;"></div>
+                        <div id="their-overlay-emoji" class="profile-emoji-overlay"></div>
                     </div>
-                    <div class="u-name" id="target-name-display" style="font-size:12px; font-weight:700;">Connecting...</div>
+                    <div class="u-name" id="target-name-display">
+                        Connecting...
+                    </div>
                 </div>
             </div>
 
-            <h1 id="status-text" style="font-size:24px; font-weight:800; text-align:center; letter-spacing:-0.5px;">Initializing</h1>
-            <p style="font-size:13px; color:#666; margin-top:8px;">Establishing secure handshake...</p>
+            <h1 id="status-text" style="font-size:22px; font-weight:800; text-align:center; letter-spacing:-0.5px;">Initializing Uplink</h1>
+            <p style="font-size:13px; color:#666; margin-top:8px; font-weight:500;">Establishing secure tunnel...</p>
         </div>
 
         <div class="screen" id="screen-active">
             
             <div class="status-pill">
-                <div class="status-dot"></div> LIVE SYNC
+                <div class="status-dot"></div> SYNCED
             </div>
 
             <div class="top-nav">
@@ -410,25 +422,26 @@
 
             <div class="duo-header">
                 <div class="duo-user" id="duo-me">
-                    <img id="duo-me-img" class="duo-img" src="">
+                    <div class="duo-img-wrap">
+                        <img id="duo-me-img" class="duo-img" src="">
+                        <div id="duo-me-overlay" class="profile-emoji-overlay" style="font-size:24px;"></div>
+                    </div>
                     <div class="duo-name">YOU</div>
                 </div>
                 <div class="duo-user" id="duo-them">
-                    <img id="duo-them-img" class="duo-img" src="">
+                    <div class="duo-img-wrap">
+                        <img id="duo-them-img" class="duo-img" src="">
+                        <div id="duo-them-overlay" class="profile-emoji-overlay" style="font-size:24px;"></div>
+                    </div>
                     <div class="duo-name" id="duo-them-name">THEM</div>
                 </div>
             </div>
 
             <div class="player-ui">
-                <div class="visualizer-container">
-                    <canvas id="pro-visualizer"></canvas>
-
-                    <div class="album-box" id="album-container">
-                        <div id="default-art">PULSE</div>
-                        <img id="active-album-art" src="">
-                        
-                        <div id="active-emoji-badge" class="active-emoji-badge"></div>
-                    </div>
+                <canvas id="visualizer"></canvas>
+                <div class="album-box" id="album-container">
+                    <div id="default-art">PULSE</div>
+                    <img id="active-album-art" src="">
                 </div>
 
                 <div class="track-info">
@@ -440,11 +453,11 @@
             </div>
 
             <div id="sync-overlay" onclick="resumeAudio()">
-                <div style="background:var(--accent); width:70px; height:70px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:20px; box-shadow:0 0 40px var(--accent);">
-                    <span class="material-icons-round" style="color:#fff; font-size:36px;">play_arrow</span>
+                <div style="background:#fff; width:70px; height:70px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:25px; box-shadow:0 10px 30px rgba(255,255,255,0.3);">
+                    <span class="material-icons-round" style="color:#000; font-size:36px;">play_arrow</span>
                 </div>
-                <h3 style="font-weight:900; letter-spacing:2px; font-size:18px;">TAP TO SYNC</h3>
-                <p style="font-size:13px; color:#aaa; margin-top:8px;">Audio sync required by browser</p>
+                <h3 style="font-weight:900; letter-spacing:1px; font-size:18px;">RESUME SYNC</h3>
+                <p style="font-size:13px; color:#ccc; margin-top:8px;">Audio stream interrupted</p>
             </div>
         </div>
     </div>
@@ -456,13 +469,25 @@
     </div>
 
     <script>
-        // --- 1. FIREBASE & SESSION STATE ---
+        // --- RENAMED VARIABLES TO PREVENT CONFLICTS ---
         const sessionDb = firebase.firestore();
         const sessionAuth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
-        const targetUsername = params.get('user');
         
-        let wakeLock = null; 
+        const targetUsername = params.get('user');
+        let wakeLock = null; // Screen Wake Lock
+
+        // --- ZERO-LATENCY: INSTANT TARGET CACHE LOAD ---
+        if (targetUsername) {
+            try {
+                const cachedTarget = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
+                if (cachedTarget) {
+                    const data = JSON.parse(cachedTarget);
+                    updateTargetUI(data);
+                }
+            } catch(e) {}
+        }
+
         let targetUid = null;
         let myUid = null;
         let myProfile = null;
@@ -470,8 +495,14 @@
         let roomRef = null;
         let roomUnsub = null;
         let audio = new Audio();
-        audio.crossOrigin = "anonymous"; 
+        audio.crossOrigin = "anonymous"; // Enable visualizer data
         
+        // Audio Visualizer & FX
+        let audioCtx, analyser, dataArray, canvas, canvasCtx, visualizerAnimation;
+        let fxCanvas, fxCtx, fxAnimation;
+        let particles = [];
+        let eyeParticles = [];
+
         // Cycle State
         let currentTurnUid = null;
         let isMyTurn = false;
@@ -481,199 +512,35 @@
         let emojiCloseTimer = null; 
         let turnTimer = null; 
 
-        // --- 2. PROFESSIONAL VISUAL ENGINE CLASS ---
-        class PulseVisualEngine {
-            constructor() {
-                this.audioCtx = null;
-                this.analyser = null;
-                this.dataArray = null;
-                this.source = null;
-                
-                // Canvases
-                this.visCanvas = document.getElementById('pro-visualizer');
-                this.visCtx = this.visCanvas.getContext('2d');
-                this.partCanvas = document.getElementById('particle-canvas');
-                this.partCtx = this.partCanvas.getContext('2d');
-                
-                this.particles = [];
-                this.isPlaying = false;
-                this.animationFrame = null;
-
-                this.resize();
-                window.addEventListener('resize', () => this.resize());
-            }
-
-            resize() {
-                // High DPI scaling
-                const dpr = window.devicePixelRatio || 1;
-                
-                // Visualizer
-                const vRect = this.visCanvas.getBoundingClientRect();
-                this.visCanvas.width = vRect.width * dpr;
-                this.visCanvas.height = vRect.height * dpr;
-                this.visCtx.scale(dpr, dpr);
-
-                // Particles (Full Screen)
-                this.partCanvas.width = window.innerWidth * dpr;
-                this.partCanvas.height = window.innerHeight * dpr;
-                this.partCtx.scale(dpr, dpr);
-            }
-
-            initAudio(audioElement) {
-                if (this.audioCtx) return;
+        // --- WAKE LOCK API (PROFESSIONAL IMPLEMENTATION) ---
+        // Prevents screen sleep efficiently without video hacks
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
                 try {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    this.audioCtx = new AudioContext();
-                    this.analyser = this.audioCtx.createAnalyser();
-                    this.analyser.smoothingTimeConstant = 0.8;
-                    this.analyser.fftSize = 256; // High res
-                    
-                    this.source = this.audioCtx.createMediaElementSource(audioElement);
-                    this.source.connect(this.analyser);
-                    this.analyser.connect(this.audioCtx.destination);
-                    
-                    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-                    this.startLoop();
-                } catch(e) { console.warn("Audio Context Error", e); }
-            }
-
-            resume() {
-                if(this.audioCtx && this.audioCtx.state === 'suspended') this.audioCtx.resume();
-            }
-
-            // The Render Loop
-            startLoop() {
-                const render = () => {
-                    this.animationFrame = requestAnimationFrame(render);
-                    
-                    // 1. Clear Canvases
-                    this.visCtx.clearRect(0, 0, this.visCanvas.width, this.visCanvas.height);
-                    this.partCtx.clearRect(0, 0, this.partCanvas.width, this.partCanvas.height);
-
-                    // 2. Audio Data
-                    let bass = 0;
-                    if(this.analyser) {
-                        this.analyser.getByteFrequencyData(this.dataArray);
-                        // Calculate Bass Average for Pulse Effect
-                        let bTotal = 0;
-                        for(let i=0; i<10; i++) bTotal += this.dataArray[i];
-                        bass = bTotal / 10; 
-                    }
-
-                    // 3. Draw Circular Visualizer
-                    this.drawCircularWave(bass);
-
-                    // 4. Update Particles
-                    this.updateParticles();
-
-                    // 5. Background Beat Pulse
-                    if(bass > 140) {
-                        document.body.style.boxShadow = `inset 0 0 ${bass}px rgba(255,59,48, 0.1)`;
-                    } else {
-                        document.body.style.boxShadow = 'none';
-                    }
-                };
-                render();
-            }
-
-            drawCircularWave(bass) {
-                const ctx = this.visCtx;
-                const width = this.visCanvas.width / (window.devicePixelRatio||1);
-                const height = this.visCanvas.height / (window.devicePixelRatio||1);
-                const cx = width / 2;
-                const cy = height / 2;
-                const radius = 135; // Just outside the album art (130px radius)
-
-                if (!this.dataArray) return;
-
-                const bars = 60;
-                const step = (Math.PI * 2) / bars;
-
-                ctx.save();
-                ctx.translate(cx, cy);
-                // Slight rotation for dynamic feel
-                ctx.rotate(Date.now() * 0.0005);
-
-                for (let i = 0; i < bars; i++) {
-                    // Map generic frequency data to bars
-                    // We skip the very high frequencies (empty usually)
-                    const dataIndex = Math.floor((i / bars) * (this.dataArray.length * 0.7));
-                    const val = this.dataArray[dataIndex];
-                    
-                    // Scale bar height based on volume + bass kick
-                    const barHeight = (val / 255) * 50 + (bass > 130 ? 10 : 0);
-                    
-                    const rad = i * step;
-                    
-                    const x1 = Math.cos(rad) * radius;
-                    const y1 = Math.sin(rad) * radius;
-                    const x2 = Math.cos(rad) * (radius + barHeight);
-                    const y2 = Math.sin(rad) * (radius + barHeight);
-
-                    // Gradient Color based on intensity
-                    const hue = 0 + (val / 255) * 60; // Red to Yellow
-                    ctx.strokeStyle = `hsl(${hue}, 100%, 60%)`;
-                    ctx.lineWidth = 4;
-                    ctx.lineCap = 'round';
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            // --- PARTICLE SYSTEM (WHOLE SCREEN EFFECTS) ---
-            triggerExplosion(emoji) {
-                const count = 30; // Number of particles
-                const cx = window.innerWidth / 2;
-                const cy = window.innerHeight / 2;
-                
-                for(let i=0; i<count; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const vel = 5 + Math.random() * 10;
-                    this.particles.push({
-                        x: cx,
-                        y: cy,
-                        vx: Math.cos(angle) * vel,
-                        vy: Math.sin(angle) * vel,
-                        text: emoji,
-                        life: 1.0,
-                        grav: 0.2
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    // console.log('Screen Wake Lock active');
+                    wakeLock.addEventListener('release', () => {
+                        // console.log('Screen Wake Lock released');
+                        // Auto-reacquire if still in active session
+                        if(roomRef && document.visibilityState === 'visible') requestWakeLock();
                     });
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
                 }
-            }
-
-            updateParticles() {
-                const ctx = this.partCtx;
-                const width = window.innerWidth;
-                const height = window.innerHeight;
-
-                for(let i = this.particles.length - 1; i >= 0; i--) {
-                    const p = this.particles[i];
-                    
-                    // Physics
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.vy += p.grav; // Gravity
-                    p.life -= 0.015; // Fade out
-
-                    // Render
-                    ctx.globalAlpha = Math.max(0, p.life);
-                    ctx.font = "30px Arial";
-                    ctx.fillText(p.text, p.x, p.y);
-                    
-                    // Remove dead particles
-                    if(p.life <= 0) this.particles.splice(i, 1);
-                }
-                ctx.globalAlpha = 1;
             }
         }
 
-        const visualEngine = new PulseVisualEngine();
+        // Re-acquire lock if tab becomes visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
 
-        // --- 3. INIT & AUTH ---
+        document.addEventListener('touchstart', requestWakeLock, {passive:true});
+        document.addEventListener('click', requestWakeLock);
+
+
         sessionAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
@@ -698,16 +565,18 @@
                             targetUid = snap.docs[0].id;
                             targetProfile = snap.docs[0].data();
                             
+                            // Cache Target Data
+                            localStorage.setItem(`pulse_cache_user_${targetUsername}`, JSON.stringify(targetProfile));
                             updateTargetUI(targetProfile);
 
                             const allowed = await verifyMutuals(myUid, targetUid);
                             if (allowed) initPulseSession();
-                            else showError("Mutual connection required.");
+                            else showError("You are not mutual friends.");
                         } else {
                             showError("User not found.");
                         }
                     } catch (e) {
-                        showError("Connection handshake failed.");
+                        showError("Connection failed.");
                     }
                 } else {
                     window.location.replace('pulseLobby.html');
@@ -717,48 +586,34 @@
             }
         });
 
-        // --- 4. WAKE LOCK ---
-        async function requestWakeLock() {
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => {});
-                } catch (err) { console.log(err); }
-            }
-        }
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                requestWakeLock();
-            }
-        });
-
-        // --- 5. UI HELPERS ---
         function updateTargetUI(data) {
             const pfp = data.photoURL || 'https://via.placeholder.com/150';
             const name = data.name.split(' ')[0];
-            
+            const badge = data.verified ? `<span class="material-icons-round verified-badge">verified</span>` : '';
+
             // Waiting Screen
             document.getElementById('target-avatar').src = pfp;
-            document.getElementById('status-text').innerText = `Syncing with ${name}`;
-            document.getElementById('target-name-display').innerHTML = `${name}`;
+            document.getElementById('status-text').innerText = `Syncing with ${name}...`;
+            document.getElementById('target-name-display').innerHTML = `${name} ${badge}`;
 
             // Active Screen
             document.getElementById('duo-them-img').src = pfp;
-            document.getElementById('duo-them-name').innerHTML = name.toUpperCase();
+            document.getElementById('duo-them-name').innerHTML = `${name} ${badge}`;
         }
 
         async function verifyMutuals(me, them) {
             try {
                 const myDoc = await sessionDb.collection('users').doc(me).get();
                 if (!myDoc.exists) return false;
-                const myData = myDoc.data();
-                const myF = (myData.following || []).map(u => typeof u === 'string' ? u : u.uid);
+                myProfile = myDoc.data(); 
+
+                const myF = (myProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
                 const theirF = (targetProfile.following || []).map(u => typeof u === 'string' ? u : u.uid);
+
                 return myF.includes(them) && theirF.includes(me);
             } catch (e) { return false; }
         }
 
-        // --- 6. SESSION LOGIC ---
         function initPulseSession() {
             const roomId = [myUid, targetUid].sort().join('_');
             roomRef = sessionDb.collection('pulse_rooms').doc(roomId);
@@ -766,72 +621,87 @@
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
             
-            // Go Online
+            // Mark online via MERGE to avoid race conditions
             roomRef.set({ 
                 [myField]: 'online',
-                sessionStatus: 'active',
+                sessionStatus: 'active', // Revive session if marked ended
                 lastActive: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true }).then(() => {
                 roomRef.get().then(doc => {
                     const data = doc.data();
                     if (!doc.exists || !data.cycleStatus) {
-                        cleanSessionStart();
+                        cleanSessionStart(myField);
                     }
                 });
             });
 
+            // Trigger Wake Lock
             requestWakeLock();
+            
+            // Init Canvas FX
+            initFxCanvas();
 
             // Listeners
             window.addEventListener('beforeunload', leaveSession);
             window.addEventListener('pagehide', leaveSession);
-            document.addEventListener('visibilitychange', () => { if (document.hidden) leaveSession(); });
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) leaveSession();
+            });
 
-            // Emoji Picker Setup
+            // BACK BUTTON CLOSES MODAL logic
+            window.addEventListener('popstate', (event) => {
+                const modal = document.getElementById('emoji-modal');
+                if (modal.classList.contains('active')) {
+                    modal.classList.remove('active');
+                } 
+            });
+
+            // EMOJI LISTENER
             const picker = document.getElementById('cycle-emoji-picker');
             const newPicker = picker.cloneNode(true);
             picker.parentNode.replaceChild(newPicker, picker);
+            
             newPicker.addEventListener('emoji-click', (e) => {
                 if (e.detail && (e.detail.unicode || e.detail.emoji)) {
                     handleEmojiSelection(e.detail.unicode || e.detail.emoji);
                 }
             });
 
-            // Realtime Sync
             roomUnsub = roomRef.onSnapshot(snapshot => {
                 if (!snapshot.exists) return;
                 const data = snapshot.data();
                 
+                // 1. CHECK IF SESSION ENDED
                 if (data.sessionStatus === 'ended') {
                     audio.pause();
                     window.location.replace("pulseLobby.html");
                     return;
                 }
 
+                // 2. CONNECTION STATUS & INACTIVE STATE LOGIC
                 if (data[otherField] === 'online') {
-                    // Connected
                     document.getElementById('target-group').classList.add('active');
-                    document.getElementById('target-group').style.opacity = '1';
-                    document.getElementById('target-group').style.filter = 'none';
-                    document.querySelector('.s-line').classList.add('connected');
+                    document.getElementById('target-group').classList.remove('them'); // Remove dimming
                     
+                    document.querySelector('.s-line').classList.add('connected');
                     if (!document.getElementById('screen-active').classList.contains('active')) {
                          showScreen('screen-active');
-                         requestWakeLock();
+                         setupVisualizer(); // Init Visualizer
+                         requestWakeLock(); // Re-request lock on session start
                     }
                     syncCycle(data);
                 } else {
-                    // Disconnected
+                    // INACTIVE STATE: Look Down / Grayed Out
                     document.getElementById('target-group').classList.remove('active');
-                    document.getElementById('target-group').style.opacity = '0.5';
-                    document.getElementById('target-group').style.filter = 'grayscale(100%)';
+                    document.getElementById('target-group').classList.add('them');
+                    
                     document.querySelector('.s-line').classList.remove('connected');
                     deactivatePulse();
                 }
             });
         }
 
-        function cleanSessionStart() {
+        function cleanSessionStart(myField) {
             const startingTurn = (myUid < targetUid) ? myUid : targetUid;
             roomRef.set({ 
                 turn: startingTurn,          
@@ -847,7 +717,7 @@
             isMyTurn = (myUid === currentTurnUid);
             const status = data.cycleStatus;
 
-            // Header UI
+            // Highlight who is DJ in active header
             document.getElementById('duo-me').classList.toggle('active', isMyTurn);
             document.getElementById('duo-them').classList.toggle('active', !isMyTurn);
 
@@ -869,32 +739,27 @@
                     controls.innerHTML = '';
                     const btn = document.createElement('button');
                     btn.className = "dj-btn";
-                    btn.innerHTML = `<span class="material-icons-round">queue_music</span> Select Track`;
+                    btn.innerHTML = `<span class="material-icons-round">music_note</span> Select Track`;
                     btn.onclick = () => document.getElementById('song-picker').open();
                     controls.appendChild(btn);
-                    document.getElementById('active-song-artist').innerText = "YOUR TURN TO PICK";
+                    document.getElementById('active-song-artist').innerText = "It's your turn to set the vibe.";
                 } else {
-                    controls.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="material-icons-round" style="font-size:20px; margin-bottom:5px; color:#888;">pending</span><span style="font-size:10px; color:#666; font-weight:700;">WAITING FOR SELECTION</span></div>`;
-                    document.getElementById('active-song-artist').innerText = "Waiting for DJ...";
+                    controls.innerHTML = `<p style="font-size:11px; color:#666; font-weight:700; letter-spacing:1px; text-transform:uppercase;">${targetProfile ? targetProfile.name.split(' ')[0] : 'Partner'} is choosing...</p>`;
+                    document.getElementById('active-song-artist').innerText = "Waiting for track...";
                 }
-                
-                // Clean canvas
-                visualEngine.visCtx.clearRect(0,0, visualEngine.visCanvas.width, visualEngine.visCanvas.height);
             }
             
             // BUFFERING
             else if (status === 'buffering' && data.currentSong) {
                 const song = data.currentSong;
                 updateSongDisplay(song);
-                document.getElementById('active-album-art').style.opacity = '0.5';
-                document.getElementById('controls-container').innerHTML = `<p style="font-size:10px; color:var(--accent); font-family:'Orbitron';">SYNCING AUDIO...</p>`;
+                document.getElementById('active-album-art').classList.add('buffering'); 
+                document.getElementById('controls-container').innerHTML = `<p style="font-size:12px; color:#aaa; font-weight:700; letter-spacing:1px;">SYNCING AUDIO...</p>`;
                 
                 if (currentSongId !== song.id) {
                     currentSongId = song.id;
                     audio.src = song.previewUrl;
                     audio.load();
-                    visualEngine.initAudio(audio); // Bind Visualizer
-                    
                     audio.oncanplaythrough = () => { roomRef.update({ [`ready.${myUid}`]: true }); };
                     if(audio.readyState >= 3) { roomRef.update({ [`ready.${myUid}`]: true }); }
                 }
@@ -912,125 +777,275 @@
                 if (currentSongId !== data.currentSong.id) {
                     currentSongId = data.currentSong.id;
                     audio.src = data.currentSong.previewUrl;
-                    visualEngine.initAudio(audio);
                     updateSongDisplay(data.currentSong);
                 }
 
-                document.getElementById('active-album-art').style.opacity = '1';
-                document.getElementById('active-album-art').parentElement.classList.add('playing');
+                document.getElementById('active-album-art').classList.remove('buffering');
+                document.getElementById('active-album-art').classList.add('playing');
                 document.getElementById('controls-container').innerHTML = '';
 
-                // Background & Vibe
-                // We use the artist name length to generate a seed for color
-                const hue = (data.currentSong.artistName.length * 40) % 360;
-                document.body.style.background = `radial-gradient(circle at center, hsl(${hue}, 40%, 10%), #000)`;
+                // Background Dynamic
+                const hue = (data.currentSong.artistName.length * 60) % 360;
+                document.body.style.background = `radial-gradient(circle at center, hsla(${hue}, 70%, 10%, 1), #000)`;
 
                 if (audio.paused) {
-                    audio.play().then(() => {
-                        visualEngine.resume();
-                    }).catch(() => {
+                    audio.play().catch(() => {
                         if(!isMyTurn) document.getElementById('sync-overlay').classList.add('active');
                     });
                     
                     clearTimeout(turnTimer);
-                    turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 29500); 
+                    turnTimer = setTimeout(() => { if (isMyTurn) swapTurn(); }, 30000); 
                 }
 
                 clearTimeout(emojiTimer);
                 if (!hasPickedEmoji) {
-                    emojiTimer = setTimeout(openEmojiModal, 4000); 
+                    emojiTimer = setTimeout(openEmojiModal, 5000); 
                 }
             }
 
-            // REACTION SYNC
+            // Realtime Reactions - BIG EMOJI LOGIC
             if (data.emojis) {
-                // If I reacted
                 if(data.emojis[myUid]) {
-                    showBadge(data.emojis[myUid]);
+                    showBigProfileEmoji('me', data.emojis[myUid]);
+                    checkHotEyesEffect('me', data.emojis[myUid]);
                 }
-                // If they reacted
                 if(data.emojis[targetUid]) {
-                    const emoji = data.emojis[targetUid];
-                    
-                    // Trigger Logic only once per change
-                    const lastEmoji = document.getElementById('active-emoji-badge').getAttribute('data-last');
-                    if (lastEmoji !== emoji) {
-                        visualEngine.triggerExplosion(emoji); // Big Visual
-                        applyScreenFilter(emoji); // Screen Effect
-                        showBadge(emoji);
-                    }
+                    showBigProfileEmoji('them', data.emojis[targetUid]);
+                    checkHotEyesEffect('them', data.emojis[targetUid]);
                 }
             }
         }
 
-        // --- 7. INTERACTION LOGIC ---
-        
+        // --- PROFESSIONAL AUDIO VISUALIZER (Circular Bar) ---
+        function setupVisualizer() {
+            if (audioCtx) return; 
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                const source = audioCtx.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                analyser.fftSize = 256; // Higher res
+                
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                canvas = document.getElementById('visualizer');
+                canvasCtx = canvas.getContext('2d');
+                canvas.width = 760; // Retina 2x
+                canvas.height = 760;
+                
+                drawVisualizer();
+            } catch(e) { console.log("Visualizer failed:", e); }
+        }
+
+        function drawVisualizer() {
+            visualizerAnimation = requestAnimationFrame(drawVisualizer);
+            analyser.getByteFrequencyData(dataArray);
+            
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = 220; 
+
+            // Glow
+            canvasCtx.shadowBlur = 15;
+            canvasCtx.shadowColor = "rgba(255, 255, 255, 0.5)";
+
+            for (let i = 0; i < dataArray.length; i+=2) { // Skip every other for clarity
+                const barHeight = Math.max(4, dataArray[i] * 0.8);
+                const rads = (Math.PI * 2 * i) / dataArray.length;
+                
+                // Mirror effect
+                const x1 = cx + Math.cos(rads) * radius;
+                const y1 = cy + Math.sin(rads) * radius;
+                const x2 = cx + Math.cos(rads) * (radius + barHeight);
+                const y2 = cy + Math.sin(rads) * (radius + barHeight);
+
+                canvasCtx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1, dataArray[i]/200)})`;
+                canvasCtx.lineWidth = 4;
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(x1, y1);
+                canvasCtx.lineTo(x2, y2);
+                canvasCtx.stroke();
+            }
+            canvasCtx.shadowBlur = 0;
+        }
+
+        // --- CANVAS PARTICLE SYSTEM (HEARTS, HOT EYES) ---
+        function initFxCanvas() {
+            fxCanvas = document.getElementById('fx-canvas');
+            fxCtx = fxCanvas.getContext('2d');
+            
+            // Resize handler
+            const resize = () => {
+                fxCanvas.width = window.innerWidth;
+                fxCanvas.height = window.innerHeight;
+            };
+            window.addEventListener('resize', resize);
+            resize();
+            
+            animateFx();
+        }
+
+        function createParticles(x, y, emoji, type) {
+            for(let i=0; i<20; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 1) * 15,
+                    life: 1.0,
+                    text: emoji,
+                    size: 20 + Math.random()*30,
+                    type: 'burst'
+                });
+            }
+        }
+
+        function createEyeParticles(x, y, color) {
+             // Continuous stream for "Hot Eyes"
+            eyeParticles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 5,
+                life: 1.0,
+                color: color,
+                size: 3 + Math.random() * 5
+            });
+        }
+
+        function animateFx() {
+            fxAnimation = requestAnimationFrame(animateFx);
+            fxCtx.clearRect(0,0, fxCanvas.width, fxCanvas.height);
+
+            // 1. General Particles (Burst)
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.5; // Gravity
+                p.life -= 0.02;
+                
+                fxCtx.globalAlpha = p.life;
+                fxCtx.font = `${p.size}px Arial`;
+                fxCtx.fillText(p.text, p.x, p.y);
+                
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            // 2. Eye Particles (Flame/Heart effect)
+            for(let i=eyeParticles.length-1; i>=0; i--) {
+                let p = eyeParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.04;
+                
+                fxCtx.globalAlpha = p.life;
+                fxCtx.fillStyle = p.color;
+                fxCtx.beginPath();
+                fxCtx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                fxCtx.fill();
+
+                if(p.life <= 0) eyeParticles.splice(i, 1);
+            }
+            fxCtx.globalAlpha = 1;
+        }
+
+        // --- LOGIC FOR "HOT IN EYES" & BIG EMOJI ---
+        function checkHotEyesEffect(who, emoji) {
+            const hotEmojis = ['😍', '🥵', '🔥', '😻', '❤️', '💘'];
+            if(hotEmojis.includes(emoji)) {
+                // Determine screen coordinates of avatar eyes
+                let avatarId = (who === 'me') ? 'duo-me-img' : 'duo-them-img';
+                
+                // Fallback to waiting room avatars if active screen is hidden
+                if(!document.getElementById('screen-active').classList.contains('active')){
+                    avatarId = (who === 'me') ? 'my-avatar' : 'target-avatar';
+                }
+
+                const img = document.getElementById(avatarId);
+                if(img) {
+                    const rect = img.getBoundingClientRect();
+                    // Rough eye estimation: 30% and 70% width, 40% height
+                    const eyeY = rect.top + rect.height * 0.4;
+                    const eyeX1 = rect.left + rect.width * 0.3;
+                    const eyeX2 = rect.left + rect.width * 0.7;
+                    const color = (emoji === '🔥') ? '#ffaa00' : '#ff3b30';
+
+                    // Trigger particle stream for 2 seconds
+                    let interval = setInterval(() => {
+                        createEyeParticles(eyeX1, eyeY, color);
+                        createEyeParticles(eyeX2, eyeY, color);
+                    }, 50);
+                    
+                    setTimeout(() => clearInterval(interval), 2000);
+                }
+            }
+        }
+
+        function showBigProfileEmoji(who, emoji) {
+            // IDs for waiting screen
+            const waitOverlay = document.getElementById(who === 'me' ? 'my-overlay-emoji' : 'their-overlay-emoji');
+            
+            // IDs for active screen
+            const activeOverlay = document.getElementById(who === 'me' ? 'duo-me-overlay' : 'duo-them-overlay');
+
+            [waitOverlay, activeOverlay].forEach(el => {
+                if(el) {
+                    el.innerText = emoji;
+                    el.classList.add('visible');
+                }
+            });
+
+            // Trigger burst fx
+            const rect = (activeOverlay && activeOverlay.offsetParent) ? activeOverlay.getBoundingClientRect() : null;
+            if(rect) createParticles(rect.left + rect.width/2, rect.top + rect.height/2, emoji, 'burst');
+        }
+
+        // --- EMOJI & MODAL LOGIC ---
         function openEmojiModal() {
             const modal = document.getElementById('emoji-modal');
             modal.classList.add('active');
+            
             history.pushState({modal: 'emoji'}, "");
+
             clearTimeout(emojiCloseTimer);
-            emojiCloseTimer = setTimeout(() => closeEmojiModal(), 15000); 
+            emojiCloseTimer = setTimeout(() => {
+                closeEmojiModal();
+            }, 20000); 
         }
 
         function closeEmojiModal() {
             const modal = document.getElementById('emoji-modal');
-            modal.classList.remove('active');
-            if (history.state && history.state.modal === 'emoji') history.back();
+            if (modal.classList.contains('active')) {
+                modal.classList.remove('active');
+                if (history.state && history.state.modal === 'emoji') {
+                    history.back();
+                }
+            }
         }
 
         function handleEmojiSelection(emoji) {
             hasPickedEmoji = true;
             closeEmojiModal();
-            // Instant local feedback
-            visualEngine.triggerExplosion(emoji);
-            showBadge(emoji);
-            applyScreenFilter(emoji);
+
+            // Big Animation
+            const flyer = document.createElement('div');
+            flyer.className = 'flying-emoji';
+            flyer.innerText = emoji;
+            flyer.style.top = '50%'; flyer.style.left = '50%';
+            document.body.appendChild(flyer);
+
+            setTimeout(() => flyer.remove(), 2000);
 
             roomRef.set({ emojis: { [myUid]: emoji } }, { merge: true });
         }
 
-        // VISUAL EFFECTS: Screen Filters
-        function applyScreenFilter(emoji) {
-            const vignette = document.getElementById('overlay-vignette');
-            vignette.className = ''; // reset
-            
-            // "Hot in their eyes" effects
-            if (['🔥', '🥵', '🧨'].includes(emoji)) {
-                vignette.classList.add('filter-fire');
-            } else if (['❤️', '😍', '😘', '💕'].includes(emoji)) {
-                vignette.classList.add('filter-love');
-            } else if (['🥶', '💎', '❄️'].includes(emoji)) {
-                vignette.classList.add('filter-cool');
-            }
-
-            // Reset after 3s
-            setTimeout(() => { vignette.className = ''; }, 3000);
-        }
-
-        // VISUAL EFFECTS: Badge on Avatar
-        function showBadge(emoji) {
-            const badge = document.getElementById('active-emoji-badge');
-            badge.innerText = emoji;
-            badge.setAttribute('data-last', emoji);
-            badge.classList.add('visible');
-            
-            // Pulse animation
-            badge.animate([
-                { transform: 'scale(1)' },
-                { transform: 'scale(1.4)' },
-                { transform: 'scale(1)' }
-            ], { duration: 400, easing: 'ease-out' });
-        }
-
+        // --- HELPERS ---
         function updateSongDisplay(song) {
             const highRes = song.artworkUrl100.replace('100x100', '600x600');
             const img = document.getElementById('active-album-art');
             const def = document.getElementById('default-art');
-            
             img.src = highRes;
             img.onload = () => { img.classList.add('loaded'); def.style.display = 'none'; };
-            
             document.getElementById('active-song-title').innerText = song.trackName;
             document.getElementById('active-song-artist').innerText = song.artistName;
         }
@@ -1038,26 +1053,21 @@
         function resetSongDisplay() {
             const img = document.getElementById('active-album-art');
             const def = document.getElementById('default-art');
-            img.classList.remove('loaded');
-            img.parentElement.classList.remove('playing');
+            img.classList.remove('loaded', 'playing', 'buffering');
             img.src = "";
             def.style.display = 'block';
             document.getElementById('active-song-title').innerText = "Pulse Active";
-            document.body.style.background = "#050505";
         }
 
         function resetEmojiState() {
             hasPickedEmoji = false;
-            const badge = document.getElementById('active-emoji-badge');
-            badge.classList.remove('visible');
-            badge.innerText = "";
-            badge.setAttribute('data-last', "");
+            document.querySelectorAll('.profile-emoji-overlay').forEach(el => el.classList.remove('visible'));
         }
 
         function resumeAudio() {
-            visualEngine.resume();
+            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             audio.play();
-            requestWakeLock();
+            requestWakeLock(); // Ensure screen stays on
             document.getElementById('sync-overlay').classList.remove('active');
         }
 
@@ -1076,6 +1086,9 @@
             showScreen('screen-waiting');
             audio.pause(); audio.src = "";
             document.body.style.background = "#000";
+            
+            // Clear Visuals
+            if(canvasCtx) canvasCtx.clearRect(0,0,canvas.width,canvas.height);
         }
 
         document.addEventListener('song-selected', (e) => {
@@ -1089,7 +1102,7 @@
             if(navigator.vibrate) navigator.vibrate(20);
         });
 
-        // --- 8. CLEANUP ---
+        // --- ROBUST LEAVE SESSION ---
         function leaveSession() {
             try {
                 if(roomRef) {
@@ -1097,11 +1110,14 @@
                         sessionStatus: 'ended',
                         [`userA`]: 'offline', 
                         [`userB`]: 'offline' 
-                    }).catch(e => console.log(e));
+                    }).catch(e => console.log("Update failed (offline?):", e));
                 }
                 if(audio) audio.pause();
                 if(wakeLock) wakeLock.release();
-            } catch(e) {} finally {
+            } catch(e) {
+                console.error("Error leaving session:", e);
+            } finally {
+                // FORCE REDIRECT ALWAYS
                 window.location.replace("pulseLobby.html");
             }
         }
