@@ -329,7 +329,7 @@
 .v-badge { 
     width: 16px; 
     height: 16px; 
-    display: block; /* Ensure it is visible */
+    display: none; /* Changed from block to none */
     flex-shrink: 0;
     position: relative; 
     top: -1.7px; /* Moves it up exactly 1 pixel */
@@ -1569,7 +1569,11 @@
                 // Set default label to username initially (Prevents showing old status)
                 document.getElementById('h-username-label').innerText = `@${chatTargetData.username}`;
                 
-                if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+                if(chatTargetData.verified === true) {
+                    document.getElementById('v-badge').style.display = 'block';
+                } else {
+                    document.getElementById('v-badge').style.display = 'none';
+                }
 
                 // 2. Setup IDs
                 myUid = storedMyUid; 
@@ -1615,7 +1619,7 @@
     document.addEventListener('click', function(e) {
         // Auto-close attachment menu
         if (!e.target.closest('#attachment-menu') && !e.target.closest('.plus-btn')) {
-            attachmentMenu.style.display = 'none';
+            if (attachmentMenu.style.display === 'flex') closeAttachmentMenu();
         }
         
         // Don't ripple on inputs or mic button
@@ -1731,12 +1735,12 @@
     }
 
     function openCameraPicker() {
-        attachmentMenu.style.display = 'none';
+        closeAttachmentMenu();
         if (imagePickerComponent) imagePickerComponent.openPicker();
     }
 
     function openFilePicker() {
-        attachmentMenu.style.display = 'none';
+        closeAttachmentMenu();
         if (filePickerComponent) filePickerComponent.openPicker();
     }
 
@@ -1754,7 +1758,14 @@
     
     // Reaction Picker (Half Screen)
     function expandEmojiMenu() {
-        closeMenu();
+        const overlay = document.getElementById('menu-overlay');
+        if(overlay.style.display === 'flex') {
+            overlay.style.display = 'none';
+            history.replaceState({modal: 'reactionPicker'}, null, "");
+        } else {
+            pushModalState('reactionPicker');
+        }
+        
         const reactionModal = document.getElementById('reaction-picker-modal');
         const container = document.getElementById('reaction-picker-container');
         container.innerHTML = ''; 
@@ -1769,7 +1780,6 @@
         });
         container.appendChild(reactionPicker);
         reactionModal.style.display = 'flex';
-        pushModalState('reactionPicker');
     }
 
     function closeReactionPicker() {
@@ -1922,7 +1932,11 @@
         typingPfp.src = pfpUrl;
 
         document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
-        if(chatTargetData.verified === true) document.getElementById('v-badge').style.display = 'block';
+        if(chatTargetData.verified === true) {
+            document.getElementById('v-badge').style.display = 'block';
+        } else {
+            document.getElementById('v-badge').style.display = 'none';
+        }
 
         // Start Monitoring Status
         if(myUserData) monitorTargetStatus();
