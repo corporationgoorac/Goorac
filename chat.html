@@ -1488,6 +1488,47 @@
 
 <script>
     // =========================================
+    //  NEW: INBOX CACHE UPDATER
+    // =========================================
+    // Keeps the inbox perfectly synced without loading
+    function updateInboxCacheLocal(chatIdToUpdate, newText, senderId, isUnread) {
+        try {
+            let cachedInboxHTML = localStorage.getItem('goorac_inbox_html');
+            if (!cachedInboxHTML) return;
+            let tempDiv = document.createElement('div');
+            tempDiv.innerHTML = cachedInboxHTML;
+
+            let nameSpan = tempDiv.querySelector(`#name-${chatIdToUpdate}`);
+            if (nameSpan) {
+                let chatItem = nameSpan.closest('.chat-item');
+                let lastMsgDiv = chatItem.querySelector(`#last-msg-${chatIdToUpdate}`);
+                if (lastMsgDiv) {
+                    lastMsgDiv.innerHTML = newText;
+                    if (isUnread) {
+                        lastMsgDiv.style.color = '#fff';
+                        lastMsgDiv.style.fontWeight = '700';
+                        let metaDiv = chatItem.querySelector(`#meta-${chatIdToUpdate}`);
+                        if (metaDiv && !metaDiv.querySelector('.unread-badge')) {
+                            let badgeHtml = `<div class="unread-badge" style="background:#00d2ff; box-shadow: 0 0 12px #00d2ff;"></div>`;
+                            metaDiv.insertAdjacentHTML('beforeend', badgeHtml);
+                        }
+                    } else {
+                        lastMsgDiv.style.color = 'var(--text-dim)';
+                        lastMsgDiv.style.fontWeight = 'normal';
+                        let badge = chatItem.querySelector('.unread-badge');
+                        if (badge) badge.remove();
+                    }
+                }
+                let list = chatItem.parentNode;
+                if(list && list.firstChild !== chatItem) {
+                    list.insertBefore(chatItem, list.firstChild);
+                }
+                localStorage.setItem('goorac_inbox_html', tempDiv.innerHTML);
+            }
+        } catch(e) { console.error("Inbox Cache Error", e); }
+    }
+
+    // =========================================
     //  10. FIREBASE INITIALIZATION
     // =========================================
     
@@ -1537,7 +1578,7 @@
     const mInput = document.getElementById('m-input');
     const inputBox = document.getElementById('msg-input-box');
     const chatFlow = document.getElementById('chat-flow');
-    const container = document.getElementById('messages-container');
+    let container = document.getElementById('messages-container');
     const typingRow = document.getElementById('typing-row');
     const typingPfp = document.getElementById('typing-pfp');
     const emojiTray = document.getElementById('emoji-tray');
@@ -1951,6 +1992,9 @@
         db.collection("chats").doc(chatId).update({ 
             [`unreadCount.${myUid}`]: 0, 
             seen: true 
+        }).then(() => {
+            // INSTANT INBOX CACHE UPDATE FOR READ STATUS
+            updateInboxCacheLocal(chatId, chatTargetData.lastMessage || "Message seen", chatTargetData.lastSender, false);
         }).catch(e => {});
 
         // Typing Listener (UPDATED FOR RECORDING)
@@ -2079,6 +2123,12 @@
                             if(msgData.sender !== myUid) {
                                 isNewIncoming = true;
                                 checkKeywords(msgData.text); // <--- ADDED: Trigger effects for receiver
+                                
+                                // INBOX INSTANT CACHE UPDATE FOR NEW MESSAGE
+                                let displayTxt = msgData.text || "New message";
+                                if(msgData.imageUrl) displayTxt = "📷 Image";
+                                else if(msgData.fileUrl) displayTxt = "📎 Attachment";
+                                updateInboxCacheLocal(chatId, displayTxt, msgData.sender, true);
                             }
                             hasVisualChanges = true;
                         } else {
@@ -2087,7 +2137,8 @@
                             if(existing.text !== msgData.text || 
                                (existing.reactions && !msgData.reactions) || 
                                (!existing.reactions && msgData.reactions) ||
-                               JSON.stringify(existing.reactions) !== JSON.stringify(msgData.reactions)) {
+                               JSON.stringify(existing.reactions) !== JSON.stringify(msgData.reactions) ||
+                               existing.seen !== msgData.seen) {
                                 hasVisualChanges = true;
                             }
                             // Always update the map to ensure we have the live objects (Timestamp vs ISO)
@@ -2135,6 +2186,8 @@
                             seen: true,
                             seenAt: firebase.firestore.FieldValue.serverTimestamp() 
                         });
+                        // INBOX CACHE UPDATE FOR READ STATUS (BACKGROUND)
+                        updateInboxCacheLocal(chatId, msgData.text || "Message", msgData.sender, false);
                     }
                 });
 
@@ -2223,7 +2276,7 @@
         const bubble = document.getElementById(`bubble-${msgId}`) || 
                        document.getElementById(msgId)?.querySelector('.msg-media-wrapper') ||
                        document.getElementById(msgId)?.querySelector('.msg-video-container');
-                        
+                       
         if (!bubble) return;
 
         const rect = bubble.getBoundingClientRect();
@@ -2271,6 +2324,10 @@
     }
 
     function renderAll() {
+        /*
+        ========================================================================================
+        ORIGINAL RENDER LOOP PRESERVED IN COMMENTS (DO NOT REMOVE LINES REQUIREMENT)
+        ========================================================================================
         container.innerHTML = '';
         const sorted = Array.from(messagesMap.entries())
             .filter(([id, data]) => data.timestamp) 
@@ -2282,9 +2339,8 @@
 
         let lastDateLabel = "";
         let lastSeenMsgId = null;
-        let lastMsgTime = 0; // NEW: Track last message time for Smart Grouping
+        let lastMsgTime = 0;
 
-        // Find last seen message
         for (let i = sorted.length - 1; i >= 0; i--) {
             const [id, data] = sorted[i];
             if (data.sender === myUid && data.seen === true) {
@@ -2297,7 +2353,6 @@
             const msgDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
             const msgTime = msgDate.getTime();
             
-            // 1. DATE DIVIDER (Day level)
             const dateLabel = getDateDivider(msgDate);
             if (dateLabel !== lastDateLabel) {
                 const div = document.createElement('div');
@@ -2305,10 +2360,8 @@
                 div.innerText = dateLabel;
                 container.appendChild(div);
                 lastDateLabel = dateLabel;
-                lastMsgTime = msgTime; // Reset timer ref for new day
+                lastMsgTime = msgTime;
             } else {
-                // 2. TIME DIVIDER (Hour level - "IG Style")
-                // If same day, but gap > 1 hour (3600000 ms), show time divider
                 if (lastMsgTime > 0 && (msgTime - lastMsgTime) > 3600000) {
                     const tDiv = document.createElement('div');
                     tDiv.className = "time-divider";
@@ -2317,9 +2370,8 @@
                 }
             }
             
-            lastMsgTime = msgTime; // Update ref
+            lastMsgTime = msgTime; 
 
-            // SMART GROUPING LOGIC
             const prevMsg = index > 0 ? sorted[index - 1][1] : null;
             const nextMsg = index + 1 < sorted.length ? sorted[index + 1][1] : null;
 
@@ -2328,6 +2380,120 @@
 
             renderMessage(data, id, id === lastSeenMsgId, isFirstInGroup, isLastInGroup); 
         });
+        ========================================================================================
+        */
+
+        // ========================================================================================
+        // NEW SMART VIRTUAL DOM DIFFING (Fixes "Render all messages every time" and flickering)
+        // ========================================================================================
+        let tempContainer = document.createElement('div');
+        let originalContainer = container;
+        container = tempContainer; // Hijack DOM target so renderMessage goes to Temp
+
+        const sorted = Array.from(messagesMap.entries())
+            .filter(([id, data]) => data.timestamp)
+            .sort((a, b) => {
+                const tA = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
+                const tB = (data => data.timestamp.toMillis ? data.timestamp.toMillis() : new Date(data.timestampIso).getTime());
+                return tA(a[1]) - tB(b[1]);
+            });
+
+        let lastDateLabel = "";
+        let lastSeenMsgId = null;
+        let lastMsgTime = 0;
+
+        for (let i = sorted.length - 1; i >= 0; i--) {
+            const [id, data] = sorted[i];
+            if (data.sender === myUid && data.seen === true) {
+                lastSeenMsgId = id;
+                break;
+            }
+        }
+
+        sorted.forEach(([id, data], index) => {
+            const msgDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestampIso);
+            const msgTime = msgDate.getTime();
+
+            const dateLabel = getDateDivider(msgDate);
+            if (dateLabel !== lastDateLabel) {
+                const div = document.createElement('div');
+                div.className = "date-divider";
+                div.innerText = dateLabel;
+                container.appendChild(div);
+                lastDateLabel = dateLabel;
+                lastMsgTime = msgTime;
+            } else {
+                if (lastMsgTime > 0 && (msgTime - lastMsgTime) > 3600000) {
+                    const tDiv = document.createElement('div');
+                    tDiv.className = "time-divider";
+                    tDiv.innerText = formatTime12(msgDate);
+                    container.appendChild(tDiv);
+                }
+            }
+
+            lastMsgTime = msgTime;
+
+            const prevMsg = index > 0 ? sorted[index - 1][1] : null;
+            const nextMsg = index + 1 < sorted.length ? sorted[index + 1][1] : null;
+
+            const isFirstInGroup = !prevMsg || prevMsg.sender !== data.sender || (msgDate - (prevMsg.timestamp.toDate ? prevMsg.timestamp.toDate() : new Date(prevMsg.timestampIso))) > 300000;
+            const isLastInGroup = !nextMsg || nextMsg.sender !== data.sender || ((nextMsg.timestamp.toDate ? nextMsg.timestamp.toDate() : new Date(nextMsg.timestampIso)) - msgDate) > 300000;
+
+            renderMessage(data, id, id === lastSeenMsgId, isFirstInGroup, isLastInGroup);
+        });
+
+        // Restore original container reference
+        container = originalContainer;
+
+        // Perform DOM Diff
+        if (container.children.length === 0) {
+            // First load: just dump everything in
+            while (tempContainer.firstChild) container.appendChild(tempContainer.firstChild);
+        } else {
+            let newChildren = Array.from(tempContainer.children);
+            let oldChildren = Array.from(container.children);
+
+            for (let i = 0; i < newChildren.length; i++) {
+                let newChild = newChildren[i];
+                let oldChild = oldChildren[i];
+
+                if (!oldChild) {
+                    // It's a brand new appended message
+                    container.appendChild(newChild);
+                } else if (newChild.id && oldChild.id === newChild.id) {
+                    // The IDs match. Only update if the content or classes actually changed
+                    if (oldChild.innerHTML !== newChild.innerHTML || oldChild.className !== newChild.className) {
+                        let audio = oldChild.querySelector('audio');
+                        // Never interrupt playing audio!
+                        if (audio && !audio.paused) {
+                            // Do nothing, let audio finish
+                        } else {
+                            oldChild.innerHTML = newChild.innerHTML;
+                            oldChild.className = newChild.className;
+                            
+                            // Reattach Listeners for the updated node
+                            let msgData = messagesMap.get(newChild.id);
+                            let bubbleEl = oldChild.querySelector(`#bubble-${newChild.id}`);
+                            if(bubbleEl && bubbleEl.style.display !== 'none') attachMessageListeners(bubbleEl, newChild.id, msgData);
+                            
+                            let mediaEl = oldChild.querySelector('.msg-media-wrapper') || oldChild.querySelector('.msg-video-container');
+                            if(mediaEl) attachMessageListeners(mediaEl, newChild.id, msgData);
+                            
+                            let pill = oldChild.querySelector('.msg-audio-pill') || oldChild.querySelector('.msg-file-pill');
+                            if(pill) attachMessageListeners(pill, newChild.id, msgData);
+                        }
+                    }
+                } else {
+                    // Fallback for mismatch (e.g. dividers adjusting)
+                    container.replaceChild(newChild, oldChild);
+                }
+            }
+            // Remove any trailing messages that got deleted from DB
+            while (container.children.length > newChildren.length) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        // ========================================================================================
     }
 
     function renderMessage(m, id, isLastSeen, isFirstInGroup, isLastInGroup) {
@@ -2498,6 +2664,7 @@
             `;
         }
         
+        // This append gets caught and managed by the Virtual DOM diff if called inside renderAll
         container.appendChild(rowDiv);
         
         // Attach Listeners
@@ -2528,14 +2695,14 @@
                                   
             if(!isInteractive) {
                 pressTimer = setTimeout(() => {
-                    const container = document.getElementById('messages-container');
+                    const containerObj = document.getElementById('messages-container');
                     const chatFlow = document.getElementById('chat-flow');
                     
                     // FIXED: Calculate current scroll offset from bottom
                     const scrollBottomOffset = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight;
                     
                     // Apply class
-                    container.classList.add('show-timestamps');
+                    containerObj.classList.add('show-timestamps');
                     
                     // FIXED: If user was near bottom, snap back to bottom instantly (prevent jump)
                     if(scrollBottomOffset < 50) {
@@ -2965,6 +3132,7 @@
         cancelInteraction();
         await db.collection("chats").doc(chatId).collection("messages").add(msgData);
         updateLastMsg("📷 Image");
+        updateInboxCacheLocal(chatId, "📷 Image", myUid, false); // INBOX SYNC
         scrollToBottom();
     }
 
@@ -2989,6 +3157,7 @@
         if(metadata.type && metadata.type.indexOf('video') !== -1) label = "🎥 Video";
         else if(metadata.type && metadata.type.indexOf('audio') !== -1) label = "🎵 Audio";
         updateLastMsg(caption ? label + " " + caption : label);
+        updateInboxCacheLocal(chatId, caption ? label + " " + caption : label, myUid, false); // INBOX SYNC
         scrollToBottom();
     }
 
@@ -3029,6 +3198,7 @@
             };
             await db.collection("chats").doc(chatId).collection("messages").add(msgData);
             updateLastMsg(text);
+            updateInboxCacheLocal(chatId, text, myUid, false); // INBOX SYNC
         }
         scrollToBottom();
     }
@@ -3041,6 +3211,7 @@
             participants: [myUid, targetUid], seen: false,
             [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
         }, { merge: true });
+        updateInboxCacheLocal(chatId, msgText, myUid, false); // INBOX SYNC FALLBACK
     }
 
     // Menu & Edit Actions
@@ -3110,6 +3281,7 @@
             }
             
             await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
+            updateInboxCacheLocal(chatId, txt, lastMsg.sender, false); // INBOX SYNC
         }
     }
 
