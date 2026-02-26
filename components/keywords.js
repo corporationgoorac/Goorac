@@ -1,6 +1,6 @@
 // components/keywords.js
 window.effectKeywords = {
-    hearts: ['love', '❤️', 'meena', '🥰', '😍'],
+    hearts: ['love', '❤️', 'meena', '🥰', '😍', 'sumaiya'],
     confetti: ['congratulations', 'congrats', 'happy birthday', 'party', '🎉', 'yay'],
     balloons: ['surprise', '🎈', 'celebrate', 'bday'],
     stars: ['star', 'amazing', 'magic', '⭐', 'wow'],
