@@ -1224,7 +1224,7 @@
 
             box-shadow: none !important;
 
-            font-size: 3.5rem !important;
+            font-size: 2.2rem !important; /* REDUCED FROM 3.5rem */
 
             padding: 0 !important;
 
@@ -3314,7 +3314,7 @@
 
     let myUid, targetUid, chatId, replyingTo = null, editModeId = null;
 
-    let activeMenuId = null, unsubscribe = null, isLoadingMore = false;
+    let activeMenuId = null, unsubscribe = null, isLoadingMore = false; window.isLoadingMore = false;
 
     let lastVisible = null; 
 
@@ -3644,7 +3644,7 @@
 
         // The Intersection Observer should catch this, but having this backup listener is good
 
-        if (chatFlow.scrollTop < 150 && !isLoadingMore && messagesMap.size > 0) {
+        if (chatFlow.scrollTop <= 50 && !isLoadingMore && messagesMap.size > 0) {
 
             loadMoreMessages();
 
@@ -4658,7 +4658,7 @@
 
                     } else {
 
-                        const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 350;
+                        const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 150; // Modified threshold
 
                         const cfSH = chatFlow.scrollHeight;
 
@@ -4676,13 +4676,29 @@
 
                         if (didRemoveMessage) {
 
-                            // Do not scroll on unsend
+                            // Do not scroll on unsend, maintain position if up high
+
+                            if (!isNearBottom) {
+
+                                chatFlow.scrollTop = cfST - (cfSH - chatFlow.scrollHeight);
+
+                            }
+
+                        } else if (isNearBottom || (!isNewIncoming && hasVisualChanges)) {
+
+                            // Smooth glide only if already at bottom or if I AM THE SENDER
+
+                            requestAnimationFrame(() => window.scrollToBottom(true));
+
+                        } else if (isNewIncoming) {
+
+                            // Someone else sent it and I am scrolled up. DO NOT JUMP.
 
                             chatFlow.scrollTop = cfST + (chatFlow.scrollHeight - cfSH);
 
-                        } else if (isNearBottom || isNewIncoming) {
+                            scrollBtn.classList.add('new-msg');
 
-                            requestAnimationFrame(() => window.scrollToBottom(isNewIncoming)); /* MODIFIED: Glide in */
+                            scrollBtn.style.display = 'flex';
 
                         } else {
 
@@ -4904,9 +4920,9 @@
 
             msgsToSave.sort((a, b) => new Date(a.timestampIso) - new Date(b.timestampIso));
 
-            const limitMsgs = msgsToSave.slice(-50); 
+            const limitMsgs = msgsToSave; // Changed from msgsToSave.slice(-50) to store all local
 
-            localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(limitMsgs));
+            try { localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(limitMsgs)); } catch(quotaErr) { localStorage.setItem(`chat_msgs_${chatId}`, JSON.stringify(msgsToSave.slice(-300))); }
 
         } catch (e) { console.error("Cache Save Error", e); }
 
@@ -5420,9 +5436,13 @@
 
                 const urlPath = url.split('?')[0].toLowerCase();
 
+                let matchedMedia = false;
+
                 if (urlPath.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
 
                     renderImageUrl = url;
+
+                    matchedMedia = true;
 
                 } else if (urlPath.match(/\.(mp4|webm|mov)$/i)) {
 
@@ -5430,11 +5450,25 @@
 
                     renderFileMeta = { type: 'video/mp4', name: 'Video Link', size: 0 };
 
+                    matchedMedia = true;
+
                 } else if (urlPath.match(/\.(mp3|wav|ogg|m4a)$/i)) {
 
                     renderFileUrl = url;
 
                     renderFileMeta = { type: 'audio/mp3', name: 'Audio Link', size: 0 };
+
+                    matchedMedia = true;
+
+                }
+
+                
+
+                // FIX: Hide link text if the message is exactly just the URL (so it only displays the media)
+
+                if (matchedMedia && renderText.trim() === url) {
+
+                    renderText = ""; 
 
                 }
 
@@ -5988,9 +6022,11 @@
 
                     }
 
-                    mInput.focus(); // NEW FIX: Force focus directly inside the synchronous touchend execution path before timeouts
+                    // FIX: iOS Keyboard hack - strictly synchronous execution here
 
-                    setTimeout(() => { mInput.focus(); mInput.click(); }, 50); // Fallback for mobile WebKit
+                    mInput.focus({preventScroll: true});
+
+                    setTimeout(() => { mInput.click(); }, 10); // Fallback for mobile WebKit if strict synchronous blocks
 
                     triggerReply(replyText);
 
@@ -6106,7 +6142,11 @@
 
                       if(error.name === 'NotSupportedError') {
 
-                           alert("Audio format not supported on this device.");
+                           // FIX: Notify user gracefully rather than crashing
+
+                           console.warn("Audio format not supported on this device natively.");
+
+                           alert("Audio format not supported on this device/browser.");
 
                       }
 
@@ -6494,7 +6534,11 @@
 
                 if (type === 'hearts') {
 
-                    const scale = p.size / 10; 
+                    // FIX: Added dynamic pulse to the hearts for smoother feel
+
+                    const pulse = 1 + Math.sin(Date.now() / 150 + p.wobble) * 0.1;
+
+                    const scale = (p.size / 10) * pulse; 
 
                     ctx.scale(scale, scale);
 
@@ -7060,7 +7104,7 @@
 
         if (isLoadingMore) return;
 
-        isLoadingMore = true;
+        isLoadingMore = true; window.isLoadingMore = true;
 
         
 
@@ -7114,7 +7158,7 @@
 
             } else {
 
-                isLoadingMore = false;
+                isLoadingMore = false; window.isLoadingMore = false;
 
                 chatFlow.style.overflowAnchor = 'auto';
 
@@ -7164,7 +7208,7 @@
 
                         chatFlow.style.scrollBehavior = 'smooth'; 
 
-                        isLoadingMore = false;
+                        isLoadingMore = false; window.isLoadingMore = false;
 
                     }, 50);
 
@@ -7174,7 +7218,7 @@
 
         } else {
 
-            isLoadingMore = false;
+            isLoadingMore = false; window.isLoadingMore = false;
 
             lastVisible = null; // No more messages
 
@@ -7198,7 +7242,7 @@
 
             }
 
-        }, { root: chatFlow, rootMargin: "400px", threshold: 0.01 }); 
+        }, { root: chatFlow, rootMargin: "100px", threshold: 0.01 }); 
 
         observer.observe(document.getElementById('scroll-trigger'));
 
@@ -7467,6 +7511,16 @@
         
 
         let uploadedUrl = null;
+
+
+
+        // Ensure Supabase client is initialized if it exists
+
+        if (fpElement && !fpElement.sbClient && typeof fpElement.initSupabaseClient === 'function') {
+
+            fpElement.initSupabaseClient();
+
+        }
 
 
 
@@ -7973,3 +8027,4 @@
 </body>
 
 </html>
+
