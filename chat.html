@@ -4680,11 +4680,11 @@
 
                             if (!isNearBottom) {
 
-                                chatFlow.scrollTop = cfST - (cfSH - chatFlow.scrollHeight);
+                                chatFlow.style.overflowAnchor = 'auto'; /* Fixed unsend scroll glitch */
 
                             }
 
-                        } else if (isNearBottom || (!isNewIncoming && hasVisualChanges)) {
+                        } else if (isNearBottom || (!isNewIncoming && hasVisualChanges && !window.isLoadingMore)) {
 
                             // Smooth glide only if already at bottom or if I AM THE SENDER
 
@@ -4694,7 +4694,7 @@
 
                             // Someone else sent it and I am scrolled up. DO NOT JUMP.
 
-                            chatFlow.scrollTop = cfST + (chatFlow.scrollHeight - cfSH);
+                            chatFlow.style.overflowAnchor = 'auto'; /* Fixed incoming scroll glitch */
 
                             scrollBtn.classList.add('new-msg');
 
@@ -4704,7 +4704,7 @@
 
                             // Lock scroll position securely if loading older messages
 
-                            chatFlow.scrollTop = cfST + (chatFlow.scrollHeight - cfSH);
+                            chatFlow.style.overflowAnchor = 'auto'; /* Fixed background update glitch */
 
                         }
 
@@ -7098,7 +7098,7 @@
 
     // =======================================================================
 
-    // FIX: RELIABLE SCROLL LOADING FOR OLDER MESSAGES
+    // FIX: RELIABLE SCROLL LOADING FOR OLDER MESSAGES (REWRITTEN NO JUMP)
 
     // =======================================================================
 
@@ -7107,12 +7107,6 @@
         if (isLoadingMore) return;
 
         isLoadingMore = true; window.isLoadingMore = true;
-
-        
-
-        const oldScrollHeight = chatFlow.scrollHeight;
-
-        const oldScrollTop = chatFlow.scrollTop;
 
 
 
@@ -7190,9 +7184,23 @@
 
                 
 
-                // Keep original scroll state before rendering to prevent jump
+                // --- NEW FAST JUMP-FREE LOGIC ---
 
-                chatFlow.style.overflowAnchor = 'none';
+                // Identify the topmost element to anchor to before rendering
+
+                const containerEl = document.getElementById('messages-container');
+
+                const firstMsgEl = containerEl ? containerEl.querySelector('.msg-row') : null;
+
+                const anchorId = firstMsgEl ? firstMsgEl.id : null;
+
+                const anchorOffsetTop = firstMsgEl ? firstMsgEl.offsetTop : 0;
+
+                const currentScrollTop = chatFlow.scrollTop;
+
+                
+
+                chatFlow.style.overflowAnchor = 'none'; // Temporarily disable native anchor
 
                 
 
@@ -7200,15 +7208,23 @@
 
 
 
-                // Wait for DOM to update, then mathematically fix scroll position
-
                 requestAnimationFrame(() => {
 
-                    const newScrollHeight = chatFlow.scrollHeight;
+                    if (anchorId) {
 
-                    chatFlow.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+                        const newAnchorEl = document.getElementById(anchorId);
 
-                    chatFlow.style.overflowAnchor = 'auto'; // Restore browser scrolling logic
+                        if (newAnchorEl) {
+
+                            const offsetDifference = newAnchorEl.offsetTop - anchorOffsetTop;
+
+                            chatFlow.scrollTop = currentScrollTop + offsetDifference;
+
+                        }
+
+                    }
+
+                    chatFlow.style.overflowAnchor = 'auto'; // Restore native anchor
 
                     isLoadingMore = false; window.isLoadingMore = false;
 
@@ -8029,3 +8045,4 @@
 </body>
 
 </html>
+
