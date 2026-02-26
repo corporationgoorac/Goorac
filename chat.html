@@ -447,8 +447,8 @@
             flex-direction: column; 
             padding: 0 12px; 
             width: 100%; 
-            /* FIX 2: Added extra bottom padding so last msg timestamp isn't hidden */
-            padding-bottom: 50px;
+            /* FIX 2: Reduced bottom padding to fix the artificial gap */
+            padding-bottom: 10px;
             /* Performance Optimization */
             will-change: transform;
             contain: content;
@@ -571,7 +571,7 @@
 
         .msg-bubble-box { 
             position: relative; 
-            max-width: 75%; 
+            max-width: 75vw; /* FIX: Changed from 75% to 75vw to ensure exact match regardless of flex parents */
             display: flex; 
             flex-direction: column; 
             transition: transform 0.2s, padding-bottom 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Smooth expand */
@@ -587,7 +587,7 @@
             position: relative; 
             word-wrap: break-word; 
             z-index: 2; 
-            transition: box-shadow 0.2s ease;
+            transition: box-shadow 0.2s ease, border-radius 0.2s ease; /* FIX: Added border-radius transition for smooth grouping updates */
         }
 
         /* ACTIVE GLOW EFFECT */
@@ -829,70 +829,85 @@
         }
 
         /* =========================================
-           9. INPUT AREA
+           9. INPUT AREA (PROFESSIONAL REDESIGN)
            ========================================= */
         .input-area-container { 
-            background: rgba(10, 10, 10, 0.9); 
-            border-top: 1px solid var(--border); 
-            padding-bottom: env(safe-area-inset-bottom, 10px); 
+            background: rgba(15, 15, 15, 0.75);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            padding-bottom: env(safe-area-inset-bottom, 15px); 
             flex-shrink: 0; 
             width: 100%; 
             z-index: 1000; 
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
             position: relative; /* Essential for overlay */
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
         }
         
         .input-area { 
-            padding: 8px 12px; 
+            padding: 10px 14px; 
             display: flex; 
             align-items: flex-end; 
-            gap: 10px; 
+            gap: 12px; 
         }
         
         .input-box { 
             flex: 1; 
-            background: #1a1a1a; 
+            background: rgba(255, 255, 255, 0.05); 
             border-radius: 24px; 
-            padding: 4px 16px; 
-            border: 1px solid #333; 
+            padding: 2px 16px; 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
             display: flex; 
             align-items: center; 
-            min-height: 44px; 
-            transition: border-color 0.2s, background 0.2s, box-shadow 0.3s ease; 
+            min-height: 48px; 
+            transition: all 0.3s var(--ease-smooth); 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         }
-        .input-box:focus-within { border-color: var(--accent); background: #222; }
+        .input-box:focus-within { 
+            border-color: rgba(255, 109, 0, 0.6); 
+            background: rgba(255, 255, 255, 0.08); 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), 0 0 0 2px rgba(255, 109, 0, 0.15); 
+        }
 
         .msg-input { 
             width: 100%; 
             background: transparent; 
             border: none; 
-            color: white; 
-            padding: 10px 0; 
+            color: #fff; 
+            padding: 12px 0; 
             font-size: 16px; 
+            font-weight: 400;
             resize: none; 
-            max-height: 140px; 
+            max-height: 120px; 
             overflow-y: auto; 
             line-height: 1.4; 
         }
+        .msg-input::placeholder {
+            color: rgba(255,255,255,0.3);
+        }
         
         .plus-btn { 
-            font-size: 28px; 
-            color: var(--accent); 
+            font-size: 26px; 
+            color: rgba(255,255,255,0.6); 
             cursor: pointer; 
-            padding: 0 4px; 
-            height: 44px; 
+            padding: 0; 
+            height: 40px; 
+            width: 40px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
             display: flex; 
             align-items: center; 
-            transition: transform 0.2s var(--ease-elastic); 
+            justify-content: center;
+            margin-bottom: 4px;
+            transition: all 0.2s var(--ease-spring); 
         }
-        .plus-btn:active { transform: rotate(90deg); }
+        .plus-btn:active { transform: scale(0.9) rotate(90deg); background: rgba(255,255,255,0.1); }
         
         .send-btn { 
             background: transparent; 
             border: none; 
             font-weight: 700; 
-            font-size: 1rem; 
+            font-size: 1.05rem; 
             padding: 0 8px; 
             height: 44px; 
             display: none; 
@@ -900,12 +915,13 @@
             color: #555; 
             pointer-events: none; 
             transition: all 0.2s ease; 
+            margin-bottom: 2px;
         }
         .send-btn.active { 
             color: var(--accent); 
             cursor: pointer; 
             pointer-events: auto; 
-            text-shadow: 0 0 15px rgba(255, 109, 0, 0.4); 
+            text-shadow: none; 
             transform: scale(1.05);
             display: flex !important;
         }
@@ -916,20 +932,21 @@
             display: flex; align-items: center; justify-content: center;
             position: relative;
             z-index: 100;
+            margin-bottom: 2px;
         }
 
         .mic-btn {
-            width: 44px; height: 44px;
+            width: 40px; height: 40px;
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
-            background: #2a2a2a; color: #fff;
+            background: var(--accent); color: #000;
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             -webkit-user-select: none; user-select: none;
             touch-action: none; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(255, 109, 0, 0.3);
         }
-        .mic-btn svg { width: 24px; height: 24px; fill: currentColor; pointer-events: none; }
+        .mic-btn svg { width: 22px; height: 22px; fill: currentColor; pointer-events: none; }
         
         .mic-btn.recording {
             transform: scale(1.5);
@@ -938,12 +955,13 @@
             box-shadow: 0 0 20px rgba(255, 69, 58, 0.5);
         }
         .mic-btn.locked {
-             transform: scale(1); background: #ff453a;
+             transform: scale(1); background: #ff453a; color: white;
         }
 
         .recording-ui-overlay {
             position: absolute; left: 0; bottom: 0; width: 100%; height: 100%;
-            background: var(--bg); 
+            background: rgba(15, 15, 15, 0.95); 
+            backdrop-filter: blur(10px);
             display: none; align-items: center; padding: 0 16px; z-index: 50;
         }
         
@@ -2016,17 +2034,17 @@
                     <div class="rec-wave-icon"><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div></div>
                     Recording...
                 `;
-                inputBox.style.boxShadow = "0 0 15px rgba(255, 69, 58, 0.3)"; // NEW FEATURE: Glow red when recording
+                inputBox.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.1), 0 0 15px rgba(255, 69, 58, 0.3)"; // NEW FEATURE: Glow red when recording
                 scrollToBottom();
             } else if (val === true) {
                 typingRow.style.display = 'flex';
                 bubble.className = "typing-bubble";
                 bubble.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-                inputBox.style.boxShadow = "0 0 15px rgba(255, 109, 0, 0.3)"; // NEW FEATURE: Glow orange when typing
+                inputBox.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.1), 0 0 15px rgba(255, 109, 0, 0.3)"; // NEW FEATURE: Glow orange when typing
                 scrollToBottom();
             } else {
                 typingRow.style.display = 'none';
-                inputBox.style.boxShadow = "none"; // NEW FEATURE: Remove glow
+                inputBox.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.1)"; // NEW FEATURE: Remove glow
             }
         });
 
@@ -2480,6 +2498,26 @@
                         if (audio && !audio.paused) {
                             // Do nothing, let audio finish
                         } else {
+                            // SOFT REPLACE LOGIC: Prevent image glitching when re-rendered for seen status/groups
+                            if (oldChild.querySelector('img.chat-media-img') && newChild.querySelector('img.chat-media-img')) {
+                                if (oldChild.querySelector('img.chat-media-img').src === newChild.querySelector('img.chat-media-img').src) {
+                                    oldChild.className = newChild.className;
+                                    const oldReact = oldChild.querySelector('.reaction-badge');
+                                    const newReact = newChild.querySelector('.reaction-badge');
+                                    if(oldReact && newReact) {
+                                        oldReact.innerHTML = newReact.innerHTML;
+                                        oldReact.style.display = newReact.style.display;
+                                    }
+                                    const oldSeen = oldChild.querySelector('.seen-status');
+                                    const newSeen = newChild.querySelector('.seen-status');
+                                    if (newSeen) {
+                                        if (!oldSeen) oldChild.appendChild(newSeen.cloneNode(true));
+                                        else oldSeen.innerHTML = newSeen.innerHTML;
+                                    }
+                                    continue; // Skip the destructive innerHTML wipe
+                                }
+                            }
+                            
                             oldChild.innerHTML = newChild.innerHTML;
                             oldChild.className = newChild.className;
                             
@@ -3349,7 +3387,9 @@
         observer.observe(document.getElementById('scroll-trigger'));
     }
 
-    function scrollToBottom() { chatFlow.scrollTop = chatFlow.scrollHeight; }
+    function scrollToBottom() { 
+        chatFlow.scrollTo({ top: chatFlow.scrollHeight, behavior: 'smooth' }); 
+    }
 
     // Reaction Logic
     async function applyReaction(emoji) {
