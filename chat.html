@@ -318,22 +318,22 @@
             flex: 1; /* Allow name to take available space */
         }
  
-.h-name-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 4px; /* Distance between Name and Tick */
-    width: fit-content; /* Keeps the tick attached to the name */
-    max-width: 100%;
-}
+        .h-name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px; /* Distance between Name and Tick */
+            width: fit-content; /* Keeps the tick attached to the name */
+            max-width: 100%;
+        }
 
-.v-badge { 
-    width: 16px; 
-    height: 16px; 
-    display: none; /* Changed from block to none */
-    flex-shrink: 0;
-    position: relative; 
-    top: -1.7px; /* Moves it up exactly 1 pixel */
-}
+        .v-badge { 
+            width: 16px; 
+            height: 16px; 
+            display: none; /* Changed from block to none */
+            flex-shrink: 0;
+            position: relative; 
+            top: -1.7px; /* Moves it up exactly 1 pixel */
+        }
         
         .h-username-sub { 
             font-size: 0.8rem; 
@@ -447,8 +447,8 @@
             flex-direction: column; 
             padding: 0 12px; 
             width: 100%; 
-            /* FIX 2: Added extra bottom padding so last msg timestamp isn't hidden */
-            padding-bottom: 10px; /* MODIFIED: Removed the 50px artificial gap */
+            /* Added extra bottom padding so last msg timestamp isn't hidden */
+            padding-bottom: 10px; 
             /* Performance Optimization */
             will-change: transform;
             contain: content;
@@ -501,7 +501,17 @@
             50% { transform: translateY(-4px); opacity: 1; } 
         }
 
-        #scroll-trigger { text-align: center; padding: 20px; opacity: 0; pointer-events: none; order: -1; }
+        /* FIX: Ensure scroll trigger is absolutely positioned at the top for proper intersection observation */
+        #scroll-trigger { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            pointer-events: none;
+            visibility: hidden;
+            z-index: -1;
+        }
         
         /* DATE DIVIDER */
         .date-divider { 
@@ -525,7 +535,7 @@
             border: 1px solid rgba(255,255,255,0.05);
         }
 
-        /* FIX 3: TIME DIVIDER (Same Style) */
+        /* TIME DIVIDER (Same Style) */
         .time-divider {
             text-align: center; 
             margin: 20px 0 12px 0; 
@@ -549,8 +559,8 @@
             transform: translateZ(0);
         }
         
-        /* Spacing for groups */
-        .msg-row.group-bottom, .msg-row.single { margin-bottom: 10px; }
+        /* Spacing for groups - Smart Grouping Enhancements */
+        .msg-row.group-bottom, .msg-row.single { margin-bottom: 18px; }
 
         .msg-row.sent { align-items: flex-end; padding-right: 0px; }
         .msg-row.received { align-items: flex-start; }
@@ -571,7 +581,7 @@
 
         .msg-bubble-box { 
             position: relative; 
-            max-width: 75vw; /* FIX: Use viewport width so both sent and received have the exact same max width ignoring avatar */
+            max-width: 75vw; /* Use viewport width so both sent and received have the exact same max width ignoring avatar */
             display: flex; 
             flex-direction: column; 
             transition: transform 0.2s, padding-bottom 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Smooth expand */
@@ -580,7 +590,7 @@
         .received .msg-bubble-box { align-items: flex-start; }
 
         .bubble { 
-            padding: 12px 16px; /* MODIFIED: Uniform professional padding */
+            padding: 12px 16px; /* Uniform professional padding */
             border-radius: 20px; 
             font-size: 1rem; 
             line-height: 1.4; 
@@ -710,23 +720,44 @@
         .received .swipe-reply-icon { left: -45px; } 
         .sent .swipe-reply-icon { right: -45px; }
 
-        /* Reply Preview Box (Inside Bubble) */
+        /* PROFESSIONAL REPLY PREVIEW DESIGN - 3 LINES CLAMP & GLASSMORPHISM */
         .reply-box-ui { 
-            background: rgba(0, 0, 0, 0.25); 
-            padding: 8px 12px; 
-            border-radius: 12px; 
-            margin-bottom: 6px; 
+            background: rgba(255, 255, 255, 0.08); 
+            padding: 10px 14px; 
+            border-radius: 14px; 
+            margin-bottom: 8px; 
             font-size: 0.85rem; 
-            border-left: 3px solid rgba(255, 255, 255, 0.5); 
-            color: rgba(255,255,255,0.9); 
+            border-left: 4px solid var(--accent); 
+            color: rgba(255,255,255,0.95); 
             max-width: 100%; 
             cursor: pointer; 
-            overflow: hidden; 
-            white-space: nowrap; 
+            position: relative;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            overflow: hidden;
             text-overflow: ellipsis;
-            transition: background 0.2s;
+            white-space: normal;
+            line-height: 1.4;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .reply-box-ui:active { background: rgba(0,0,0,0.4); }
+        .reply-box-ui::before {
+            content: 'Replying to';
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .reply-box-ui:active { 
+            background: rgba(255,255,255,0.15); 
+            transform: scale(0.98);
+        }
         
         /* NOTE REPLY STYLE - UPDATED FROM NOTES.HTML */
         .note-reply-wrapper {
@@ -832,7 +863,7 @@
            9. INPUT AREA (PROFESSIONAL REDESIGN)
            ========================================= */
         .input-area-container { 
-            background: rgba(15, 15, 15, 0.85); /* MODIFIED: Sleeker Glassmorphism */
+            background: rgba(15, 15, 15, 0.85); /* Sleeker Glassmorphism */
             border-top: 1px solid rgba(255, 255, 255, 0.05); 
             padding-bottom: env(safe-area-inset-bottom, 10px); 
             flex-shrink: 0; 
@@ -844,16 +875,16 @@
         }
         
         .input-area { 
-            padding: 10px 14px; /* MODIFIED: Spacing */
+            padding: 10px 14px; /* Spacing */
             display: flex; 
-            align-items: flex-end; /* MODIFIED: Bottom alignment */
+            align-items: flex-end; /* Bottom alignment */
             gap: 12px; 
         }
         
         .input-box { 
             flex: 1; 
-            background: rgba(255, 255, 255, 0.08); /* MODIFIED: Clean pill container */
-            border-radius: 26px; /* MODIFIED: Perfect pill shape */
+            background: rgba(255, 255, 255, 0.08); /* Clean pill container */
+            border-radius: 26px; /* Perfect pill shape */
             padding: 6px 16px; 
             border: 1px solid transparent; 
             display: flex; 
@@ -862,7 +893,7 @@
             transition: border-color 0.2s, background 0.2s, box-shadow 0.3s ease; 
         }
         .input-box:focus-within { 
-            border-color: rgba(255, 109, 0, 0.5); /* MODIFIED: Subtle brand border */
+            border-color: rgba(255, 109, 0, 0.5); /* Subtle brand border */
             background: rgba(255, 255, 255, 0.12); 
         }
 
@@ -871,8 +902,8 @@
             background: transparent; 
             border: none; 
             color: white; 
-            padding: 8px 0; /* MODIFIED */
-            font-size: 15px; /* MODIFIED */
+            padding: 8px 0; 
+            font-size: 15px; 
             resize: none; 
             max-height: 140px; 
             overflow-y: auto; 
@@ -880,18 +911,18 @@
         }
         
         .plus-btn { 
-            background: rgba(255, 255, 255, 0.1); /* MODIFIED: Solid subtle button */
+            background: rgba(255, 255, 255, 0.1); /* Solid subtle button */
             border-radius: 50%;
             font-size: 24px; 
             color: var(--accent); 
             cursor: pointer; 
-            height: 36px; /* MODIFIED */
-            width: 36px;  /* MODIFIED */
+            height: 36px; 
+            width: 36px;  
             display: flex; 
             align-items: center; 
             justify-content: center;
-            align-self: flex-end; /* MODIFIED */
-            margin-bottom: 4px; /* MODIFIED */
+            align-self: flex-end; 
+            margin-bottom: 4px; 
             transition: transform 0.2s var(--ease-elastic), background 0.2s; 
         }
         .plus-btn:active { transform: rotate(90deg); background: rgba(255,255,255,0.2); }
@@ -908,8 +939,8 @@
             color: #555; 
             pointer-events: none; 
             transition: all 0.2s ease; 
-            align-self: flex-end; /* MODIFIED */
-            margin-bottom: 0px; /* MODIFIED */
+            align-self: flex-end; 
+            margin-bottom: 0px; 
         }
         .send-btn.active { 
             color: var(--accent); 
@@ -926,14 +957,14 @@
             display: flex; align-items: center; justify-content: center;
             position: relative;
             z-index: 100;
-            align-self: flex-end; /* MODIFIED */
+            align-self: flex-end; 
         }
 
         .mic-btn {
             width: 44px; height: 44px;
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
-            background: transparent; color: var(--accent); /* MODIFIED: Cleaner mic */
+            background: transparent; color: var(--accent); /* Cleaner mic */
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             -webkit-user-select: none; user-select: none;
@@ -1728,7 +1759,8 @@
         }
         
         // FIX: Reliable top scroll detection for older messages
-        if (chatFlow.scrollTop < 150 && !isLoadingMore && lastVisible) {
+        // The Intersection Observer should catch this, but having this backup listener is good
+        if (chatFlow.scrollTop < 150 && !isLoadingMore && messagesMap.size > 0) {
             loadMoreMessages();
         }
     });
@@ -2553,7 +2585,7 @@
         
         // Styling Vars
         const boxStyle = reactionDisplay ? 'style="margin-bottom: 16px"' : '';
-        const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">⤴ ${m.replyTo}</div>` : '';
+        const replyHtml = m.replyTo ? `<div class="reply-box-ui" onclick="event.stopPropagation(); scrollToAndFlash('${m.replyTo}')">${m.replyTo}</div>` : '';
 
         // Note Reply - FULL UI RENDER (Updated Layout)
         const noteMeta = m.noteMetadata || {};
@@ -3318,18 +3350,41 @@
         }
     }
 
+    // =======================================================================
+    // FIX: RELIABLE SCROLL LOADING FOR OLDER MESSAGES
+    // =======================================================================
     async function loadMoreMessages() {
-        if (isLoadingMore || !lastVisible) return;
+        if (isLoadingMore) return;
         isLoadingMore = true;
         
         chatFlow.style.scrollBehavior = 'auto'; 
         const oldScrollHeight = chatFlow.scrollHeight;
-        
-        const snapshot = await db.collection("chats").doc(chatId).collection("messages")
-            .orderBy("timestamp", "desc")
-            .startAfter(lastVisible)
-            .limit(15)
-            .get();
+
+        let query = db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc");
+
+        if (lastVisible) {
+            query = query.startAfter(lastVisible);
+        } else {
+            // FIX: If lastVisible is somehow null (e.g. fast caching issue), reliably find the oldest message loaded.
+            let oldestMsg = null;
+            messagesMap.forEach(msg => {
+                if (!oldestMsg) oldestMsg = msg;
+                else {
+                    const tOld = oldestMsg.timestamp?.toDate ? oldestMsg.timestamp.toDate() : new Date(oldestMsg.timestampIso || 0);
+                    const tCur = msg.timestamp?.toDate ? msg.timestamp.toDate() : new Date(msg.timestampIso || 0);
+                    if (tCur < tOld) oldestMsg = msg;
+                }
+            });
+
+            if (oldestMsg && oldestMsg.timestamp) {
+                query = query.startAfter(oldestMsg.timestamp);
+            } else {
+                isLoadingMore = false;
+                return;
+            }
+        }
+
+        const snapshot = await query.limit(15).get();
 
         if (!snapshot.empty) {
             snapshot.forEach(doc => { 
@@ -3339,7 +3394,8 @@
             });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
-            // NEW FIX: Use requestAnimationFrame to let DOM paint the new top messages smoothly before calculating scroll anchoring height.
+            
+            // Use requestAnimationFrame to let DOM paint the new top messages smoothly before calculating scroll anchoring height.
             requestAnimationFrame(() => {
                 chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
                 setTimeout(() => { 
@@ -3349,16 +3405,16 @@
             });
         } else {
             isLoadingMore = false;
-            lastVisible = null; 
+            lastVisible = null; // No more messages
         }
     }
 
     function setupObserver() {
         const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && !isLoadingMore && lastVisible) {
+            if (entries[0].isIntersecting && !isLoadingMore && messagesMap.size > 0) {
                 loadMoreMessages();
             }
-        }, { root: chatFlow, rootMargin: "400px", threshold: 0.01 }); // MODIFIED: Load seamlessly before hitting top
+        }, { root: chatFlow, rootMargin: "400px", threshold: 0.01 }); 
         observer.observe(document.getElementById('scroll-trigger'));
     }
 
