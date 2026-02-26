@@ -720,11 +720,11 @@
         .received .swipe-reply-icon { left: -45px; } 
         .sent .swipe-reply-icon { right: -45px; }
 
-        /* PROFESSIONAL REPLY PREVIEW DESIGN - 3 LINES CLAMP & GLASSMORPHISM */
+        /* PROFESSIONAL REPLY PREVIEW DESIGN - REDESIGNED FOR SMOOTHER UI */
         .reply-box-ui { 
-            background: rgba(255, 255, 255, 0.08); 
+            background: linear-gradient(90deg, rgba(255, 109, 0, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%); 
             padding: 10px 14px; 
-            border-radius: 14px; 
+            border-radius: 12px; 
             margin-bottom: 8px; 
             font-size: 0.85rem; 
             border-left: 4px solid var(--accent); 
@@ -739,10 +739,12 @@
             text-overflow: ellipsis;
             white-space: normal;
             line-height: 1.4;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            transition: all 0.25s var(--ease-spring);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-left: 4px solid var(--accent);
         }
         .reply-box-ui::before {
             content: 'Replying to';
@@ -753,10 +755,12 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 4px;
+            opacity: 0.9;
         }
         .reply-box-ui:active { 
-            background: rgba(255,255,255,0.15); 
-            transform: scale(0.98);
+            background: linear-gradient(90deg, rgba(255, 109, 0, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%); 
+            transform: scale(0.97);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         
         /* NOTE REPLY STYLE - UPDATED FROM NOTES.HTML */
@@ -3357,6 +3361,8 @@
         if (isLoadingMore) return;
         isLoadingMore = true;
         
+        // Prevent scroll jump fighting native overflow anchoring
+        chatFlow.style.overflowAnchor = 'none';
         chatFlow.style.scrollBehavior = 'auto'; 
         const oldScrollHeight = chatFlow.scrollHeight;
 
@@ -3380,6 +3386,7 @@
                 query = query.startAfter(oldestMsg.timestamp);
             } else {
                 isLoadingMore = false;
+                chatFlow.style.overflowAnchor = 'auto';
                 return;
             }
         }
@@ -3395,17 +3402,22 @@
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
             
-            // Use requestAnimationFrame to let DOM paint the new top messages smoothly before calculating scroll anchoring height.
+            // FIX: Double requestAnimationFrame guarantees DOM has fully painted the new DOM nodes before math execution.
             requestAnimationFrame(() => {
-                chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
-                setTimeout(() => { 
-                    chatFlow.style.scrollBehavior = 'smooth'; 
-                    isLoadingMore = false;
-                }, 50);
+                requestAnimationFrame(() => {
+                    chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
+                    chatFlow.style.overflowAnchor = 'auto'; // Restore browser scrolling logic
+                    
+                    setTimeout(() => { 
+                        chatFlow.style.scrollBehavior = 'smooth'; 
+                        isLoadingMore = false;
+                    }, 50);
+                });
             });
         } else {
             isLoadingMore = false;
             lastVisible = null; // No more messages
+            chatFlow.style.overflowAnchor = 'auto';
         }
     }
 
