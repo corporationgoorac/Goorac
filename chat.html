@@ -6118,6 +6118,16 @@
 
             audio.dataset.loading = 'true';
 
+            
+
+            // Add crossorigin property dynamically if needed (helps with some external domains)
+
+            // Note: If server blocks with 403, it will still fail, but this protects the code.
+
+            audio.crossOrigin = "anonymous";
+
+            
+
             var playPromise = audio.play();
 
             if (playPromise !== undefined) {
@@ -6138,17 +6148,9 @@
 
                       audio.dataset.loading = 'false';
 
-                      console.error("Auto-play was prevented", error);
+                      console.error("Playback prevented:", error);
 
-                      if(error.name === 'NotSupportedError') {
-
-                           // FIX: Notify user gracefully rather than crashing
-
-                           console.warn("Audio format not supported on this device natively.");
-
-                           alert("Audio format not supported on this device/browser.");
-
-                      }
+                      alert("Cannot play audio. The server hosting this file refused access (CORS / 403 Forbidden), or the format is unsupported.");
 
                 });
 
@@ -7108,12 +7110,6 @@
 
         
 
-        // Prevent scroll jump fighting native overflow anchoring
-
-        chatFlow.style.overflowAnchor = 'none';
-
-        chatFlow.style.scrollBehavior = 'auto'; 
-
         const oldScrollHeight = chatFlow.scrollHeight;
 
         const oldScrollTop = chatFlow.scrollTop;
@@ -7130,7 +7126,7 @@
 
         } else {
 
-            // FIX: If lastVisible is somehow null (e.g. fast caching issue), reliably find the oldest message loaded.
+            // Safe fallback to find oldest if lastVisible was cleared/dropped
 
             let oldestMsg = null;
 
@@ -7160,8 +7156,6 @@
 
                 isLoadingMore = false; window.isLoadingMore = false;
 
-                chatFlow.style.overflowAnchor = 'auto';
-
                 return;
 
             }
@@ -7170,61 +7164,69 @@
 
 
 
-        const snapshot = await query.limit(15).get();
+        try {
+
+            const snapshot = await query.limit(20).get();
 
 
 
-        if (!snapshot.empty) {
+            if (!snapshot.empty) {
 
-            snapshot.forEach(doc => { 
+                snapshot.forEach(doc => {
 
-                let d = doc.data(); 
+                    let d = doc.data();
 
-                d.id = doc.id; 
+                    d.id = doc.id;
 
-                messagesMap.set(doc.id, d); 
+                    if (!messagesMap.has(doc.id)) {
 
-            });
+                        messagesMap.set(doc.id, d);
 
-            lastVisible = snapshot.docs[snapshot.docs.length - 1];
-
-            renderAll();
-
-            
-
-            // FIX: Double requestAnimationFrame guarantees DOM has fully painted the new DOM nodes before math execution.
-
-            requestAnimationFrame(() => {
-
-                requestAnimationFrame(() => {
-
-                    chatFlow.scrollTop = oldScrollTop + (chatFlow.scrollHeight - oldScrollHeight);
-
-                    chatFlow.style.overflowAnchor = 'auto'; // Restore browser scrolling logic
-
-                    
-
-                    setTimeout(() => { 
-
-                        chatFlow.style.scrollBehavior = 'smooth'; 
-
-                        isLoadingMore = false; window.isLoadingMore = false;
-
-                    }, 50);
+                    }
 
                 });
 
-            });
+                lastVisible = snapshot.docs[snapshot.docs.length - 1];
 
-        } else {
+                
+
+                // Keep original scroll state before rendering to prevent jump
+
+                chatFlow.style.overflowAnchor = 'none';
+
+                
+
+                renderAll();
+
+
+
+                // Wait for DOM to update, then mathematically fix scroll position
+
+                requestAnimationFrame(() => {
+
+                    const newScrollHeight = chatFlow.scrollHeight;
+
+                    chatFlow.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+
+                    chatFlow.style.overflowAnchor = 'auto'; // Restore browser scrolling logic
+
+                    isLoadingMore = false; window.isLoadingMore = false;
+
+                });
+
+            } else {
+
+                lastVisible = null; // No more messages
+
+                isLoadingMore = false; window.isLoadingMore = false;
+
+            }
+
+        } catch (e) {
+
+            console.error("Pagination Error:", e);
 
             isLoadingMore = false; window.isLoadingMore = false;
-
-            lastVisible = null; // No more messages
-
-            chatFlow.style.overflowAnchor = 'auto';
-
-            chatFlow.style.scrollBehavior = 'smooth'; 
 
         }
 
@@ -7242,7 +7244,7 @@
 
             }
 
-        }, { root: chatFlow, rootMargin: "100px", threshold: 0.01 }); 
+        }, { root: chatFlow, rootMargin: "300px", threshold: 0 }); 
 
         observer.observe(document.getElementById('scroll-trigger'));
 
@@ -8027,4 +8029,3 @@
 </body>
 
 </html>
-
