@@ -339,7 +339,7 @@
             font-size: 0.8rem; 
             color: var(--text-secondary); 
             font-weight: 500; 
-            transition: color 0.3s ease;
+            transition: opacity 0.3s ease, color 0.3s ease;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -859,7 +859,7 @@
             display: flex; 
             align-items: center; 
             min-height: 44px; 
-            transition: border-color 0.2s, background 0.2s; 
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.3s ease; 
         }
         .input-box:focus-within { border-color: var(--accent); background: #222; }
 
@@ -1920,6 +1920,13 @@
                return;
             }
 
+            // NEW FIX: Smooth Opacity transition to avoid sudden harsh flicker 
+            if(isFirstStatusLoad) {
+                headerSubLabel.style.opacity = '0';
+                setTimeout(() => headerSubLabel.style.opacity = '1', 150);
+                isFirstStatusLoad = false;
+            }
+
             // === INSTANT UPDATE LOGIC (CRITICAL FIX) ===
             // Directly calculate timeAgo here immediately, do not wait for next tick.
             updateHeaderStatus();
@@ -2009,14 +2016,17 @@
                     <div class="rec-wave-icon"><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div></div>
                     Recording...
                 `;
+                inputBox.style.boxShadow = "0 0 15px rgba(255, 69, 58, 0.3)"; // NEW FEATURE: Glow red when recording
                 scrollToBottom();
             } else if (val === true) {
                 typingRow.style.display = 'flex';
                 bubble.className = "typing-bubble";
                 bubble.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+                inputBox.style.boxShadow = "0 0 15px rgba(255, 109, 0, 0.3)"; // NEW FEATURE: Glow orange when typing
                 scrollToBottom();
             } else {
                 typingRow.style.display = 'none';
+                inputBox.style.boxShadow = "none"; // NEW FEATURE: Remove glow
             }
         });
 
@@ -2209,8 +2219,10 @@
                     } else {
                         const isNearBottom = chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 300;
                         renderAll();
-                        if (isNearBottom || isNewIncoming && isNearBottom) {
-                            scrollToBottom();
+                        // NEW FIX: Smarter auto-scroll. Only scroll if near bottom, or if it was MY message. 
+                        // Prevents random jumping when reading older messages and a new one arrives.
+                        if (isNearBottom || (!isNewIncoming)) {
+                            requestAnimationFrame(() => scrollToBottom());
                         }
                     }
                 }
@@ -2730,12 +2742,19 @@
             let myReaction = null;
             if (m.reactions && m.reactions[myUid]) myReaction = m.reactions[myUid].emoji;
 
-            // Double Tap to Like
+            // Double Tap to Like or Edit
             element.addEventListener('dblclick', (e) => {
                 e.preventDefault(); e.stopPropagation(); 
-                vibrate(50); 
-                triggerHeartAnimation();
-                applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
+                if (m.sender === myUid) {
+                    // NEW FEATURE: Double tap own message to quick-edit
+                    vibrate(40);
+                    activeMenuId = id; 
+                    initEdit();
+                } else {
+                    vibrate(50); 
+                    triggerHeartAnimation();
+                    applyReactionToId(id, myReaction === '❤️' ? '' : '❤️');
+                }
             });
 
             // Long Press Menu & Swipe Logic
@@ -2812,6 +2831,7 @@
                         else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
                         else replyText = "Attachment";
                     }
+                    mInput.focus(); // NEW FIX: Force focus directly inside the synchronous touchend execution path before timeouts
                     triggerReply(replyText);
                 }
 
@@ -3306,9 +3326,14 @@
             });
             lastVisible = snapshot.docs[snapshot.docs.length - 1];
             renderAll();
-            chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
-            setTimeout(() => { chatFlow.style.scrollBehavior = 'smooth'; }, 50);
-            isLoadingMore = false;
+            // NEW FIX: Use requestAnimationFrame to let DOM paint the new top messages smoothly before calculating scroll anchoring height.
+            requestAnimationFrame(() => {
+                chatFlow.scrollTop = chatFlow.scrollHeight - oldScrollHeight;
+                setTimeout(() => { 
+                    chatFlow.style.scrollBehavior = 'smooth'; 
+                    isLoadingMore = false;
+                }, 50);
+            });
         } else {
             isLoadingMore = false;
             lastVisible = null; 
