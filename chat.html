@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="en">
 
@@ -16,7 +16,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
 
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
@@ -3410,7 +3410,7 @@
 
                 pfp.classList.remove('loading-shimmer');
 
-                pfp.src = chatTargetData.photoURL || 'https://via.placeholder.com/150';
+                pfp.src = (typeof chatTargetData.photoURL === 'string' && chatTargetData.photoURL !== 'true') ? chatTargetData.photoURL : 'https://via.placeholder.com/150';
 
                 document.getElementById('h-display-name').innerText = chatTargetData.name || chatTargetData.username;
 
@@ -4170,7 +4170,7 @@
 
         pfp.classList.remove('loading-shimmer');
 
-        const pfpUrl = chatTargetData.photoURL || 'https://via.placeholder.com/150';
+        const pfpUrl = (typeof chatTargetData.photoURL === 'string' && chatTargetData.photoURL !== 'true') ? chatTargetData.photoURL : 'https://via.placeholder.com/150';
 
         pfp.src = pfpUrl;
 
@@ -4458,6 +4458,8 @@
 
                 let reactionOnlyUpdates = false;
 
+                let didRemoveMessage = false; // NEW
+
 
 
                 snapshot.docChanges().forEach(change => {
@@ -4596,6 +4598,8 @@
 
                         hasVisualChanges = true; 
 
+                        didRemoveMessage = true; // NEW
+
                     }
 
                     
@@ -4670,11 +4674,17 @@
 
                         // Prevents random jumping when reading older messages and a new one arrives.
 
-                        if (isNearBottom || (!isNewIncoming)) {
+                        if (didRemoveMessage) {
+
+                            // Do not scroll on unsend
+
+                            chatFlow.scrollTop = cfST + (chatFlow.scrollHeight - cfSH);
+
+                        } else if (isNearBottom || isNewIncoming) {
 
                             requestAnimationFrame(() => window.scrollToBottom(isNewIncoming)); /* MODIFIED: Glide in */
 
-                        } else if(!isNewIncoming) {
+                        } else {
 
                             // Lock scroll position securely if loading older messages
 
@@ -5340,7 +5350,7 @@
 
                     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px; width:100%; justify-content:center; opacity:0.9;">
 
-                        <img src="${noteMeta.pfp || (chatTargetData ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" style="width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);">
+                        <img src="${(typeof noteMeta.pfp === 'string' && noteMeta.pfp !== 'true') ? noteMeta.pfp : (typeof chatTargetData.photoURL === 'string' && chatTargetData.photoURL !== 'true' ? chatTargetData.photoURL : 'https://via.placeholder.com/20')}" style="width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);">
 
                         <span style="font-size:0.75rem;font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,0.5);">${noteMeta.username || 'User'}</span>
 
@@ -5388,6 +5398,52 @@
 
 
 
+        let renderImageUrl = (typeof m.imageUrl === 'string' && m.imageUrl !== 'true') ? m.imageUrl : null;
+
+        let renderFileUrl = (typeof m.fileUrl === 'string' && m.fileUrl !== 'true') ? m.fileUrl : null;
+
+        let renderFileMeta = m.fileMeta;
+
+        let renderText = m.text || "";
+
+
+
+        // Auto-detect media links in text
+
+        if (!renderImageUrl && !renderFileUrl && renderText) {
+
+            const urlMatch = renderText.match(/(https?:\/\/[^\s]+)/);
+
+            if (urlMatch) {
+
+                const url = urlMatch[0];
+
+                const urlPath = url.split('?')[0].toLowerCase();
+
+                if (urlPath.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
+
+                    renderImageUrl = url;
+
+                } else if (urlPath.match(/\.(mp4|webm|mov)$/i)) {
+
+                    renderFileUrl = url;
+
+                    renderFileMeta = { type: 'video/mp4', name: 'Video Link', size: 0 };
+
+                } else if (urlPath.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+
+                    renderFileUrl = url;
+
+                    renderFileMeta = { type: 'audio/mp3', name: 'Audio Link', size: 0 };
+
+                }
+
+            }
+
+        }
+
+
+
         let mediaHtml = '';
 
         let bubbleClass = `bubble ${groupClass}`;
@@ -5398,13 +5454,13 @@
 
         // Media Types Construction - LOAD EVENT ADDED TO FIX SCROLL HIDDEN BUG
 
-        if (m.imageUrl) {
+        if (renderImageUrl) {
 
             mediaHtml = `
 
-            <div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${m.imageUrl}')">
+            <div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${renderImageUrl}')">
 
-                <img src="${m.imageUrl}" class="chat-media-img" onload="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 300) window.scrollToBottom(true)">
+                <img src="${renderImageUrl}" class="chat-media-img" onload="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)">
 
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
 
@@ -5412,17 +5468,17 @@
 
             bubbleClass = `bubble has-media ${groupClass}`;
 
-            if(!m.text) bubbleStyle = "display:none;";
+            if(!renderText) bubbleStyle = "display:none;";
 
         } 
 
-        else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('video')) {
+        else if (renderFileUrl && renderFileMeta && renderFileMeta.type.includes('video')) {
 
             mediaHtml = `
 
-            <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${m.fileUrl}', 'video')">
+            <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${renderFileUrl}', 'video')">
 
-                <video src="${m.fileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:220px; background:#000;" preload="metadata" onloadeddata="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 300) window.scrollToBottom(true)"></video>
+                <video src="${renderFileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:220px; background:#000;" preload="metadata" onloadeddata="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)"></video>
 
                 <div class="play-overlay"><span class="material-icons-round" style="font-size:32px; color:white;">play_arrow</span></div>
 
@@ -5432,11 +5488,11 @@
 
             bubbleClass = `bubble has-media ${groupClass}`;
 
-            if(!m.text) bubbleStyle = "display:none;";
+            if(!renderText) bubbleStyle = "display:none;";
 
         }
 
-        else if (m.fileUrl && m.fileMeta && m.fileMeta.type.includes('audio')) {
+        else if (renderFileUrl && renderFileMeta && renderFileMeta.type.includes('audio')) {
 
             const safeId = 'audio-' + id;
 
@@ -5470,7 +5526,7 @@
 
                 
 
-                <audio id="${safeId}" src="${m.fileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
+                <audio id="${safeId}" src="${renderFileUrl}" ontimeupdate="updateAudioUI('${safeId}')" onended="resetAudioUI('${safeId}')"></audio>
 
                 
 
@@ -5480,23 +5536,23 @@
 
             bubbleClass = `bubble has-media ${groupClass}`; 
 
-            if(!m.text) bubbleStyle = "display:none;";
+            if(!renderText) bubbleStyle = "display:none;";
 
         }
 
-        else if (m.fileUrl) {
+        else if (renderFileUrl) {
 
             mediaHtml = `
 
-            <div class="msg-file-pill" onclick="window.open('${m.fileUrl}', '_blank')">
+            <div class="msg-file-pill" onclick="window.open('${renderFileUrl}', '_blank')">
 
                 <div class="file-icon">📄</div>
 
                 <div class="file-details">
 
-                    <div class="file-name">${m.fileMeta.name || "File"}</div>
+                    <div class="file-name">${renderFileMeta.name || "File"}</div>
 
-                    <div class="file-meta">${(m.fileMeta.size / (1024*1024)).toFixed(2)} MB • ${m.fileMeta.type.toUpperCase()}</div>
+                    <div class="file-meta">${(renderFileMeta.size / (1024*1024)).toFixed(2)} MB • ${renderFileMeta.type.toUpperCase()}</div>
 
                 </div>
 
@@ -5506,19 +5562,19 @@
 
             bubbleClass = `bubble has-media ${groupClass}`;
 
-            if(!m.text) bubbleStyle = "display:none;";
+            if(!renderText) bubbleStyle = "display:none;";
 
         }
 
 
 
-        const safeText = linkify(m.text);
+        const safeText = linkify(renderText);
 
         
 
         // ADVANCED EMOJI DETECTOR FOR JUMBO INSTAGRAM EMOJIS
 
-        const textNoSpaces = (m.text || "").replace(/\s/g, '');
+        const textNoSpaces = (renderText || "").replace(/\s/g, '');
 
         const emojiRegex = /^[\p{Extended_Pictographic}]+$/u;
 
@@ -5526,7 +5582,7 @@
 
         
 
-        if (isOnlyEmoji && !m.imageUrl && !m.fileUrl && !m.replyTo) {
+        if (isOnlyEmoji && !renderImageUrl && !renderFileUrl && !m.replyTo) {
 
             bubbleClass += ' jumbo-emoji';
 
@@ -5550,7 +5606,7 @@
 
                 <span id="text-${id}">${safeText} ${m.edited ? '<small style="opacity:0.6;font-size:0.65rem; margin-left:4px;">(edited)</small>' : ''}</span>
 
-                ${(!m.imageUrl && !m.fileUrl && !m.fileMeta?.type?.includes('audio')) ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
+                ${(!renderImageUrl && !renderFileUrl && !renderFileMeta?.type?.includes('audio')) ? `<div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>` : ''}
 
             </div>
 
@@ -5934,6 +5990,8 @@
 
                     mInput.focus(); // NEW FIX: Force focus directly inside the synchronous touchend execution path before timeouts
 
+                    setTimeout(() => { mInput.focus(); mInput.click(); }, 50); // Fallback for mobile WebKit
+
                     triggerReply(replyText);
 
                 }
@@ -5991,6 +6049,18 @@
         if (!audio) {
 
             console.error("Audio element not found:", id);
+
+            return;
+
+        }
+
+
+
+        const currentSrc = audio.getAttribute('src');
+
+        if (!currentSrc || currentSrc === 'true' || currentSrc.trim() === '') {
+
+            alert("This voice message is unavailable or corrupted.");
 
             return;
 
@@ -6258,9 +6328,9 @@
 
         let particleCount = 150;
 
-        if(type === 'hearts') particleCount = 40;
+        if(type === 'hearts') particleCount = 60; // Increased
 
-        if(type === 'balloons') particleCount = 20;
+        if(type === 'balloons') particleCount = 25;
 
         if(type === 'snow') particleCount = 100;
 
@@ -6324,7 +6394,7 @@
 
                 p.y = canvas.height + Math.random() * 200;
 
-                p.speedY = -(Math.random() * 3 + 2);
+                p.speedY = -(Math.random() * 4 + 3); // Faster up
 
                 if(type === 'hearts') p.color = heartColors[Math.floor(Math.random() * heartColors.length)];
 
@@ -6400,11 +6470,11 @@
 
                     p.speedY += 0.2; // gravity
 
-                    p.opacity -= 0.01;
+                    p.opacity -= 0.008; // slightly slower fade
 
                 } else if (type === 'hearts' || type === 'thumbsup' || type === 'balloons' || emojiMap[type]) {
 
-                    p.opacity -= 0.003; 
+                    p.opacity -= 0.0015; // smoother slower fade
 
                 }
 
@@ -7109,6 +7179,8 @@
             lastVisible = null; // No more messages
 
             chatFlow.style.overflowAnchor = 'auto';
+
+            chatFlow.style.scrollBehavior = 'smooth'; 
 
         }
 
