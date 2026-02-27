@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>New Moment | Goorac</title>
+    
+    <script src="config.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script src="components/songPicker.js"></script>
+    <script src="components/closeFriends.js" defer></script>
+    <script src="components/imagePicker.js" defer></script>
+    <script src="components/filePicker.js" defer></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
+
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+    <style>
+        :root { 
+            --bg: #000; 
+            --surface: #121212;
+            --accent: #ff007f; /* A vibrant pink/magenta for Moments */
+            --text: #ffffff;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --safe-top: env(safe-area-inset-top, 20px);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+        body {
+            background-color: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0; padding: 0; height: 100dvh; 
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        header {
+            position: relative; z-index: 10;
+            padding: calc(15px + var(--safe-top)) 20px 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .cancel-btn { color: #fff; font-size: 16px; font-weight: 500; cursor: pointer; }
+        .header-title { font-weight: 800; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+        
+        .post-btn { 
+            background: #fff; color: #000; padding: 8px 22px; border-radius: 100px; 
+            font-weight: 700; font-size: 14px; border: none; 
+            transition: 0.3s; opacity: 0.4; pointer-events: none;
+        }
+        .post-btn.active { opacity: 1; pointer-events: auto; background: var(--accent); color: #fff; box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4); }
+        .post-btn.loading { opacity: 0.8; pointer-events: none; display: flex; align-items: center; gap: 8px; }
+
+        /* --- PREVIEW CANVAS --- */
+        .canvas-container {
+            flex: 1; margin: 0 15px; border-radius: 24px; background: var(--surface);
+            position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Mode Selection UI */
+        .mode-selector {
+            display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 250px;
+        }
+        .mode-btn {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            color: #fff; padding: 16px; border-radius: 16px; font-size: 16px; font-weight: 600;
+            display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s;
+        }
+        .mode-btn:active { transform: scale(0.96); background: rgba(255,255,255,0.1); }
+        .mode-btn .material-icons-round { font-size: 24px; color: var(--accent); }
+
+        /* Media Viewers */
+        #media-preview { width: 100%; height: 100%; object-fit: cover; display: none; position: absolute; inset: 0; z-index: 1; }
+        #text-preview { 
+            width: 100%; height: 100%; display: none; align-items: center; justify-content: center; 
+            padding: 30px; font-size: 28px; font-weight: 700; text-align: center; word-break: break-word; outline: none; z-index: 2; position: absolute; inset: 0;
+            white-space: pre-wrap;
+        }
+        #text-preview:empty:before { content: 'Type something...'; opacity: 0.5; }
+
+        .clear-media-btn {
+            position: absolute; top: 15px; right: 15px; z-index: 10;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); color: white; border: none;
+            width: 36px; height: 36px; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer;
+        }
+
+        /* --- CONTROLS / FOOTER --- */
+        .controls-panel {
+            padding: 20px 20px calc(20px + var(--safe-bottom));
+            display: flex; flex-direction: column; gap: 15px; background: var(--bg);
+        }
+
+        /* Required Inputs Group */
+        .required-group { display: flex; flex-direction: column; gap: 10px; }
+        
+        .caption-input {
+            width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+            color: #fff; padding: 16px; border-radius: 16px; font-size: 15px; outline: none;
+            transition: 0.2s;
+        }
+        .caption-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.12); }
+        .caption-input::placeholder { color: rgba(255,255,255,0.4); }
+
+        .song-btn {
+            background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.3);
+            color: #fff; padding: 14px 16px; border-radius: 16px; font-size: 14px; font-weight: 600;
+            display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s;
+        }
+        .song-btn.has-song { border-style: solid; border-color: var(--accent); background: rgba(255, 0, 127, 0.1); }
+        .song-btn span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Settings Row */
+        .settings-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        
+        .setting-toggle {
+            flex: 1; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 12px;
+            display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #ccc; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; justify-content: center;
+        }
+        .setting-toggle.active { color: #fff; border-color: var(--accent); background: rgba(255, 0, 127, 0.1); }
+        .setting-toggle .material-icons-round { font-size: 18px; }
+
+        /* Text Formatting Tools (Hidden unless mode='text') */
+        .text-tools {
+            display: none; align-items: center; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none;
+        }
+        .text-tools::-webkit-scrollbar { display: none; }
+        .t-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+        .color-dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; cursor: pointer; }
+        .font-pill { padding: 8px 16px; background: rgba(255,255,255,0.1); border-radius: 12px; font-size: 13px; flex-shrink: 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="cancel-btn" onclick="history.back()">Cancel</div>
+        <div class="header-title">Create Moment</div>
+        <button class="post-btn" id="post-btn" onclick="postMoment()">Share</button>
+    </header>
+
+    <div class="canvas-container" id="canvas-bg">
+        <div class="mode-selector" id="mode-selector">
+            <div class="mode-btn" onclick="setMode('text')">
+                <span class="material-icons-round">text_fields</span> Write Text
+            </div>
+            <div class="mode-btn" onclick="document.getElementById('img-picker').openPicker()">
+                <span class="material-icons-round">image</span> Choose Photo
+            </div>
+            <div class="mode-btn" onclick="document.getElementById('file-picker').openPicker()">
+                <span class="material-icons-round">videocam</span> Choose Video
+            </div>
+        </div>
+
+        <button class="clear-media-btn" id="clear-btn" onclick="clearMedia()"><span class="material-icons-round">close</span></button>
+        <div id="text-preview" contenteditable="true" spellcheck="false"></div>
+        <img id="media-preview" src="">
+        <video id="video-preview" style="width: 100%; height: 100%; object-fit: cover; display: none; position: absolute; inset: 0; z-index: 1;" loop muted playsinline autoplay></video>
+    </div>
+
+    <div class="controls-panel">
+        
+        <div class="text-tools" id="text-tools">
+            <div class="t-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
+            <div style="width:1px; height:20px; background:rgba(255,255,255,0.2); margin:0 5px;"></div>
+            </div>
+
+        <div class="required-group">
+            <input type="text" class="caption-input" id="caption-input" placeholder="Write a caption (Required)..." autocomplete="off">
+            
+            <button class="song-btn" id="song-trigger" onclick="document.getElementById('song-picker').open()">
+                <span class="material-icons-round">music_note</span>
+                <span id="song-label">Select a Song (Required)</span>
+            </button>
+        </div>
+
+        <div class="settings-row">
+            <div class="setting-toggle" id="audience-toggle" onclick="toggleAudience()">
+                <span class="material-icons-round" id="aud-icon">public</span>
+                <span id="aud-label">Public</span>
+            </div>
+            <div class="setting-toggle active" id="comments-toggle" onclick="toggleComments()">
+                <span class="material-icons-round" id="com-icon">chat_bubble</span>
+                <span id="com-label">Comments On</span>
+            </div>
+        </div>
+        
+        <div id="edit-cf-btn" onclick="document.getElementById('cf-selector').open()" style="display:none; text-align:center; font-size:12px; color:var(--accent); font-weight:700; cursor:pointer; text-transform:uppercase;">
+            Edit Close Friends List
+        </div>
+    </div>
+
+    <song-picker id="song-picker"></song-picker>
+    <close-friends-selector id="cf-selector"></close-friends-selector>
+    <image-picker id="img-picker"></image-picker>
+    <file-picker id="file-picker"></file-picker>
+
+<script>
+    // --- FIREBASE INIT ---
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    let currentUser = null;
+    let isPosting = false;
+
+    // --- TEXT MODE CONFIG ---
+    const bgColors = [
+        '#121212', '#ff007f', '#00d2ff', '#00ba7c', '#ff3b30', 
+        'linear-gradient(45deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
+        'linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%)',
+        'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(to top, #0ba360 0%, #3cba92 100%)'
+    ];
+    const fonts = ['-apple-system, sans-serif', '"Abril Fatface"', '"Bangers"', '"Dancing Script"', '"Orbitron"', '"Fredoka"', '"Righteous"'];
+
+    // --- STATE ---
+    let state = {
+        mode: null, // 'text', 'image', 'video'
+        text: '', colorIdx: 0, fontIdx: 0, align: 'center',
+        mediaUrl: null, videoMeta: null,
+        caption: '', song: null,
+        audience: 'public', allowComments: true
+    };
+
+    const els = {
+        selector: document.getElementById('mode-selector'),
+        textPreview: document.getElementById('text-preview'),
+        imgPreview: document.getElementById('media-preview'),
+        vidPreview: document.getElementById('video-preview'),
+        clearBtn: document.getElementById('clear-btn'),
+        canvasBg: document.getElementById('canvas-bg'),
+        textTools: document.getElementById('text-tools'),
+        captionInput: document.getElementById('caption-input'),
+        songBtn: document.getElementById('song-trigger'),
+        songLabel: document.getElementById('song-label'),
+        postBtn: document.getElementById('post-btn')
+    };
+
+    // --- INIT ---
+    function init() {
+        auth.onAuthStateChanged(user => {
+            if (user) currentUser = user;
+            else window.location.href = 'login.html';
+        });
+
+        // Build Text Formatting Row
+        bgColors.forEach((c, i) => {
+            const dot = document.createElement('div');
+            dot.className = 'color-dot';
+            dot.style.background = c;
+            dot.onclick = () => { state.colorIdx = i; updateTextVisuals(); saveDraft(); };
+            els.textTools.appendChild(dot);
+        });
+        fonts.forEach((f, i) => {
+            const pill = document.createElement('div');
+            pill.className = 'font-pill';
+            pill.style.fontFamily = f;
+            pill.innerText = "Abc";
+            pill.onclick = () => { state.fontIdx = i; updateTextVisuals(); saveDraft(); };
+            els.textTools.appendChild(pill);
+        });
+
+        // Event Listeners
+        els.captionInput.addEventListener('input', (e) => { state.caption = e.target.value; saveDraft(); });
+        els.textPreview.addEventListener('input', (e) => { state.text = e.target.innerText; saveDraft(); });
+        document.addEventListener('song-selected', (e) => { state.song = e.detail; updateSongUI(); saveDraft(); });
+        
+        document.addEventListener('image-uploaded', (e) => {
+            state.mediaUrl = e.detail.url; setMode('image');
+        });
+        document.addEventListener('file-uploaded', (e) => {
+            if(e.detail.metadata.type === 'video') {
+                state.mediaUrl = e.detail.url; state.videoMeta = e.detail.metadata; setMode('video');
+            } else {
+                alert("Only videos are supported in Moments.");
+            }
+        });
+
+        loadDraft();
+    }
+
+    // --- CORE LOGIC ---
+    function setMode(mode) {
+        state.mode = mode;
+        els.selector.style.display = 'none';
+        els.clearBtn.style.display = 'flex';
+        
+        els.textPreview.style.display = 'none';
+        els.imgPreview.style.display = 'none';
+        els.vidPreview.style.display = 'none';
+        els.textTools.style.display = 'none';
+        els.canvasBg.style.background = 'var(--surface)';
+
+        if (mode === 'text') {
+            els.textPreview.style.display = 'flex';
+            els.textTools.style.display = 'flex';
+            updateTextVisuals();
+            els.textPreview.focus();
+        } else if (mode === 'image') {
+            els.imgPreview.style.display = 'block';
+            els.imgPreview.src = state.mediaUrl;
+        } else if (mode === 'video') {
+            els.vidPreview.style.display = 'block';
+            els.vidPreview.src = state.mediaUrl;
+        }
+        saveDraft();
+    }
+
+    function clearMedia() {
+        state.mode = null; state.mediaUrl = null; state.text = ''; state.videoMeta = null;
+        els.textPreview.innerText = '';
+        els.imgPreview.src = ''; els.vidPreview.src = '';
+        
+        els.selector.style.display = 'flex';
+        els.clearBtn.style.display = 'none';
+        els.textPreview.style.display = 'none';
+        els.imgPreview.style.display = 'none';
+        els.vidPreview.style.display = 'none';
+        els.textTools.style.display = 'none';
+        els.canvasBg.style.background = 'var(--surface)';
+        saveDraft();
+    }
+
+    function updateTextVisuals() {
+        els.canvasBg.style.background = bgColors[state.colorIdx];
+        els.textPreview.style.fontFamily = fonts[state.fontIdx];
+        els.textPreview.style.textAlign = state.align;
+        // Adjust text color based on background luminance (simplified)
+        els.textPreview.style.color = (state.colorIdx === 0) ? '#fff' : '#fff'; 
+    }
+
+    function toggleAlign() {
+        const alignments = ['center', 'left', 'right'];
+        const icons = ['format_align_center', 'format_align_left', 'format_align_right'];
+        let curr = alignments.indexOf(state.align);
+        state.align = alignments[(curr + 1) % 3];
+        document.getElementById('align-icon').innerText = icons[(curr + 1) % 3];
+        updateTextVisuals(); saveDraft();
+    }
+
+    function toggleAudience() {
+        state.audience = state.audience === 'public' ? 'close_friends' : 'public';
+        const isCF = state.audience === 'close_friends';
+        
+        const toggle = document.getElementById('audience-toggle');
+        toggle.classList.toggle('active', isCF);
+        document.getElementById('aud-icon').innerText = isCF ? 'stars' : 'public';
+        document.getElementById('aud-label').innerText = isCF ? 'Close Friends' : 'Public';
+        document.getElementById('edit-cf-btn').style.display = isCF ? 'block' : 'none';
+        saveDraft();
+    }
+
+    function toggleComments() {
+        state.allowComments = !state.allowComments;
+        const toggle = document.getElementById('comments-toggle');
+        toggle.classList.toggle('active', state.allowComments);
+        document.getElementById('com-icon').innerText = state.allowComments ? 'chat_bubble' : 'comments_disabled';
+        document.getElementById('com-label').innerText = state.allowComments ? 'Comments On' : 'Comments Off';
+        saveDraft();
+    }
+
+    function updateSongUI() {
+        if (state.song) {
+            els.songBtn.classList.add('has-song');
+            els.songLabel.innerText = `${state.song.trackName} • ${state.song.artistName}`;
+        } else {
+            els.songBtn.classList.remove('has-song');
+            els.songLabel.innerText = "Select a Song (Required)";
+        }
+    }
+
+    // --- DRAFT & VALIDATION ---
+    function saveDraft() {
+        localStorage.setItem('goorac_moment_draft', JSON.stringify(state));
+        validatePost();
+    }
+
+    function loadDraft() {
+        const draft = JSON.parse(localStorage.getItem('goorac_moment_draft'));
+        if (draft) {
+            state = { ...state, ...draft };
+            els.captionInput.value = state.caption;
+            els.textPreview.innerText = state.text;
+            updateSongUI();
+            
+            if (state.audience === 'close_friends') { state.audience = 'public'; toggleAudience(); } // force visual update
+            if (!state.allowComments) { state.allowComments = true; toggleComments(); }
+
+            if (state.mode) setMode(state.mode);
+        }
+        validatePost();
+    }
+
+    function validatePost() {
+        const hasMedia = (state.mode === 'text' && state.text.trim().length > 0) || 
+                         (state.mode === 'image' && state.mediaUrl) || 
+                         (state.mode === 'video' && state.mediaUrl);
+        const hasCaption = state.caption.trim().length > 0;
+        const hasSong = state.song !== null;
+
+        if (hasMedia && hasCaption && hasSong) {
+            els.postBtn.classList.add('active');
+        } else {
+            els.postBtn.classList.remove('active');
+        }
+    }
+
+    // --- POSTING ---
+    async function postMoment() {
+        if (isPosting || !els.postBtn.classList.contains('active')) return;
+        if (!currentUser) return;
+
+        isPosting = true;
+        els.postBtn.classList.add('loading');
+        els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:14px; animation:spin 1s linear infinite;">refresh</span> Posting...`;
+
+        try {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            const userData = userDoc.data() || {};
+            
+            const expiry = new Date();
+            expiry.setHours(expiry.getHours() + 24); // Expires in 24 hours
+
+            const payload = {
+                uid: currentUser.uid,
+                username: userData.username || "",
+                displayName: userData.name || "",
+                pfp: userData.photoURL || currentUser.photoURL,
+                verified: userData.verified || false,
+                
+                type: state.mode, // 'text', 'image', 'video'
+                caption: state.caption.trim(),
+                audience: state.audience,
+                allowComments: state.allowComments,
+                
+                // Song Data
+                songName: state.song.trackName,
+                songArtist: state.song.artistName,
+                songPreview: state.song.previewUrl,
+                songArt: state.song.artworkUrl100,
+
+                isActive: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.firestore.Timestamp.fromDate(expiry),
+                likes: [],
+                comments: []
+            };
+
+            // Inject Media specific data
+            if (state.mode === 'text') {
+                payload.text = state.text;
+                payload.bgColor = bgColors[state.colorIdx];
+                payload.font = fonts[state.fontIdx];
+                payload.align = state.align;
+            } else {
+                payload.mediaUrl = state.mediaUrl;
+                if (state.mode === 'video') payload.videoMeta = state.videoMeta;
+            }
+
+            await db.collection("moments").add(payload);
+            
+            localStorage.removeItem('goorac_moment_draft');
+            window.location.href = 'home.html';
+
+        } catch (error) {
+            console.error(error);
+            alert("Failed to post Moment. Try again.");
+            els.postBtn.innerHTML = 'Share';
+            els.postBtn.classList.remove('loading');
+            isPosting = false;
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>
