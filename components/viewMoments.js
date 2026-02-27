@@ -157,15 +157,28 @@ class ViewMoments extends HTMLElement {
 
         // 🚀 CRITICAL BUG FIX: Smart Keyboard Handling using Visual Viewport
         if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => {
+            const handleViewportChange = () => {
                 const activeOverlays = this.querySelectorAll('.c-overlay.open');
                 activeOverlays.forEach(activeOverlay => {
                     // Match overlay bottom offset dynamically to stick perfectly above the keyboard.
                     // This prevents browser fighting and anchors the text field in view smoothly.
                     const offset = window.innerHeight - window.visualViewport.height;
-                    activeOverlay.style.bottom = `${offset}px`;
+                    // activeOverlay.style.bottom = `${offset}px`; // Commented out to prevent the stretch jump bug
+                    
+                    // NEW FIX: Pin the overlay dimensions directly to the visual viewport to stop browser fighting
+                    activeOverlay.style.height = `${window.visualViewport.height}px`;
+                    activeOverlay.style.top = `${window.visualViewport.offsetTop}px`;
+                    activeOverlay.style.bottom = 'auto'; 
                 });
-            });
+                
+                // NEW FIX: Force the page scroll back to 0 to counter the browser natively stretching the view
+                if (activeOverlays.length > 0) {
+                    window.scrollTo(0, 0); 
+                }
+            };
+
+            window.visualViewport.addEventListener('resize', handleViewportChange);
+            window.visualViewport.addEventListener('scroll', handleViewportChange); // Added scroll binding for iOS
         }
 
         // Keep input fields visually centered on focus
@@ -180,7 +193,11 @@ class ViewMoments extends HTMLElement {
                 const activeOverlays = this.querySelectorAll('.c-overlay.open');
                 activeOverlays.forEach(activeOverlay => {
                     activeOverlay.style.bottom = '0px'; // Reset to default
+                    // NEW FIX: Clean up the applied styles from the viewport handling
+                    activeOverlay.style.top = '0px'; 
+                    activeOverlay.style.height = '100%';
                 });
+                window.scrollTo(0, 0); // Re-anchor page layout
             });
         });
     }
