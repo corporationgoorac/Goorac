@@ -47,20 +47,32 @@ class MainNavbar extends HTMLElement {
         this.innerHTML = `
         <style>
             /* ==========================================================================
-               CSS VARIABLES & THEMING (Matching Home Page)
+               CSS VARIABLES & THEMING (Synced with home.html)
                ========================================================================== */
             :host {
                 display: block;
-                --nav-bg: rgba(5, 5, 5, 0.85);
+                /* Light Mode (Default) Variables */
+                --nav-bg: rgba(255, 255, 255, 0.90);
+                --nav-border: rgba(0, 0, 0, 0.06);
+                --icon-inactive: #9aa0a6; /* Professional sleek gray */
+                --icon-active: #202124;   /* Deep slate for active items */
                 --accent: #00d2ff;
-                --accent-dim: rgba(0, 210, 255, 0.1);
-                --text-dim: #888888;
-                --nav-height: 65px;
+                --nav-height: 60px;
                 --safe-area-bottom: env(safe-area-inset-bottom, 0px);
                 
                 /* Transition definitions for smooth states */
                 transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
                             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            /* Dark Mode Variables (Synced with home.html) */
+            @media (prefers-color-scheme: dark) {
+                :host {
+                    --nav-bg: rgba(15, 15, 15, 0.90);
+                    --nav-border: rgba(255, 255, 255, 0.08);
+                    --icon-inactive: #757575; 
+                    --icon-active: #ffffff;   
+                }
             }
 
             /* ==========================================================================
@@ -70,87 +82,136 @@ class MainNavbar extends HTMLElement {
             .nav-hidden {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                transform: translateY(100%) !important; 
+                transform: translate(-50%, calc(100% + 20px)) !important; 
             }
 
             /* ==========================================================================
-               MAIN NAV CONTAINER (Mirroring .native-bottom-nav)
+               MAIN NAV CONTAINER
                ========================================================================== */
             .bottom-nav {
+                /* Positioning */
                 position: fixed;
                 bottom: 0;
-                left: 0;
-                right: 0;
-                height: calc(var(--nav-height) + var(--safe-area-bottom));
-                background: var(--nav-bg);
-                backdrop-filter: blur(25px);
-                -webkit-backdrop-filter: blur(25px);
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
+                left: 50%;
+                transform: translateX(-50%);
+                width: 100%;
+                max-width: 600px;
+                
+                /* Layout */
                 display: flex;
                 justify-content: space-around;
                 align-items: center;
+                height: calc(var(--nav-height) + var(--safe-area-bottom));
                 padding-bottom: var(--safe-area-bottom);
-                z-index: 9999; /* Absolute priority matching hardcoded version */
-                transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+                
+                /* High-End Glassmorphism */
+                background: var(--nav-bg);
+                backdrop-filter: blur(24px) saturate(150%);
+                -webkit-backdrop-filter: blur(24px) saturate(150%);
+                
+                border-top: 1px solid var(--nav-border);
+                box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
+                
+                /* Z-INDEX MANAGEMENT */
+                z-index: 990;
+                
+                /* Animation */
+                transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                            opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                            background-color 0.3s ease;
+            }
+
+            /* Tablet/Desktop optimization (Synced with home.html) */
+            @media (min-width: 601px) {
+                .bottom-nav {
+                    bottom: 24px;
+                    border-radius: 32px;
+                    border: 1px solid var(--nav-border);
+                    height: var(--nav-height);
+                    padding-bottom: 0;
+                    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
+                }
             }
 
             /* ==========================================================================
-               NAVIGATION ITEMS (Mirroring .nav-item)
+               NAVIGATION ITEMS
                ========================================================================== */
             .nav-item {
-                color: var(--text-dim);
+                position: relative;
                 text-decoration: none;
+                color: var(--icon-inactive);
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                transition: all 0.2s ease;
-                -webkit-tap-highlight-color: transparent;
+                flex: 1;
+                height: 100%;
+                -webkit-tap-highlight-color: transparent; 
                 cursor: pointer;
             }
 
             /* ==========================================================================
-               MATERIAL ICON STYLING
+               MATERIAL ICON STYLING & ANIMATIONS
                ========================================================================== */
             .nav-item .material-icons-round {
-                font-size: 26px;
-                transition: 0.2s;
+                font-size: 26px; 
+                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                            color 0.3s ease,
+                            filter 0.3s ease;
             }
 
-            /* Active Item Styling */
-            .nav-item.active {
-                color: var(--accent);
-            }
-
-            .nav-item.active .material-icons-round {
-                filter: drop-shadow(0px 0px 8px var(--accent-dim));
-            }
-
-            /* Press feedback */
-            .nav-item:active {
-                background: rgba(255, 255, 255, 0.05);
-                transform: scale(0.9);
-            }
-
-            /* Hide text spans visually like hardcoded version */
+            /* Hidden text labels for a clean, minimalist professional look */
             .nav-item span:not(.material-icons-round) {
-                display: none;
+                display: none; 
+            }
+
+            /* ACTIVE STATE (Synced with home.html) */
+            .nav-item.active .material-icons-round {
+                color: var(--icon-active);
+                transform: scale(1.15);
+                filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15)); 
+            }
+
+            /* HAPTIC FEEDBACK (CSS visual simulation) */
+            .nav-item:active .material-icons-round {
+                transform: scale(0.9);
+                opacity: 0.7;
             }
 
             /* ==========================================================================
-               PULSE ANIMATION (Matching your Home Page requirement)
+               SPECIFIC ICON OVERRIDES
                ========================================================================== */
-            .pulse-graphic {
-                animation: pulse-skel 2s infinite;
+
+            /* Pulse / Graphical Wave Icon Styling */
+            .pulse-icon-container {
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* The animated pulse effect for the graphic_eq icon (Synced with home.html) */
+            .nav-item .pulse-graphic {
+                color: var(--accent);
+                animation: pulse-skel 2s infinite ease-in-out;
+            }
+
+            /* Stronger glow when active (Synced with home.html) */
+            .nav-item.active .pulse-graphic {
+                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
+                animation: pulse-skel-active 2s infinite ease-in-out;
             }
 
             @keyframes pulse-skel {
-                0% { opacity: 0.6; }
-                50% { opacity: 1; }
+                0% { opacity: 0.6; } 
+                50% { opacity: 1; } 
                 100% { opacity: 0.6; }
+            }
+
+            @keyframes pulse-skel-active {
+                0% { opacity: 0.8; transform: scale(1.1); }
+                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(0, 210, 255, 0.8)); }
+                100% { opacity: 0.8; transform: scale(1.1); }
             }
 
         </style>
@@ -172,8 +233,10 @@ class MainNavbar extends HTMLElement {
                 <span>Add Contact</span>
             </a>
             
-            <a href="pulseLobby.html" class="nav-item" aria-label="Pulse">
-                <span class="material-icons-round pulse-graphic" style="color: var(--accent);">graphic_eq</span>
+            <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
+                <div class="pulse-icon-container">
+                    <span class="material-icons-round pulse-graphic">graphic_eq</span>
+                </div>
                 <span>Pulse</span>
             </a>
             
@@ -192,7 +255,6 @@ class MainNavbar extends HTMLElement {
      */
     _highlightActive() {
         const path = window.location.pathname;
-        // Default to home.html if we are at the root
         const page = path.split("/").pop() || "home.html";
         const links = this.querySelectorAll('.nav-item');
         
@@ -201,7 +263,6 @@ class MainNavbar extends HTMLElement {
             if (page === href) {
                 link.classList.add('active');
                 
-                // Swap to filled icon for Messages if active
                 const icon = link.querySelector('.material-icons-round');
                 if (icon && icon.innerText === 'chat_bubble_outline') {
                     icon.innerText = 'chat_bubble';
@@ -214,7 +275,6 @@ class MainNavbar extends HTMLElement {
 
     /**
      * Logic to observe and hide the navbar when #call-screen is visible.
-     * Retains original logic precisely but adds JSDoc documentation.
      */
     _setupVisibilityToggle() {
         const navContainer = this.querySelector('#main-nav-container');
