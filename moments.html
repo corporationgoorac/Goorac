@@ -54,7 +54,8 @@
             width: 100vw; height: 100dvh; 
             display: flex; flex-direction: column;
             background: var(--bg);
-            animation: slideInRight 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            /* Slide animation removed per user request */
+            /* animation: slideInRight 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; */
             position: relative;
         }
 
@@ -123,18 +124,22 @@
         .mode-btn:active { transform: scale(0.95); background: rgba(40,40,40,0.8); }
         .mode-btn .material-icons-round { font-size: 24px; color: var(--accent); }
 
-        /* Media Elements */
+        /* Media Elements - Changed object-fit from cover to contain so image/video is not cropped */
         #media-preview, #video-preview { 
-            width: 100%; height: 100%; object-fit: cover; display: none; position: absolute; inset: 0; z-index: 1; 
+            width: 100%; height: 100%; object-fit: contain; display: none; position: absolute; inset: 0; z-index: 1; 
         }
         
         #text-preview { 
             width: 100%; height: 100%; display: none; align-items: center; justify-content: center; 
             padding: 40px 30px 140px; font-size: 36px; font-weight: 800; text-align: center; word-break: break-word; outline: none; 
             z-index: 2; position: absolute; inset: 0; white-space: pre-wrap; line-height: 1.25;
-            text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
         }
         #text-preview:empty:before { content: 'Tap to type...'; opacity: 0.5; }
+
+        /* NEW TEXT EFFECTS */
+        .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+        .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
 
         .clear-media-btn {
             position: absolute; top: calc(15px + var(--safe-top)); left: 20px; z-index: 60;
@@ -283,6 +288,7 @@
 
             <div class="text-tools" id="text-tools">
                 <div class="t-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
+                <div class="t-btn" onclick="toggleEffect()" id="fx-btn"><span class="material-icons-round">auto_fix_high</span></div>
                 <div style="width:1px; height:24px; background:rgba(255,255,255,0.3); margin:0 4px;"></div>
             </div>
         </div>
@@ -353,11 +359,18 @@
         'linear-gradient(to top, #0ba360 0%, #3cba92 100%)'
     ];
     const fonts = ['-apple-system, sans-serif', '"Abril Fatface"', '"Bangers"', '"Dancing Script"', '"Orbitron"', '"Fredoka"', '"Righteous"'];
+    
+    // NEW TEXT EFFECTS CONFIG
+    const effects = [
+        { name: 'none', class: '' },
+        { name: 'glow', class: 'fx-glow' },
+        { name: 'shadow', class: 'fx-shadow' }
+    ];
 
     // --- STATE ---
     let state = {
         mode: null, // 'text', 'image', 'video'
-        text: '', colorIdx: 0, fontIdx: 0, align: 'center',
+        text: '', colorIdx: 0, fontIdx: 0, align: 'center', effectIdx: 0,
         mediaUrl: null, videoMeta: null,
         caption: '', song: null,
         audience: 'public', allowComments: true
@@ -378,7 +391,8 @@
         songLabel: document.getElementById('song-label'),
         songIconWrap: document.getElementById('song-icon-wrap'),
         postBtn: document.getElementById('post-btn'),
-        emojiOverlay: document.getElementById('emoji-modal-overlay')
+        emojiOverlay: document.getElementById('emoji-modal-overlay'),
+        fxBtn: document.getElementById('fx-btn')
     };
 
     function triggerHaptic() {
@@ -462,6 +476,13 @@
             if (e.target === els.emojiOverlay) closeEmojiPicker();
         });
 
+        // HANDLE DEVICE BACK BUTTON FOR EMOJI PICKER
+        window.addEventListener('popstate', (e) => {
+            if (els.emojiOverlay.classList.contains('open')) {
+                closeEmojiPicker(true);
+            }
+        });
+
         loadDraft();
         autoResizeTextarea(); // Initialize correct height if draft loaded
     }
@@ -470,10 +491,14 @@
     function openEmojiPicker() {
         triggerHaptic();
         els.emojiOverlay.classList.add('open');
+        window.history.pushState({ emojiPickerOpen: true }, "");
     }
     
-    function closeEmojiPicker() {
+    function closeEmojiPicker(fromHistory = false) {
         els.emojiOverlay.classList.remove('open');
+        if (!fromHistory && window.history.state && window.history.state.emojiPickerOpen) {
+            window.history.back();
+        }
     }
 
     // --- CORE LOGIC ---
@@ -537,6 +562,19 @@
         els.textPreview.style.fontFamily = fonts[state.fontIdx];
         els.textPreview.style.textAlign = state.align;
         els.textPreview.style.color = '#fff'; 
+        
+        // Reset and Apply Effect Class
+        els.textPreview.className = '';
+        const currentEffect = effects[state.effectIdx];
+        if (currentEffect && currentEffect.class) {
+            els.textPreview.classList.add(currentEffect.class);
+        }
+        
+        // Update Effect Button UI
+        if (els.fxBtn) {
+            els.fxBtn.style.background = state.effectIdx !== 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0,0,0,0.6)';
+            els.fxBtn.style.color = state.effectIdx !== 0 ? 'var(--accent)' : '#fff';
+        }
     }
 
     function toggleAlign() {
@@ -547,6 +585,14 @@
         state.align = alignments[(curr + 1) % 3];
         document.getElementById('align-icon').innerText = icons[(curr + 1) % 3];
         updateTextVisuals(); saveDraft();
+    }
+
+    // NEW FUNCTION: Toggle Text Effects
+    function toggleEffect() {
+        triggerHaptic();
+        state.effectIdx = (state.effectIdx + 1) % effects.length;
+        updateTextVisuals(); 
+        saveDraft();
     }
 
     function toggleAudience() {
@@ -670,6 +716,7 @@
                 payload.bgColor = bgColors[state.colorIdx];
                 payload.font = fonts[state.fontIdx];
                 payload.align = state.align;
+                payload.effect = effects[state.effectIdx].name; // Added Effect Export
             } else {
                 payload.mediaUrl = state.mediaUrl;
                 if (state.mode === 'video') payload.videoMeta = state.videoMeta;
