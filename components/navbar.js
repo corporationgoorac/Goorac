@@ -2,9 +2,9 @@
 
 /**
  * MainNavbar Component
- * A professional, Instagram-style bottom navigation bar.
+ * A professional, sleek bottom navigation bar.
  * Features:
- * - Glassmorphism & adaptive dark/light mode
+ * - Premium Glassmorphism & adaptive dark/light mode
  * - Mobile safe-area support for modern smartphones (notch/home indicator)
  * - Dynamic active states and high-fidelity micro-animations
  * - MutationObserver to automatically hide during active calls
@@ -52,13 +52,11 @@ class MainNavbar extends HTMLElement {
             :host {
                 display: block;
                 /* Light Mode (Default) Variables */
-                --nav-bg: rgba(255, 255, 255, 0.95);
-                --nav-border: rgba(0, 0, 0, 0.08);
-                --icon-inactive: #8e8e93; /* Subtle gray for inactive items */
-                --icon-active: #000000;   /* High contrast for active items */
-                --add-btn-bg: transparent;
-                --add-btn-border: #000000;
-                --pulse-color: #00d2ff;   /* Using your --accent color for the pulse */
+                --nav-bg: rgba(255, 255, 255, 0.90);
+                --nav-border: rgba(0, 0, 0, 0.06);
+                --icon-inactive: #9aa0a6; /* Sleek, professional gray */
+                --icon-active: #202124;   /* Deep slate for active items */
+                --pulse-color: #00d2ff;   /* Accent color for the pulse */
                 --nav-height: 60px;
                 --safe-area-bottom: env(safe-area-inset-bottom, 0px);
                 
@@ -70,11 +68,11 @@ class MainNavbar extends HTMLElement {
             /* Dark Mode Variables */
             @media (prefers-color-scheme: dark) {
                 :host {
-                    --nav-bg: rgba(18, 18, 18, 0.95);
-                    --nav-border: rgba(255, 255, 255, 0.1);
-                    --icon-inactive: #8e8e93;
-                    --icon-active: #ffffff;
-                    --add-btn-border: #ffffff;
+                    --nav-bg: rgba(15, 15, 15, 0.90);
+                    --nav-border: rgba(255, 255, 255, 0.08);
+                    --icon-inactive: #8ab4f8; /* Muted cool tone for dark mode inactive */
+                    --icon-inactive: #757575; /* Professional gray */
+                    --icon-active: #ffffff;   /* Crisp white for active */
                     --pulse-color: #00d2ff;
                 }
             }
@@ -86,7 +84,6 @@ class MainNavbar extends HTMLElement {
             .nav-hidden {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                /* Sinks downwards instead of backwards for a cleaner exit */
                 transform: translate(-50%, calc(100% + 20px)) !important; 
             }
 
@@ -109,18 +106,15 @@ class MainNavbar extends HTMLElement {
                 height: calc(var(--nav-height) + var(--safe-area-bottom));
                 padding-bottom: var(--safe-area-bottom); /* iOS Home Bar padding */
                 
-                /* Glassmorphism & Background */
+                /* High-End Glassmorphism */
                 background: var(--nav-bg);
-                backdrop-filter: blur(20px) saturate(180%);
-                -webkit-backdrop-filter: blur(20px) saturate(180%);
+                backdrop-filter: blur(24px) saturate(150%);
+                -webkit-backdrop-filter: blur(24px) saturate(150%);
                 
-                /* Borders & Shadows (Instagram style is very flat with a subtle top border) */
                 border-top: 1px solid var(--nav-border);
-                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.02);
+                box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
                 
-                /* Z-INDEX MANAGEMENT 
-                   Set to 990 so it stays above standard content but naturally 
-                   falls behind modals, dropdowns, and overlays (which usually use 1000+) */
+                /* Z-INDEX MANAGEMENT */
                 z-index: 990;
                 
                 /* Animation */
@@ -129,15 +123,15 @@ class MainNavbar extends HTMLElement {
                             background-color 0.3s ease;
             }
 
-            /* Tablet/Desktop optimization: Float it slightly like a dock if screen is wide */
+            /* Tablet/Desktop optimization */
             @media (min-width: 601px) {
                 .bottom-nav {
-                    bottom: 20px;
-                    border-radius: 30px;
+                    bottom: 24px;
+                    border-radius: 32px;
                     border: 1px solid var(--nav-border);
                     height: var(--nav-height);
                     padding-bottom: 0;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+                    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
                 }
             }
 
@@ -154,7 +148,6 @@ class MainNavbar extends HTMLElement {
                 justify-content: center;
                 flex: 1;
                 height: 100%;
-                /* Remove tap highlight on mobile for cleaner feel */
                 -webkit-tap-highlight-color: transparent; 
                 cursor: pointer;
             }
@@ -163,29 +156,25 @@ class MainNavbar extends HTMLElement {
                MATERIAL ICON STYLING & ANIMATIONS
                ========================================================================== */
             .nav-item .material-icons-round {
-                font-size: 28px;
+                font-size: 26px; /* Sleeker size */
                 transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
                             color 0.3s ease,
                             filter 0.3s ease;
             }
 
-            /* Hidden text labels for screen readers. 
-               Instagram typically does not show text on the bottom bar. */
+            /* Hidden text labels for a clean, minimalist professional look */
             .nav-item span:not(.material-icons-round) {
-                display: none; /* Visually hidden to match Instagram style */
+                display: none; 
             }
 
-            /* ACTIVE STATE 
-               When the URL matches, the icon becomes darker/lighter (theme dependent)
-               and visually bolder, exactly like Instagram's active state. */
+            /* ACTIVE STATE */
             .nav-item.active .material-icons-round {
                 color: var(--icon-active);
                 transform: scale(1.15); /* Subtle pop effect */
-                filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.1));
+                filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15)); /* Elegant shadow */
             }
 
-            /* HAPTIC FEEDBACK (CSS visual simulation)
-               When actively pressing down on an icon */
+            /* HAPTIC FEEDBACK (CSS visual simulation) */
             .nav-item:active .material-icons-round {
                 transform: scale(0.9);
                 opacity: 0.7;
@@ -194,13 +183,8 @@ class MainNavbar extends HTMLElement {
             /* ==========================================================================
                SPECIFIC ICON OVERRIDES
                ========================================================================== */
-            
-            /* 1. Add Customer (Center Button) Styling */
-            .nav-item.add-btn {
-                flex: 1.2; /* Slightly wider hit area */
-            }
 
-            /* 2. Pulse / Graphical Wave Icon Styling (From your Home Page) */
+            /* 2. Pulse / Graphical Wave Icon Styling */
             .pulse-icon-container {
                 position: relative;
                 display: flex;
@@ -216,7 +200,7 @@ class MainNavbar extends HTMLElement {
 
             /* Stronger glow when active */
             .nav-item.active .pulse-graphic {
-                filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
+                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
                 animation: pulse-skel-active 2s infinite ease-in-out;
             }
 
@@ -228,7 +212,7 @@ class MainNavbar extends HTMLElement {
 
             @keyframes pulse-skel-active {
                 0% { opacity: 0.8; transform: scale(1.1); }
-                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.8)); }
+                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(0, 210, 255, 0.8)); }
                 100% { opacity: 0.8; transform: scale(1.1); }
             }
 
@@ -246,12 +230,12 @@ class MainNavbar extends HTMLElement {
                 <span>Messages</span>
             </a>
             
-            <a href="add-customer.html" class="nav-item add-btn" aria-label="Add Customer">
-                <span class="material-icons-round">add_box</span>
-                <span>Add Customer</span>
+            <a href="add-contact.html" class="nav-item" aria-label="Add Contact">
+                <span class="material-icons-round">person_add</span>
+                <span>Add Contact</span>
             </a>
             
-            <a href="pulse.html" class="nav-item" aria-label="Pulse">
+            <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
                 <div class="pulse-icon-container">
                     <span class="material-icons-round pulse-graphic">graphic_eq</span>
                 </div>
