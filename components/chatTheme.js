@@ -3,7 +3,7 @@
     window.chatTheme = {
         bg: "#000000",
         bgGradient: "radial-gradient(circle at 50% 30%, #111111 0%, #000000 70%)",
-        headerBg: "rgba(10, 10, 10, 0.90)",
+        headerBg: "#0A0A0A",
         headerBlur: "blur(25px)",
         accent: "#FF6D00",
         accentDark: "#E65100",
@@ -20,7 +20,7 @@
         text: "#ffffff",
         textSecondary: "#a1a1a1",
         textMuted: "#666666",
-        mobileToolbarBg: "rgba(15, 15, 15, 0.85)"
+        mobileToolbarBg: "#0A0A0A"
     };
 
     // Apply the theme directly to the root CSS variables
