@@ -38,6 +38,9 @@ class ViewMoments extends HTMLElement {
         this.render();
         this.setupEventListeners();
         
+        // 🚀 INSTANT LOAD: Render from cache immediately (0ms) before network requests block it
+        this.loadCachedMoments();
+        
         this.auth.onAuthStateChanged(async (user) => {
             if (user) {
                 const doc = await this.db.collection('users').doc(user.uid).get();
@@ -80,13 +83,10 @@ class ViewMoments extends HTMLElement {
         // 1. Fetch Mutuals & CF
         await this.fetchRelations(uid);
         
-        // 2. Load Local Cache instantly
-        this.loadCachedMoments();
-
-        // 3. Setup Intersection Observer for Music & Seen Tracking
+        // 2. Setup Intersection Observer for Music & Seen Tracking
         this.setupMediaObserver();
 
-        // 4. Fetch Fresh Data (Batch of 6)
+        // 3. Fetch Fresh Data (Batch of 6)
         this.fetchMoments();
     }
 
