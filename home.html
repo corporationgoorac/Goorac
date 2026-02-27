@@ -16,7 +16,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
     <script src="components/navbar.js" defer></script>
     
@@ -217,6 +217,15 @@
             overflow: hidden; 
             text-overflow: ellipsis;
             text-align: center;
+        }
+
+        /* Added Note Bubble Style */
+        .note-bubble {
+            position: absolute; top: -5px; right: -5px; background: var(--surface);
+            border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px;
+            font-size: 0.65rem; max-width: 65px; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; z-index: 2;
+            color: #fff; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
         /* ==========================================================================
@@ -519,6 +528,7 @@
 
 <div id="notes-container">
     <div class="note-item" id="my-note-btn">
+        <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
         <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp">
         <span class="note-username" id="my-note-text">You</span>
     </div>
@@ -703,6 +713,7 @@
                 listenNotifications(user.uid);
                 checkMyMoment(user.uid, userData.photoURL);
                 checkMyNote(user.uid);
+                listenAllNotes(user.uid); // Added this to fetch others
             } else {
                 window.location.href = "setup.html";
             }
@@ -711,14 +722,18 @@
         }
     });
 
+    // --- FIX FOR YOUR NOTE ---
     function checkMyNote(uid) {
         db.collection('notes').doc(uid).onSnapshot(doc => {
             const textEl = document.getElementById('my-note-text');
+            const previewEl = document.getElementById('my-note-preview');
             const btn = document.getElementById('my-note-btn');
             
             if (doc.exists && doc.data().text) {
                 // You have a note
                 textEl.innerText = "You";
+                previewEl.innerText = doc.data().text;
+                previewEl.style.display = 'block';
                 btn.onclick = () => {
                     const nv = document.getElementById('note-viewer');
                     if(nv) nv.open(uid);
@@ -726,10 +741,40 @@
             } else {
                 // You don't have a note
                 textEl.innerText = "What's on your mind?";
+                previewEl.style.display = 'none';
                 btn.onclick = () => { 
                     window.location.href = 'notes.html'; 
                 };
             }
+        });
+    }
+
+    // --- FETCHING OTHER USER NOTES ---
+    function listenAllNotes(uid) {
+        db.collection('notes').limit(20).onSnapshot(snap => {
+            const container = document.getElementById('notes-container');
+            // Clear existing others
+            const others = container.querySelectorAll('.note-item:not(#my-note-btn)');
+            others.forEach(el => el.remove());
+
+            snap.forEach(doc => {
+                const data = doc.data();
+                // Don't duplicate yourself in the list
+                if (doc.id === uid) return;
+
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'note-item';
+                noteDiv.innerHTML = `
+                    <div class="note-bubble">${data.text || ''}</div>
+                    <img src="${data.photoURL || 'https://via.placeholder.com/150'}" class="note-pfp">
+                    <span class="note-username">${data.displayName || 'User'}</span>
+                `;
+                noteDiv.onclick = () => {
+                    const nv = document.getElementById('note-viewer');
+                    if(nv) nv.open(doc.id);
+                };
+                container.appendChild(noteDiv);
+            });
         });
     }
 
