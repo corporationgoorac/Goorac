@@ -47,34 +47,20 @@ class MainNavbar extends HTMLElement {
         this.innerHTML = `
         <style>
             /* ==========================================================================
-               CSS VARIABLES & THEMING
+               CSS VARIABLES & THEMING (Matching Home Page)
                ========================================================================== */
             :host {
                 display: block;
-                /* Light Mode (Default) Variables */
-                --nav-bg: rgba(255, 255, 255, 0.90);
-                --nav-border: rgba(0, 0, 0, 0.06);
-                --icon-inactive: #9aa0a6; /* Sleek, professional gray */
-                --icon-active: #202124;   /* Deep slate for active items */
-                --pulse-color: #00d2ff;   /* Accent color for the pulse */
-                --nav-height: 60px;
+                --nav-bg: rgba(5, 5, 5, 0.85);
+                --accent: #00d2ff;
+                --accent-dim: rgba(0, 210, 255, 0.1);
+                --text-dim: #888888;
+                --nav-height: 65px;
                 --safe-area-bottom: env(safe-area-inset-bottom, 0px);
                 
                 /* Transition definitions for smooth states */
                 transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
                             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            }
-
-            /* Dark Mode Variables */
-            @media (prefers-color-scheme: dark) {
-                :host {
-                    --nav-bg: rgba(15, 15, 15, 0.90);
-                    --nav-border: rgba(255, 255, 255, 0.08);
-                    --icon-inactive: #8ab4f8; /* Muted cool tone for dark mode inactive */
-                    --icon-inactive: #757575; /* Professional gray */
-                    --icon-active: #ffffff;   /* Crisp white for active */
-                    --pulse-color: #00d2ff;
-                }
             }
 
             /* ==========================================================================
@@ -84,136 +70,87 @@ class MainNavbar extends HTMLElement {
             .nav-hidden {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                transform: translate(-50%, calc(100% + 20px)) !important; 
+                transform: translateY(100%) !important; 
             }
 
             /* ==========================================================================
-               MAIN NAV CONTAINER
+               MAIN NAV CONTAINER (Mirroring .native-bottom-nav)
                ========================================================================== */
             .bottom-nav {
-                /* Positioning */
                 position: fixed;
                 bottom: 0;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 100%;
-                max-width: 600px; /* Constrain width on tablets/desktops */
-                
-                /* Layout */
+                left: 0;
+                right: 0;
+                height: calc(var(--nav-height) + var(--safe-area-bottom));
+                background: var(--nav-bg);
+                backdrop-filter: blur(25px);
+                -webkit-backdrop-filter: blur(25px);
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
                 display: flex;
                 justify-content: space-around;
                 align-items: center;
-                height: calc(var(--nav-height) + var(--safe-area-bottom));
-                padding-bottom: var(--safe-area-bottom); /* iOS Home Bar padding */
-                
-                /* High-End Glassmorphism */
-                background: var(--nav-bg);
-                backdrop-filter: blur(24px) saturate(150%);
-                -webkit-backdrop-filter: blur(24px) saturate(150%);
-                
-                border-top: 1px solid var(--nav-border);
-                box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
-                
-                /* Z-INDEX MANAGEMENT */
-                z-index: 990;
-                
-                /* Animation */
-                transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                            opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                            background-color 0.3s ease;
-            }
-
-            /* Tablet/Desktop optimization */
-            @media (min-width: 601px) {
-                .bottom-nav {
-                    bottom: 24px;
-                    border-radius: 32px;
-                    border: 1px solid var(--nav-border);
-                    height: var(--nav-height);
-                    padding-bottom: 0;
-                    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
-                }
+                padding-bottom: var(--safe-area-bottom);
+                z-index: 9999; /* Absolute priority matching hardcoded version */
+                transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
             }
 
             /* ==========================================================================
-               NAVIGATION ITEMS
+               NAVIGATION ITEMS (Mirroring .nav-item)
                ========================================================================== */
             .nav-item {
-                position: relative;
+                color: var(--text-dim);
                 text-decoration: none;
-                color: var(--icon-inactive);
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                flex: 1;
-                height: 100%;
-                -webkit-tap-highlight-color: transparent; 
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+                -webkit-tap-highlight-color: transparent;
                 cursor: pointer;
             }
 
             /* ==========================================================================
-               MATERIAL ICON STYLING & ANIMATIONS
+               MATERIAL ICON STYLING
                ========================================================================== */
             .nav-item .material-icons-round {
-                font-size: 26px; /* Sleeker size */
-                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-                            color 0.3s ease,
-                            filter 0.3s ease;
+                font-size: 26px;
+                transition: 0.2s;
             }
 
-            /* Hidden text labels for a clean, minimalist professional look */
-            .nav-item span:not(.material-icons-round) {
-                display: none; 
+            /* Active Item Styling */
+            .nav-item.active {
+                color: var(--accent);
             }
 
-            /* ACTIVE STATE */
             .nav-item.active .material-icons-round {
-                color: var(--icon-active);
-                transform: scale(1.15); /* Subtle pop effect */
-                filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15)); /* Elegant shadow */
+                filter: drop-shadow(0px 0px 8px var(--accent-dim));
             }
 
-            /* HAPTIC FEEDBACK (CSS visual simulation) */
-            .nav-item:active .material-icons-round {
+            /* Press feedback */
+            .nav-item:active {
+                background: rgba(255, 255, 255, 0.05);
                 transform: scale(0.9);
-                opacity: 0.7;
+            }
+
+            /* Hide text spans visually like hardcoded version */
+            .nav-item span:not(.material-icons-round) {
+                display: none;
             }
 
             /* ==========================================================================
-               SPECIFIC ICON OVERRIDES
+               PULSE ANIMATION (Matching your Home Page requirement)
                ========================================================================== */
-
-            /* 2. Pulse / Graphical Wave Icon Styling */
-            .pulse-icon-container {
-                position: relative;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            /* The animated pulse effect for the graphic_eq icon */
-            .nav-item .pulse-graphic {
-                color: var(--pulse-color);
-                animation: pulse-skel 2s infinite ease-in-out;
-            }
-
-            /* Stronger glow when active */
-            .nav-item.active .pulse-graphic {
-                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
-                animation: pulse-skel-active 2s infinite ease-in-out;
+            .pulse-graphic {
+                animation: pulse-skel 2s infinite;
             }
 
             @keyframes pulse-skel {
-                0% { opacity: 0.7; transform: scale(0.95); }
-                50% { opacity: 1; transform: scale(1.05); }
-                100% { opacity: 0.7; transform: scale(0.95); }
-            }
-
-            @keyframes pulse-skel-active {
-                0% { opacity: 0.8; transform: scale(1.1); }
-                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(0, 210, 255, 0.8)); }
-                100% { opacity: 0.8; transform: scale(1.1); }
+                0% { opacity: 0.6; }
+                50% { opacity: 1; }
+                100% { opacity: 0.6; }
             }
 
         </style>
@@ -235,10 +172,8 @@ class MainNavbar extends HTMLElement {
                 <span>Add Contact</span>
             </a>
             
-            <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
-                <div class="pulse-icon-container">
-                    <span class="material-icons-round pulse-graphic">graphic_eq</span>
-                </div>
+            <a href="pulseLobby.html" class="nav-item" aria-label="Pulse">
+                <span class="material-icons-round pulse-graphic" style="color: var(--accent);">graphic_eq</span>
                 <span>Pulse</span>
             </a>
             
@@ -263,11 +198,10 @@ class MainNavbar extends HTMLElement {
         
         links.forEach(link => {
             const href = link.getAttribute('href');
-            // Check if the link's href matches the current page file
             if (page === href) {
                 link.classList.add('active');
                 
-                // Professional Touch: Swap out the outlined chat bubble for the filled one when active
+                // Swap to filled icon for Messages if active
                 const icon = link.querySelector('.material-icons-round');
                 if (icon && icon.innerText === 'chat_bubble_outline') {
                     icon.innerText = 'chat_bubble';
@@ -285,10 +219,8 @@ class MainNavbar extends HTMLElement {
     _setupVisibilityToggle() {
         const navContainer = this.querySelector('#main-nav-container');
         
-        // 1. Check function for call screen presence and visibility status
         const checkVisibility = () => {
             const callScreen = document.getElementById('call-screen');
-            // If the element exists and is displaying flex or has 'active' class
             if (callScreen && (callScreen.style.display === 'flex' || callScreen.classList.contains('active'))) {
                 navContainer.classList.add('nav-hidden');
             } else {
@@ -296,23 +228,18 @@ class MainNavbar extends HTMLElement {
             }
         };
 
-        // 2. Use a MutationObserver to watch for display/class changes on the call-screen
         const observer = new MutationObserver(() => {
             checkVisibility();
         });
 
-        // Start observing once the page is fully loaded
-        // Timeout ensures other DOM elements have finished mounting
         setTimeout(() => {
             const target = document.getElementById('call-screen');
             if (target) {
-                // Watch for changes in the 'style' and 'class' attributes
                 observer.observe(target, { 
                     attributes: true, 
                     attributeFilter: ['style', 'class'] 
                 });
             }
-            // Perform an initial check in case the call screen started open
             checkVisibility();
         }, 1000);
     }
