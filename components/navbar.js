@@ -47,45 +47,43 @@ class MainNavbar extends HTMLElement {
         this.innerHTML = `
         <style>
             /* ==========================================================================
-               CSS VARIABLES & THEMING (Synced with home.html hardcoded styles)
+               CSS VARIABLES & THEMING
                ========================================================================== */
             :host {
                 display: block;
-                /* Light Mode (Default) Variables */
-                --nav-bg: rgba(255, 255, 255, 0.90);
-                --nav-border: rgba(0, 0, 0, 0.06);
-                --icon-inactive: #9aa0a6; 
-                --icon-active: #202124;   
+                /* Light Mode (Refined) */
+                --nav-bg: rgba(255, 255, 255, 0.75);
+                --nav-border: rgba(0, 0, 0, 0.08);
+                --icon-inactive: #8e8e93; 
+                --icon-active: #007aff;   
                 --pulse-color: #00d2ff;   
-                --nav-height: 60px;
+                --nav-height: 64px;
                 --safe-area-bottom: env(safe-area-inset-bottom, 0px);
                 
-                transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
-                            transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                            transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
-            /* Dark Mode Variables (Synced with home.html:50-51) */
+            /* Dark Mode Variables */
             @media (prefers-color-scheme: dark) {
                 :host {
-                    --nav-bg: rgba(15, 15, 15, 0.90);
-                    --nav-border: rgba(255, 255, 255, 0.08);
-                    --icon-inactive: #757575; 
-                    --icon-active: #ffffff;   
+                    --nav-bg: rgba(20, 20, 20, 0.80);
+                    --nav-border: rgba(255, 255, 255, 0.12);
+                    --icon-inactive: #98989d; 
+                    --icon-active: #0a84ff;   
                     --pulse-color: #00d2ff;
                 }
             }
 
-            /* ==========================================================================
-               VISIBILITY TOGGLE CLASS (For Call Screen)
-               ========================================================================== */
+            /* Visibility Logic */
             .nav-hidden {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                transform: translate(-50%, calc(100% + 20px)) !important; 
+                transform: translate(-50%, 100px) !important; 
             }
 
             /* ==========================================================================
-               MAIN NAV CONTAINER (Synced with .native-bottom-nav:191)
+               MAIN NAV CONTAINER (Enhanced Glassmorphism)
                ========================================================================== */
             .bottom-nav {
                 position: fixed;
@@ -101,35 +99,35 @@ class MainNavbar extends HTMLElement {
                 height: calc(var(--nav-height) + var(--safe-area-bottom));
                 padding-bottom: var(--safe-area-bottom); 
                 
-                /* High-End Glassmorphism (Synced with home.html:205) */
                 background: var(--nav-bg);
-                backdrop-filter: blur(24px) saturate(150%);
-                -webkit-backdrop-filter: blur(24px) saturate(150%);
+                backdrop-filter: blur(28px) saturate(180%) contrast(100%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%) contrast(100%);
                 
-                border-top: 1px solid var(--nav-border);
-                box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
+                border-top: 0.5px solid var(--nav-border);
+                box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.04);
                 
-                z-index: 990;
+                z-index: 9999; /* Ensure priority */
                 
-                /* Animation Timing (Synced with home.html:213) */
-                transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                            opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                            background-color 0.3s ease;
+                transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                            opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                            background-color 0.4s ease;
             }
 
+            /* Floating Tablet/Desktop Mode */
             @media (min-width: 601px) {
                 .bottom-nav {
                     bottom: 24px;
-                    border-radius: 32px;
+                    border-radius: 40px;
                     border: 1px solid var(--nav-border);
                     height: var(--nav-height);
                     padding-bottom: 0;
-                    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
+                    width: 90%;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
                 }
             }
 
             /* ==========================================================================
-               NAVIGATION ITEMS (Synced with .nav-item:232)
+               NAVIGATION ITEMS
                ========================================================================== */
             .nav-item {
                 position: relative;
@@ -143,61 +141,96 @@ class MainNavbar extends HTMLElement {
                 height: 100%;
                 -webkit-tap-highlight-color: transparent; 
                 cursor: pointer;
+                transition: color 0.3s ease;
             }
 
             .nav-item .material-icons-round {
-                font-size: 26px; 
-                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                font-size: 28px; 
+                transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
                             color 0.3s ease,
                             filter 0.3s ease;
             }
 
             .nav-item span:not(.material-icons-round) {
-                display: none; 
+                font-size: 10px;
+                font-weight: 600;
+                margin-top: 4px;
+                opacity: 0;
+                transform: translateY(4px);
+                transition: all 0.3s ease;
             }
 
-            /* ACTIVE STATE (Synced with home.html:253-257) */
-            .nav-item.active .material-icons-round {
+            /* ACTIVE STATE - Refined Scaling and Glow */
+            .nav-item.active {
                 color: var(--icon-active);
-                transform: scale(1.15); 
-                filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15)); 
             }
 
+            .nav-item.active .material-icons-round {
+                transform: translateY(-2px) scale(1.1); 
+                filter: drop-shadow(0px 2px 4px rgba(0,122,255,0.3)); 
+            }
+
+            .nav-item.active span:not(.material-icons-round) {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Micro-Interaction on Tap */
             .nav-item:active .material-icons-round {
-                transform: scale(0.9);
-                opacity: 0.7;
+                transform: scale(0.85);
+                opacity: 0.6;
             }
 
             /* ==========================================================================
-               SPECIFIC ICON OVERRIDES (Synced with home.html:265-285)
+               PULSE ICON ENHANCEMENTS
                ========================================================================== */
             .pulse-icon-container {
                 position: relative;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                height: 32px;
+                width: 32px;
             }
 
             .nav-item .pulse-graphic {
                 color: var(--pulse-color);
-                animation: pulse-skel 2s infinite ease-in-out;
+                animation: pulse-skel 2.5s infinite ease-in-out;
             }
 
             .nav-item.active .pulse-graphic {
-                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
-                animation: pulse-skel-active 2s infinite ease-in-out;
+                filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
+                animation: pulse-skel-active 1.5s infinite ease-in-out;
             }
 
             @keyframes pulse-skel {
-                0% { opacity: 0.6; }
-                50% { opacity: 1; }
-                100% { opacity: 0.6; }
+                0%, 100% { opacity: 0.5; transform: scale(1); }
+                50% { opacity: 0.9; transform: scale(1.05); }
             }
 
             @keyframes pulse-skel-active {
-                0% { opacity: 0.8; transform: scale(1.1); }
-                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(0, 210, 255, 0.8)); }
-                100% { opacity: 0.8; transform: scale(1.1); }
+                0% { transform: scale(1.1); filter: brightness(1); }
+                50% { transform: scale(1.3); filter: brightness(1.3) drop-shadow(0 0 15px rgba(0, 210, 255, 0.8)); }
+                100% { transform: scale(1.1); filter: brightness(1); }
+            }
+
+            /* Subtle Active Indicator Dot */
+            .nav-item::after {
+                content: '';
+                position: absolute;
+                bottom: 8px;
+                width: 4px;
+                height: 4px;
+                background: var(--icon-active);
+                border-radius: 50%;
+                opacity: 0;
+                transform: scale(0);
+                transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+            .nav-item.active::after {
+                opacity: 1;
+                transform: scale(1);
+                bottom: 6px;
             }
 
         </style>
@@ -209,11 +242,11 @@ class MainNavbar extends HTMLElement {
             </a>
             <a href="messages.html" class="nav-item" aria-label="Messages">
                 <span class="material-icons-round">chat_bubble_outline</span>
-                <span>Messages</span>
+                <span>Chats</span>
             </a>
             <a href="add-contact.html" class="nav-item" aria-label="Add Contact">
                 <span class="material-icons-round">person_add</span>
-                <span>Add Contact</span>
+                <span>Invite</span>
             </a>
             <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
                 <div class="pulse-icon-container">
