@@ -21,14 +21,13 @@ class MainNavbar extends HTMLElement {
         // (Retained exactly as requested)
         localStorage.setItem('goorac_navbar_component', this.constructor.toString());
 
-        // Import Lucide Icons dynamically if not already present
-        if (!document.getElementById('lucide-icons-script')) {
-            const script = document.createElement('script');
-            script.id = 'lucide-icons-script';
-            script.src = 'https://unpkg.com/lucide@latest';
-            // Render icons once the script loads
-            script.onload = () => lucide.createIcons();
-            document.head.appendChild(script);
+        // Import Google Material Icons Round dynamically if not already present
+        if (!document.getElementById('material-icons-round-css')) {
+            const link = document.createElement('link');
+            link.id = 'material-icons-round-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons+Round';
+            document.head.appendChild(link);
         }
 
         // Render the HTML and CSS
@@ -59,7 +58,7 @@ class MainNavbar extends HTMLElement {
                 --icon-active: #000000;   /* High contrast for active items */
                 --add-btn-bg: transparent;
                 --add-btn-border: #000000;
-                --pulse-color: #ff3b30;   /* Vibrant color for the pulse/wave */
+                --pulse-color: #00d2ff;   /* Using your --accent color for the pulse */
                 --nav-height: 60px;
                 --safe-area-bottom: env(safe-area-inset-bottom, 0px);
                 
@@ -76,7 +75,7 @@ class MainNavbar extends HTMLElement {
                     --icon-inactive: #8e8e93;
                     --icon-active: #ffffff;
                     --add-btn-border: #ffffff;
-                    --pulse-color: #ff453a;
+                    --pulse-color: #00d2ff;
                 }
             }
 
@@ -161,37 +160,34 @@ class MainNavbar extends HTMLElement {
             }
 
             /* ==========================================================================
-               ICON STYLING & ANIMATIONS
+               MATERIAL ICON STYLING & ANIMATIONS
                ========================================================================== */
-            .nav-item i {
-                width: 26px;
-                height: 26px;
-                /* Lucide icons rely on stroke-width. 1.5 is standard, 2.5 is active/bold */
-                stroke-width: 1.8px; 
+            .nav-item .material-icons-round {
+                font-size: 28px;
                 transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
                             color 0.3s ease,
-                            stroke-width 0.3s ease;
+                            filter 0.3s ease;
             }
 
             /* Hidden text labels for screen readers. 
                Instagram typically does not show text on the bottom bar. */
-            .nav-item span {
+            .nav-item span:not(.material-icons-round) {
                 display: none; /* Visually hidden to match Instagram style */
             }
 
             /* ACTIVE STATE 
                When the URL matches, the icon becomes darker/lighter (theme dependent)
                and visually bolder, exactly like Instagram's active state. */
-            .nav-item.active i {
+            .nav-item.active .material-icons-round {
                 color: var(--icon-active);
-                stroke-width: 2.8px;
-                transform: scale(1.1); /* Subtle pop effect */
+                transform: scale(1.15); /* Subtle pop effect */
+                filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.1));
             }
 
             /* HAPTIC FEEDBACK (CSS visual simulation)
                When actively pressing down on an icon */
-            .nav-item:active i {
-                transform: scale(0.85);
+            .nav-item:active .material-icons-round {
+                transform: scale(0.9);
                 opacity: 0.7;
             }
 
@@ -200,18 +196,11 @@ class MainNavbar extends HTMLElement {
                ========================================================================== */
             
             /* 1. Add Customer (Center Button) Styling */
-            /* In Instagram, this is a clean square with a plus inside. 
-               Using lucide "plus-square" achieves this natively, but we can enhance it. */
             .nav-item.add-btn {
                 flex: 1.2; /* Slightly wider hit area */
             }
-            
-            .nav-item.active.add-btn i {
-                /* Even bolder for the action button if active */
-                stroke-width: 3px;
-            }
 
-            /* 2. Pulse / Graphical Wave Icon Styling */
+            /* 2. Pulse / Graphical Wave Icon Styling (From your Home Page) */
             .pulse-icon-container {
                 position: relative;
                 display: flex;
@@ -219,31 +208,28 @@ class MainNavbar extends HTMLElement {
                 justify-content: center;
             }
 
-            /* Add a subtle glowing dot to the pulse icon if it's active */
-            .nav-item.active i[data-lucide="activity"] {
+            /* The animated pulse effect for the graphic_eq icon */
+            .nav-item .pulse-graphic {
                 color: var(--pulse-color);
-                filter: drop-shadow(0 2px 8px rgba(255, 59, 48, 0.3));
+                animation: pulse-skel 2s infinite ease-in-out;
             }
 
-            /* Optional animated heartbeat ring for the pulse icon when active */
-            .nav-item.active i[data-lucide="activity"]::after {
-                content: '';
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 100%;
-                height: 100%;
-                transform: translate(-50%, -50%);
-                border-radius: 50%;
-                border: 1px solid var(--pulse-color);
-                animation: heartbeatRing 2s infinite cubic-bezier(0.16, 1, 0.3, 1);
-                pointer-events: none;
+            /* Stronger glow when active */
+            .nav-item.active .pulse-graphic {
+                filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
+                animation: pulse-skel-active 2s infinite ease-in-out;
             }
 
-            @keyframes heartbeatRing {
-                0% { width: 26px; height: 26px; opacity: 0.8; }
-                50% { width: 45px; height: 45px; opacity: 0; }
-                100% { width: 45px; height: 45px; opacity: 0; }
+            @keyframes pulse-skel {
+                0% { opacity: 0.7; transform: scale(0.95); }
+                50% { opacity: 1; transform: scale(1.05); }
+                100% { opacity: 0.7; transform: scale(0.95); }
+            }
+
+            @keyframes pulse-skel-active {
+                0% { opacity: 0.8; transform: scale(1.1); }
+                50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.8)); }
+                100% { opacity: 0.8; transform: scale(1.1); }
             }
 
         </style>
@@ -251,29 +237,29 @@ class MainNavbar extends HTMLElement {
         <nav class="bottom-nav" id="main-nav-container" aria-label="Main Navigation">
             
             <a href="home.html" class="nav-item" aria-label="Home">
-                <i data-lucide="home"></i>
+                <span class="material-icons-round">home</span>
                 <span>Home</span>
             </a>
             
             <a href="messages.html" class="nav-item" aria-label="Messages">
-                <i data-lucide="send"></i>
+                <span class="material-icons-round">chat_bubble_outline</span>
                 <span>Messages</span>
             </a>
             
             <a href="add-customer.html" class="nav-item add-btn" aria-label="Add Customer">
-                <i data-lucide="plus-square"></i>
+                <span class="material-icons-round">add_box</span>
                 <span>Add Customer</span>
             </a>
             
             <a href="pulse.html" class="nav-item" aria-label="Pulse">
                 <div class="pulse-icon-container">
-                    <i data-lucide="activity"></i>
+                    <span class="material-icons-round pulse-graphic">graphic_eq</span>
                 </div>
                 <span>Pulse</span>
             </a>
             
             <a href="calls.html" class="nav-item" aria-label="Calls">
-                <i data-lucide="phone"></i>
+                <span class="material-icons-round">phone</span>
                 <span>Calls</span>
             </a>
 
@@ -296,15 +282,16 @@ class MainNavbar extends HTMLElement {
             // Check if the link's href matches the current page file
             if (page === href) {
                 link.classList.add('active');
+                
+                // Professional Touch: Swap out the outlined chat bubble for the filled one when active
+                const icon = link.querySelector('.material-icons-round');
+                if (icon && icon.innerText === 'chat_bubble_outline') {
+                    icon.innerText = 'chat_bubble';
+                }
             } else {
                 link.classList.remove('active');
             }
         });
-        
-        // Re-render Lucide icons so stroke widths apply correctly
-        if (window.lucide) {
-            lucide.createIcons();
-        }
     }
 
     /**
