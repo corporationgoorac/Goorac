@@ -2,8 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="manifest" href="/manifest.json">
-    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>New Moment | Goorac</title>
     
@@ -257,6 +255,9 @@
                 </button>
             </div>
             <div class="header-right">
+                <button class="header-icon-btn" id="header-song-btn" onclick="triggerHaptic(); document.getElementById('song-picker').open()" title="Add Music">
+                    <span class="material-icons-round" id="header-song-icon">music_note</span>
+                </button>
                 <button class="header-icon-btn" id="audience-toggle" onclick="toggleAudience()" title="Audience">
                     <span class="material-icons-round" id="aud-icon">public</span>
                 </button>
@@ -320,6 +321,7 @@
             </div>
         </div>
     </div>
+    <audio id="bg-audio" loop></audio>
     <song-picker id="song-picker"></song-picker>
     <close-friends-selector id="cf-selector"></close-friends-selector>
     <image-picker id="img-picker"></image-picker>
@@ -376,7 +378,9 @@
         songLabel: document.getElementById('song-label'),
         postBtn: document.getElementById('post-btn'),
         emojiOverlay: document.getElementById('emoji-modal-overlay'),
-        fxBtn: document.getElementById('fx-btn')
+        fxBtn: document.getElementById('fx-btn'),
+        bgAudio: document.getElementById('bg-audio'),
+        headerSongBtn: document.getElementById('header-song-btn')
     };
     function triggerHaptic() {
         if (navigator.vibrate) navigator.vibrate(15);
@@ -417,7 +421,18 @@
         els.textPreview.addEventListener('input', (e) => { state.text = e.target.innerText; saveDraft(); });
         
         // Listeners for Web Components
-        document.addEventListener('song-selected', (e) => { state.song = e.detail; updateSongUI(); saveDraft(); });
+        document.addEventListener('song-selected', (e) => { 
+            state.song = e.detail; 
+            updateSongUI(); 
+            saveDraft(); 
+            if (state.song && state.song.previewUrl) {
+                els.bgAudio.src = state.song.previewUrl;
+                els.bgAudio.play().catch(err => console.log("Audio play failed: ", err));
+            } else {
+                els.bgAudio.pause();
+                els.bgAudio.src = '';
+            }
+        });
         
         document.addEventListener('image-uploaded', (e) => {
             state.mediaUrl = e.detail.url; setMode('image');
@@ -536,6 +551,9 @@
         els.mediaBackdrop.style.display = 'none';
         els.textTools.style.display = 'none';
         els.canvasBg.style.background = '#121212';
+        state.song = null;
+        if(els.bgAudio) { els.bgAudio.pause(); els.bgAudio.src = ''; }
+        updateSongUI();
         saveDraft();
     }
     function updateTextVisuals() {
@@ -597,9 +615,11 @@
         if (state.song) {
             els.songBtn.classList.add('has-song');
             els.songLabel.innerText = `${state.song.trackName} • ${state.song.artistName}`;
+            if(els.headerSongBtn) els.headerSongBtn.classList.add('active');
         } else {
             els.songBtn.classList.remove('has-song');
             els.songLabel.innerText = "Add Music";
+            if(els.headerSongBtn) els.headerSongBtn.classList.remove('active');
         }
     }
     // --- DRAFT & VALIDATION ---
