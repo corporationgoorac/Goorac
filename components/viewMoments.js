@@ -16,6 +16,13 @@ class ViewMoments extends HTMLElement {
         // Audio & Observer
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
+        
+        // 🚀 NEW: Dedicated Audio Player for the Full-Screen Modal
+        this.modalAudioPlayer = new Audio();
+        this.modalAudioPlayer.loop = true;
+        this.isModalOpen = false;
+        this.lastClickTime = 0; // For double-tap detection
+        
         this.isMuted = true; 
         this.observer = null;
         this.seenTimers = {}; 
@@ -38,6 +45,9 @@ class ViewMoments extends HTMLElement {
         this.render();
         this.setupEventListeners();
         
+        // 🚀 INSTANT LOAD: Render from cache immediately (0ms) before network requests block it
+        this.loadCachedMoments();
+        
         this.auth.onAuthStateChanged(async (user) => {
             const cachedUid = localStorage.getItem('goorac_moments_last_uid');
             
@@ -48,8 +58,6 @@ class ViewMoments extends HTMLElement {
                     localStorage.setItem('goorac_moments_last_uid', user.uid);
                     this.moments = [];
                     this.renderFeed(); // clear UI
-                } else {
-                    this.loadCachedMoments(); // Safe to load
                 }
 
                 const doc = await this.db.collection('users').doc(user.uid).get();
@@ -93,6 +101,36 @@ class ViewMoments extends HTMLElement {
             if (this.querySelector('#reply-sheet').classList.contains('open') && (!e.state || e.state.modal !== 'momentReply')) {
                 this.closeReplySheet(true);
             }
+        });
+
+        // 🚀 NEW: Smart Keyboard Handling using Visual Viewport
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                const activeOverlay = this.querySelector('.c-overlay.open');
+                if (activeOverlay) {
+                    const sheet = activeOverlay.querySelector('.c-sheet');
+                    if (sheet) {
+                        const offset = window.innerHeight - window.visualViewport.height;
+                        if (offset > 50) {
+                            // Lift sheet above keyboard safely
+                            sheet.style.marginBottom = `${offset}px`;
+                        } else {
+                            // Reset when keyboard closes
+                            sheet.style.marginBottom = `0px`;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Keep input fields visually centered on focus
+        const inputs = this.querySelectorAll('.c-input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
         });
     }
 
@@ -248,7 +286,8 @@ class ViewMoments extends HTMLElement {
                 const moment = this.moments.find(m => m.id === momentId);
                 
                 if (entry.isIntersecting) {
-                    if (moment && moment.songPreview) {
+                    // 🚀 NEW: Prevent background music playing if the Full Modal is Open
+                    if (moment && moment.songPreview && !this.isModalOpen) {
                         this.playMomentMusic(moment.songPreview);
                     }
                     
@@ -274,8 +313,23 @@ class ViewMoments extends HTMLElement {
     toggleMute() {
         this.isMuted = !this.isMuted;
         this.audioPlayer.muted = this.isMuted;
-        if (!this.isMuted) this.audioPlayer.play().catch(()=>{});
+        this.modalAudioPlayer.muted = this.isMuted; // Sync to modal player
+        
+        if (!this.isMuted) {
+            if (this.isModalOpen) {
+                this.modalAudioPlayer.play().catch(()=>{});
+            } else {
+                this.audioPlayer.play().catch(()=>{});
+            }
+        } else {
+            this.audioPlayer.pause();
+            this.modalAudioPlayer.pause();
+        }
         this.renderFeed(); 
+        
+        // Update live modal UI mute icon instantly without re-rendering feed entirely
+        const modalMute = this.querySelector('#full-moment-modal .mute-btn span');
+        if (modalMute) modalMute.innerText = this.isMuted ? 'volume_off' : 'volume_up';
     }
 
     async markAsSeen(momentId, moment) {
@@ -290,6 +344,24 @@ class ViewMoments extends HTMLElement {
                 if(!moment.viewers) moment.viewers = [];
                 moment.viewers.push(myUid);
             } catch(e) {}
+        }
+    }
+
+    // --- 🚀 NEW: DOUBLE TAP HEART ANIMATION LOGIC ---
+    showHeartAnimation(momentId, isModal = false) {
+        let heart;
+        if (isModal) {
+            heart = this.querySelector('#full-moment-modal .double-tap-heart');
+        } else {
+            const card = this.querySelector(`.m-card[data-id="${momentId}"]`);
+            if (card) heart = card.querySelector('.double-tap-heart');
+        }
+        
+        if (heart) {
+            heart.classList.remove('animate');
+            void heart.offsetWidth; // trigger DOM reflow to restart animation
+            heart.classList.add('animate');
+            if(navigator.vibrate) navigator.vibrate([10, 30, 10]);
         }
     }
 
@@ -374,6 +446,23 @@ class ViewMoments extends HTMLElement {
                 .m-media { width: 100%; height: 100%; object-fit: contain; z-index: 2; position: relative; }
                 .m-backdrop { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(30px) brightness(0.4); z-index: 0; }
                 
+                /* Double Tap Heart Animation */
+                .double-tap-heart {
+                    position: absolute; top: 50%; left: 50%;
+                    transform: translate(-50%, -50%) scale(0);
+                    color: #ff3b30; font-size: 90px; opacity: 0;
+                    z-index: 100; pointer-events: none;
+                    text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                }
+                .double-tap-heart.animate { animation: heartBeatPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+                @keyframes heartBeatPop {
+                    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+                    15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                    45% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+                }
+
                 .mute-btn { position: absolute; bottom: 15px; right: 15px; z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color:#fff; border:none; cursor:pointer;}
                 
                 .m-actions { display: flex; padding: 12px 15px; gap: 20px; align-items: center; }
@@ -552,6 +641,7 @@ class ViewMoments extends HTMLElement {
                 <div class="m-canvas" onclick="document.querySelector('view-moments').openFullModal('${moment.id}')">
                     ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                     ${mediaHtml}
+                    <span class="material-icons-round double-tap-heart">favorite</span>
                     ${moment.songPreview ? `
                         <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
                             <span class="material-icons-round" style="font-size:18px;">${muteIcon}</span>
@@ -590,6 +680,16 @@ class ViewMoments extends HTMLElement {
 
     // --- FULL SCREEN MODAL ---
     async openFullModal(momentId) {
+        // 🚀 NEW: Double Tap to Like implementation
+        const now = Date.now();
+        if (this.lastClickTime && (now - this.lastClickTime) < 300 && this.activeMomentId === momentId) {
+            this.toggleLike(momentId);
+            this.showHeartAnimation(momentId, true);
+            this.lastClickTime = 0; 
+            return;
+        }
+        this.lastClickTime = now;
+
         const moment = this.moments.find(m => m.id === momentId);
         if (!moment) return;
         
@@ -600,6 +700,17 @@ class ViewMoments extends HTMLElement {
         window.history.pushState({ modal: 'momentFull' }, '');
         this.toggleBodyScroll(true);
         modal.classList.add('open');
+
+        // 🚀 NEW: Swap Audio Player
+        this.isModalOpen = true;
+        if (!this.isMuted) {
+            this.audioPlayer.pause();
+            if (moment.songPreview) {
+                this.modalAudioPlayer.src = moment.songPreview;
+                this.modalAudioPlayer.muted = false;
+                this.modalAudioPlayer.play().catch(()=>{});
+            }
+        }
 
         const isMe = moment.uid === this.auth.currentUser.uid;
         const isLiked = moment.likes && moment.likes.includes(this.auth.currentUser.uid);
@@ -662,11 +773,12 @@ class ViewMoments extends HTMLElement {
         const timerDisplay = moment.isActive !== false ? "Active 24h" : "Archived";
 
         content.innerHTML = `
-            <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" onclick="document.querySelector('view-moments').openFullModal('${moment.id}')">
                  ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                  ${mediaHtml}
+                 <span class="material-icons-round double-tap-heart">favorite</span>
                  ${moment.songPreview ? `
-                    <button class="mute-btn" onclick="document.querySelector('view-moments').toggleMute()">
+                    <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
                         <span class="material-icons-round" style="font-size:18px;">${this.isMuted ? 'volume_off' : 'volume_up'}</span>
                     </button>
                 ` : ''}
@@ -737,6 +849,14 @@ class ViewMoments extends HTMLElement {
         this.toggleBodyScroll(false);
         if (!fromHistory && window.history.state?.modal === 'momentFull') {
             window.history.back();
+        }
+
+        // 🚀 NEW: Revert Audio back to Feed
+        this.isModalOpen = false;
+        this.modalAudioPlayer.pause();
+        this.modalAudioPlayer.src = '';
+        if (!this.isMuted && this.audioPlayer.src) {
+            this.audioPlayer.play().catch(()=>{});
         }
     }
 
