@@ -17,6 +17,10 @@
     <chat-loader></chat-loader>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/profileNotes.js" defer></script>
+    
+    <script src="components/viewMoments.js" defer></script>
+    <script src="components/profileMoments.js" defer></script>
+    
     <script type="module" src="components/presence.js"></script>
 
     <script>
@@ -93,9 +97,8 @@
         /* --- TOP HALF: PROFILE CARD --- */
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
-            padding: 20px 24px 30px;
+            padding: 20px 24px 20px;
             display: flex; flex-direction: column; align-items: center;
-            border-bottom: 1px solid var(--border);
         }
 
         .avatar-wrapper {
@@ -177,12 +180,36 @@
         .btn-msg { background: var(--surface); color: var(--primary); border: 1px solid var(--border); }
         .btn-msg:active { background: var(--surface-press); }
 
-        /* --- BOTTOM HALF: NOTES --- */
-        .notes-section {
+        /* --- TABS & SWIPE NAVIGATION --- */
+        .tab-bar {
+            display: flex; position: sticky; top: calc(59px + var(--safe-top)); z-index: 90;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .tab-btn {
+            flex: 1; padding: 14px 0; background: transparent; border: none;
+            color: var(--secondary); font-size: 14px; font-weight: 700; cursor: pointer;
+            transition: color 0.3s; text-align: center;
+        }
+        .tab-btn.active { color: var(--primary); }
+        .tab-indicator {
+            position: absolute; bottom: -1px; left: 0; width: 50%; height: 2px;
+            background: var(--accent); transition: transform 0.3s ease;
+        }
+        
+        .swipe-container {
+            display: flex; width: 100%; overflow-x: auto; scroll-snap-type: x mandatory;
+            scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth;
             flex: 1;
-            padding: 0 24px;
-            margin-top: 10px;
-            padding-bottom: 50px;
+        }
+        .swipe-container::-webkit-scrollbar { display: none; }
+        .swipe-page {
+            flex: 0 0 100%; width: 100%; scroll-snap-align: start;
+        }
+
+        /* --- BOTTOM HALF: NOTES/MOMENTS --- */
+        .notes-section {
+            padding: 15px 24px 50px;
         }
 
         .skeleton {
@@ -338,8 +365,23 @@
             </div>
         </div>
 
-        <div class="notes-section" id="notes-area">
-            <profile-notes id="profile-notes"></profile-notes>
+        <div class="tab-bar">
+            <button class="tab-btn active" id="tab-btn-0" onclick="scrollToTab(0)">Moments</button>
+            <button class="tab-btn" id="tab-btn-1" onclick="scrollToTab(1)">Notes</button>
+            <div class="tab-indicator" id="tab-indicator"></div>
+        </div>
+
+        <div class="swipe-container" id="swipe-container">
+            <div class="swipe-page">
+                <div class="notes-section" id="moments-area">
+                    <profile-moments id="profile-moments"></profile-moments>
+                </div>
+            </div>
+            <div class="swipe-page">
+                <div class="notes-section" id="notes-area">
+                    <profile-notes id="profile-notes"></profile-notes>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -350,8 +392,7 @@
     </div>
 
     <view-notes id="view-notes-modal"></view-notes>
-
-    <div id="toast">
+    <view-moments id="view-moments-modal"></view-moments> <div id="toast">
         <span class="material-icons-round" style="color: #000;">check_circle</span>
         <span id="toast-msg">Copied to clipboard</span>
     </div>
@@ -370,6 +411,26 @@
     // NEW: Variable to hold current user's profile info for notifications
     let currentUserProfileData = null;
     
+    // --- TABS & SWIPE LOGIC ---
+    function scrollToTab(index) {
+        const container = document.getElementById('swipe-container');
+        container.scrollTo({ left: container.clientWidth * index, behavior: 'smooth' });
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('swipe-container');
+        if(container) {
+            container.addEventListener('scroll', () => {
+                const width = container.clientWidth || 1;
+                const index = Math.round(container.scrollLeft / width);
+                document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                    btn.classList.toggle('active', i === index);
+                });
+                document.getElementById('tab-indicator').style.transform = `translateX(${index * 100}%)`;
+            });
+        }
+    });
+
     // --- 1. LOCAL STORAGE CACHE ---
     function loadFromCache() {
         if(!targetUsername) return;
@@ -384,7 +445,10 @@
                     updateFollowButton(data.amIFollowing, data.doIBlock || false);
                     removeBtnSkeletons();
                 }
-                if(targetUid) initNotesComponent(targetUid);
+                if(targetUid) {
+                    initNotesComponent(targetUid);
+                    initMomentsComponent(targetUid);
+                }
             } catch (e) { console.error("Cache Error", e); }
         }
     }
@@ -411,7 +475,7 @@
         const modal = document.getElementById('bottom-modal');
         const overlay = document.getElementById('modal-overlay');
         
-        if (modal.classList.contains('active')) {
+        if (modal && modal.classList.contains('active')) {
             modal.classList.remove('active');
             setTimeout(() => overlay.style.display = 'none', 400);
         }
@@ -459,6 +523,7 @@
             if(!amIBlocked) {
                 renderProfile(freshData);
                 initNotesComponent(targetUid);
+                initMomentsComponent(targetUid);
                 checkRelation(freshData);
             }
         });
@@ -479,6 +544,13 @@
         if(!notesComp) return;
         if (customElements.get('profile-notes')) { notesComp.uid = uid; } 
         else { customElements.whenDefined('profile-notes').then(() => { notesComp.uid = uid; }); }
+    }
+
+    function initMomentsComponent(uid) {
+        const momentsComp = document.getElementById('profile-moments');
+        if(!momentsComp) return;
+        if (customElements.get('profile-moments')) { momentsComp.uid = uid; } 
+        else { customElements.whenDefined('profile-moments').then(() => { momentsComp.uid = uid; }); }
     }
 
     // --- RENDER LOGIC ---
@@ -513,8 +585,10 @@
     }
 
     function removeBtnSkeletons() {
-        document.getElementById('btn-follow').classList.remove('skeleton');
-        document.getElementById('btn-msg').classList.remove('skeleton');
+        const btnFol = document.getElementById('btn-follow');
+        const btnMsg = document.getElementById('btn-msg');
+        if(btnFol) btnFol.classList.remove('skeleton');
+        if(btnMsg) btnMsg.classList.remove('skeleton');
     }
 
     // --- RELATION & BLOCKING ---
@@ -537,12 +611,14 @@
         removeBtnSkeletons();
 
         const notesArea = document.getElementById('notes-area');
+        const momentsArea = document.getElementById('moments-area');
+        
         if(doIBlock) {
-            notesArea.style.opacity = '0.3';
-            notesArea.style.pointerEvents = 'none';
+            if(notesArea) { notesArea.style.opacity = '0.3'; notesArea.style.pointerEvents = 'none'; }
+            if(momentsArea) { momentsArea.style.opacity = '0.3'; momentsArea.style.pointerEvents = 'none'; }
         } else {
-            notesArea.style.opacity = '1';
-            notesArea.style.pointerEvents = 'auto';
+            if(notesArea) { notesArea.style.opacity = '1'; notesArea.style.pointerEvents = 'auto'; }
+            if(momentsArea) { momentsArea.style.opacity = '1'; momentsArea.style.pointerEvents = 'auto'; }
         }
 
         const cacheObj = { ...freshData, uid: targetUid, amIFollowing: isFollowing, doIBlock: doIBlock };
@@ -552,13 +628,15 @@
     function updateFollowButton(isFollowing, isBlocked) {
         const btn = document.getElementById('btn-follow');
         const txt = document.getElementById('btn-follow-text');
+        const msgBtn = document.getElementById('btn-msg');
+        if(!btn || !txt) return;
         
         if(isBlocked) {
             txt.innerText = "Unblock";
             btn.className = "btn btn-unblock";
-            document.getElementById('btn-msg').style.display = 'none';
+            if(msgBtn) msgBtn.style.display = 'none';
         } else {
-            document.getElementById('btn-msg').style.display = 'flex';
+            if(msgBtn) msgBtn.style.display = 'flex';
             if(isFollowing) {
                 txt.innerText = "Following";
                 btn.className = "btn btn-following";
@@ -582,15 +660,25 @@
                 notesComp.uid = current;
             }, 50);
         }
+        
+        const momentsComp = document.getElementById('profile-moments');
+        if(momentsComp) {
+            const currentMoments = momentsComp.uid;
+            momentsComp.uid = null;
+            setTimeout(() => {
+                momentsComp.uid = currentMoments;
+            }, 50);
+        }
 
         // Force visibility update
         const notesArea = document.getElementById('notes-area');
+        const momentsArea = document.getElementById('moments-area');
         if(doIBlock) {
-            notesArea.style.opacity = '0.3';
-            notesArea.style.pointerEvents = 'none';
+            if(notesArea) { notesArea.style.opacity = '0.3'; notesArea.style.pointerEvents = 'none'; }
+            if(momentsArea) { momentsArea.style.opacity = '0.3'; momentsArea.style.pointerEvents = 'none'; }
         } else {
-            notesArea.style.opacity = '1';
-            notesArea.style.pointerEvents = 'auto';
+            if(notesArea) { notesArea.style.opacity = '1'; notesArea.style.pointerEvents = 'auto'; }
+            if(momentsArea) { momentsArea.style.opacity = '1'; momentsArea.style.pointerEvents = 'auto'; }
         }
     }
 
