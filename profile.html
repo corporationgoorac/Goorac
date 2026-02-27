@@ -20,8 +20,12 @@
     <script type="module" src="components/presence.js"></script>
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
+    
     <script src="components/viewNotes.js" defer></script>
     <script src="components/profileNotes.js" defer></script>
+    
+    <script src="components/viewMoments.js" defer></script>
+    <script src="components/profileMoments.js" defer></script>
     
     <script src="components/closeFriends.js" defer></script>
 
@@ -130,9 +134,8 @@
 
         .profile-top-section {
             background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
-            padding: 20px 24px 30px;
+            padding: 20px 24px 20px;
             display: flex; flex-direction: column; align-items: center;
-            border-bottom: 1px solid var(--border);
         }
 
         .avatar-wrapper { width: 90px; height: 90px; margin-bottom: 15px; position: relative; padding: 3px; background: linear-gradient(135deg, var(--border), transparent); border-radius: 50%; }
@@ -158,7 +161,34 @@
         .btn-edit { background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
         .btn-logout { background: #111; color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
 
-        .notes-section { flex: 1; padding: 0 24px; margin-top: 10px; }
+        /* --- TABS & SWIPE NAVIGATION --- */
+        .tab-bar {
+            display: flex; position: sticky; top: calc(59px + var(--safe-top)); z-index: 40;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .tab-btn {
+            flex: 1; padding: 14px 0; background: transparent; border: none;
+            color: var(--secondary); font-size: 14px; font-weight: 700; cursor: pointer;
+            transition: color 0.3s; text-align: center;
+        }
+        .tab-btn.active { color: var(--primary); }
+        .tab-indicator {
+            position: absolute; bottom: -1px; left: 0; width: 50%; height: 2px;
+            background: var(--accent); transition: transform 0.3s ease;
+        }
+        
+        .swipe-container {
+            display: flex; width: 100%; overflow-x: auto; scroll-snap-type: x mandatory;
+            scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth;
+            flex: 1;
+        }
+        .swipe-container::-webkit-scrollbar { display: none; }
+        .swipe-page {
+            flex: 0 0 100%; width: 100%; scroll-snap-align: start;
+        }
+
+        .notes-section { padding: 15px 24px 50px; }
 
         .skeleton { background: #111 !important; position: relative; overflow: hidden; border: none !important; }
         .skeleton::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.5s infinite; }
@@ -166,7 +196,7 @@
 
         #toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--primary); color: #000; padding: 12px 24px; border-radius: 16px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.4s; z-index: 3000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    
+        
         .header-title { font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px; background: linear-gradient(to right, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 
@@ -272,12 +302,27 @@
         </div>
     </div>
 
-    <div class="notes-section" id="notes-container-wrapper">
-        <profile-notes id="profile-notes"></profile-notes>
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tab-btn-0" onclick="scrollToTab(0)">Moments</button>
+        <button class="tab-btn" id="tab-btn-1" onclick="scrollToTab(1)">Notes</button>
+        <div class="tab-indicator" id="tab-indicator"></div>
+    </div>
+
+    <div class="swipe-container" id="swipe-container">
+        <div class="swipe-page">
+            <div class="notes-section">
+                <profile-moments id="profile-moments"></profile-moments>
+            </div>
+        </div>
+        <div class="swipe-page">
+            <div class="notes-section">
+                <profile-notes id="profile-notes"></profile-notes>
+            </div>
+        </div>
     </div>
 
     <view-notes id="view-notes-modal"></view-notes>
-    <call-notifier></call-notifier>
+    <view-moments id="view-moments-modal"></view-moments> <call-notifier></call-notifier>
     
     <close-friends-selector id="cf-selector"></close-friends-selector>
     
@@ -297,6 +342,26 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
     const rdb = firebase.database();
+
+    // --- TABS & SWIPE LOGIC ---
+    function scrollToTab(index) {
+        const container = document.getElementById('swipe-container');
+        container.scrollTo({ left: container.clientWidth * index, behavior: 'smooth' });
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('swipe-container');
+        if(container) {
+            container.addEventListener('scroll', () => {
+                const width = container.clientWidth || 1;
+                const index = Math.round(container.scrollLeft / width);
+                document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                    btn.classList.toggle('active', i === index);
+                });
+                document.getElementById('tab-indicator').style.transform = `translateX(${index * 100}%)`;
+            });
+        }
+    });
 
     // --- UI CONTROLS ---
     function toggleMenu(show) {
@@ -429,6 +494,14 @@
                 notesComp.setAttribute('uid', user.uid);
                 customElements.whenDefined('profile-notes').then(() => { if(notesComp.init) notesComp.init(); });
             }
+            
+            const momentsComp = document.getElementById('profile-moments');
+            if(momentsComp) {
+                momentsComp.uid = user.uid;
+                momentsComp.setAttribute('uid', user.uid);
+                customElements.whenDefined('profile-moments').then(() => { if(momentsComp.init) momentsComp.init(); });
+            }
+            
             initRealtimeListener(user.uid);
         } else {
             window.location.replace('login.html');
