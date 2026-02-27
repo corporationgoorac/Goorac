@@ -2,25 +2,25 @@
 (function() {
     window.chatTheme = {
         bg: "#000000",
-        bgGradient: "radial-gradient(circle at 50% 30%, #061A10 0%, #000000 70%)",
-        headerBg: "rgba(6, 18, 12, 0.90)",
+        bgGradient: "radial-gradient(circle at 50% 30%, #111111 0%, #000000 70%)",
+        headerBg: "rgba(10, 10, 10, 0.90)",
         headerBlur: "blur(25px)",
-        accent: "#10B981",
-        accentDark: "#047857",
-        accentDim: "rgba(16, 185, 129, 0.2)",
+        accent: "#FF6D00",
+        accentDark: "#E65100",
+        accentDim: "rgba(255, 109, 0, 0.2)",
         glassBorder: "rgba(255, 255, 255, 0.08)",
-        border: "#12221A",
-        borderLight: "rgba(16, 185, 129, 0.15)",
-        sentBg: "linear-gradient(135deg, #047857 0%, #10B981 100%)",
+        border: "#1c1c1c",
+        borderLight: "rgba(255,255,255,0.1)",
+        sentBg: "linear-gradient(135deg, #E65100 0%, #FF6D00 100%)",
         sentText: "#ffffff",
-        sentShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
-        receivedBg: "#1A2A22",
+        sentShadow: "0 4px 15px rgba(230, 81, 0, 0.25)",
+        receivedBg: "#262626",
         receivedText: "#ffffff",
         receivedShadow: "0 2px 5px rgba(0,0,0,0.2)",
         text: "#ffffff",
-        textSecondary: "#A7B8B0",
-        textMuted: "#5F7068",
-        mobileToolbarBg: "rgba(6, 18, 12, 0.85)"
+        textSecondary: "#a1a1a1",
+        textMuted: "#666666",
+        mobileToolbarBg: "rgba(15, 15, 15, 0.85)"
     };
 
     // Apply the theme directly to the root CSS variables
