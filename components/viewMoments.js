@@ -1298,9 +1298,11 @@ class ViewMoments extends HTMLElement {
                     <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="document.querySelector('view-moments').toggleLike('${moment.id}')">
                         <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
                     </button>
+                    ${moment.allowComments !== false ? `
                     <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
                         <span class="material-icons-round">chat_bubble_outline</span>
                     </button>
+                    ` : ''}
                     <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
                         <span class="material-icons-round">send</span>
                     </button>
@@ -1520,9 +1522,11 @@ class ViewMoments extends HTMLElement {
                         <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="const vm = document.querySelector('view-moments'); vm.toggleLike('${moment.id}'); const icon = this.querySelector('span'); if(this.classList.contains('liked')){this.classList.remove('liked');icon.innerText='favorite_border';}else{this.classList.add('liked');icon.innerText='favorite';}">
                             <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
                         </button>
+                        ${moment.allowComments !== false ? `
                         <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
                             <span class="material-icons-round">chat_bubble_outline</span>
                         </button>
+                        ` : ''}
                         <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
                             <span class="material-icons-round">send</span>
                         </button>
