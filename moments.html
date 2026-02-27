@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>New Moment | Goorac Premium</title>
+    <title>New Moment | Goorac Pro</title>
     
     <script src="config.js"></script>
 
@@ -19,13 +19,16 @@
     <script src="components/chatLoader.js" defer></script>
     <chat-loader></chat-loader>
 
-    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&family=Inter:wght@400;700;900&family=Montserrat:wght@800&family=Pacifico&family=Press+Start+2P&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
         /* ==========================================================================
-           ROOT & CORE STYLES
-           ========================================================================== */
+           GLOBAL DESIGN SYSTEM & VARIABLES
+           ========================================================================== 
+        */
         :root { 
             --bg: #000000; 
             --surface: #111111;
@@ -36,10 +39,11 @@
             --text-dim: rgba(255, 255, 255, 0.6);
             --safe-bottom: env(safe-area-inset-bottom, 20px);
             --safe-top: env(safe-area-inset-top, 20px);
-            --nav-height: 70px;
-            --transition-main: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            --panel-bg: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 50%, transparent 100%);
+            --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        /* RESET & BASE STYLES */
         * { 
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
@@ -47,19 +51,27 @@
             outline: none;
         }
 
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: var(--bg);
+        }
+
         body {
-            background-color: var(--bg); 
             color: var(--text);
             font-family: 'Inter', -apple-system, system-ui, sans-serif;
             margin: 0; 
             padding: 0; 
+            /* Fix for 100vh issue on mobile */
             height: 100dvh; 
-            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
-        /* COMPONENT Z-INDEX PRIORITY */
+        /* FIX: ULTIMATE Z-INDEX STACKING 
+           Ensures floating modals and pickers always sit above the canvas.
+        */
         song-picker, close-friends-selector, image-picker, file-picker { 
             position: absolute !important; 
             z-index: 999999 !important; 
@@ -67,31 +79,36 @@
         }
 
         /* ==========================================================================
-           APP CONTAINER & NAVIGATION
-           ========================================================================== */
+           APPLICATION SHELL
+           ========================================================================== 
+        */
         .app-modal {
+            flex: 1;
             width: 100vw; 
-            height: 100dvh; 
             display: flex; 
             flex-direction: column;
             background: var(--bg);
             position: relative;
+            overflow: hidden;
         }
 
-        /* --- IMMERSIVE CANVAS --- */
+        /* --- IMMERSIVE CANVAS --- 
+           The central area where media or text stories are composed.
+        */
         .canvas-container {
-            flex: 1;
-            position: relative; 
+            position: absolute; 
+            inset: 0; 
             width: 100%; 
+            height: 100%;
             display: flex; 
             align-items: center; 
             justify-content: center;
             background: #0a0a0a; 
             z-index: 1; 
             overflow: hidden;
-            transition: var(--transition-main);
         }
 
+        /* Blurred Backdrop for Photos/Videos */
         #media-backdrop {
             position: absolute; 
             inset: -15%; 
@@ -106,8 +123,9 @@
         }
 
         /* ==========================================================================
-           HEADER UI
-           ========================================================================== */
+           HEADER UI (NAVBAR)
+           ========================================================================== 
+        */
         header {
             position: absolute; 
             top: 0; 
@@ -129,13 +147,14 @@
             pointer-events: auto;
         }
 
+        /* Circle buttons with high-end glassmorphism */
         .back-btn, .clear-media-btn { 
             width: 44px; 
             height: 44px; 
             border-radius: 50%;
             background: rgba(255,255,255,0.1); 
-            backdrop-filter: blur(20px); 
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(25px); 
+            -webkit-backdrop-filter: blur(25px);
             display: flex; 
             align-items: center; 
             justify-content: center;
@@ -145,10 +164,13 @@
             transition: transform 0.2s, background 0.2s;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .back-btn:active, .clear-media-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.25); }
+        .back-btn:active, .clear-media-btn:active { 
+            transform: scale(0.9); 
+            background: rgba(255,255,255,0.25); 
+        }
         
         .clear-media-btn { display: none; }
-        .clear-media-btn.show { display: flex; animation: fadeInScale 0.3s ease forwards; }
+        .clear-media-btn.show { display: flex; animation: fadeInScale 0.3s ease; }
         .back-btn.hide { display: none; }
 
         @keyframes fadeInScale {
@@ -156,6 +178,7 @@
             to { opacity: 1; transform: scale(1); }
         }
 
+        /* Share Button - Professional iOS Style */
         .post-btn { 
             background: rgba(255,255,255,0.05); 
             color: rgba(255,255,255,0.3); 
@@ -169,6 +192,9 @@
             border: 1px solid rgba(255,255,255,0.1); 
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .post-btn.active { 
@@ -187,8 +213,9 @@
         }
 
         /* ==========================================================================
-           MODE SELECTOR (CENTER UI)
-           ========================================================================== */
+           MODE SELECTOR UI
+           ========================================================================== 
+        */
         .mode-selector {
             display: flex; 
             flex-direction: column; 
@@ -219,8 +246,9 @@
         .mode-btn .material-icons-round { font-size: 26px; color: var(--accent); }
 
         /* ==========================================================================
-           PREVIEW ELEMENTS
-           ========================================================================== */
+           PREVIEW ELEMENTS (IMAGE / VIDEO / TEXT)
+           ========================================================================== 
+        */
         #media-preview, #video-preview { 
             width: 100%; 
             height: 100%; 
@@ -238,9 +266,9 @@
             display: none; 
             align-items: center; 
             justify-content: center; 
-            padding: 60px 40px 160px; 
+            padding: 60px 40px 180px; 
             font-size: 38px; 
-            font-weight: 800; 
+            font-weight: 900; 
             text-align: center; 
             word-break: break-word; 
             outline: none; 
@@ -251,18 +279,19 @@
             line-height: 1.2;
             transition: all 0.3s ease;
         }
-        #text-preview:empty:before { content: 'Tap to express...'; opacity: 0.4; }
+        #text-preview:empty:before { content: 'Tap to express...'; opacity: 0.3; }
 
-        /* TEXT EFFECTS */
+        /* ADVANCED TEXT EFFECTS */
         .fx-glow { text-shadow: 0 0 15px currentColor, 0 0 30px currentColor; }
         .fx-shadow { text-shadow: 4px 4px 0px rgba(0,0,0,0.8); }
 
         /* ==========================================================================
-           TEXT TOOLS (FLOATING BAR)
-           ========================================================================== */
+           TEXT FORMATTING TOOLS (FLOATING BAR)
+           ========================================================================== 
+        */
         .text-tools {
             position: absolute; 
-            bottom: 20px; 
+            bottom: calc(230px + var(--safe-bottom)); 
             left: 50%;
             transform: translateX(-50%);
             width: 90%;
@@ -273,9 +302,9 @@
             padding: 12px 20px; 
             scrollbar-width: none; 
             z-index: 150;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(25px);
+            border-radius: 26px;
             border: 1px solid rgba(255,255,255,0.1);
         }
         .text-tools::-webkit-scrollbar { display: none; }
@@ -293,43 +322,58 @@
             color:#fff;
             transition: 0.2s;
         }
+        .t-btn:active { transform: scale(0.9); }
+
         .color-dot { 
-            width: 34px; 
-            height: 34px; 
+            width: 36px; 
+            height: 36px; 
             border-radius: 50%; 
             border: 2.5px solid rgba(255,255,255,0.4); 
             flex-shrink: 0; 
             cursor: pointer; 
-            transition: 0.2s;
+            transition: transform 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
+        .color-dot:active { transform: scale(0.8); }
+
         .font-pill { 
             padding: 10px 20px; 
             background: rgba(255,255,255,0.1); 
             border-radius: 16px; 
             font-size: 14px; 
-            font-weight: 700;
+            font-weight: 800;
             flex-shrink: 0; 
             cursor: pointer; 
             color:#fff;
+            transition: 0.2s;
         }
+        .font-pill:active { transform: scale(0.95); }
 
         /* ==========================================================================
-           BOTTOM CONTROLS PANEL (THE FIXED BAR)
-           ========================================================================== */
+           RESPONSIVE BOTTOM CONTROLS PANEL
+           ========================================================================== 
+           FIX: Using flexbox container and safer padding to ensure visibility 
+           on all mobile viewports and PWA installs.
+        */
         .controls-panel {
-            position: relative; /* Changed from absolute to ensure visibility */
+            position: absolute; 
+            bottom: 0; 
+            left: 0; 
             width: 100%;
             padding: 20px 20px calc(25px + var(--safe-bottom));
             display: flex; 
             flex-direction: column; 
-            gap: 16px; 
-            background: #000;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            gap: 14px; 
+            background: linear-gradient(to top, 
+                rgba(0,0,0,1) 0%, 
+                rgba(0,0,0,0.9) 70%, 
+                transparent 100%);
             z-index: 200;
-            box-shadow: 0 -20px 60px rgba(0,0,0,0.9);
+            box-shadow: 0 -15px 50px rgba(0,0,0,0.8);
+            transition: transform 0.4s ease;
         }
 
-        /* CAPTION AREA */
+        /* Input Styles */
         .input-wrapper { 
             position: relative; 
             width: 100%; 
@@ -339,31 +383,36 @@
         
         .caption-input {
             flex: 1; 
-            background: rgba(255,255,255,0.07); 
-            backdrop-filter: blur(10px); 
-            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.08); 
+            backdrop-filter: blur(20px); 
+            border: 1.5px solid rgba(255,255,255,0.1);
             color: #fff; 
-            padding: 16px 90px 16px 20px; 
-            border-radius: 22px; 
+            padding: 16px 85px 16px 18px; 
+            border-radius: 24px; 
             font-size: 15px; 
-            transition: var(--transition-main);
+            transition: var(--transition-smooth);
             resize: none; 
             min-height: 56px; 
-            max-height: 140px; 
+            max-height: 150px; 
             overflow-y: auto;
             line-height: 1.5;
+            font-family: 'Inter', sans-serif;
         }
-        .caption-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.1); }
+        .caption-input:focus { 
+            border-color: var(--accent); 
+            background: rgba(255,255,255,0.12); 
+            box-shadow: 0 0 0 4px rgba(255, 0, 127, 0.15);
+        }
         
         .char-count {
             position: absolute; 
-            right: 55px; 
+            right: 52px; 
             bottom: 18px;
             font-size: 10px; 
-            font-weight: 800; 
+            font-weight: 900; 
             color: var(--text-dim); 
             pointer-events: none;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .emoji-trigger-btn {
@@ -377,15 +426,17 @@
             display: flex; 
             align-items: center; 
             justify-content: center;
-            transition: 0.2s;
+            transition: transform 0.2s;
+            cursor: pointer;
         }
+        .emoji-trigger-btn:active { transform: scale(0.85); }
 
-        /* MUSIC TRIGGER */
+        /* Song Selector - High Visibility */
         .song-btn {
             background: rgba(255,255,255,0.05); 
-            border: 1.5px dashed rgba(255,255,255,0.2);
+            border: 1.5px dashed rgba(255,255,255,0.25);
             color: #fff; 
-            padding: 16px 20px; 
+            padding: 14px 18px; 
             border-radius: 24px; 
             font-size: 14px; 
             font-weight: 700;
@@ -393,13 +444,14 @@
             align-items: center; 
             gap: 14px; 
             cursor: pointer; 
-            transition: 0.3s;
+            transition: all 0.3s ease;
         }
         .song-btn.has-song { 
             border-style: solid; 
             border-color: var(--accent); 
-            background: linear-gradient(90deg, rgba(255, 0, 127, 0.2), transparent); 
+            background: linear-gradient(90deg, rgba(255, 0, 127, 0.15), rgba(0,0,0,0.2)); 
         }
+        .song-btn span { flex: 1; text-align: left; }
         
         .song-icon { 
             background: rgba(255,255,255,0.1); 
@@ -407,9 +459,10 @@
             border-radius: 14px; 
             display: flex; 
             color: var(--accent);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
 
-        /* SETTINGS ROW */
+        /* Interaction Row (Audience & Comments) */
         .settings-row { 
             display: flex; 
             align-items: center; 
@@ -418,7 +471,7 @@
         
         .setting-toggle {
             flex: 1; 
-            background: rgba(255,255,255,0.05); 
+            background: rgba(255,255,255,0.06); 
             padding: 14px; 
             border-radius: 18px;
             display: flex; 
@@ -429,42 +482,46 @@
             font-weight: 700; 
             color: var(--text-dim); 
             border: 1px solid transparent; 
-            transition: 0.3s;
+            transition: all 0.3s ease;
         }
         .setting-toggle.active { 
             color: #fff; 
             border-color: rgba(255, 0, 127, 0.4); 
             background: rgba(255, 0, 127, 0.1); 
         }
+        .setting-toggle .material-icons-round { font-size: 18px; }
 
         #edit-cf-btn {
             text-align: center; 
             font-size: 11px; 
             color: var(--accent); 
-            font-weight: 800; 
+            font-weight: 900; 
             text-transform: uppercase; 
             letter-spacing: 1.2px;
-            padding: 8px; 
+            padding: 10px; 
             display: none; 
             animation: fadeIn 0.4s ease;
+            cursor: pointer;
         }
 
         /* ==========================================================================
-           EMOJI MODAL
-           ========================================================================== */
+           EMOJI BOTTOM SHEET
+           ========================================================================== 
+        */
         .emoji-modal-overlay {
-            position: fixed; inset: 0; z-index: 1000000; background: rgba(0,0,0,0.8);
-            display: none; align-items: flex-end; backdrop-filter: blur(8px);
+            position: fixed; inset: 0; z-index: 1000000; background: rgba(0,0,0,0.7);
+            display: none; align-items: flex-end; backdrop-filter: blur(10px);
             opacity: 0; transition: opacity 0.3s;
         }
         .emoji-modal-overlay.open { display: flex; opacity: 1; }
         
         .emoji-sheet {
-            width: 100%; height: 60vh; background: #0a0a0a;
-            border-top-left-radius: 32px; border-top-right-radius: 32px;
-            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 100%; height: 65vh; background: #0a0a0a;
+            border-top-left-radius: 35px; border-top-right-radius: 35px;
+            transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             overflow: hidden; display: flex; flex-direction: column;
             border-top: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.8);
         }
         .emoji-modal-overlay.open .emoji-sheet { transform: translateY(0); }
         
@@ -472,9 +529,18 @@
             display: flex; justify-content: center; padding: 15px;
             background: transparent;
         }
-        .drag-handle { width: 44px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 10px; }
+        .drag-handle { width: 45px; height: 6px; background: rgba(255,255,255,0.2); border-radius: 10px; }
 
+        /* Animation Keyframes */
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ==========================================================================
+           UTILITY CLASSES
+           ========================================================================== 
+        */
+        .hidden { display: none !important; }
+        .loading { pointer-events: none; opacity: 0.7; }
     </style>
 </head>
 <body>
@@ -491,7 +557,10 @@
                 </button>
             </div>
             <div class="header-right">
-                <button class="post-btn" id="post-btn" onclick="postMoment()">Share</button>
+                <button class="post-btn" id="post-btn" onclick="postMoment()">
+                    <span id="post-btn-icon" class="material-icons-round hidden" style="font-size:16px;">send</span>
+                    <span id="post-btn-text">Share</span>
+                </button>
             </div>
         </header>
 
@@ -518,37 +587,48 @@
             <video id="video-preview" loop muted playsinline autoplay></video>
 
             <div class="text-tools" id="text-tools">
-                <div class="t-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
-                <div class="t-btn" onclick="toggleEffect()" id="fx-btn"><span class="material-icons-round">auto_fix_high</span></div>
-                <div style="width:1px; height:30px; background:rgba(255,255,255,0.2); margin:0 8px;"></div>
+                <div class="t-btn" onclick="toggleAlign()">
+                    <span class="material-icons-round" id="align-icon">format_align_center</span>
+                </div>
+                <div class="t-btn" onclick="toggleEffect()" id="fx-btn">
+                    <span class="material-icons-round">auto_fix_high</span>
+                </div>
+                <div style="width:1.5px; height:28px; background:rgba(255,255,255,0.2); margin:0 8px;"></div>
+                
                 </div>
         </main>
 
-        <footer class="controls-panel">
+        <footer class="controls-panel" id="controls-panel">
+            
             <div class="input-wrapper">
                 <textarea class="caption-input" id="caption-input" placeholder="What's happening? (Required)" maxlength="300" rows="1"></textarea>
                 <span class="char-count" id="char-count">0/300</span>
-                <button class="emoji-trigger-btn" onclick="openEmojiPicker()">😀</button>
+                <button class="emoji-trigger-btn" onclick="openEmojiPicker()">
+                    <span class="material-icons-round" style="color:#ffcc00; font-size: 24px;">sentiment_satisfied_alt</span>
+                </button>
             </div>
             
             <button class="song-btn" id="song-trigger" onclick="triggerHaptic(); document.getElementById('song-picker').open()">
-                <div class="song-icon" id="song-icon-wrap"><span class="material-icons-round">music_note</span></div>
+                <div class="song-icon" id="song-icon-wrap">
+                    <span class="material-icons-round" id="music-icon-ref">music_note</span>
+                </div>
                 <span id="song-label">Add Soundtrack (Required)</span>
             </button>
 
             <div class="settings-row">
                 <div class="setting-toggle" id="audience-toggle" onclick="toggleAudience()">
-                    <span class="material-icons-round" id="aud-icon" style="font-size:18px;">public</span>
+                    <span class="material-icons-round" id="aud-icon">public</span>
                     <span id="aud-label">Public</span>
                 </div>
                 <div class="setting-toggle active" id="comments-toggle" onclick="toggleComments()">
-                    <span class="material-icons-round" id="com-icon" style="font-size:18px;">chat_bubble</span>
+                    <span class="material-icons-round" id="com-icon">chat_bubble</span>
                     <span id="com-label">Comments On</span>
                 </div>
             </div>
             
             <div id="edit-cf-btn" onclick="document.getElementById('cf-selector').open()">
-                Manage Close Friends <span class="material-icons-round" style="font-size: 14px; vertical-align: middle;">settings</span>
+                Manage Close Friends 
+                <span class="material-icons-round" style="font-size: 14px; vertical-align: middle;">settings_suggest</span>
             </div>
         </footer>
     </div>
@@ -571,11 +651,11 @@
 
 <script>
     /**
-     * GOORAC CORE LOGIC
-     * Handles state, Firebase interactions, and UI updates.
+     * GOORAC CORE ENGINE v3.0
+     * Responsible for State Management, Firebase Interaction, and UI Orchestration.
      */
 
-    // --- FIREBASE INITIALIZATION ---
+    // --- FIREBASE INITIALIZATION & SECURITY ---
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (!firebase.apps.length && window.firebaseConfig) {
@@ -586,13 +666,14 @@
     let currentUser = null;
     let isPosting = false;
 
-    // --- CONFIGURATION ---
+    // --- ENGINE CONFIGURATION ---
     const bgColors = [
-        '#1a1a1a', '#ff007f', '#00d2ff', '#00ba7c', '#ff3b30', 
+        '#1a1a1a', '#ff007f', '#00d2ff', '#00ba7c', '#ff3b30', '#6C5CE7',
         'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         'linear-gradient(45deg, #ff9a9e 0%, #fecfef 100%)',
         'radial-gradient(circle, #3f5efb 0%, #fc466b 100%)',
-        'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)'
+        'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(120deg, #f093fb 0%, #f5576c 100%)'
     ];
     
     const fonts = [
@@ -602,7 +683,10 @@
         '"Dancing Script"', 
         '"Orbitron"', 
         '"Fredoka"', 
-        '"Righteous"'
+        '"Righteous"',
+        '"Pacifico"',
+        '"Montserrat"',
+        '"Space Grotesk"'
     ];
     
     const effects = [
@@ -611,23 +695,23 @@
         { name: 'shadow', class: 'fx-shadow' }
     ];
 
-    // --- STATE MANAGEMENT ---
+    // --- APPLICATION STATE ---
     let state = {
-        mode: null, 
-        text: '', 
-        colorIdx: 0, 
-        fontIdx: 0, 
-        align: 'center', 
-        effectIdx: 0,
-        mediaUrl: null, 
-        videoMeta: null,
-        caption: '', 
-        song: null,
-        audience: 'public', 
-        allowComments: true
+        mode: null,             // 'text', 'image', or 'video'
+        text: '',               // Content for text moments
+        colorIdx: 0,            // Background/Color selection index
+        fontIdx: 0,             // Font selection index
+        align: 'center',        // Text alignment: center, left, right
+        effectIdx: 0,           // Visual effect index (glow, shadow)
+        mediaUrl: null,         // URL for uploaded media
+        videoMeta: null,        // Metadata for video files
+        caption: '',            // Post caption
+        song: null,             // Selected track object
+        audience: 'public',      // public or close_friends
+        allowComments: true      // Toggle for comment system
     };
 
-    // DOM Cache
+    // DOM Cache for performance
     const els = {
         selector: document.getElementById('mode-selector'),
         textPreview: document.getElementById('text-preview'),
@@ -648,25 +732,41 @@
         fxBtn: document.getElementById('fx-btn')
     };
 
-    // --- UTILITIES ---
+    /**
+     * UTILITIES & HAPTICS
+     */
     function triggerHaptic() {
+        // High-end feel: Snappy vibrate
         if (navigator.vibrate) navigator.vibrate(12);
     }
 
     function autoResizeTextarea() {
         els.captionInput.style.height = 'auto';
         els.captionInput.style.height = (els.captionInput.scrollHeight) + 'px';
+        
+        // Ensure buttons don't get pushed out of view when keyboard is up
+        const panel = document.getElementById('controls-panel');
+        if (window.innerHeight < 500) {
+            panel.style.transform = 'translateY(-10px)';
+        } else {
+            panel.style.transform = 'translateY(0)';
+        }
     }
 
-    // --- INITIALIZATION ---
+    /**
+     * INITIALIZATION FLOW
+     */
     function init() {
-        // Auth Guardian
+        // Authentication Observer
         auth.onAuthStateChanged(user => {
-            if (user) currentUser = user;
-            else window.location.href = 'login.html';
+            if (user) {
+                currentUser = user;
+            } else {
+                window.location.href = 'login.html';
+            }
         });
 
-        // Setup Text Tools
+        // Construct Visual Control Bar
         bgColors.forEach((c, i) => {
             const dot = document.createElement('div');
             dot.className = 'color-dot';
@@ -694,7 +794,7 @@
             els.textTools.appendChild(pill);
         });
 
-        // Event Listeners
+        // Setup Main Event Listeners
         els.captionInput.addEventListener('input', (e) => {
             autoResizeTextarea();
             updateCaptionState(e.target.value);
@@ -705,7 +805,7 @@
             saveDraft(); 
         });
         
-        // Listeners for Web Components
+        // Web Component Message Handlers
         document.addEventListener('song-selected', (e) => { 
             state.song = e.detail; 
             updateSongUI(); 
@@ -723,16 +823,18 @@
                 state.videoMeta = e.detail.metadata; 
                 setMode('video');
             } else {
-                alert("Please upload a video file.");
+                alert("Please select a valid video format.");
             }
         });
 
-        // Emoji System
+        // Emoji Integration System
         document.addEventListener('emoji-click', (e) => {
             triggerHaptic();
             if (state.mode === 'text' && document.activeElement === els.textPreview) {
+                // Insert emoji into rich text preview
                 document.execCommand('insertText', false, e.detail.emoji);
             } else {
+                // Insert emoji into caption textarea
                 const start = els.captionInput.selectionStart;
                 const end = els.captionInput.selectionEnd;
                 const text = els.captionInput.value;
@@ -743,18 +845,28 @@
             saveDraft();
         });
 
+        // Close Emoji Modal on outside click
         els.emojiOverlay.addEventListener('click', (e) => {
             if (e.target === els.emojiOverlay) closeEmojiPicker();
         });
 
+        // Handle Browser/Device Back Button for modals
         window.addEventListener('popstate', (e) => {
-            if (els.emojiOverlay.classList.contains('open')) closeEmojiPicker(true);
+            if (els.emojiOverlay.classList.contains('open')) {
+                closeEmojiPicker(true);
+            }
         });
 
+        // Lifecycle: Load state from storage
         loadDraft();
+        
+        // Accessibility: Refresh height
+        setTimeout(autoResizeTextarea, 500);
     }
 
-    // --- NAVIGATION & MODALS ---
+    /**
+     * MODAL MANAGEMENT
+     */
     function openEmojiPicker() {
         triggerHaptic();
         els.emojiOverlay.classList.add('open');
@@ -768,24 +880,28 @@
         }
     }
 
-    // --- CORE LOGIC ---
+    /**
+     * UI & CONTENT ENGINE
+     */
     function updateCaptionState(val) {
         state.caption = val;
         els.captionInput.value = val;
         const len = state.caption.length;
         els.charCount.innerText = `${len}/300`;
-        els.charCount.classList.toggle('limit', len >= 290);
+        els.charCount.classList.toggle('limit', len >= 285);
         saveDraft(); 
     }
 
     function setMode(mode) {
         triggerHaptic();
         state.mode = mode;
-        els.selector.style.display = 'none';
         
+        // Switch Layouts
+        els.selector.style.display = 'none';
         els.clearBtn.classList.add('show');
         els.backBtn.classList.add('hide');
         
+        // Hide all previews initially
         els.textPreview.style.display = 'none';
         els.imgPreview.style.display = 'none';
         els.vidPreview.style.display = 'none';
@@ -798,7 +914,8 @@
             els.textPreview.style.display = 'flex';
             els.textTools.style.display = 'flex';
             updateTextVisuals();
-            setTimeout(() => els.textPreview.focus(), 100);
+            // Focus with delay for mobile keyboard stability
+            setTimeout(() => els.textPreview.focus(), 200);
         } else if (mode === 'image') {
             els.imgPreview.style.display = 'block';
             els.imgPreview.src = state.mediaUrl;
@@ -814,21 +931,27 @@
     function applyMediaBackdrop(url) {
         els.mediaBackdrop.src = url;
         els.mediaBackdrop.style.display = 'block';
-        setTimeout(() => { els.mediaBackdrop.style.opacity = '1'; }, 100);
+        // Smooth transition for the blur effect
+        setTimeout(() => { 
+            els.mediaBackdrop.style.opacity = '1'; 
+        }, 150);
     }
 
     function clearMedia() {
         triggerHaptic();
+        // Reset state
         state.mode = null; 
         state.mediaUrl = null; 
         state.text = ''; 
         state.videoMeta = null;
         
+        // Clear DOM
         els.textPreview.innerText = '';
         els.imgPreview.src = ''; 
         els.vidPreview.src = ''; 
         els.mediaBackdrop.src = '';
         
+        // Show selection UI
         els.selector.style.display = 'flex';
         els.clearBtn.classList.remove('show');
         els.backBtn.classList.remove('hide');
@@ -839,23 +962,27 @@
         els.mediaBackdrop.style.display = 'none';
         els.textTools.style.display = 'none';
         els.canvasBg.style.background = '#0a0a0a';
+        
         saveDraft();
     }
 
     function updateTextVisuals() {
+        // Apply stylistic choices to the story canvas
         els.canvasBg.style.background = bgColors[state.colorIdx];
         els.textPreview.style.fontFamily = fonts[state.fontIdx];
         els.textPreview.style.textAlign = state.align;
         
+        // Clear previous effects and apply new one
         els.textPreview.className = '';
         const currentEffect = effects[state.effectIdx];
         if (currentEffect && currentEffect.class) {
             els.textPreview.classList.add(currentEffect.class);
         }
         
+        // Feedback UI for the FX button
         if (els.fxBtn) {
             els.fxBtn.style.background = state.effectIdx !== 0 ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
-            els.fxBtn.style.color = state.effectIdx !== 0 ? '#fff' : '#fff';
+            els.fxBtn.style.color = '#ffffff';
         }
     }
 
@@ -914,27 +1041,32 @@
         }
     }
 
-    // --- PERSISTENCE ---
+    /**
+     * PERSISTENCE & VALIDATION
+     */
     function saveDraft() {
+        // Save current progress to local storage for recovery
         localStorage.setItem('goorac_moment_draft', JSON.stringify(state));
         validatePost();
     }
 
     function loadDraft() {
-        const draftStr = localStorage.getItem('goorac_moment_draft');
-        if (!draftStr) {
+        const draftData = localStorage.getItem('goorac_moment_draft');
+        if (!draftData) {
             validatePost();
             return;
         }
         
         try {
-            const draft = JSON.parse(draftStr);
+            const draft = JSON.parse(draftData);
             state = { ...state, ...draft };
             
+            // Sync UI with loaded state
             updateCaptionState(state.caption || '');
             els.textPreview.innerText = state.text || '';
             updateSongUI();
             
+            // Reset toggles to reflect current state
             if (state.audience === 'close_friends') {
                 state.audience = 'public'; 
                 toggleAudience();
@@ -945,47 +1077,61 @@
                 toggleComments();
             }
 
+            // Restore active creation mode
             if (state.mode) setMode(state.mode);
-        } catch(e) { console.error("Draft error", e); }
+        } catch(e) { 
+            console.error("Moment recovery error:", e); 
+        }
         
         validatePost();
     }
 
     function validatePost() {
-        const hasMedia = (state.mode === 'text' && state.text.trim().length > 0) || 
-                         (state.mode === 'image' && state.mediaUrl) || 
-                         (state.mode === 'video' && state.mediaUrl);
+        // Business Logic: What defines a 'postable' moment?
+        const hasContent = (state.mode === 'text' && state.text.trim().length > 0) || 
+                           (state.mode === 'image' && state.mediaUrl) || 
+                           (state.mode === 'video' && state.mediaUrl);
         const hasCaption = state.caption.trim().length > 0;
         const hasSong = state.song !== null;
 
-        if (hasMedia && hasCaption && hasSong) {
+        // Visual feedback for Share button
+        if (hasContent && hasCaption && hasSong) {
             els.postBtn.classList.add('active');
         } else {
             els.postBtn.classList.remove('active');
         }
     }
 
-    // --- SUBMISSION ---
+    /**
+     * SUBMISSION & FIREBASE INTEGRATION
+     */
     async function postMoment() {
+        // Prevent double posting
         if (isPosting || !els.postBtn.classList.contains('active')) return;
         if (!currentUser) return;
 
         triggerHaptic();
         isPosting = true;
+        
+        // Loading state UI
         els.postBtn.classList.add('loading');
-        els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:16px; animation:spin 1.5s linear infinite; margin-right:8px;">sync</span> Sending...`;
+        document.getElementById('post-btn-icon').classList.remove('hidden');
+        document.getElementById('post-btn-icon').style.animation = 'spin 1.5s linear infinite';
+        document.getElementById('post-btn-text').innerText = 'Sending...';
 
         try {
+            // Fetch User profile details for normalization
             const userDoc = await db.collection("users").doc(currentUser.uid).get();
             const userData = userDoc.data() || {};
             
+            // Moments expire after 24 hours
             const expiry = new Date();
             expiry.setHours(expiry.getHours() + 24);
 
-            const payload = {
+            const momentData = {
                 uid: currentUser.uid,
                 username: userData.username || "anonymous",
-                displayName: userData.name || "User",
+                displayName: userData.name || "Goorac User",
                 pfp: userData.photoURL || currentUser.photoURL || "",
                 verified: userData.verified || false,
                 
@@ -994,11 +1140,13 @@
                 audience: state.audience,
                 allowComments: state.allowComments,
                 
+                // Track Metadata
                 songName: state.song.trackName,
                 songArtist: state.song.artistName,
                 songPreview: state.song.previewUrl,
                 songArt: state.song.artworkUrl100,
 
+                // Server side timing
                 isActive: true,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 expiresAt: firebase.firestore.Timestamp.fromDate(expiry),
@@ -1006,32 +1154,68 @@
                 comments: []
             };
 
+            // Inject mode-specific data
             if (state.mode === 'text') {
-                payload.text = state.text;
-                payload.bgColor = bgColors[state.colorIdx];
-                payload.font = fonts[state.fontIdx];
-                payload.align = state.align;
-                payload.effect = effects[state.effectIdx].name;
+                momentData.text = state.text;
+                momentData.bgColor = bgColors[state.colorIdx];
+                momentData.font = fonts[state.fontIdx];
+                momentData.align = state.align;
+                momentData.effect = effects[state.effectIdx].name;
             } else {
-                payload.mediaUrl = state.mediaUrl;
-                if (state.mode === 'video') payload.videoMeta = state.videoMeta;
+                momentData.mediaUrl = state.mediaUrl;
+                if (state.mode === 'video') momentData.videoMeta = state.videoMeta;
             }
 
-            await db.collection("moments").add(payload);
+            // Write to Firestore
+            await db.collection("moments").add(momentData);
             
+            // Success: Clean up and redirect
             localStorage.removeItem('goorac_moment_draft');
             window.location.href = 'home.html';
 
         } catch (error) {
-            console.error("Post Error:", error);
-            alert("Upload failed. Please check your connection.");
-            els.postBtn.innerHTML = 'Share';
+            console.error("Firestore Upload Error:", error);
+            alert("Upload failed. Check your internet connection.");
+            
+            // Revert UI
+            document.getElementById('post-btn-icon').classList.add('hidden');
+            document.getElementById('post-btn-text').innerText = 'Share';
+            els.postBtn.classList.remove('loading');
             isPosting = false;
         }
     }
 
-    // Initialize the engine
+    /**
+     * PWA VIEWPORT OBSERVER
+     * Ensures UI elements adjust when virtual keyboard appears.
+     */
+    if ('visualViewport' in window) {
+        window.visualViewport.addEventListener('resize', () => {
+            const panel = document.getElementById('controls-panel');
+            const offset = window.innerHeight - window.visualViewport.height;
+            if (offset > 0) {
+                // Keyboard is open
+                panel.style.bottom = `${offset}px`;
+                panel.style.borderRadius = '0';
+            } else {
+                // Keyboard is closed
+                panel.style.bottom = '0';
+                panel.style.borderRadius = '0';
+            }
+        });
+    }
+
+    // Initialize the application engine
     document.addEventListener('DOMContentLoaded', init);
+
+    /**
+     * DOCUMENTATION & EXTENSION API
+     * --------------------------------------------------------------------------
+     * 1. To add a new font: Add the Google Font import and push name to fonts[].
+     * 2. To add a text effect: Add CSS class and entry to effects[].
+     * 3. To update privacy logic: Modify toggleAudience() and postMoment() payload.
+     * --------------------------------------------------------------------------
+     */
 </script>
 </body>
 </html>
