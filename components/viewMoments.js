@@ -166,14 +166,29 @@ class ViewMoments extends HTMLElement {
                     // activeOverlay.style.bottom = `${offset}px`; // Commented out to prevent the stretch jump bug
                     
                     // NEW FIX: Pin the overlay dimensions directly to the visual viewport to stop browser fighting
-                    activeOverlay.style.height = `${window.visualViewport.height}px`;
-                    activeOverlay.style.top = `${window.visualViewport.offsetTop}px`;
-                    activeOverlay.style.bottom = 'auto'; 
+                    // activeOverlay.style.height = `${window.visualViewport.height}px`;
+                    // activeOverlay.style.top = `${window.visualViewport.offsetTop}px`;
+                    // activeOverlay.style.bottom = 'auto'; 
+
+                    // SMOOTH FIX: Instead of hard-pinning top/height which fights iOS Safari scroll boundaries,
+                    // we use padding-bottom. This naturally glides the sheet up without causing layout jumps.
+                    activeOverlay.style.height = '100%'; 
+                    activeOverlay.style.top = '0px';
+                    activeOverlay.style.bottom = '0px';
+                    activeOverlay.style.paddingBottom = `${offset > 0 ? offset : 0}px`;
+                    activeOverlay.style.transition = 'padding-bottom 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
                 });
                 
                 // NEW FIX: Force the page scroll back to 0 to counter the browser natively stretching the view
                 if (activeOverlays.length > 0) {
-                    window.scrollTo(0, 0); 
+                    // window.scrollTo(0, 0); // This synchronous call caused the violent up-down jump!
+                    
+                    // SMOOTH FIX: Use requestAnimationFrame to gently snap it back without jittering against the browser
+                    window.requestAnimationFrame(() => {
+                        if (document.documentElement.scrollTop > 0 || document.body.scrollTop > 0) {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                    });
                 }
             };
 
@@ -194,10 +209,15 @@ class ViewMoments extends HTMLElement {
                 activeOverlays.forEach(activeOverlay => {
                     activeOverlay.style.bottom = '0px'; // Reset to default
                     // NEW FIX: Clean up the applied styles from the viewport handling
-                    activeOverlay.style.top = '0px'; 
-                    activeOverlay.style.height = '100%';
+                    // activeOverlay.style.top = '0px'; 
+                    // activeOverlay.style.height = '100%';
+
+                    // SMOOTH FIX CLEANUP: Revert padding smoothly
+                    activeOverlay.style.paddingBottom = '0px';
                 });
-                window.scrollTo(0, 0); // Re-anchor page layout
+                // window.scrollTo(0, 0); // Re-anchor page layout
+                // SMOOTH FIX: Smoothly re-anchor layout to prevent drop-jumps
+                window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
             });
         });
     }
