@@ -1,26 +1,26 @@
 // components/chatTheme.js
 (function() {
     window.chatTheme = {
-        bg: "#040A07",
-        bgGradient: "radial-gradient(circle at 50% 30%, #0A1C14 0%, #040A07 70%)",
-        headerBg: "rgba(10, 26, 18, 0.90)",
+        bg: "#000000",
+        bgGradient: "radial-gradient(circle at 50% 30%, #111111 0%, #000000 70%)",
+        headerBg: "rgba(10, 10, 10, 0.90)",
         headerBlur: "blur(25px)",
-        accent: "#10B981",
-        accentDark: "#059669",
-        accentDim: "rgba(16, 185, 129, 0.2)",
-        glassBorder: "rgba(16, 185, 129, 0.08)",
-        border: "#132A1F",
-        borderLight: "rgba(16, 185, 129, 0.15)",
-        sentBg: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
+        accent: "#FF6D00",
+        accentDark: "#E65100",
+        accentDim: "rgba(255, 109, 0, 0.2)",
+        glassBorder: "rgba(255, 255, 255, 0.08)",
+        border: "#1c1c1c",
+        borderLight: "rgba(255,255,255,0.1)",
+        sentBg: "linear-gradient(135deg, #E65100 0%, #FF6D00 100%)",
         sentText: "#ffffff",
-        sentShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
-        receivedBg: "#162B21",
+        sentShadow: "0 4px 15px rgba(230, 81, 0, 0.25)",
+        receivedBg: "#262626",
         receivedText: "#ffffff",
-        receivedShadow: "0 2px 5px rgba(0,0,0,0.3)",
+        receivedShadow: "0 2px 5px rgba(0,0,0,0.2)",
         text: "#ffffff",
-        textSecondary: "#A7BDB3",
-        textMuted: "#6B7A73",
-        mobileToolbarBg: "rgba(10, 26, 18, 0.85)"
+        textSecondary: "#a1a1a1",
+        textMuted: "#666666",
+        mobileToolbarBg: "rgba(15, 15, 15, 0.85)"
     };
 
     // Apply the theme directly to the root CSS variables
@@ -45,6 +45,6 @@
     root.style.setProperty('--text-secondary', window.chatTheme.textSecondary);
     root.style.setProperty('--text-muted', window.chatTheme.textMuted);
     
-    // ADDED THIS LINE to ensure the mobile toolbar color is actually set!
-    root.style.setProperty('--mobile-toolbar-bg', window.chatTheme.mobileToolbarBg);
+    // FIX: Added the missing line to link the mobile toolbar background!
+    root.style.setProperty('--mobileToolbarBg', window.chatTheme.mobileToolbarBg);
 })();
