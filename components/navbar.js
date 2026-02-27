@@ -29,6 +29,8 @@ class MainNavbar extends HTMLElement {
                 left: 0;
                 right: 0;
                 z-index: 900; /* Low enough to stay under modals naturally */
+                /* FIX: Prevent invisible host wrapper from blocking clicks on the main page */
+                pointer-events: none; 
                 transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
                             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             }
@@ -54,6 +56,8 @@ class MainNavbar extends HTMLElement {
                 justify-content: space-around;
                 align-items: center;
                 padding-bottom: env(safe-area-inset-bottom);
+                /* FIX: Restore clickability to the actual visible navigation bar */
+                pointer-events: auto;
                 transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
             }
 
