@@ -14,7 +14,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
-    <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/viewMoments.js" defer></script> 
@@ -30,6 +29,7 @@
             --text-main: #ffffff;
             --text-dim: #888888;
             --danger: #ff3b30;
+            --nav-bg: rgba(5, 5, 5, 0.85);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -37,10 +37,9 @@
         body {
             background-color: var(--bg);
             color: var(--text-main);
-            font-family: -apple-system, system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
-            /* Ensures bottom content is completely visible above the nav bar */
-            padding-bottom: calc(100px + env(safe-area-inset-bottom)); 
+            padding-bottom: calc(100px + env(safe-area-inset-bottom)); /* Prevents content hiding behind nav */
             overflow-x: hidden;
             -webkit-touch-callout: none;
         }
@@ -48,14 +47,14 @@
         /* --- HEADER --- */
         header {
             position: sticky; top: 0; 
-            background: rgba(0,0,0,0.95);
+            background: rgba(0,0,0,0.85);
             padding: 15px 20px; 
             display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); 
             z-index: 1000;
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
-            height: 70px;
+            height: max(70px, calc(55px + env(safe-area-inset-top)));
         }
 
         .logo { 
@@ -71,24 +70,20 @@
             position: relative; cursor: pointer;
             width: 32px; height: 32px;
             display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s;
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        .notif-btn:active { transform: scale(0.92); }
+        .notif-btn:active { transform: scale(0.85); }
 
         .notif-icon {
-            width: 26px; height: 26px; 
-            fill: none; stroke: #fff; stroke-width: 1.8; 
-            stroke-linecap: round; stroke-linejoin: round;
+            width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
         }
 
-        /* NEW BADGE STYLE */
         .notif-badge {
-            position: absolute; top: 0px; right: 0px;
+            position: absolute; top: -2px; right: -2px;
             background: var(--danger); color: #fff;
-            font-size: 10px; font-weight: 700;
-            min-width: 16px; height: 16px;
-            padding: 0 3px; border-radius: 10px; 
-            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 800;
+            min-width: 18px; height: 18px; padding: 0 4px;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
             opacity: 0; transform: scale(0);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none; border: 2px solid var(--bg); z-index: 2;
@@ -106,122 +101,163 @@
             display: flex; gap: 15px; padding: 15px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
-            min-height: 95px; 
+            min-height: 105px;
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
-        .note-item { display: flex; flex-direction: column; align-items: center; min-width: 70px; cursor: pointer; position: relative; }
-        .note-pfp { width: 65px; height: 65px; min-width: 65px; min-height: 65px; border-radius: 24px; object-fit: cover; border: 2px solid var(--border); padding: 2px; background: #000; transition: transform 0.2s; }
-        .note-item:active .note-pfp { transform: scale(0.95); border-color: var(--accent); }
-        .note-username { margin-top: 6px; font-size: 0.7rem; color: var(--text-dim); max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .note-bubble { position: absolute; top: 0; right: 0; background: var(--surface); border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px; font-size: 0.7rem; max-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+        .note-item { 
+            display: flex; flex-direction: column; align-items: center; 
+            min-width: 70px; cursor: pointer; position: relative;
+        }
+        
+        .note-pfp {
+            width: 65px; height: 65px; min-width: 65px; min-height: 65px;
+            border-radius: 24px; object-fit: cover; border: 2px solid var(--border);
+            padding: 2px; background: #000; transition: transform 0.2s;
+        }
+        .note-item:active .note-pfp { transform: scale(0.92); border-color: var(--accent); }
+        
+        .note-username {
+            margin-top: 6px; font-size: 0.7rem; color: var(--text-dim);
+            max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
 
-        /* --- CONTENT --- */
-        .content { padding: 20px; transition: opacity 0.3s ease; }
+        /* --- CONTENT DASHBOARD --- */
+        .content { padding: 20px; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .section-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); font-weight: 800; letter-spacing: 1.5px; margin-bottom: 15px; display: block; }
+        .section-label { 
+            font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); 
+            font-weight: 800; letter-spacing: 1.5px; margin-bottom: 15px; display: block;
+        }
 
-        .welcome-card { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 24px; margin-bottom: 25px; position: relative; overflow: hidden; display: flex; flex-direction: column; min-height: 250px; }
+        .welcome-card { 
+            background: var(--surface); border: 1px solid var(--border); 
+            padding: 25px; border-radius: 24px; margin-bottom: 25px; 
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
         .quantum-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .status-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 0.7rem; font-weight: 700; }
-        .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
+        .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); animation: pulse-glow 2s infinite; }
         .live-clock { color: var(--text-dim); font-family: monospace; font-size: 0.8rem; }
+
         .welcome-card h1 { margin: 0; font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.2; word-wrap: break-word; min-height: 34px; }
         .welcome-card p { color: var(--text-dim); margin-top: 10px; font-size: 0.85rem; line-height: 1.5; min-height: 21px; }
 
         /* --- ACTIVITY GRID --- */
         .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
-        .activity-card { background: #0d0d0d; border: 1px solid var(--border); padding: 20px; border-radius: 20px; position: relative; min-height: 130px; display: flex; flex-direction: column; justify-content: flex-end; transition: 0.1s; cursor: pointer; }
-        .activity-card:active { transform: scale(0.98); background: #151515; }
-        .card-icon-area { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 10px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border); }
+        
+        .activity-card { 
+            background: #0d0d0d; border: 1px solid var(--border); padding: 20px; 
+            border-radius: 20px; position: relative; min-height: 130px; 
+            display: flex; flex-direction: column; justify-content: flex-end;
+            transition: 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); cursor: pointer;
+            overflow: hidden; /* For ripple effect */
+        }
+        .activity-card:active { transform: scale(0.96); background: #151515; }
+        
+        .card-icon-area { 
+            position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; 
+            border-radius: 10px; background: #1a1a1a; 
+            display: flex; align-items: center; justify-content: center; 
+            overflow: hidden; border: 1px solid var(--border); 
+        }
         .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
         .card-icon-area div { color: var(--text-dim); font-size: 9px; font-weight: 800; }
+
         .time-badge { font-size: 0.7rem; color: var(--accent); margin-bottom: 4px; font-weight: 600; }
         .count-num { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
         .count-label { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; }
+
         .activity-card.has-count { border-color: rgba(0, 210, 255, 0.3); background: rgba(0, 210, 255, 0.05); }
         .activity-card.missed-alert { border-color: rgba(255, 68, 68, 0.3); background: rgba(255, 68, 68, 0.05); }
         .missed-alert .count-num { color: var(--danger); }
 
         /* --- SKELETONS --- */
-        .skeleton { background: #111; color: transparent !important; border-radius: 6px; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        .skeleton { background: #151515; color: transparent !important; border-radius: 6px; animation: pulse-skel 1.5s infinite; }
+        @keyframes pulse-skel { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 
-        /* --- CRITICAL Z-INDEX AND NAV FIXES --- */
-        view-moments { 
-            position: relative; 
-            z-index: 10; 
-            display: block; 
+        /* --- NATIVE BOTTOM NAVBAR --- */
+        .native-bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: calc(65px + env(safe-area-inset-bottom));
+            background: var(--nav-bg);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 9999; /* Absolute priority */
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
         
-        view-notes {
-            z-index: 9999 !important; 
-            position: relative;
-        }
+        .native-bottom-nav.hidden-nav { transform: translateY(100%); pointer-events: none; }
 
-        main-navbar {
-            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-            position: fixed; 
-            bottom: 0; left: 0; right: 0;
-            z-index: 9998 !important; /* Forces it over the feed */
-            pointer-events: auto !important; /* PREVENTS PHANTOM CLICKS */
+        .nav-item {
+            color: var(--text-dim);
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
         }
-        main-navbar.hidden-nav {
-            transform: translateY(150%) !important;
-            pointer-events: none !important;
-        }
+        
+        .nav-item .material-icons-round { font-size: 26px; transition: 0.2s; }
+        .nav-item:active { background: rgba(255,255,255,0.05); transform: scale(0.9); }
+        .nav-item.active { color: var(--accent); }
+        .nav-item.active .material-icons-round { filter: drop-shadow(0px 0px 8px var(--accent-dim)); }
 
-        /* --- SMART MOMENTS FAB STYLE --- */
+        /* --- MOMENTS FAB STYLE --- */
         .moments-fab {
             position: fixed;
-            /* Dynamically adapts to notch/swipe bars on mobile */
-            bottom: calc(90px + env(safe-area-inset-bottom)); 
+            /* Ensures it sits dynamically above the nav bar even on iPhones with bottom bars */
+            bottom: calc(85px + env(safe-area-inset-bottom)); 
             right: 20px;
             width: 56px; height: 56px;
             border-radius: 50%;
             background: var(--surface);
             border: 2px solid var(--border);
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            z-index: 9990; /* High, but strictly under modals/notes */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            z-index: 9998; /* Just below the navbar if they ever overlap */
             cursor: pointer;
-            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-            transform-origin: center;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        
-        /* NEW: Scroll Shrink Effect */
-        .moments-fab.scrolling {
-            transform: scale(0.7);
-            opacity: 0.5;
-        }
-        
-        .moments-fab:active { transform: scale(0.9) !important; }
-        .moments-fab.has-moment { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); animation: pulse-glow 2s infinite; }
-        @keyframes pulse-glow { 0% { box-shadow: 0 0 8px var(--accent); } 50% { box-shadow: 0 0 20px var(--accent); } 100% { box-shadow: 0 0 8px var(--accent); } }
+        .moments-fab:active { transform: scale(0.85); }
+        .moments-fab.has-moment { border-color: var(--accent); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 5px var(--accent); } 50% { box-shadow: 0 0 15px var(--accent); } 100% { box-shadow: 0 0 5px var(--accent); } }
         .moments-fab img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
         .moments-fab .material-icons-round { color: var(--accent); font-size: 30px; }
+        .moments-fab.hidden-fab { transform: scale(0) translateY(50px) rotate(45deg); pointer-events: none; opacity: 0; }
 
-        /* --- POPUPS & TOASTS --- */
-        #install-popup { position: fixed; bottom: 100px; left: 50%; transform: translate(-50%, 20px); width: 90%; max-width: 400px; background: #111; border: 1px solid var(--accent); padding: 20px; border-radius: 20px; display: flex; align-items: center; z-index: 10000; opacity: 0; pointer-events: none; transition: 0.3s; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        #install-popup.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-        .install-text h3 { margin: 0; color: #fff; font-size: 1rem; }
-        .install-text p { margin: 4px 0 0; color: #888; font-size: 0.8rem; }
-        .install-btn { margin-left: auto; background: var(--accent); border: none; color: #000; padding: 8px 16px; border-radius: 50px; font-weight: 800; cursor: pointer; }
+        /* --- QUANTUM RIPPLE EFFECT --- */
+        .ripple {
+            position: absolute; border-radius: 50%; transform: scale(0);
+            animation: quantum-ripple 600ms linear; background-color: rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+        @keyframes quantum-ripple { to { transform: scale(4); opacity: 0; } }
 
-        #bell-toast { position: fixed; top: 65px; right: 15px; width: auto; min-width: 200px; max-width: 280px; background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 10000; opacity: 0; transform: translateY(-10px) scale(0.95); pointer-events: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        #bell-toast.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-        .toast-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.9rem; }
-        .icon-like { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
-        .icon-follow { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
-        .toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-        .toast-title { font-size: 0.75rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
-        .toast-body { font-size: 0.7rem; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .toast-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
-
-        .pulse-btn-link { color: var(--accent); animation: breathe 2s infinite ease-in-out; font-size: 26px !important; }
-        @keyframes breathe { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
+        view-notes { z-index: 10000 !important; position: relative; }
     </style>
+
+    <script>
+        const cached = localStorage.getItem('goorac_home_data');
+        let preloadedData = null;
+        if (cached) {
+            try { preloadedData = JSON.parse(cached); } 
+            catch (e) { console.error("Cache parsing error", e); }
+        }
+    </script>
 </head>
+
 <body oncontextmenu="return false;"> 
 <script src="components/chatLoader.js" defer></script>
 <chat-loader></chat-loader>
@@ -229,10 +265,6 @@
 <header>
     <div class="logo">GOORAC</div>
     <div class="header-right">
-        <div class="notif-btn" >
-            <span class="material-icons-round pulse-btn-link" onclick="window.location.href='pulseLobby.html'">graphic_eq</span>
-        </div>
-
         <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
             <svg class="notif-icon" viewBox="0 0 24 24">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -240,57 +272,38 @@
             </svg>
             <div id="notif-count" class="notif-badge">0</div>
         </div>
-        <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" width="38" height="38" onclick="window.location.href='profile.html'">
+        <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-pfp skeleton" onclick="window.location.href='profile.html'">
     </div>
 </header>
 
-<div id="bell-toast" onclick="window.location.href='notifications.html'">
-    <div class="toast-icon" id="t-icon"></div>
-    <img id="t-img" class="toast-img" style="display:none;">
-    <div class="toast-content">
-        <div class="toast-title" id="t-title"></div>
-        <div class="toast-body" id="t-body"></div>
-    </div>
-</div>
-
-<div id="install-popup">
-    <div class="install-text">
-        <h3>Install Goorac</h3>
-        <p>Quantum Access Enabled</p>
-    </div>
-    <button class="install-btn" onclick="installPWA()">GET</button>
-</div>
-
 <div id="notes-container">
     <div class="note-item" id="my-note-btn">
-        <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
-        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp" width="65" height="65">
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp">
         <span class="note-username">You</span>
     </div>
 </div>
 
 <view-moments id="moments-feed"></view-moments> 
 
-<div class="content" id="dashboard-content" style="display: block;">
+<div class="content" id="dashboard-content">
     <span class="section-label">DASHBOARD</span>
     <div class="welcome-card">
         <div class="quantum-info">
             <div class="status-tag"><div class="dot"></div> ONLINE</div>
             <div class="live-clock" id="clock">00:00</div>
         </div>
-        
         <h1 id="welcome-name" class="skeleton" style="width: 60%; min-height: 35px;"></h1>
         <p id="welcome-text" class="skeleton" style="width: 90%; min-height: 20px; margin-top: 10px;"></p>
         
         <div class="activity-grid">
-            <div class="activity-card" id="msg-card" onclick="window.location.href='messages.html'">
+            <div class="activity-card quantum-touch" id="msg-card" onclick="window.location.href='messages.html'">
                 <div class="card-icon-area" id="msg-pfp-area"><div>MSG</div></div>
                 <span id="msg-time" class="time-badge">--:--</span>
                 <span id="msg-header" class="count-num">Inbox</span>
                 <span id="msg-subtext" class="count-label">Check Messages</span>
             </div>
             
-            <div class="activity-card" id="call-card" onclick="window.location.href='calls.html'">
+            <div class="activity-card quantum-touch" id="call-card" onclick="window.location.href='calls.html'">
                 <div class="card-icon-area" id="call-pfp-area"><div>LOG</div></div>
                 <span id="call-time" class="time-badge">--:--</span>
                 <span id="call-count" class="count-num">Calls</span>
@@ -304,175 +317,130 @@
     <span class="material-icons-round">add</span>
 </div>
 
-<main-navbar id="main-nav"></main-navbar>
+<nav class="native-bottom-nav" id="main-nav">
+    <a href="index.html" class="nav-item active"><span class="material-icons-round">home</span></a>
+    <a href="pulseLobby.html" class="nav-item"><span class="material-icons-round" style="animation: pulse-skel 2s infinite; color: var(--accent);">graphic_eq</span></a>
+    <a href="search.html" class="nav-item"><span class="material-icons-round">search</span></a>
+    <a href="messages.html" class="nav-item"><span class="material-icons-round">chat_bubble_outline</span></a>
+    <a href="profile.html" class="nav-item"><span class="material-icons-round">person_outline</span></a>
+</nav>
+
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    // --- 1. ENHANCED ZERO-LATENCY CACHE LOAD ---
-    // (Now instantly blocks dashboard flicker if moments existed last session)
-    (function loadHomeCache() {
-        const cached = localStorage.getItem('goorac_home_data');
-        if (cached) {
-            try {
-                const data = JSON.parse(cached);
+    // --- 1. APPLY CACHE INSTANTLY (Prevents DOM Glitch) ---
+    if (preloadedData) {
+        document.addEventListener('DOMContentLoaded', () => {
+            if(preloadedData.name) {
+                document.getElementById('welcome-name').innerText = preloadedData.name;
+                document.getElementById('welcome-name').classList.remove('skeleton');
+            }
+            if(preloadedData.text) {
+                document.getElementById('welcome-text').innerText = preloadedData.text;
+                document.getElementById('welcome-text').classList.remove('skeleton');
+            }
+            if(preloadedData.photoURL) {
+                document.getElementById('header-pfp').src = preloadedData.photoURL;
+                document.getElementById('header-pfp').classList.remove('skeleton');
+                document.getElementById('my-note-pfp').src = preloadedData.photoURL;
+                document.getElementById('my-note-pfp').classList.remove('skeleton');
+            }
+            if(preloadedData.msgState) {
+                document.getElementById('msg-header').innerText = preloadedData.msgState.header;
+                document.getElementById('msg-subtext').innerText = preloadedData.msgState.sub;
+                document.getElementById('msg-pfp-area').innerHTML = preloadedData.msgState.pfpHTML;
+                if (preloadedData.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
+            }
+        });
+    }
+
+    // --- QUANTUM RIPPLE FEATURE ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const buttons = document.querySelectorAll('.quantum-touch');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const circle = document.createElement('span');
+                circle.classList.add('ripple');
+                circle.style.left = `${x}px`;
+                circle.style.top = `${y}px`;
                 
-                // Zero-Flicker Logic: If feed had items previously, hide dashboard immediately
-                if (data.hasFeedItems) {
-                    document.getElementById('dashboard-content').style.display = 'none';
-                }
+                // Diameter based on the furthest corner
+                const diameter = Math.max(btn.clientWidth, btn.clientHeight);
+                circle.style.width = circle.style.height = `${diameter}px`;
                 
-                const nameEl = document.getElementById('welcome-name');
-                const textEl = document.getElementById('welcome-text');
-                const pfpEl = document.getElementById('header-pfp');
-                const notePfp = document.getElementById('my-note-pfp');
-
-                if (data.name) { nameEl.innerText = data.name; nameEl.classList.remove('skeleton'); }
-                if (data.text) { textEl.innerText = data.text; textEl.classList.remove('skeleton'); }
-                if (data.photoURL) {
-                    pfpEl.src = data.photoURL; pfpEl.classList.remove('skeleton');
-                    notePfp.src = data.photoURL; notePfp.classList.remove('skeleton');
-                }
-
-                if (data.msgState) {
-                    document.getElementById('msg-header').innerText = data.msgState.header;
-                    document.getElementById('msg-subtext').innerText = data.msgState.sub;
-                    document.getElementById('msg-time').innerText = data.msgState.time;
-                    document.getElementById('msg-pfp-area').innerHTML = data.msgState.pfpHTML;
-                    if (data.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
-                }
-
-                if (data.callState) {
-                    document.getElementById('call-count').innerText = data.callState.count;
-                    document.getElementById('call-label').innerText = data.callState.label;
-                    document.getElementById('call-time').innerText = data.callState.time;
-                    document.getElementById('call-pfp-area').innerHTML = data.callState.pfpHTML;
-                    if (data.callState.isMissed) document.getElementById('call-card').classList.add('missed-alert');
-                }
-            } catch (e) { console.error(e); }
-        }
-    })();
-
-    // --- SMART SCROLL FEATURE FOR FAB ---
-    let scrollTimeout;
-    window.addEventListener('scroll', () => {
-        const fab = document.getElementById('moments-fab');
-        if(!fab) return;
-        
-        // Add scrolling class when actively swiping
-        fab.classList.add('scrolling');
-        
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-            fab.classList.remove('scrolling');
-        }, 400); // Wait until scrolling stops completely to restore
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
     });
 
+    // --- VISIBILITY OBSERVERS ---
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
+        const fab = document.getElementById('moments-fab');
         const momentsFeed = document.getElementById('moments-feed');
         const dashboardContent = document.getElementById('dashboard-content');
-        
-        // State tracking to prevent DOM glitches
-        let isNavCurrentlyHidden = false;
 
-        function updateUIVisibility() {
-            // Check Moments Modal
-            let isMomentModalOpen = false;
-            if(momentsFeed) {
-                isMomentModalOpen = momentsFeed.querySelector('.m-full-modal.open') !== null || 
-                                    momentsFeed.querySelector('.c-overlay.open') !== null;
-            }
-            
-            // Check Notes Modal
-            let isNotesOpen = false;
-            if(noteViewer) {
-                const style = window.getComputedStyle(noteViewer);
-                isNotesOpen = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
-                              noteViewer.classList.contains('open') || 
-                              noteViewer.classList.contains('active') || 
-                              noteViewer.hasAttribute('open');
-            }
-
-            // Smoothly hide/show Navbar
-            const shouldHideNav = isMomentModalOpen || isNotesOpen;
-            if (shouldHideNav !== isNavCurrentlyHidden) {
-                isNavCurrentlyHidden = shouldHideNav;
-                if (shouldHideNav) {
-                    mainNav.classList.add('hidden-nav');
-                } else {
-                    mainNav.classList.remove('hidden-nav');
-                }
-            }
-
-            // Sync Dashboard visibility with feed presence live
-            if (dashboardContent && momentsFeed) {
-                const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
-                dashboardContent.style.display = hasMoments ? 'none' : 'block';
-                // Trigger save so next reload handles it correctly
-                saveHomeState();
+        function toggleOverlays(shouldHide) {
+            if (shouldHide) {
+                mainNav.classList.add('hidden-nav');
+                fab.classList.add('hidden-fab');
+            } else {
+                mainNav.classList.remove('hidden-nav');
+                fab.classList.remove('hidden-fab');
             }
         }
 
         if (noteViewer) {
-            const noteObserver = new MutationObserver(updateUIVisibility);
-            noteObserver.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+            new MutationObserver(() => {
+                const style = window.getComputedStyle(noteViewer);
+                const isNotesOpen = (style.display !== 'none' && style.opacity !== '0') || noteViewer.classList.contains('open');
+                const isModalOpen = momentsFeed && (momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open'));
+                toggleOverlays(isNotesOpen || isModalOpen);
+            }).observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
         }
 
         if (momentsFeed) {
-            const vmObserver = new MutationObserver(updateUIVisibility);
-            vmObserver.observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+            new MutationObserver(() => {
+                const isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
+                toggleOverlays(isModalOpen);
+
+                // Instantly hide dashboard if moments exist to prevent scrolling bugs
+                const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
+                if (dashboardContent) {
+                    dashboardContent.style.display = hasMoments ? 'none' : 'block';
+                }
+            }).observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         }
     });
 
     function saveHomeState() {
-        const momentsFeed = document.getElementById('moments-feed');
-        const hasFeedItems = momentsFeed ? momentsFeed.querySelectorAll('.m-card').length > 0 : false;
-
         const state = {
             name: document.getElementById('welcome-name').innerText,
             text: document.getElementById('welcome-text').innerText,
             photoURL: document.getElementById('header-pfp').src,
-            hasFeedItems: hasFeedItems, // Storing feed state to fix flicker
             msgState: {
                 header: document.getElementById('msg-header').innerText,
                 sub: document.getElementById('msg-subtext').innerText,
-                time: document.getElementById('msg-time').innerText,
                 pfpHTML: document.getElementById('msg-pfp-area').innerHTML,
                 hasCount: document.getElementById('msg-card').classList.contains('has-count')
-            },
-            callState: {
-                count: document.getElementById('call-count').innerText,
-                label: document.getElementById('call-label').innerText,
-                time: document.getElementById('call-time').innerText,
-                pfpHTML: document.getElementById('call-pfp-area').innerHTML,
-                isMissed: document.getElementById('call-card').classList.contains('missed-alert')
             }
         };
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
 
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); deferredPrompt = e;
-        setTimeout(() => document.getElementById('install-popup').classList.add('show'), 2000);
-    });
-    async function installPWA() {
-        if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-popup').classList.remove('show'); }
-    }
-
     // --- FIREBASE INIT ---
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } else if (typeof firebase !== 'undefined' && !firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
+    if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
+    else if (typeof firebase !== 'undefined' && !firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
 
     const auth = firebase.auth();
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     const db = firebase.firestore();
-    if (!window.rdb && firebase.database) window.rdb = firebase.database();
 
     setInterval(() => {
         document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
@@ -495,31 +463,25 @@
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
-                checkMyMoment(user.uid, doc.data().photoURL); // Checks if user has a moment and updates FAB
+                checkMyMoment(user.uid, doc.data().photoURL);
             } else window.location.href = "setup.html";
         } else window.location.href = "login.html";
     });
 
     // --- MOMENTS FAB LOGIC ---
     function checkMyMoment(uid, photoURL) {
-        db.collection('moments')
-          .where('uid', '==', uid)
-          .where('isActive', '==', true)
-          .where('expiresAt', '>', firebase.firestore.Timestamp.now())
-          .limit(1)
-          .onSnapshot(snap => {
-              const fab = document.getElementById('moments-fab');
-              if(!snap.empty) {
-                  const moment = snap.docs[0];
-                  fab.dataset.momentId = moment.id;
-                  fab.classList.add('has-moment');
-                  fab.innerHTML = `<img src="${photoURL || 'https://via.placeholder.com/150'}">`;
-              } else {
-                  fab.dataset.momentId = '';
-                  fab.classList.remove('has-moment');
-                  fab.innerHTML = `<span class="material-icons-round">add</span>`;
-              }
-          });
+        db.collection('moments').where('uid', '==', uid).where('isActive', '==', true).where('expiresAt', '>', firebase.firestore.Timestamp.now()).limit(1).onSnapshot(snap => {
+            const fab = document.getElementById('moments-fab');
+            if(!snap.empty) {
+                fab.dataset.momentId = snap.docs[0].id;
+                fab.classList.add('has-moment');
+                fab.innerHTML = `<img src="${photoURL || 'https://via.placeholder.com/150'}">`;
+            } else {
+                fab.dataset.momentId = '';
+                fab.classList.remove('has-moment');
+                fab.innerHTML = `<span class="material-icons-round">add</span>`;
+            }
+        });
     }
 
     window.handleFabClick = function() {
@@ -527,7 +489,6 @@
         if(fab.classList.contains('has-moment') && fab.dataset.momentId) {
             const vm = document.querySelector('view-moments');
             if(vm) {
-                // Ensure the moment exists in viewMoments array before opening, since it could be paginated
                 const exists = vm.moments.find(m => m.id === fab.dataset.momentId);
                 if(!exists) {
                     db.collection('moments').doc(fab.dataset.momentId).get().then(doc => {
@@ -536,13 +497,9 @@
                             vm.openFullModal(doc.id);
                         }
                     });
-                } else {
-                    vm.openFullModal(fab.dataset.momentId);
-                }
+                } else vm.openFullModal(fab.dataset.momentId);
             }
-        } else {
-            window.location.href = 'moments.html';
-        }
+        } else window.location.href = 'moments.html';
     }
 
     function updateUI(data) {
@@ -550,100 +507,28 @@
         const textEl = document.getElementById('welcome-text');
         const pfpEl = document.getElementById('header-pfp');
         const notePfp = document.getElementById('my-note-pfp');
-        nameEl.classList.remove('skeleton');
+        
         const hour = new Date().getHours();
         let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
         nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
+        nameEl.classList.remove('skeleton');
+        
         const src = data.photoURL || 'https://via.placeholder.com/150';
         pfpEl.src = src; pfpEl.classList.remove('skeleton');
         notePfp.src = src; notePfp.classList.remove('skeleton');
-        textEl.classList.remove('skeleton');
+        
         textEl.innerText = "System operational. Connection secure.";
+        textEl.classList.remove('skeleton');
         saveHomeState();
     }
 
-    // --- 🔔 SHOW TOAST FUNCTION ---
-    let toastTimeout;
-    function showNotificationToast(type, name, pic) {
-        const toast = document.getElementById('bell-toast');
-        const icon = document.getElementById('t-icon');
-        const img = document.getElementById('t-img');
-        const title = document.getElementById('t-title');
-        const body = document.getElementById('t-body');
-
-        if(toastTimeout) clearTimeout(toastTimeout);
-        
-        icon.style.display = 'none';
-        img.style.display = 'none';
-
-        if (pic) {
-            img.src = pic;
-            img.style.display = 'block';
-        } else {
-            icon.style.display = 'flex';
-            if(type === 'like') {
-                icon.innerHTML = '❤️';
-                icon.className = 'toast-icon icon-like';
-            } else {
-                icon.innerHTML = '👤';
-                icon.className = 'toast-icon icon-follow';
-            }
-        }
-
-        title.innerText = type === 'like' ? 'New Like' : 'New Follower';
-        body.innerText = `${name} ${type === 'like' ? 'liked your note' : 'started following you'}`;
-
-        toast.classList.add('active');
-        if(navigator.vibrate) navigator.vibrate(20);
-
-        toastTimeout = setTimeout(() => {
-            toast.classList.remove('active');
-        }, 3000);
-    }
-
     function listenNotifications(uid) {
-        // --- NEW BADGE LOGIC: LISTEN TO PROFILE FIELD ---
         db.collection("users").doc(uid).onSnapshot(doc => {
             const data = doc.data();
             const count = data ? (data.unreadCount || 0) : 0;
             const badge = document.getElementById('notif-count');
-            
-            if (count > 0) {
-                badge.innerText = count > 99 ? '99+' : count;
-                badge.classList.add('visible');
-            } else {
-                badge.classList.remove('visible');
-            }
-        });
-
-        // --- TOAST LISTENER (SEPARATE FROM BADGE) ---
-        // Keeps the toasts working for real-time feedback
-        let isFirstLoad = true;
-        
-        // Listen for new likes (Standard Collection)
-        db.collection("notes").where("uid", "==", uid).limit(1).onSnapshot(snapshot => {
-            if(!isFirstLoad && !snapshot.empty) {
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'modified') {
-                        const data = change.doc.data();
-                        const lastLike = data.likes ? data.likes[data.likes.length - 1] : null;
-                        if(lastLike && lastLike.uid !== uid) {
-                            showNotificationToast('like', lastLike.displayName || 'Someone', lastLike.photoURL);
-                        }
-                    }
-                });
-            }
-        });
-
-        // Listen for new followers (User Subcollection)
-        db.collection("users").doc(uid).onSnapshot(doc => {
-            if(!isFirstLoad && doc.exists) {
-                const data = doc.data();
-                const followers = data.followers || [];
-                const lastFollower = followers[followers.length - 1]; // Assuming array order
-                // This is a basic check; robust diffing is better but complex for this snippet
-            }
-            if(isFirstLoad) setTimeout(()=>isFirstLoad=false, 2000);
+            if (count > 0) { badge.innerText = count > 99 ? '99+' : count; badge.classList.add('visible'); } 
+            else badge.classList.remove('visible');
         });
     }
 
