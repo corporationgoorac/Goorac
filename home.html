@@ -17,7 +17,8 @@
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
-    <script src="components/viewMoments.js" defer></script> <script type="module" src="components/presence.js"></script>
+    <script src="components/viewMoments.js" defer></script> 
+    <script type="module" src="components/presence.js"></script>
 
     <style>
         :root {
@@ -38,7 +39,7 @@
             color: var(--text-main);
             font-family: -apple-system, system-ui, sans-serif;
             margin: 0;
-            padding-bottom: 100px;
+            padding-bottom: calc(100px + env(safe-area-inset-bottom));
             overflow-x: hidden;
             -webkit-touch-callout: none;
         }
@@ -53,7 +54,7 @@
             z-index: 1000;
             backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
-            height: 70px; /* Enforced height for stability */
+            height: 70px;
         }
 
         .logo { 
@@ -64,7 +65,6 @@
 
         .header-right { display: flex; align-items: center; gap: 20px; height: 100%; }
 
-        /* SLEEK BELL ICON & BADGE */
         .notif-btn {
             position: relative; cursor: pointer;
             width: 32px; height: 32px;
@@ -75,38 +75,27 @@
 
         .notif-icon {
             width: 26px; height: 26px; 
-            fill: none; 
-            stroke: #fff; 
-            stroke-width: 1.8; 
-            stroke-linecap: round; 
-            stroke-linejoin: round;
+            fill: none; stroke: #fff; stroke-width: 1.8; 
+            stroke-linecap: round; stroke-linejoin: round;
         }
 
-        /* NEW BADGE STYLE */
         .notif-badge {
-            position: absolute; 
-            top: 0px; right: 0px;
-            background: var(--danger); 
-            color: #fff;
+            position: absolute; top: 0px; right: 0px;
+            background: var(--danger); color: #fff;
             font-size: 10px; font-weight: 700;
             min-width: 16px; height: 16px;
-            padding: 0 3px;
-            border-radius: 10px; 
+            padding: 0 3px; border-radius: 10px; 
             display: flex; align-items: center; justify-content: center;
             opacity: 0; transform: scale(0);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none; 
-            border: 2px solid var(--bg); 
-            z-index: 2;
+            pointer-events: none; border: 2px solid var(--bg); z-index: 2;
         }
         .notif-badge.visible { opacity: 1; transform: scale(1); }
 
         .header-pfp { 
             width: 38px; height: 38px; min-width: 38px; min-height: 38px;
-            border-radius: 12px; 
-            object-fit: cover; border: 1px solid var(--border);
-            cursor: pointer; background: #111;
-            display: block; /* Prevents line-height layout shift */
+            border-radius: 12px; object-fit: cover; border: 1px solid var(--border);
+            cursor: pointer; background: #111; display: block;
         }
 
         /* --- NOTES --- */
@@ -114,7 +103,7 @@
             display: flex; gap: 15px; padding: 15px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
-            min-height: 95px; /* Pre-reserve space for notes */
+            min-height: 95px;
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
@@ -124,13 +113,9 @@
         }
         
         .note-pfp {
-            width: 65px; height: 65px; 
-            min-width: 65px; min-height: 65px;
-            border-radius: 24px; 
-            object-fit: cover; 
-            border: 2px solid var(--border);
-            padding: 2px; background: #000;
-            transition: transform 0.2s;
+            width: 65px; height: 65px; min-width: 65px; min-height: 65px;
+            border-radius: 24px; object-fit: cover; border: 2px solid var(--border);
+            padding: 2px; background: #000; transition: transform 0.2s;
         }
         .note-item:active .note-pfp { transform: scale(0.95); border-color: var(--accent); }
         
@@ -158,28 +143,16 @@
             background: var(--surface); border: 1px solid var(--border); 
             padding: 25px; border-radius: 24px; margin-bottom: 25px; 
             position: relative; overflow: hidden;
-            display: flex; flex-direction: column;
-            min-height: 250px; /* Enforced min-height to prevent jump */
+            display: flex; flex-direction: column; min-height: 250px;
         }
 
-        .quantum-info {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
-        }
-        .status-tag {
-            display: inline-flex; align-items: center; gap: 6px; 
-            color: var(--accent); font-size: 0.7rem; font-weight: 700;
-        }
+        .quantum-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .status-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 0.7rem; font-weight: 700; }
         .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
         .live-clock { color: var(--text-dim); font-family: monospace; font-size: 0.8rem; }
 
-        .welcome-card h1 { 
-            margin: 0; font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.2;
-            word-wrap: break-word; min-height: 34px; /* Layout stability */
-        }
-        .welcome-card p { 
-            color: var(--text-dim); margin-top: 10px; font-size: 0.85rem; line-height: 1.5;
-            min-height: 21px; /* Layout stability */
-        }
+        .welcome-card h1 { margin: 0; font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.2; word-wrap: break-word; min-height: 34px; }
+        .welcome-card p { color: var(--text-dim); margin-top: 10px; font-size: 0.85rem; line-height: 1.5; min-height: 21px; }
 
         /* --- ACTIVITY GRID --- */
         .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
@@ -194,8 +167,7 @@
         
         .card-icon-area { 
             position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; 
-            border-radius: 10px; background: #1a1a1a; 
-            display: flex; align-items: center; justify-content: center; 
+            border-radius: 10px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; 
             overflow: hidden; border: 1px solid var(--border); 
         }
         .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
@@ -205,117 +177,51 @@
         .count-num { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
         .count-label { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; }
 
-        /* States */
         .activity-card.has-count { border-color: rgba(0, 210, 255, 0.3); background: rgba(0, 210, 255, 0.05); }
         .activity-card.missed-alert { border-color: rgba(255, 68, 68, 0.3); background: rgba(255, 68, 68, 0.05); }
         .missed-alert .count-num { color: var(--danger); }
 
-        /* --- SKELETONS --- */
-        .skeleton { 
-            background: #111; 
-            color: transparent !important; 
-            border-radius: 6px; 
-            animation: pulse 1.5s infinite;
-        }
+        .skeleton { background: #111; color: transparent !important; border-radius: 6px; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* --- NAVBAR HIDING UTILS --- */
+        /* --- EXTREMELY IMPORTANT: NAVBAR FIXES --- */
         main-navbar {
             transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
             position: fixed; bottom: 0; left: 0; right: 0;
-            z-index: 1000;
+            z-index: 9998 !important; /* Forces it over the feed */
+            pointer-events: auto; /* Guarantees hitboxes work */
+            display: block;
         }
         main-navbar.hidden-nav {
             transform: translateY(150%) !important;
-            pointer-events: none !important;
+            pointer-events: none !important; /* Only disable clicks when hidden */
         }
         
-        view-notes {
-            z-index: 9999 !important; 
-            position: relative;
-        }
+        view-notes { z-index: 9999 !important; position: relative; }
+        view-moments { position: relative; z-index: 10; display: block;} /* Base level feed */
 
-        /* --- INSTALL POPUP --- */
-        #install-popup {
-            position: fixed; bottom: 100px; left: 50%; transform: translate(-50%, 20px);
-            width: 90%; max-width: 400px; background: #111; border: 1px solid var(--accent);
-            padding: 20px; border-radius: 20px; display: flex; align-items: center; 
-            z-index: 9999; opacity: 0; pointer-events: none; transition: 0.3s;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-        }
-        #install-popup.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-        .install-text h3 { margin: 0; color: #fff; font-size: 1rem; }
-        .install-text p { margin: 4px 0 0; color: #888; font-size: 0.8rem; }
-        .install-btn { 
-            margin-left: auto; background: var(--accent); border: none; color: #000; 
-            padding: 8px 16px; border-radius: 50px; font-weight: 800; cursor: pointer; 
-        }
-
-        /* --- BELL POP-UP NOTIFICATION (TOAST) --- */
-        #bell-toast {
-            position: fixed; top: 65px; right: 15px; /* Position relative to bell */
-            width: auto; min-width: 200px; max-width: 280px;
-            background: rgba(20, 20, 20, 0.95);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 16px;
-            padding: 10px 14px;
-            display: flex; align-items: center; gap: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-            z-index: 10000;
-            opacity: 0; transform: translateY(-10px) scale(0.95); pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        #bell-toast.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-        
-        .toast-icon {
-            width: 28px; height: 28px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0; font-size: 0.9rem;
-        }
-        .icon-like { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
-        .icon-follow { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
-        
-        .toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-        .toast-title { font-size: 0.75rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
-        .toast-body { font-size: 0.7rem; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
-        .toast-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
-
-        /* --- PULSE ICON STYLE --- */
-        .pulse-btn-link {
-            color: var(--accent);
-            animation: breathe 2s infinite ease-in-out;
-            font-size: 26px !important;
-        }
-        @keyframes breathe {
-            0% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.8; }
-        }
-
-        /* --- MOMENTS FAB STYLE --- */
+        /* --- SMART FAB BUTTON --- */
         .moments-fab {
             position: fixed;
-            bottom: 85px; /* Sits cleanly above the navbar */
+            /* Dynamically calculates height above the navbar + notch safe space */
+            bottom: calc(95px + env(safe-area-inset-bottom)); 
             right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: var(--surface);
+            width: 56px; height: 56px;
+            border-radius: 50%; background: var(--surface);
             border: 2px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            z-index: 900; 
+            z-index: 9990; /* Right below the nav bar layer */
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: center;
         }
-        .moments-fab:active { transform: scale(0.9); }
+        /* New Scroll Feature */
+        .moments-fab.scrolling { transform: scale(0.7); opacity: 0.6; }
+        .moments-fab:active { transform: scale(0.9) !important; }
+        
         .moments-fab.has-moment {
-            border-color: var(--accent);
-            box-shadow: 0 0 15px var(--accent);
+            border-color: var(--accent); box-shadow: 0 0 15px var(--accent);
             animation: pulse-glow 2s infinite;
         }
         @keyframes pulse-glow {
@@ -323,16 +229,44 @@
             50% { box-shadow: 0 0 20px var(--accent); }
             100% { box-shadow: 0 0 8px var(--accent); }
         }
-        .moments-fab img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
+        .moments-fab img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .moments-fab .material-icons-round { color: var(--accent); font-size: 30px; }
+
+        /* --- TOASTS & POPUPS --- */
+        #install-popup {
+            position: fixed; bottom: 100px; left: 50%; transform: translate(-50%, 20px);
+            width: 90%; max-width: 400px; background: #111; border: 1px solid var(--accent);
+            padding: 20px; border-radius: 20px; display: flex; align-items: center; 
+            z-index: 10000; opacity: 0; pointer-events: none; transition: 0.3s;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
-        .moments-fab .material-icons-round {
-            color: var(--accent);
-            font-size: 30px;
+        #install-popup.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .install-text h3 { margin: 0; color: #fff; font-size: 1rem; }
+        .install-text p { margin: 4px 0 0; color: #888; font-size: 0.8rem; }
+        .install-btn { margin-left: auto; background: var(--accent); border: none; color: #000; padding: 8px 16px; border-radius: 50px; font-weight: 800; cursor: pointer; }
+
+        #bell-toast {
+            position: fixed; top: 65px; right: 15px; 
+            width: auto; min-width: 200px; max-width: 280px;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 16px;
+            padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 10000;
+            opacity: 0; transform: translateY(-10px) scale(0.95); pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+        #bell-toast.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        .toast-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.9rem; }
+        .icon-like { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+        .icon-follow { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
+        .toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .toast-title { font-size: 0.75rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
+        .toast-body { font-size: 0.7rem; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .toast-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
+
+        .pulse-btn-link { color: var(--accent); animation: breathe 2s infinite ease-in-out; font-size: 26px !important; }
+        @keyframes breathe { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
     </style>
 </head>
 <body oncontextmenu="return false;"> 
@@ -345,7 +279,6 @@
         <div class="notif-btn" >
             <span class="material-icons-round pulse-btn-link" onclick="window.location.href='pulseLobby.html'">graphic_eq</span>
         </div>
-
         <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
             <svg class="notif-icon" viewBox="0 0 24 24">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -367,10 +300,7 @@
 </div>
 
 <div id="install-popup">
-    <div class="install-text">
-        <h3>Install Goorac</h3>
-        <p>Quantum Access Enabled</p>
-    </div>
+    <div class="install-text"><h3>Install Goorac</h3><p>Quantum Access Enabled</p></div>
     <button class="install-btn" onclick="installPWA()">GET</button>
 </div>
 
@@ -382,17 +312,17 @@
     </div>
 </div>
 
-<view-moments id="moments-feed"></view-moments> <div class="content">
+<view-moments id="moments-feed"></view-moments> 
+
+<div class="content" id="dashboard-content">
     <span class="section-label">DASHBOARD</span>
     <div class="welcome-card">
         <div class="quantum-info">
             <div class="status-tag"><div class="dot"></div> ONLINE</div>
             <div class="live-clock" id="clock">00:00</div>
         </div>
-        
         <h1 id="welcome-name" class="skeleton" style="width: 60%; min-height: 35px;"></h1>
         <p id="welcome-text" class="skeleton" style="width: 90%; min-height: 20px; margin-top: 10px;"></p>
-        
         <div class="activity-grid">
             <div class="activity-card" id="msg-card" onclick="window.location.href='messages.html'">
                 <div class="card-icon-area" id="msg-pfp-area"><div>MSG</div></div>
@@ -400,7 +330,6 @@
                 <span id="msg-header" class="count-num">Inbox</span>
                 <span id="msg-subtext" class="count-label">Check Messages</span>
             </div>
-            
             <div class="activity-card" id="call-card" onclick="window.location.href='calls.html'">
                 <div class="card-icon-area" id="call-pfp-area"><div>LOG</div></div>
                 <span id="call-time" class="time-badge">--:--</span>
@@ -426,7 +355,6 @@
         if (cached) {
             try {
                 const data = JSON.parse(cached);
-                
                 const nameEl = document.getElementById('welcome-name');
                 const textEl = document.getElementById('welcome-text');
                 const pfpEl = document.getElementById('header-pfp');
@@ -458,55 +386,72 @@
         }
     })();
 
+    // --- SMART SCROLL LISTENER FOR FAB ---
+    let scrollTimeout;
+    window.addEventListener('scroll', () => {
+        const fab = document.getElementById('moments-fab');
+        if(!fab) return;
+        
+        fab.classList.add('scrolling');
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            fab.classList.remove('scrolling');
+        }, 300); // Pops back after 300ms of no scrolling
+    });
+
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
         const mainNav = document.getElementById('main-nav');
-        if (noteViewer && mainNav) {
-            mainNav.classList.remove('hidden-nav');
-            const observer = new MutationObserver((mutations) => {
-                const style = window.getComputedStyle(noteViewer);
-                const isVisible = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
-                    noteViewer.classList.contains('open') || noteViewer.classList.contains('active') || noteViewer.hasAttribute('open');
-                
-                // Add Check for Moments Modals to observer
-                const vm = document.getElementById('moments-feed');
-                const isModalOpen = vm && (vm.querySelector('.m-full-modal.open') || vm.querySelector('.c-overlay.open'));
+        const momentsFeed = document.getElementById('moments-feed');
+        const dashboardContent = document.getElementById('dashboard-content');
+        
+        // --- OPTIMIZED OBSERVER LOGIC ---
+        // By keeping track of the state, we stop the browser from "glitching" and unnecessarily recalculating styles
+        let isNavCurrentlyHidden = false;
 
-                if (isVisible || isModalOpen) mainNav.classList.add('hidden-nav');
-                else mainNav.classList.remove('hidden-nav');
-            });
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+        function updateUIVisibility() {
+            // Check Moments Modal
+            let isMomentModalOpen = false;
+            if(momentsFeed) {
+                isMomentModalOpen = momentsFeed.querySelector('.m-full-modal.open') !== null || 
+                                    momentsFeed.querySelector('.c-overlay.open') !== null;
+            }
+            
+            // Check Notes Modal
+            let isNotesOpen = false;
+            if(noteViewer) {
+                const style = window.getComputedStyle(noteViewer);
+                isNotesOpen = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
+                              noteViewer.classList.contains('open') || 
+                              noteViewer.classList.contains('active') || 
+                              noteViewer.hasAttribute('open');
+            }
+
+            // Hide/Show Navbar Safely
+            const shouldHideNav = isMomentModalOpen || isNotesOpen;
+            if (shouldHideNav !== isNavCurrentlyHidden) {
+                isNavCurrentlyHidden = shouldHideNav;
+                if (shouldHideNav) {
+                    mainNav.classList.add('hidden-nav');
+                } else {
+                    mainNav.classList.remove('hidden-nav');
+                }
+            }
+
+            // Hide/Show Dashboard based on Feed presence
+            if (dashboardContent && momentsFeed) {
+                const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
+                dashboardContent.style.display = hasMoments ? 'none' : 'block';
+            }
         }
 
-        // --- NEW OBSERVER FOR MOMENTS COMPONENT VISIBILITY AND DASHBOARD TOGGLE ---
-        const momentsFeed = document.getElementById('moments-feed');
-        if (momentsFeed) {
-            const dashboardContent = document.querySelector('.content');
-            const vmObserver = new MutationObserver(() => {
-                // Ensure Nav updates smoothly with modals from moments component
-                const isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
-                let isNotesOpen = false;
-                if(noteViewer) {
-                    const style = window.getComputedStyle(noteViewer);
-                    isNotesOpen = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
-                        noteViewer.classList.contains('open') || noteViewer.classList.contains('active') || noteViewer.hasAttribute('open');
-                }
-                
-                if (mainNav) {
-                    if (isModalOpen || isNotesOpen) mainNav.classList.add('hidden-nav');
-                    else mainNav.classList.remove('hidden-nav');
-                }
+        if (noteViewer) {
+            const noteObserver = new MutationObserver(updateUIVisibility);
+            noteObserver.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+        }
 
-                // If moments exist, hide dashboard, else show dashboard
-                if (dashboardContent) {
-                    const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
-                    if (hasMoments) {
-                        dashboardContent.style.display = 'none';
-                    } else {
-                        dashboardContent.style.display = 'block';
-                    }
-                }
-            });
+        if (momentsFeed) {
+            const vmObserver = new MutationObserver(updateUIVisibility);
             vmObserver.observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         }
     });
@@ -576,7 +521,7 @@
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
-                checkMyMoment(user.uid, doc.data().photoURL); // Checks if user has a moment and updates FAB
+                checkMyMoment(user.uid, doc.data().photoURL);
             } else window.location.href = "setup.html";
         } else window.location.href = "login.html";
     });
@@ -608,7 +553,6 @@
         if(fab.classList.contains('has-moment') && fab.dataset.momentId) {
             const vm = document.querySelector('view-moments');
             if(vm) {
-                // Ensure the moment exists in viewMoments array before opening, since it could be paginated
                 const exists = vm.moments.find(m => m.id === fab.dataset.momentId);
                 if(!exists) {
                     db.collection('moments').doc(fab.dataset.momentId).get().then(doc => {
@@ -643,7 +587,6 @@
         saveHomeState();
     }
 
-    // --- 🔔 SHOW TOAST FUNCTION ---
     let toastTimeout;
     function showNotificationToast(type, name, pic) {
         const toast = document.getElementById('bell-toast');
@@ -683,7 +626,6 @@
     }
 
     function listenNotifications(uid) {
-        // --- NEW BADGE LOGIC: LISTEN TO PROFILE FIELD ---
         db.collection("users").doc(uid).onSnapshot(doc => {
             const data = doc.data();
             const count = data ? (data.unreadCount || 0) : 0;
@@ -697,11 +639,8 @@
             }
         });
 
-        // --- TOAST LISTENER (SEPARATE FROM BADGE) ---
-        // Keeps the toasts working for real-time feedback
         let isFirstLoad = true;
         
-        // Listen for new likes (Standard Collection)
         db.collection("notes").where("uid", "==", uid).limit(1).onSnapshot(snapshot => {
             if(!isFirstLoad && !snapshot.empty) {
                 snapshot.docChanges().forEach(change => {
@@ -716,13 +655,11 @@
             }
         });
 
-        // Listen for new followers (User Subcollection)
         db.collection("users").doc(uid).onSnapshot(doc => {
             if(!isFirstLoad && doc.exists) {
                 const data = doc.data();
                 const followers = data.followers || [];
-                const lastFollower = followers[followers.length - 1]; // Assuming array order
-                // This is a basic check; robust diffing is better but complex for this snippet
+                const lastFollower = followers[followers.length - 1]; 
             }
             if(isFirstLoad) setTimeout(()=>isFirstLoad=false, 2000);
         });
