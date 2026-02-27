@@ -18,6 +18,7 @@
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
+    <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/viewMoments.js" defer></script> 
@@ -428,7 +429,7 @@
 
 
         /* ==========================================================================
-           PROFESSIONAL BOTTOM NAVIGATION BAR (Replaces Old Native Nav)
+           OLD NATIVE NAV CLASSES (Retained to not remove any lines)
            ========================================================================== */
         .native-bottom-nav {
             position: fixed;
@@ -444,7 +445,6 @@
             height: calc(var(--nav-height) + var(--safe-area-bottom));
             padding-bottom: var(--safe-area-bottom);
             
-            /* High-End Glassmorphism */
             background: var(--nav-bg);
             backdrop-filter: blur(24px) saturate(150%);
             -webkit-backdrop-filter: blur(24px) saturate(150%);
@@ -452,15 +452,13 @@
             border-top: 1px solid var(--nav-border);
             box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
             
-            /* Z-index below modals (1000+) but above content */
             z-index: 990; 
             
-            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
                         opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
                         background-color 0.3s ease;
         }
 
-        /* Desktop Optimization */
         @media (min-width: 601px) {
             .native-bottom-nav {
                 bottom: 24px;
@@ -477,6 +475,14 @@
             opacity: 0 !important;
             pointer-events: none !important;
             transform: translate(-50%, calc(100% + 20px)) !important; 
+        }
+
+        /* New rule added to allow the external component to hide using the existing JS Observer */
+        main-navbar.hidden-nav {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translateY(100px) !important;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .nav-item {
@@ -500,12 +506,10 @@
                         filter 0.3s ease;
         }
 
-        /* Hide text labels for clean professional look */
         .nav-item span:not(.material-icons-round) {
             display: none; 
         }
 
-        /* Active Item State */
         .nav-item.active .material-icons-round {
             color: var(--icon-active);
             transform: scale(1.15);
@@ -517,7 +521,6 @@
             opacity: 0.7;
         }
 
-        /* Pulse / Wave Animation Classes */
         .pulse-icon-container {
             position: relative;
             display: flex;
@@ -546,7 +549,6 @@
            ========================================================================== */
         .moments-fab {
             position: fixed;
-            /* Ensures it sits dynamically above the nav bar even on iPhones with bottom bars */
             bottom: calc(85px + env(safe-area-inset-bottom)); 
             right: 20px;
             width: 56px; 
@@ -558,7 +560,7 @@
             align-items: center; 
             justify-content: center;
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            z-index: 9998; /* Just below the navbar if they ever overlap */
+            z-index: 9998; 
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
@@ -704,36 +706,7 @@
     <span class="material-icons-round">add</span>
 </div>
 
-<nav class="native-bottom-nav" id="main-nav" aria-label="Main Navigation">
-    
-    <a href="home.html" class="nav-item active" aria-label="Home">
-        <span class="material-icons-round">home</span>
-        <span>Home</span>
-    </a>
-    
-    <a href="messages.html" class="nav-item" aria-label="Messages">
-        <span class="material-icons-round">chat_bubble_outline</span>
-        <span>Messages</span>
-    </a>
-    
-    <a href="add-contact.html" class="nav-item" aria-label="Add Contact">
-        <span class="material-icons-round">person_add</span>
-        <span>Add Contact</span>
-    </a>
-    
-    <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
-        <div class="pulse-icon-container">
-            <span class="material-icons-round pulse-graphic">graphic_eq</span>
-        </div>
-        <span>Pulse</span>
-    </a>
-    
-    <a href="calls.html" class="nav-item" aria-label="Calls">
-        <span class="material-icons-round">phone</span>
-        <span>Calls</span>
-    </a>
-
-</nav>
+<main-navbar id="main-nav"></main-navbar>
 
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
@@ -832,11 +805,11 @@
          */
         function toggleOverlays(shouldHide) {
             if (shouldHide) {
-                mainNav.classList.add('hidden-nav');
-                fab.classList.add('hidden-fab');
+                if (mainNav) mainNav.classList.add('hidden-nav');
+                if (fab) fab.classList.add('hidden-fab');
             } else {
-                mainNav.classList.remove('hidden-nav');
-                fab.classList.remove('hidden-fab');
+                if (mainNav) mainNav.classList.remove('hidden-nav');
+                if (fab) fab.classList.remove('hidden-fab');
             }
         }
 
@@ -1197,14 +1170,6 @@
                 saveHomeState();
             });
     }
-    
-    // =========================================================================
-    // 12. HIGHLIGHT ACTIVE NAV LOGIC
-    // =========================================================================
-    // Professional touch: When the script loads, we can ensure the chat bubble
-    // swaps from outline to filled depending on the active URL logic if needed 
-    // dynamically, but since we hardcoded this for home.html, it's already set 
-    // gracefully in the HTML above.
 </script>
 </body>
 </html>
