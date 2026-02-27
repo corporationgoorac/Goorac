@@ -156,7 +156,6 @@ class ViewMoments extends HTMLElement {
         });
 
         // 🚀 CRITICAL BUG FIX: Smart Keyboard Handling using Visual Viewport
-        // Instead of margin-bottom which pushes things off screen, we tightly bind the height
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
                 const activeOverlay = this.querySelector('.c-overlay.open');
@@ -164,7 +163,8 @@ class ViewMoments extends HTMLElement {
                     // Match overlay exactly to visual viewport height.
                     // This prevents the OS from shoving the entire container upwards into oblivion.
                     activeOverlay.style.height = `${window.visualViewport.height}px`;
-                    window.scrollTo(0, 0); // Lock body scroll to prevent native browser jump
+                    
+                    // Removed 'window.scrollTo(0, 0)' as it fights browser focus and causes wild jumping
                 }
             });
         }
@@ -173,9 +173,7 @@ class ViewMoments extends HTMLElement {
         const inputs = this.querySelectorAll('.c-input');
         inputs.forEach(input => {
             input.addEventListener('focus', () => {
-                setTimeout(() => {
-                    input.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }, 300);
+                // Removed the delayed scrollIntoView as it causes the field to jump off-screen unexpectedly
             });
             
             // Reset overlay height when keyboard closes
@@ -472,6 +470,27 @@ class ViewMoments extends HTMLElement {
     }
 
     /**
+     * Centralized Autoplay Block Error Handling
+     * Activates when the browser stops media from auto-playing due to missing interaction
+     */
+    handleAutoplayBlock() {
+        this.isMuted = true;
+        this.audioPlayer.muted = true;
+        this.modalAudioPlayer.muted = true;
+        
+        // Notify the user subtly
+        this.showToast("Tap speaker to enable audio", "volume_off");
+        
+        // Apply pulsing visual cue to all mute buttons visible to attract tap interaction
+        const mutes = this.querySelectorAll('.mute-btn');
+        mutes.forEach(btn => {
+            const icon = btn.querySelector('span');
+            if (icon) icon.innerText = 'volume_off';
+            btn.classList.add('pulse-attention');
+        });
+    }
+
+    /**
      * Plays background music for a moment if available.
      * @param {string} url - Audio source URL
      */
@@ -484,11 +503,12 @@ class ViewMoments extends HTMLElement {
         
         this.audioPlayer.muted = this.isMuted;
         
-        // Catch DOM exceptions (like auto-play policy blocks) silently
+        // Catch DOM exceptions (like auto-play policy blocks) cleanly
         const playPromise = this.audioPlayer.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => {
-                // Auto-play was prevented. This is normal on first load.
+                // Auto-play was prevented. Show speaker icon cue!
+                this.handleAutoplayBlock();
             });
         }
     }
@@ -502,6 +522,10 @@ class ViewMoments extends HTMLElement {
         this.modalAudioPlayer.muted = this.isMuted; // Sync to modal player
         
         if (!this.isMuted) {
+            // Remove pulsing attention class as the user has now interacted
+            const pulsingBtns = this.querySelectorAll('.pulse-attention');
+            pulsingBtns.forEach(btn => btn.classList.remove('pulse-attention'));
+
             if (this.isModalOpen) {
                 this.modalAudioPlayer.play().catch(()=>{});
             } else {
@@ -796,6 +820,18 @@ class ViewMoments extends HTMLElement {
                     100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
                 }
 
+                /* Pulse Attention Animation for Autoplay Blocks */
+                @keyframes pulseAttention {
+                    0% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0.7); transform: scale(1); }
+                    50% { box-shadow: 0 0 0 15px rgba(255, 0, 127, 0); transform: scale(1.1); }
+                    100% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0); transform: scale(1); }
+                }
+                .pulse-attention {
+                    animation: pulseAttention 1.5s infinite !important;
+                    background: rgba(255,0,127,0.8) !important;
+                    border: 2px solid #fff !important;
+                }
+
                 /* UI Buttons overlaying canvas */
                 .mute-btn { 
                     position: absolute; 
@@ -814,6 +850,7 @@ class ViewMoments extends HTMLElement {
                     color:#fff; 
                     border:none; 
                     cursor:pointer;
+                    transition: all 0.2s ease;
                 }
                 
                 /* Post Actions Row */
@@ -1182,7 +1219,7 @@ class ViewMoments extends HTMLElement {
                     <div class="c-list" id="comment-list-container"></div>
                     <div class="c-input-area">
                         <img src="" id="c-my-pfp" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
-                        <input type="text" class="c-input" id="c-input-field" placeholder="Add a comment...">
+                        <input type="text" class="c-input" id="c-input-field" placeholder="Add a comment..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
                         <button class="c-send" onclick="document.querySelector('view-moments').postComment()">Post</button>
                     </div>
                 </div>
@@ -1203,7 +1240,7 @@ class ViewMoments extends HTMLElement {
                             <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('👏')">👏</span>
                         </div>
                         <div class="c-input-area" style="border-top:none; background:transparent; padding:0; margin-top:10px;">
-                            <input type="text" class="c-input" id="r-input-field" placeholder="Send a message..." style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);">
+                            <input type="text" class="c-input" id="r-input-field" placeholder="Send a message..." style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
                             <button class="c-send" onclick="document.querySelector('view-moments').sendReply()">Send</button>
                         </div>
                     </div>
@@ -1369,7 +1406,10 @@ class ViewMoments extends HTMLElement {
             if (moment.songPreview) {
                 this.modalAudioPlayer.src = moment.songPreview;
                 this.modalAudioPlayer.muted = false;
-                this.modalAudioPlayer.play().catch(()=>{});
+                const playPromise = this.modalAudioPlayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => this.handleAutoplayBlock());
+                }
             }
         }
 
@@ -1442,7 +1482,7 @@ class ViewMoments extends HTMLElement {
                  ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                  ${mediaHtml}
                  <span class="material-icons-round double-tap-heart">favorite</span>
-                 ${moment.songPreview ? `
+                 ${moment.songPreview || moment.type === 'video' ? `
                     <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
                         <span class="material-icons-round" style="font-size:18px;">${this.isMuted ? 'volume_off' : 'volume_up'}</span>
                     </button>
@@ -1505,6 +1545,17 @@ class ViewMoments extends HTMLElement {
                 `}
             </div>
         `;
+
+        // If inner content is a video, strictly attach the autoplay block catch
+        setTimeout(() => {
+            const vid = content.querySelector('video');
+            if (vid && !this.isMuted) {
+                const vp = vid.play();
+                if (vp !== undefined) {
+                    vp.catch(() => this.handleAutoplayBlock());
+                }
+            }
+        }, 100);
 
         // Suspend background feed video playback to save memory/processing
         const feedVideo = this.querySelector(`.m-card[data-id="${momentId}"] video`);
