@@ -11,12 +11,12 @@ class ViewMoments extends HTMLElement {
         this.auth = firebase.auth();
         this.moments = [];
         this.mutualUids = [];
-        this.myCF = []; // My Close Friends list
+        this.myCF = []; 
         
         // Audio & Observer
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
-        this.isMuted = true; // Auto-play policies usually require starting muted
+        this.isMuted = true; 
         this.observer = null;
         this.seenTimers = {}; 
         
@@ -38,16 +38,28 @@ class ViewMoments extends HTMLElement {
         this.render();
         this.setupEventListeners();
         
-        // 🚀 INSTANT LOAD: Render from cache immediately (0ms) before network requests block it
-        this.loadCachedMoments();
-        
         this.auth.onAuthStateChanged(async (user) => {
+            const cachedUid = localStorage.getItem('goorac_moments_last_uid');
+            
             if (user) {
+                // Clear cache immediately if a different user logs in
+                if (cachedUid !== user.uid) {
+                    localStorage.removeItem('goorac_moments_cache');
+                    localStorage.setItem('goorac_moments_last_uid', user.uid);
+                    this.moments = [];
+                    this.renderFeed(); // clear UI
+                } else {
+                    this.loadCachedMoments(); // Safe to load
+                }
+
                 const doc = await this.db.collection('users').doc(user.uid).get();
                 if (doc.exists) {
                     this.currentUserData = { uid: user.uid, ...doc.data() };
                     this.initFeed(user.uid);
                 }
+            } else {
+                localStorage.removeItem('goorac_moments_cache');
+                localStorage.removeItem('goorac_moments_last_uid');
             }
         });
     }
@@ -81,7 +93,19 @@ class ViewMoments extends HTMLElement {
         });
     }
 
-    // --- TIMESTAMPS ---
+    // --- UTILS ---
+    toggleBodyScroll(lock) {
+        if (lock) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
+            const sheetOpen = this.querySelector('#comment-sheet').classList.contains('open');
+            if (!modalOpen && !sheetOpen) {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+
     getRelativeTime(timestamp) {
         if (!timestamp) return 'Just now';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -98,19 +122,13 @@ class ViewMoments extends HTMLElement {
     }
 
     async initFeed(uid) {
-        // 1. Fetch Mutuals & CF using logic matched with viewNotes.js
         await this.fetchRelations(uid);
-        
-        // 2. Setup Intersection Observer for Music & Seen Tracking
         this.setupMediaObserver();
-
-        // 3. Fetch Fresh Data (Batch)
         this.fetchMoments();
     }
 
     async fetchRelations(uid) {
         try {
-            // Retrieve mutuals directly from the user's document
             const myFollowing = this.currentUserData.following || []; 
             const myFollowers = this.currentUserData.followers || []; 
 
@@ -120,7 +138,6 @@ class ViewMoments extends HTMLElement {
             this.mutualUids = followingUIDs.filter(id => followersUIDs.includes(id));
             this.mutualUids.push(uid); // Always include myself in the feed
 
-            // Close Friends List
             this.myCF = this.currentUserData.closeFriends || [];
         } catch(e) { console.error("Relations error", e); }
     }
@@ -130,62 +147,72 @@ class ViewMoments extends HTMLElement {
         this.loading = true;
         this.querySelector('#feed-loader').style.display = 'block';
 
+        let fetchedCount = 0;
+        let newMoments = [];
+        const now = new Date();
+
         let query = this.db.collection('moments')
             .where('isActive', '==', true)
-            .orderBy('createdAt', 'desc') // Order by creation to match feed flow
-            .limit(15); 
+            .orderBy('createdAt', 'desc')
+            .limit(20); // Larger batch to find mutuals faster
 
         if (isNextPage && this.lastDoc) {
             query = query.startAfter(this.lastDoc);
         }
 
         try {
-            const snap = await query.get();
-            if (snap.empty) {
-                this.feedEnd = true;
-                this.loading = false;
-                this.querySelector('#feed-loader').style.display = 'none';
-                return;
-            }
-
-            this.lastDoc = snap.docs[snap.docs.length - 1];
-            
-            let newMoments = [];
-            const now = new Date();
-
-            for (let doc of snap.docs) {
-                const data = doc.data();
+            // Actively fetch until we have enough mutual moments or run out of DB documents
+            while (fetchedCount < 6 && !this.feedEnd) {
+                const snap = await query.get();
                 
-                // EXPIRE LOGIC: Check if expired in real-time
-                if (data.expiresAt && data.expiresAt.toDate() < now) {
-                    // Update server to archive it (so it stays in DB but leaves active feed)
-                    this.db.collection('moments').doc(doc.id).update({ isActive: false });
-                    continue; // Skip rendering
-                }
-                
-                // FILTER: Mutuals Only
-                if (!this.mutualUids.includes(data.uid)) continue;
-
-                // FILTER: Close Friends Only (Check author's CF list)
-                if (data.audience === 'close_friends' && data.uid !== this.auth.currentUser.uid) {
-                    try {
-                        const authorDoc = await this.db.collection('users').doc(data.uid).get();
-                        const authorData = authorDoc.data();
-                        if (!authorData || !authorData.closeFriends || !authorData.closeFriends.includes(this.auth.currentUser.uid)) {
-                            continue; 
-                        }
-                    } catch (e) { continue; }
+                if (snap.empty) {
+                    this.feedEnd = true;
+                    break;
                 }
 
-                newMoments.push({ id: doc.id, ...data });
-                if (newMoments.length >= 6) break; // Batch target reached
+                this.lastDoc = snap.docs[snap.docs.length - 1];
+                
+                // Prepare next query in case we need to loop again
+                query = this.db.collection('moments')
+                    .where('isActive', '==', true)
+                    .orderBy('createdAt', 'desc')
+                    .startAfter(this.lastDoc)
+                    .limit(20);
+
+                for (let doc of snap.docs) {
+                    const data = doc.data();
+                    
+                    // EXPIRE LOGIC: Archive if past 24 hours
+                    if (data.expiresAt && data.expiresAt.toDate() < now) {
+                        this.db.collection('moments').doc(doc.id).update({ isActive: false });
+                        continue; 
+                    }
+                    
+                    // FILTER: Mutuals Only
+                    if (!this.mutualUids.includes(data.uid)) continue;
+
+                    // FILTER: Close Friends Only 
+                    if (data.audience === 'close_friends' && data.uid !== this.auth.currentUser.uid) {
+                        try {
+                            const authorDoc = await this.db.collection('users').doc(data.uid).get();
+                            const authorData = authorDoc.data();
+                            if (!authorData || !authorData.closeFriends || !authorData.closeFriends.includes(this.auth.currentUser.uid)) {
+                                continue; 
+                            }
+                        } catch (e) { continue; }
+                    }
+
+                    newMoments.push({ id: doc.id, ...data });
+                    fetchedCount++;
+                    if (fetchedCount >= 6) break; // Stop loop if batch filled
+                }
             }
 
             if (isNextPage) {
                 this.moments = [...this.moments, ...newMoments];
             } else {
                 this.moments = newMoments;
-                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 6))); // Cache first 6
+                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 6))); // Cache latest 6
             }
 
             this.renderFeed();
@@ -202,7 +229,6 @@ class ViewMoments extends HTMLElement {
         if (cache) {
             const parsedCache = JSON.parse(cache);
             const now = new Date();
-            // Filter out locally expired cache before network loads
             this.moments = parsedCache.filter(m => !m.expiresAt || new Date(m.expiresAt.seconds ? m.expiresAt.seconds * 1000 : m.expiresAt) > now);
             this.renderFeed();
         }
@@ -210,7 +236,7 @@ class ViewMoments extends HTMLElement {
 
     // --- INTERSECTION OBSERVER (AUDIO & SEEN) ---
     setupMediaObserver() {
-        const options = { threshold: 0.65 }; // 65% visible
+        const options = { threshold: 0.65 }; 
         
         this.observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -218,18 +244,15 @@ class ViewMoments extends HTMLElement {
                 const moment = this.moments.find(m => m.id === momentId);
                 
                 if (entry.isIntersecting) {
-                    // Play Audio
                     if (moment && moment.songPreview) {
                         this.playMomentMusic(moment.songPreview);
                     }
                     
-                    // Mark as Seen (Debounced to 1.5 seconds)
                     this.seenTimers[momentId] = setTimeout(() => {
                         this.markAsSeen(momentId, moment);
                     }, 1500);
                     
                 } else {
-                    // Pause/Clear when out of view
                     clearTimeout(this.seenTimers[momentId]);
                 }
             });
@@ -241,16 +264,14 @@ class ViewMoments extends HTMLElement {
             this.audioPlayer.src = url;
         }
         this.audioPlayer.muted = this.isMuted;
-        this.audioPlayer.play().catch(() => {
-            // Auto-play blocked by browser; wait for user interaction (mute toggle)
-        });
+        this.audioPlayer.play().catch(() => {});
     }
 
     toggleMute() {
         this.isMuted = !this.isMuted;
         this.audioPlayer.muted = this.isMuted;
         if (!this.isMuted) this.audioPlayer.play().catch(()=>{});
-        this.renderFeed(); // Update mute icons
+        this.renderFeed(); 
     }
 
     async markAsSeen(momentId, moment) {
@@ -262,10 +283,9 @@ class ViewMoments extends HTMLElement {
                 await this.db.collection('moments').doc(momentId).update({
                     viewers: firebase.firestore.FieldValue.arrayUnion(myUid)
                 });
-                // Update local state to prevent re-firing
                 if(!moment.viewers) moment.viewers = [];
                 moment.viewers.push(myUid);
-            } catch(e) { console.error("Seen tracking error", e); }
+            } catch(e) {}
         }
     }
 
@@ -280,7 +300,6 @@ class ViewMoments extends HTMLElement {
         const isLiked = moment.likes && moment.likes.includes(myUid);
         const ref = this.db.collection('moments').doc(momentId);
 
-        // Optimistic UI update
         if (isLiked) {
             moment.likes = moment.likes.filter(id => id !== myUid);
             this.renderFeed();
@@ -291,7 +310,6 @@ class ViewMoments extends HTMLElement {
             this.renderFeed();
             await ref.update({ likes: firebase.firestore.FieldValue.arrayUnion(myUid) });
             
-            // Send Notification if it's someone else's moment
             if (moment.uid !== myUid) {
                 this.sendNotification(moment.uid, 'like_moment', momentId, 'liked your moment.');
             }
@@ -299,14 +317,13 @@ class ViewMoments extends HTMLElement {
     }
 
     async sendNotification(toUid, type, referenceId, body) {
-        if (!this.currentUserData || toUid === this.currentUserData.uid) return; // Don't notify self
+        if (!this.currentUserData || toUid === this.currentUserData.uid) return; 
         
         const notifId = `${type}_${this.currentUserData.uid}_${referenceId}`;
         const notifRef = this.db.collection('notifications').doc(notifId);
 
         try {
             const docSnap = await notifRef.get();
-            // Prevent duplicate notifications for the same action
             if (!docSnap.exists) {
                 await notifRef.set({
                     toUid: toUid,
@@ -321,7 +338,6 @@ class ViewMoments extends HTMLElement {
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // Increment Unread Count exactly like viewNotes.js
                 await this.db.collection('users').doc(toUid).update({
                     unreadCount: firebase.firestore.FieldValue.increment(1)
                 });
@@ -374,39 +390,50 @@ class ViewMoments extends HTMLElement {
                 .m-full-modal.open { transform: translateX(0); }
                 .m-full-header { padding: calc(15px + env(safe-area-inset-top)) 20px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-bottom: 1px solid #1a1a1a; }
                 
+                /* Advanced Action Buttons Top */
+                .m-action-btn-row { display: flex; gap: 10px; margin: 15px 0 25px; }
+                .m-action-btn { flex: 1; padding: 12px; border-radius: 16px; font-weight: 600; font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; border: none; transition: 0.2s; }
+                .m-action-btn .material-icons-round { font-size: 22px; }
+                .m-action-btn.primary { background: rgba(255, 255, 255, 0.1); color: #fff; }
+                .m-action-btn.secondary { background: rgba(255, 255, 255, 0.05); color: #ccc; }
+                .m-action-btn.danger { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+                .m-action-btn:active { transform: scale(0.95); }
+
                 /* My Moments Dashboard */
                 .my-stats-box { background: #111; border-radius: 16px; padding: 15px; margin: 15px 0; display: flex; justify-content: space-around; text-align: center; }
                 .stat-num { font-weight: 800; font-size: 20px; color: #fff; }
                 .stat-lbl { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
                 
                 /* Advanced Viewer List */
-                .advanced-viewers-list { margin-top: 15px; max-height: 300px; overflow-y: auto; padding: 0 5px; scrollbar-width: none; }
+                .advanced-viewers-list { margin-top: 15px; max-height: 350px; overflow-y: auto; padding: 0 5px; scrollbar-width: none; }
                 .advanced-viewers-list::-webkit-scrollbar { display: none; }
-                .viewer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 16px; }
+                .viewer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 16px; }
                 .viewer-info { display: flex; align-items: center; gap: 12px; }
                 .viewer-avatar { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); object-fit: cover; }
                 .viewer-name { color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
                 .viewer-action-icon { display: flex; align-items: center; justify-content: center; }
 
                 /* Comment Bottom Sheet */
-                .c-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: none; align-items: flex-end; opacity: 0; transition: 0.3s; }
+                .c-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: none; align-items: flex-end; opacity: 0; transition: 0.3s; backdrop-filter: blur(4px); }
                 .c-overlay.open { display: flex; opacity: 1; }
-                .c-sheet { width: 100%; height: 75vh; background: #121212; border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; flex-direction: column; transform: translateY(100%); transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+                .c-sheet { width: 100%; height: 75vh; background: #121212; border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; flex-direction: column; transform: translateY(100%); transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
                 .c-overlay.open .c-sheet { transform: translateY(0); }
                 
-                .c-header { display: flex; justify-content: center; padding: 12px; border-bottom: 1px solid #222; position: relative; }
+                .c-header { display: flex; justify-content: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); position: relative; }
                 .c-drag { width: 40px; height: 4px; background: #444; border-radius: 10px; }
                 .c-title { position: absolute; top: 15px; font-weight: 700; font-size: 14px; }
                 
-                .c-list { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 20px; }
+                .c-list { flex: 1; overflow-y: auto; padding: 15px 20px; display: flex; flex-direction: column; gap: 20px; scrollbar-width: none; }
                 .c-item { display: flex; gap: 12px; }
-                .c-pfp { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+                .c-pfp { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); }
                 .c-content { flex: 1; }
                 .c-name { font-weight: 700; font-size: 13px; color: #fff; margin-bottom: 2px; }
                 .c-text { font-size: 14px; color: #eee; line-height: 1.4; }
-                .c-meta { display: flex; gap: 15px; font-size: 11px; color: #888; margin-top: 6px; font-weight: 600; }
+                .c-meta { display: flex; align-items: center; gap: 15px; font-size: 11px; color: #888; margin-top: 6px; font-weight: 600; }
+                .c-reply-btn { cursor: pointer; transition: 0.2s; }
+                .c-reply-btn:active { color: #fff; }
                 
-                .c-input-area { padding: 10px 15px calc(15px + env(safe-area-inset-bottom)); border-top: 1px solid #222; display: flex; align-items: center; gap: 10px; background: #121212; }
+                .c-input-area { padding: 10px 15px calc(15px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px; background: #121212; }
                 .c-input { flex: 1; background: #222; border: none; color: #fff; padding: 12px 15px; border-radius: 20px; font-size: 14px; outline: none; }
                 .c-send { color: var(--accent); font-weight: 700; background: none; border: none; padding: 8px; cursor: pointer; }
 
@@ -423,13 +450,16 @@ class ViewMoments extends HTMLElement {
                 <div class="m-full-header">
                     <span class="material-icons-round" onclick="document.querySelector('view-moments').closeFullModal()" style="cursor:pointer; font-size:28px;">arrow_back</span>
                     <span style="font-weight: 700; font-size: 16px;">Moment Info</span>
-                    <span style="width:28px;"></span> </div>
+                    <span style="width:28px;"></span> 
+                </div>
                 <div id="full-modal-content" style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 40px;"></div>
             </div>
 
             <div class="c-overlay" id="comment-sheet" onclick="if(event.target === this) document.querySelector('view-moments').closeComments()">
                 <div class="c-sheet" onclick="event.stopPropagation()">
-                    <div class="c-header" onclick="document.querySelector('view-moments').closeComments()"><div class="c-drag"></div><div class="c-title">Comments</div></div>
+                    <div class="c-header" onclick="document.querySelector('view-moments').closeComments()">
+                        <div class="c-drag"></div><div class="c-title">Comments</div>
+                    </div>
                     <div class="c-list" id="comment-list-container"></div>
                     <div class="c-input-area">
                         <img src="" id="c-my-pfp" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
@@ -455,7 +485,6 @@ class ViewMoments extends HTMLElement {
             card.className = 'm-card';
             card.dataset.id = moment.id;
             
-            // Generate Media HTML based on type
             let mediaHtml = '';
             if (moment.type === 'video') {
                 mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop muted playsinline></video>`;
@@ -517,13 +546,11 @@ class ViewMoments extends HTMLElement {
 
             container.appendChild(card);
             
-            // Re-observe for audio/seen tracking
             if(this.observer) this.observer.observe(card);
         });
     }
 
     formatCaption(text) {
-        // Highlight hashtags
         return text.replace(/(#[a-zA-Z0-9]+)/g, '<span style="color:var(--accent);">$1</span>');
     }
 
@@ -536,8 +563,8 @@ class ViewMoments extends HTMLElement {
         const modal = this.querySelector('#full-moment-modal');
         const content = this.querySelector('#full-modal-content');
         
-        // Push state for mobile back button
         window.history.pushState({ modal: 'momentFull' }, '');
+        this.toggleBodyScroll(true);
         modal.classList.add('open');
 
         const isMe = moment.uid === this.auth.currentUser.uid;
@@ -549,17 +576,14 @@ class ViewMoments extends HTMLElement {
         else if (moment.type === 'image') mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
         else mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:32px; word-break:break-word;">${moment.text}</div>`;
 
-        // Generate Advanced Viewers List
         let viewersHtml = '';
         if (isMe) {
             viewersHtml = `<div class="advanced-viewers-list">`;
             
-            // Get unique UIDs for Viewers + Likers
             const likers = moment.likes || [];
             const viewers = moment.viewers || [];
             const allUids = [...new Set([...likers, ...viewers])];
             
-            // Sort: Likers first
             allUids.sort((a, b) => {
                 const aLiked = likers.includes(a);
                 const bLiked = likers.includes(b);
@@ -633,18 +657,24 @@ class ViewMoments extends HTMLElement {
                         <div><div class="stat-num" style="font-size: 14px; margin-top: 4px; color:#00ba7c;">${timerDisplay}</div><div class="stat-lbl">Status</div></div>
                     </div>
                     
-                    <h3 style="font-size: 14px; margin: 25px 0 5px; border-bottom: 1px solid #222; padding-bottom: 10px;">Activity Viewers</h3>
-                    ${viewersHtml}
-                    
-                    <div style="display:flex; gap:10px; margin-top:20px;">
-                        <button style="flex:1; padding:14px; border-radius:16px; background:rgba(255,59,48,0.1); color:#ff3b30; border:1px solid rgba(255,59,48,0.2); font-weight:700; cursor:pointer;" onclick="document.querySelector('view-moments').deleteMoment('${moment.id}')">Delete Moment</button>
-                        <button style="flex:1; padding:14px; border-radius:16px; background:#222; color:#fff; border:none; font-weight:700; cursor:pointer;" onclick="window.location.href='moments.html'">+ New Moment</button>
+                    <div class="m-action-btn-row">
+                        <button class="m-action-btn primary" onclick="window.location.href='moments.html'">
+                            <span class="material-icons-round">add_circle_outline</span> New
+                        </button>
+                        <button class="m-action-btn secondary" onclick="document.querySelector('view-moments').archiveMoment('${moment.id}')">
+                            <span class="material-icons-round">inventory_2</span> Archive
+                        </button>
+                        <button class="m-action-btn danger" onclick="document.querySelector('view-moments').deleteMoment('${moment.id}')">
+                            <span class="material-icons-round">delete_outline</span> Delete
+                        </button>
                     </div>
+
+                    <h3 style="font-size: 14px; margin: 15px 0 5px; border-bottom: 1px solid #222; padding-bottom: 10px;">Activity Viewers</h3>
+                    ${viewersHtml}
                 ` : ''}
             </div>
         `;
 
-        // Ensure current active video in feed is paused
         const feedVideo = this.querySelector(`.m-card[data-id="${momentId}"] video`);
         if(feedVideo) feedVideo.pause();
     }
@@ -653,14 +683,24 @@ class ViewMoments extends HTMLElement {
         const modal = this.querySelector('#full-moment-modal');
         modal.classList.remove('open');
         this.activeMomentId = null;
+        this.toggleBodyScroll(false);
         if (!fromHistory && window.history.state?.modal === 'momentFull') {
             window.history.back();
         }
     }
 
-    async deleteMoment(momentId) {
-        if(confirm("Delete this moment permanently?")) {
+    async archiveMoment(momentId) {
+        if(confirm("Archive this moment? It will be removed from feeds but remain in your history.")) {
             await this.db.collection('moments').doc(momentId).update({ isActive: false });
+            this.moments = this.moments.filter(m => m.id !== momentId);
+            this.closeFullModal();
+            this.renderFeed();
+        }
+    }
+
+    async deleteMoment(momentId) {
+        if(confirm("Permanently delete this moment? This cannot be undone.")) {
+            await this.db.collection('moments').doc(momentId).delete();
             this.moments = this.moments.filter(m => m.id !== momentId);
             this.closeFullModal();
             this.renderFeed();
@@ -672,15 +712,14 @@ class ViewMoments extends HTMLElement {
         this.activeMomentId = momentId;
         const overlay = this.querySelector('#comment-sheet');
         
-        // Set my PFP in input
         if(this.currentUserData) {
             this.querySelector('#c-my-pfp').src = this.currentUserData.photoURL;
         }
 
         window.history.pushState({ modal: 'momentComments' }, '');
+        this.toggleBodyScroll(true);
         overlay.classList.add('open');
         
-        // Reset and Load
         this.commentsLastDoc = null;
         this.querySelector('#comment-list-container').innerHTML = '<div class="loader-spinner" style="display:block;"><span class="material-icons-round">refresh</span></div>';
         await this.loadComments(momentId, false);
@@ -689,6 +728,7 @@ class ViewMoments extends HTMLElement {
     closeComments(fromHistory = false) {
         this.querySelector('#comment-sheet').classList.remove('open');
         this.activeMomentId = null;
+        this.toggleBodyScroll(false);
         if (!fromHistory && window.history.state?.modal === 'momentComments') {
             window.history.back();
         }
@@ -697,6 +737,7 @@ class ViewMoments extends HTMLElement {
     async loadComments(momentId, isNextPage = false) {
         if (this.loadingComments) return;
         this.loadingComments = true;
+        const myUid = this.auth.currentUser?.uid;
 
         let query = this.db.collection('moments').doc(momentId).collection('comments')
             .orderBy('timestamp', 'desc')
@@ -721,6 +762,7 @@ class ViewMoments extends HTMLElement {
         snap.forEach(doc => {
             const c = doc.data();
             const timeStr = this.getRelativeTime(c.timestamp);
+            const isCommentLiked = c.likes && c.likes.includes(myUid);
             
             const div = document.createElement('div');
             div.className = 'c-item';
@@ -731,10 +773,16 @@ class ViewMoments extends HTMLElement {
                     <div class="c-text">${c.text}</div>
                     <div class="c-meta">
                         <span>${timeStr}</span>
-                        <span style="cursor:pointer;">Reply</span>
+                        <span class="c-reply-btn" onclick="document.querySelector('view-moments').replyTo('${c.name || c.username}')">Reply</span>
                     </div>
                 </div>
-                <span class="material-icons-round" style="font-size:14px; color:#666; margin-top:5px; cursor:pointer;">favorite_border</span>
+                <div style="display:flex; flex-direction:column; align-items:center;">
+                    <span class="material-icons-round c-like-btn" 
+                          onclick="document.querySelector('view-moments').toggleCommentLike('${momentId}', '${doc.id}', this)"
+                          style="font-size:16px; cursor:pointer; color: ${isCommentLiked ? '#ff3b30' : '#666'};">
+                          ${isCommentLiked ? 'favorite' : 'favorite_border'}
+                    </span>
+                </div>
             `;
             cList.appendChild(div);
         });
@@ -742,30 +790,55 @@ class ViewMoments extends HTMLElement {
         this.loadingComments = false;
     }
 
+    replyTo(username) {
+        const input = this.querySelector('#c-input-field');
+        input.value = `@${username} `;
+        input.focus();
+    }
+
+    async toggleCommentLike(momentId, commentId, iconElement) {
+        const myUid = this.auth.currentUser?.uid;
+        if (!myUid) return;
+        
+        if(navigator.vibrate) navigator.vibrate(10);
+        
+        const isCurrentlyLiked = iconElement.innerHTML.trim() === 'favorite';
+        const ref = this.db.collection('moments').doc(momentId).collection('comments').doc(commentId);
+        
+        // Optimistic toggle
+        if (isCurrentlyLiked) {
+            iconElement.innerHTML = 'favorite_border';
+            iconElement.style.color = '#666';
+            await ref.update({ likes: firebase.firestore.FieldValue.arrayRemove(myUid) });
+        } else {
+            iconElement.innerHTML = 'favorite';
+            iconElement.style.color = '#ff3b30';
+            await ref.update({ likes: firebase.firestore.FieldValue.arrayUnion(myUid) });
+        }
+    }
+
     async postComment() {
         const input = this.querySelector('#c-input-field');
         const text = input.value.trim();
         if (!text || !this.activeMomentId || !this.currentUserData) return;
 
-        input.value = ''; // clear instantly
+        input.value = ''; 
         const momentId = this.activeMomentId;
         const moment = this.moments.find(m => m.id === momentId);
 
         try {
-            // Add to subcollection
             await this.db.collection('moments').doc(momentId).collection('comments').add({
                 uid: this.currentUserData.uid,
                 name: this.currentUserData.name || this.currentUserData.username,
                 pfp: this.currentUserData.photoURL,
                 text: text,
+                likes: [],
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Reload top comments
             this.commentsLastDoc = null;
             this.loadComments(momentId, false);
 
-            // Send Notification
             if (moment && moment.uid !== this.currentUserData.uid) {
                 this.sendNotification(moment.uid, 'comment_moment', momentId, `commented: "${text}"`);
             }
