@@ -451,25 +451,63 @@
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
                 `;
+
+                // Add Moment Caption Preview if available
+                if (n.momentCaption) {
+                    contentHtml += `
+                        <div class="note-preview" style="background:#1c1c1e; color:#aaa; font-size: 0.8rem; margin-top: 6px; padding: 6px 10px; border-radius: 8px;">
+                            <div class="note-text" style="font-weight: normal; -webkit-line-clamp: 2;">${escapeHtml(n.momentCaption)}</div>
+                        </div>
+                    `;
+                }
                 
-                actionHtml = `<div class="action-col"><button class="view-btn">View</button></div>`;
+                actionHtml = `<div class="action-col"><button class="view-btn">Profile</button></div>`;
             }
             // --- MOMENT COMMENT & REPLY NOTIFICATION ---
             else if (type === 'comment_moment' || type === 'reply_moment') {
                 iconBadge = `<div class="type-badge icon-comment">${ICONS.comment}</div>`;
                 
+                let rawBody = n.body || 'interacted with your moment.';
+                let actionText = rawBody;
+                let commentQuote = '';
+                
+                // Parse the string sent from viewMoments: e.g., 'commented: "some text"'
+                if (rawBody.includes(': "')) {
+                    let firstColonIndex = rawBody.indexOf(': "');
+                    actionText = rawBody.substring(0, firstColonIndex); // e.g. "commented"
+                    commentQuote = rawBody.substring(firstColonIndex + 3, rawBody.length - 1); // e.g. "some text"
+                }
+
                 contentHtml = `
                     <div class="text-line">
                         <span class="username-container">
                             ${escapeHtml(displayName)} 
                             ${isVerified ? `<img src="${ICONS.verified}" class="v-badge">` : ''}
                         </span>
-                        <span style="color:var(--text-secondary);">${escapeHtml(n.body || 'interacted with your moment.')}</span>
+                        <span style="color:var(--text-secondary);">${escapeHtml(actionText)}</span>
                         <span class="time-ago">${timeAgo(n.timestamp)}</span>
                     </div>
                 `;
+
+                // Add stylized Comment Quote Box
+                if (commentQuote) {
+                    contentHtml += `
+                        <div class="note-preview" style="background: rgba(255,255,255,0.05); color:#ddd; border-left: 3px solid var(--accent); border-radius: 4px 14px 14px 4px; padding: 8px 12px; margin-top: 6px; text-align: left; align-items: flex-start; width: 100%;">
+                            <div class="note-text" style="font-weight: normal; font-size: 0.9rem; text-align: left; line-height: 1.4;">"${escapeHtml(commentQuote)}"</div>
+                        </div>
+                    `;
+                }
+
+                // Add Moment Caption Preview underneath if available
+                if (n.momentCaption) {
+                    contentHtml += `
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 8px;">
+                            Moments caption: ${escapeHtml(n.momentCaption)}
+                        </div>
+                    `;
+                }
                 
-                actionHtml = `<div class="action-col"><button class="view-btn">View</button></div>`;
+                actionHtml = `<div class="action-col"><button class="view-btn">Profile</button></div>`;
             }
 
             item.innerHTML = `
@@ -508,7 +546,7 @@
         }
 
         if (n.type === 'like_moment' || n.type === 'comment_moment' || n.type === 'reply_moment') {
-            window.location.href = 'moments.html'; // Redirect to moments view
+            window.location.href = `userProfile.html?user=${username}`; // Changed from 'moments.html' to open user profile
         } else if (username) {
             window.location.href = `userProfile.html?user=${username}`;
         } else {
