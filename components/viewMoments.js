@@ -158,14 +158,13 @@ class ViewMoments extends HTMLElement {
         // 🚀 CRITICAL BUG FIX: Smart Keyboard Handling using Visual Viewport
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
-                const activeOverlay = this.querySelector('.c-overlay.open');
-                if (activeOverlay) {
-                    // Match overlay exactly to visual viewport height.
-                    // This prevents the OS from shoving the entire container upwards into oblivion.
-                    activeOverlay.style.height = `${window.visualViewport.height}px`;
-                    
-                    // Removed 'window.scrollTo(0, 0)' as it fights browser focus and causes wild jumping
-                }
+                const activeOverlays = this.querySelectorAll('.c-overlay.open');
+                activeOverlays.forEach(activeOverlay => {
+                    // Match overlay bottom offset dynamically to stick perfectly above the keyboard.
+                    // This prevents browser fighting and anchors the text field in view smoothly.
+                    const offset = window.innerHeight - window.visualViewport.height;
+                    activeOverlay.style.bottom = `${offset}px`;
+                });
             });
         }
 
@@ -178,24 +177,26 @@ class ViewMoments extends HTMLElement {
             
             // Reset overlay height when keyboard closes
             input.addEventListener('blur', () => {
-                const activeOverlay = this.querySelector('.c-overlay.open');
-                if (activeOverlay) {
-                    activeOverlay.style.height = '100dvh'; // Reset to default
-                }
+                const activeOverlays = this.querySelectorAll('.c-overlay.open');
+                activeOverlays.forEach(activeOverlay => {
+                    activeOverlay.style.bottom = '0px'; // Reset to default
+                });
             });
         });
     }
 
     /**
      * UTILS: Toggles the background body scroll to prevent 
-     * double-scrolling when modals are open.
+     * double-scrolling when modals are open. Captures previous scroll position to eliminate jumps.
      * @param {boolean} lock - True to lock, false to unlock
      */
     toggleBodyScroll(lock) {
         if (lock) {
+            this.scrollPos = window.scrollY;
             document.body.style.overflow = 'hidden';
             document.body.style.position = 'fixed'; // Hard lock for iOS
             document.body.style.width = '100%';
+            document.body.style.top = `-${this.scrollPos}px`; // Prevent page jumping to top
         } else {
             const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
             const sheetOpen = this.querySelector('#comment-sheet').classList.contains('open');
@@ -205,6 +206,8 @@ class ViewMoments extends HTMLElement {
                 document.body.style.overflow = '';
                 document.body.style.position = '';
                 document.body.style.width = '';
+                document.body.style.top = '';
+                window.scrollTo(0, this.scrollPos);
             }
         }
     }
@@ -795,6 +798,10 @@ class ViewMoments extends HTMLElement {
                     z-index: 0; 
                 }
                 
+                /* Advanced Text FX */
+                .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+                .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
+
                 /* Double Tap Heart Animation Complex */
                 .double-tap-heart {
                     position: absolute; 
@@ -1275,7 +1282,11 @@ class ViewMoments extends HTMLElement {
             } else if (moment.type === 'image') {
                 mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
             } else {
-                mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:28px; word-break:break-word;">${moment.text}</div>`;
+                let effectClass = '';
+                if (moment.effect === 'glow') effectClass = 'fx-glow';
+                else if (moment.effect === 'shadow') effectClass = 'fx-shadow';
+
+                mediaHtml = `<div class="m-media ${effectClass}" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align || 'center'}; color:#fff; padding:30px; font-size:28px; word-break:break-word; white-space:pre-wrap;">${moment.text}</div>`;
             }
 
             const muteIcon = this.isMuted ? 'volume_off' : 'volume_up';
@@ -1305,7 +1316,7 @@ class ViewMoments extends HTMLElement {
                     ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                     ${mediaHtml}
                     <span class="material-icons-round double-tap-heart">favorite</span>
-                    ${moment.songPreview ? `
+                    ${moment.songPreview || moment.type === 'video' ? `
                         <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
                             <span class="material-icons-round" style="font-size:18px;">${muteIcon}</span>
                         </button>
@@ -1422,7 +1433,13 @@ class ViewMoments extends HTMLElement {
         let mediaHtml = '';
         if (moment.type === 'video') mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop autoplay playsinline ${this.isMuted ? 'muted' : ''}></video>`;
         else if (moment.type === 'image') mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
-        else mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:32px; word-break:break-word;">${moment.text}</div>`;
+        else {
+            let effectClass = '';
+            if (moment.effect === 'glow') effectClass = 'fx-glow';
+            else if (moment.effect === 'shadow') effectClass = 'fx-shadow';
+
+            mediaHtml = `<div class="m-media ${effectClass}" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align || 'center'}; color:#fff; padding:30px; font-size:32px; word-break:break-word; white-space:pre-wrap;">${moment.text}</div>`;
+        }
 
         let viewersHtml = '';
         if (isMe) {
