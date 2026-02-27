@@ -219,13 +219,12 @@
             text-align: center;
         }
 
-        /* Added Note Bubble Style */
         .note-bubble {
-            position: absolute; top: -5px; right: -5px; background: var(--surface);
+            position: absolute; top: 0; right: 0; background: var(--surface);
             border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px;
-            font-size: 0.65rem; max-width: 65px; white-space: nowrap; 
+            font-size: 0.7rem; max-width: 60px; white-space: nowrap; 
             overflow: hidden; text-overflow: ellipsis; z-index: 2;
-            color: #fff; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            color: #fff;
         }
 
         /* ==========================================================================
@@ -713,7 +712,6 @@
                 listenNotifications(user.uid);
                 checkMyMoment(user.uid, userData.photoURL);
                 checkMyNote(user.uid);
-                listenAllNotes(user.uid); // Added this to fetch others
             } else {
                 window.location.href = "setup.html";
             }
@@ -722,7 +720,6 @@
         }
     });
 
-    // --- FIX FOR YOUR NOTE ---
     function checkMyNote(uid) {
         db.collection('notes').doc(uid).onSnapshot(doc => {
             const textEl = document.getElementById('my-note-text');
@@ -730,51 +727,24 @@
             const btn = document.getElementById('my-note-btn');
             
             if (doc.exists && doc.data().text) {
-                // You have a note
+                // You HAVE a note - show preview and allow viewing
                 textEl.innerText = "You";
-                previewEl.innerText = doc.data().text;
-                previewEl.style.display = 'block';
+                if(previewEl) {
+                    previewEl.innerText = doc.data().text;
+                    previewEl.style.display = 'block';
+                }
                 btn.onclick = () => {
                     const nv = document.getElementById('note-viewer');
                     if(nv) nv.open(uid);
                 };
             } else {
-                // You don't have a note
-                textEl.innerText = "What's on your mind?";
-                previewEl.style.display = 'none';
+                // You DON'T have a note - show prompt to create one
+                textEl.innerText = "Add Note";
+                if(previewEl) previewEl.style.display = 'none';
                 btn.onclick = () => { 
                     window.location.href = 'notes.html'; 
                 };
             }
-        });
-    }
-
-    // --- FETCHING OTHER USER NOTES ---
-    function listenAllNotes(uid) {
-        db.collection('notes').limit(20).onSnapshot(snap => {
-            const container = document.getElementById('notes-container');
-            // Clear existing others
-            const others = container.querySelectorAll('.note-item:not(#my-note-btn)');
-            others.forEach(el => el.remove());
-
-            snap.forEach(doc => {
-                const data = doc.data();
-                // Don't duplicate yourself in the list
-                if (doc.id === uid) return;
-
-                const noteDiv = document.createElement('div');
-                noteDiv.className = 'note-item';
-                noteDiv.innerHTML = `
-                    <div class="note-bubble">${data.text || ''}</div>
-                    <img src="${data.photoURL || 'https://via.placeholder.com/150'}" class="note-pfp">
-                    <span class="note-username">${data.displayName || 'User'}</span>
-                `;
-                noteDiv.onclick = () => {
-                    const nv = document.getElementById('note-viewer');
-                    if(nv) nv.open(doc.id);
-                };
-                container.appendChild(noteDiv);
-            });
         });
     }
 
