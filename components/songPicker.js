@@ -255,10 +255,12 @@ class SongPicker extends HTMLElement {
         this.API_URL = "https://itunes.apple.com/search";
         this.PAGE_SIZE = 20; 
         this.MAX_LIMIT = 50; // Requested: 50 Songs
+        // FIXED: Try Direct fetching first (iTunes API supports CORS natively), then fallback to proxies
         this.PROXIES = [
-            "https://corsproxy.io/?", // Swapped to faster proxy first
+            "DIRECT",
             "https://api.allorigins.win/raw?url=",
-            "https://api.codetabs.com/v1/proxy?quest="
+            "https://api.codetabs.com/v1/proxy?quest=",
+            "https://corsproxy.io/?"
         ];
         
         // --- STATE VARIABLES ---
@@ -446,11 +448,18 @@ class SongPicker extends HTMLElement {
         const targetUrl = `${this.API_URL}?term=${encodeURIComponent(rec.query)}&country=IN&entity=song&limit=50`;
         
         try {
-             const fetchRaw = async (url) => {
-                const res = await fetch(url);
-                return res.json();
+            // FIXED: Try Direct fetch first, then fallback
+             const fetchRaw = async () => {
+                try {
+                    const res = await fetch(targetUrl);
+                    if (res.ok) return await res.json();
+                } catch (e) {
+                    // Ignore direct fail and hit fallback proxy
+                }
+                const res = await fetch(this.PROXIES[1] + encodeURIComponent(targetUrl));
+                return await res.json();
              }
-             const data = await fetchRaw(this.PROXIES[0] + encodeURIComponent(targetUrl));
+             const data = await fetchRaw();
              
              if(data.results && data.results.length > 0) {
                 const savedIds = this.DB.getSaved().map(s => s.trackId);
@@ -600,13 +609,17 @@ class SongPicker extends HTMLElement {
             
             const fetchWithProxy = async (proxyUrl) => {
                 const controller = new AbortController();
-                const id = setTimeout(() => controller.abort(), 2500); // Fast timeout 2.5s
+                // FIXED: Increased timeout to 4000ms to allow mobile networks time to resolve
+                const id = setTimeout(() => controller.abort(), 4000); 
                 
                 try {
                     const combinedSignal = anySignal([signal, controller.signal]);
-                    const res = await fetch(proxyUrl + encodeURIComponent(targetUrl), { signal: combinedSignal });
+                    // FIXED: Allow direct connection for Apple APIs, build URL safely
+                    const finalUrl = proxyUrl === "DIRECT" ? targetUrl : proxyUrl + encodeURIComponent(targetUrl);
+                    
+                    const res = await fetch(finalUrl, { signal: combinedSignal });
                     clearTimeout(id);
-                    if (!res.ok) throw new Error('Proxy failed');
+                    if (!res.ok) throw new Error('Fetch failed');
                     return res.json();
                 } catch (e) {
                     clearTimeout(id);
