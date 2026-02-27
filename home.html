@@ -721,30 +721,35 @@
     });
 
     function checkMyNote(uid) {
-        db.collection('notes').doc(uid).onSnapshot(doc => {
+        // Querying for the note where the 'uid' field matches the user's ID
+        db.collection('notes').where('uid', '==', uid).limit(1).onSnapshot(snap => {
             const textEl = document.getElementById('my-note-text');
             const previewEl = document.getElementById('my-note-preview');
             const btn = document.getElementById('my-note-btn');
             
-            if (doc.exists && doc.data().text) {
-                // You HAVE a note - show preview and allow viewing
-                textEl.innerText = "You";
-                if(previewEl) {
-                    previewEl.innerText = doc.data().text;
-                    previewEl.style.display = 'block';
+            if (!snap.empty) {
+                const data = snap.docs[0].data();
+                if (data.text) {
+                    // You HAVE a note - show preview and allow viewing
+                    textEl.innerText = "You";
+                    if(previewEl) {
+                        previewEl.innerText = data.text;
+                        previewEl.style.display = 'block';
+                    }
+                    btn.onclick = () => {
+                        const nv = document.getElementById('note-viewer');
+                        if(nv) nv.open(uid);
+                    };
+                    return; // Successfully set, exit function
                 }
-                btn.onclick = () => {
-                    const nv = document.getElementById('note-viewer');
-                    if(nv) nv.open(uid);
-                };
-            } else {
-                // You DON'T have a note - show prompt to create one
-                textEl.innerText = "Add Note";
-                if(previewEl) previewEl.style.display = 'none';
-                btn.onclick = () => { 
-                    window.location.href = 'notes.html'; 
-                };
             }
+            
+            // If no note is found or document is empty, show "Add Note"
+            textEl.innerText = "Add Note";
+            if(previewEl) previewEl.style.display = 'none';
+            btn.onclick = () => { 
+                window.location.href = 'notes.html'; 
+            };
         });
     }
 
