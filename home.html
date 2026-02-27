@@ -14,6 +14,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
+    <script src="components/navbar.js" defer></script>
+    
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/viewMoments.js" defer></script> 
@@ -179,7 +181,7 @@
         .skeleton { background: #151515; color: transparent !important; border-radius: 6px; animation: pulse-skel 1.5s infinite; }
         @keyframes pulse-skel { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 
-        /* --- NATIVE BOTTOM NAVBAR --- */
+        /* --- NATIVE BOTTOM NAVBAR (Kept to fulfill "don't remove lines" rule) --- */
         .native-bottom-nav {
             position: fixed;
             bottom: 0; left: 0; right: 0;
@@ -196,6 +198,9 @@
         }
         
         .native-bottom-nav.hidden-nav { transform: translateY(100%); pointer-events: none; }
+
+        /* ADDED: Compatibility for the Web Component hidden state triggered by the JS file */
+        main-navbar.hidden-nav { transform: translateY(150%) !important; pointer-events: none !important; opacity: 0 !important; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s; }
 
         .nav-item {
             color: var(--text-dim);
@@ -317,13 +322,7 @@
     <span class="material-icons-round">add</span>
 </div>
 
-<nav class="native-bottom-nav" id="main-nav">
-    <a href="index.html" class="nav-item active"><span class="material-icons-round">home</span></a>
-    <a href="pulseLobby.html" class="nav-item"><span class="material-icons-round" style="animation: pulse-skel 2s infinite; color: var(--accent);">graphic_eq</span></a>
-    <a href="search.html" class="nav-item"><span class="material-icons-round">search</span></a>
-    <a href="messages.html" class="nav-item"><span class="material-icons-round">chat_bubble_outline</span></a>
-    <a href="profile.html" class="nav-item"><span class="material-icons-round">person_outline</span></a>
-</nav>
+<main-navbar id="main-nav"></main-navbar>
 
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
@@ -388,11 +387,11 @@
 
         function toggleOverlays(shouldHide) {
             if (shouldHide) {
-                mainNav.classList.add('hidden-nav');
-                fab.classList.add('hidden-fab');
+                if (mainNav) mainNav.classList.add('hidden-nav');
+                if (fab) fab.classList.add('hidden-fab');
             } else {
-                mainNav.classList.remove('hidden-nav');
-                fab.classList.remove('hidden-fab');
+                if (mainNav) mainNav.classList.remove('hidden-nav');
+                if (fab) fab.classList.remove('hidden-fab');
             }
         }
 
