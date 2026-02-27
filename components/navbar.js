@@ -24,69 +24,63 @@ class MainNavbar extends HTMLElement {
         <style>
             :host {
                 display: block;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 900; /* Low enough to stay under modals naturally */
                 transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
                             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
-            /* This class will be toggled to hide the navbar during active calls */
+            /* This class will be toggled to hide the navbar during active calls or modals */
             .nav-hidden {
-                opacity: 0 !important;
+                transform: translateY(150%) !important;
                 pointer-events: none !important;
-                transform: translate(-50%, 40px) scale(0.95) !important;
+                opacity: 0 !important;
             }
 
             .bottom-nav {
-                position: fixed;
-                bottom: 30px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: calc(100% - 48px);
-                max-width: 420px;
-                /* Enhanced Glassmorphism */
-                background: rgba(15, 15, 15, 0.7);
-                backdrop-filter: blur(30px) saturate(200%) brightness(1.2);
-                -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.2);
+                position: absolute;
+                bottom: 0; 
+                left: 0; 
+                right: 0;
+                height: calc(65px + env(safe-area-inset-bottom));
+                background: rgba(5, 5, 5, 0.85);
+                backdrop-filter: blur(25px); 
+                -webkit-backdrop-filter: blur(25px);
+                border-top: 1px solid rgba(255,255,255,0.05);
                 display: flex;
                 justify-content: space-around;
                 align-items: center;
-                padding: 10px 8px;
-                border-radius: 35px;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                box-shadow: 0 20px 40px rgba(0,0,0,0.4), 
-                            inset 0 1px 1px rgba(255,255,255,0.1);
-                z-index: 10000;
-                transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+                padding-bottom: env(safe-area-inset-bottom);
+                transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
             }
 
             .nav-item {
-                position: relative;
+                color: #888888;
                 text-decoration: none;
-                color: #8e8e93; /* Apple-style dim text */
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 4px;
-                flex: 1;
-                height: 48px;
                 justify-content: center;
-                transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                width: 50px; 
+                height: 50px;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+                -webkit-tap-highlight-color: transparent;
             }
 
             .nav-item i {
-                width: 22px;
-                height: 22px;
+                width: 26px;
+                height: 26px;
                 stroke-width: 2px;
-                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             }
 
-            .nav-item span {
-                font-size: 0.55rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1.2px;
-                opacity: 0;
-                transform: translateY(8px);
-                transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            .nav-item:active { 
+                background: rgba(255,255,255,0.05); 
+                transform: scale(0.9); 
             }
 
             .nav-item.active {
@@ -95,59 +89,38 @@ class MainNavbar extends HTMLElement {
 
             /* Premium Glow & Lift Effect */
             .nav-item.active i {
-                transform: translateY(-6px);
-                filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
+                transform: translateY(-2px);
+                filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.5));
                 stroke-width: 2.5px;
             }
 
-            .nav-item.active span {
-                opacity: 1;
-                transform: translateY(0);
+            /* Pulse Specific Animation */
+            .pulse-anim {
+                animation: pulse-skel 2s infinite;
                 color: #00d2ff;
-                text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
             }
-
-            .nav-item.active::after {
-                content: '';
-                position: absolute;
-                bottom: 0px;
-                width: 4px;
-                height: 4px;
-                background: #00d2ff;
-                border-radius: 50%;
-                box-shadow: 0 0 15px #00d2ff, 0 0 5px rgba(0, 210, 255, 1);
-                animation: navPulse 2.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
-            }
-
-            @keyframes navPulse {
-                0% { transform: scale(1); opacity: 0.8; }
-                50% { transform: scale(1.5); opacity: 1; filter: brightness(1.2); }
-                100% { transform: scale(1); opacity: 0.8; }
-            }
-
-            /* Haptic Press Effect */
-            .nav-item:active {
-                transform: scale(0.85);
-                opacity: 0.7;
+            @keyframes pulse-skel { 
+                0% { opacity: 0.6; transform: scale(0.95); } 
+                50% { opacity: 1; transform: scale(1.05); } 
+                100% { opacity: 0.6; transform: scale(0.95); } 
             }
         </style>
 
         <nav class="bottom-nav" id="main-nav-container">
-            <a href="home.html" class="nav-item">
-                <i data-lucide="layout-grid"></i>
-                <span>Home</span>
+            <a href="index.html" class="nav-item">
+                <i data-lucide="home"></i>
             </a>
             <a href="messages.html" class="nav-item">
                 <i data-lucide="message-circle"></i>
-                <span>Chats</span>
             </a>
             <a href="add-contact.html" class="nav-item">
                 <i data-lucide="search"></i>
-                <span>Find</span>
+            </a>
+            <a href="pulseLobby.html" class="nav-item">
+                <i data-lucide="radio" class="pulse-anim"></i>
             </a>
             <a href="calls.html" class="nav-item">
                 <i data-lucide="phone"></i>
-                <span>Calls</span>
             </a>
         </nav>
         `;
@@ -155,7 +128,7 @@ class MainNavbar extends HTMLElement {
 
     _highlightActive() {
         const path = window.location.pathname;
-        const page = path.split("/").pop() || "home.html";
+        const page = path.split("/").pop() || "index.html";
         const links = this.querySelectorAll('.nav-item');
         
         links.forEach(link => {
@@ -171,15 +144,21 @@ class MainNavbar extends HTMLElement {
     }
 
     /**
-     * Logic to hide navbar when #call-screen is visible
+     * Logic to hide navbar when #call-screen is visible OR ANY modal is open
      */
     _setupVisibilityToggle() {
         const navContainer = this.querySelector('#main-nav-container');
         
-        // 1. Check immediately for call screen
+        // 1. Check immediately for call screen AND any modals app-wide
         const checkVisibility = () => {
             const callScreen = document.getElementById('call-screen');
+            
+            // This aggressively checks for ANY element in the app that acts like an open modal/overlay
+            const isAnyModalOpen = document.querySelector('.m-full-modal.open, .c-overlay.open, view-notes[open], view-notes.open, .modal-active, #install-popup.show');
+
             if (callScreen && (callScreen.style.display === 'flex' || callScreen.classList.contains('active'))) {
+                navContainer.classList.add('nav-hidden');
+            } else if (isAnyModalOpen) {
                 navContainer.classList.add('nav-hidden');
             } else {
                 navContainer.classList.remove('nav-hidden');
@@ -197,6 +176,11 @@ class MainNavbar extends HTMLElement {
             if (target) {
                 observer.observe(target, { attributes: true, attributeFilter: ['style', 'class'] });
             }
+
+            // ADDED: App-wide observer. If a modal dynamically injects into the body anywhere, hide the nav.
+            const bodyObserver = new MutationObserver(() => checkVisibility());
+            bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'open'] });
+
             checkVisibility();
         }, 1000);
     }
