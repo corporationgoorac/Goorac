@@ -164,59 +164,34 @@
             display: block;
         }
 
-        /* ==========================================================================
-           NOTES SECTION STYLES
-           ========================================================================== */
+        /* --- NOTES --- */
         #notes-container {
-            display: flex; 
-            gap: 15px; 
-            padding: 15px 20px;
-            overflow-x: auto; 
-            scrollbar-width: none;
+            display: flex; gap: 15px; padding: 15px 20px;
+            overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
-            min-height: 105px;
+            min-height: 95px; /* Pre-reserve space for notes */
         }
-
-        #notes-container::-webkit-scrollbar { 
-            display: none; 
-        }
+        #notes-container::-webkit-scrollbar { display: none; }
         
         .note-item { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-width: 70px; 
-            cursor: pointer; 
-            position: relative;
+            display: flex; flex-direction: column; align-items: center; 
+            min-width: 70px; cursor: pointer; position: relative;
         }
         
         .note-pfp {
-            width: 65px; 
-            height: 65px; 
-            min-width: 65px; 
-            min-height: 65px;
+            width: 65px; height: 65px; 
+            min-width: 65px; min-height: 65px;
             border-radius: 24px; 
             object-fit: cover; 
             border: 2px solid var(--border);
-            padding: 2px; 
-            background: #000; 
+            padding: 2px; background: #000;
             transition: transform 0.2s;
         }
-
-        .note-item:active .note-pfp { 
-            transform: scale(0.92); 
-            border-color: var(--accent); 
-        }
+        .note-item:active .note-pfp { transform: scale(0.95); border-color: var(--accent); }
         
         .note-username {
-            margin-top: 6px; 
-            font-size: 0.7rem; 
-            color: var(--text-dim);
-            max-width: 80px; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis;
-            text-align: center;
+            margin-top: 6px; font-size: 0.7rem; color: var(--text-dim);
+            max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
         .note-bubble {
@@ -224,7 +199,6 @@
             border: 1px solid var(--border); padding: 4px 8px; border-radius: 10px;
             font-size: 0.7rem; max-width: 60px; white-space: nowrap; 
             overflow: hidden; text-overflow: ellipsis; z-index: 2;
-            color: #fff;
         }
 
         /* ==========================================================================
@@ -491,7 +465,7 @@
         }
 
         view-notes { 
-            z-index: 10000 !important; 
+            z-index: 9999 !important; 
             position: relative; 
         }
     </style>
@@ -528,8 +502,8 @@
 <div id="notes-container">
     <div class="note-item" id="my-note-btn">
         <div class="note-bubble" id="my-note-preview" style="display:none;"></div>
-        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp">
-        <span class="note-username" id="my-note-text">You</span>
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="note-pfp skeleton" id="my-note-pfp" width="65" height="65">
+        <span class="note-username">You</span>
     </div>
 </div>
 
@@ -639,7 +613,8 @@
         if (noteViewer) {
             new MutationObserver(() => {
                 const style = window.getComputedStyle(noteViewer);
-                const isNotesOpen = (style.display !== 'none' && style.opacity !== '0') || noteViewer.classList.contains('open');
+                const isNotesOpen = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
+                    noteViewer.classList.contains('open') || noteViewer.classList.contains('active') || noteViewer.hasAttribute('open');
                 let isModalOpen = false;
                 if (momentsFeed) {
                     isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
@@ -711,7 +686,6 @@
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
                 checkMyMoment(user.uid, userData.photoURL);
-                checkMyNote(user.uid);
             } else {
                 window.location.href = "setup.html";
             }
@@ -719,39 +693,6 @@
             window.location.href = "login.html";
         }
     });
-
-    function checkMyNote(uid) {
-        // Querying for the note where the 'uid' field matches the user's ID
-        db.collection('notes').where('uid', '==', uid).limit(1).onSnapshot(snap => {
-            const textEl = document.getElementById('my-note-text');
-            const previewEl = document.getElementById('my-note-preview');
-            const btn = document.getElementById('my-note-btn');
-            
-            if (!snap.empty) {
-                const data = snap.docs[0].data();
-                if (data.text) {
-                    // You HAVE a note - show preview and allow viewing
-                    textEl.innerText = "You";
-                    if(previewEl) {
-                        previewEl.innerText = data.text;
-                        previewEl.style.display = 'block';
-                    }
-                    btn.onclick = () => {
-                        const nv = document.getElementById('note-viewer');
-                        if(nv) nv.open(uid);
-                    };
-                    return; // Successfully set, exit function
-                }
-            }
-            
-            // If no note is found or document is empty, show "Add Note"
-            textEl.innerText = "Add Note";
-            if(previewEl) previewEl.style.display = 'none';
-            btn.onclick = () => { 
-                window.location.href = 'notes.html'; 
-            };
-        });
-    }
 
     function checkMyMoment(uid, photoURL) {
         db.collection('moments')
