@@ -12,13 +12,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <script src="components/navbar.js" defer></script>
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
-
-    <script type="module" src="components/presence.js"></script>
+    <script src="components/viewMoments.js" defer></script> <script type="module" src="components/presence.js"></script>
 
     <style>
         :root {
@@ -276,6 +275,7 @@
         }
         .icon-like { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
         .icon-follow { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
+        .icon-comment { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
         
         .toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
         .toast-title { font-size: 0.75rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
@@ -293,6 +293,31 @@
             0% { transform: scale(1); opacity: 0.8; }
             50% { transform: scale(1.1); opacity: 1; }
             100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        /* --- ADDED: FLOATING ACTION BUTTON FOR MOMENTS --- */
+        .fab-container {
+            position: fixed; bottom: 85px; right: 20px; z-index: 990;
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--accent); color: #000;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+            cursor: pointer; transition: transform 0.2s, background 0.2s;
+        }
+        .fab-container:active { transform: scale(0.9); }
+        .fab-container .material-icons-round { font-size: 32px; font-weight: bold; }
+        .fab-container img {
+            width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
+            border: 2px solid var(--accent); padding: 2px; background: #000;
+        }
+        .fab-container.has-moment {
+            background: transparent; box-shadow: 0 0 15px var(--accent);
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(0, 210, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
         }
     </style>
 </head>
@@ -343,6 +368,8 @@
     </div>
 </div>
 
+<view-moments id="moments-feed-viewer"></view-moments>
+
 <div class="content">
     <span class="section-label">DASHBOARD</span>
     <div class="welcome-card">
@@ -370,6 +397,10 @@
             </div>
         </div>
     </div>
+</div>
+
+<div id="fab-moment" class="fab-container" onclick="window.location.href='moments.html'">
+    <span class="material-icons-round" id="fab-icon">add</span>
 </div>
 
 <main-navbar id="main-nav"></main-navbar>
@@ -415,19 +446,43 @@
         }
     })();
 
+    // UPDATED: Advanced NavBar auto-hide logic covering viewNotes & viewMoments modals
     document.addEventListener('DOMContentLoaded', () => {
         const noteViewer = document.getElementById('note-viewer');
+        const momentsViewer = document.getElementById('moments-feed-viewer');
         const mainNav = document.getElementById('main-nav');
-        if (noteViewer && mainNav) {
+        
+        if (mainNav) {
             mainNav.classList.remove('hidden-nav');
+            
             const observer = new MutationObserver((mutations) => {
-                const style = window.getComputedStyle(noteViewer);
-                const isVisible = (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
-                    noteViewer.classList.contains('open') || noteViewer.classList.contains('active') || noteViewer.hasAttribute('open');
+                let isVisible = false;
+                
+                // 1. Check if view-notes is open
+                if (noteViewer) {
+                    const style = window.getComputedStyle(noteViewer);
+                    if ((style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') ||
+                        noteViewer.classList.contains('open') || noteViewer.classList.contains('active') || noteViewer.hasAttribute('open')) {
+                        isVisible = true;
+                    }
+                }
+                
+                // 2. Check if view-moments internal modals are open
+                if (momentsViewer) {
+                    const fullModal = momentsViewer.querySelector('#full-moment-modal');
+                    const commentSheet = momentsViewer.querySelector('#comment-sheet');
+                    if ((fullModal && fullModal.classList.contains('open')) ||
+                        (commentSheet && commentSheet.classList.contains('open'))) {
+                        isVisible = true;
+                    }
+                }
+
                 if (isVisible) mainNav.classList.add('hidden-nav');
                 else mainNav.classList.remove('hidden-nav');
             });
-            observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+            
+            if (noteViewer) observer.observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+            if (momentsViewer) observer.observe(momentsViewer, { attributes: true, subtree: true, attributeFilter: ['class'] });
         }
     });
 
@@ -496,6 +551,7 @@
                 updateUI(doc.data());
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
+                listenMyMoments(user.uid); // ADDED: Activate FAB Tracker
             } else window.location.href = "setup.html";
         } else window.location.href = "login.html";
     });
@@ -536,17 +592,28 @@
             img.style.display = 'block';
         } else {
             icon.style.display = 'flex';
-            if(type === 'like') {
+            if(type === 'like' || type === 'like_moment') {
                 icon.innerHTML = '❤️';
                 icon.className = 'toast-icon icon-like';
+            } else if (type === 'comment_moment') {
+                icon.innerHTML = '💬';
+                icon.className = 'toast-icon icon-comment';
             } else {
                 icon.innerHTML = '👤';
                 icon.className = 'toast-icon icon-follow';
             }
         }
 
-        title.innerText = type === 'like' ? 'New Like' : 'New Follower';
-        body.innerText = `${name} ${type === 'like' ? 'liked your note' : 'started following you'}`;
+        if (type === 'like' || type === 'like_moment') {
+            title.innerText = 'New Like';
+            body.innerText = `${name} liked your moment/note.`;
+        } else if (type === 'comment_moment') {
+            title.innerText = 'New Comment';
+            body.innerText = `${name} commented on your moment.`;
+        } else {
+            title.innerText = 'New Follower';
+            body.innerText = `${name} started following you.`;
+        }
 
         toast.classList.add('active');
         if(navigator.vibrate) navigator.vibrate(20);
@@ -571,11 +638,9 @@
             }
         });
 
-        // --- TOAST LISTENER (SEPARATE FROM BADGE) ---
-        // Keeps the toasts working for real-time feedback
         let isFirstLoad = true;
         
-        // Listen for new likes (Standard Collection)
+        // Listen for new likes (Standard Collection - Notes)
         db.collection("notes").where("uid", "==", uid).limit(1).onSnapshot(snapshot => {
             if(!isFirstLoad && !snapshot.empty) {
                 snapshot.docChanges().forEach(change => {
@@ -590,16 +655,67 @@
             }
         });
 
-        // Listen for new followers (User Subcollection)
+        // ADDED: Listen for new Notifications (Likes/Comments on Moments from viewMoments.js logic)
+        db.collection("notifications")
+            .where("toUid", "==", uid)
+            .where("isRead", "==", false)
+            .orderBy("timestamp", "desc")
+            .limit(1)
+            .onSnapshot(snap => {
+                if (!isFirstLoad && !snap.empty) {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const notif = change.doc.data();
+                            if (notif.fromUid !== uid) {
+                                showNotificationToast(notif.type, notif.fromName || 'Someone', notif.fromPfp);
+                            }
+                        }
+                    });
+                }
+            });
+
         db.collection("users").doc(uid).onSnapshot(doc => {
             if(!isFirstLoad && doc.exists) {
                 const data = doc.data();
                 const followers = data.followers || [];
-                const lastFollower = followers[followers.length - 1]; // Assuming array order
-                // This is a basic check; robust diffing is better but complex for this snippet
+                const lastFollower = followers[followers.length - 1]; 
             }
             if(isFirstLoad) setTimeout(()=>isFirstLoad=false, 2000);
         });
+    }
+
+    // --- ADDED: FAB LOGIC FOR MY MOMENTS ---
+    function listenMyMoments(uid) {
+        db.collection("moments")
+            .where("uid", "==", uid)
+            .where("isActive", "==", true)
+            .where("expiresAt", ">", firebase.firestore.Timestamp.now())
+            .orderBy("expiresAt", "desc")
+            .limit(1)
+            .onSnapshot(snap => {
+                const fab = document.getElementById('fab-moment');
+                if (snap.empty) {
+                    // No active moments -> Show generic Add button
+                    fab.classList.remove('has-moment');
+                    fab.innerHTML = `<span class="material-icons-round" id="fab-icon">add</span>`;
+                    fab.onclick = () => window.location.href = 'moments.html';
+                } else {
+                    // Active moment exists -> Show glowing profile picture
+                    const moment = snap.docs[0].data();
+                    const momentId = snap.docs[0].id;
+                    fab.classList.add('has-moment');
+                    fab.innerHTML = `<img src="${moment.pfp}" alt="My Moment">`;
+                    fab.onclick = () => {
+                        const viewer = document.getElementById('moments-feed-viewer');
+                        if (viewer && typeof viewer.openFullModal === 'function') {
+                            viewer.openFullModal(momentId);
+                        } else {
+                            // Fallback if component is still loading
+                            window.location.href = 'moments.html'; 
+                        }
+                    };
+                }
+            });
     }
 
     function startLiveCounters(uid) {
