@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>New Moment | Goorac</title>
+    <title>New Moment | Goorac Premium</title>
     
     <script src="config.js"></script>
 
@@ -19,242 +19,462 @@
     <script src="components/chatLoader.js" defer></script>
     <chat-loader></chat-loader>
 
-    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bangers&family=Dancing+Script:wght@700&family=Fredoka:wght@600&family=Orbitron:wght@700&family=Playfair+Display:ital,wght@1,700&family=Righteous&family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
+        /* ==========================================================================
+           ROOT & CORE STYLES
+           ========================================================================== */
         :root { 
             --bg: #000000; 
             --surface: #111111;
-            --surface-glass: rgba(20, 20, 20, 0.6);
+            --surface-glass: rgba(25, 25, 25, 0.7);
             --accent: #ff007f; 
-            --accent-glow: rgba(255, 0, 127, 0.4);
+            --accent-glow: rgba(255, 0, 127, 0.5);
             --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
             --safe-bottom: env(safe-area-inset-bottom, 20px);
             --safe-top: env(safe-area-inset-top, 20px);
+            --nav-height: 70px;
+            --transition-main: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none; 
+            outline: none;
+        }
 
         body {
-            background-color: var(--bg); color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0; padding: 0; height: 100dvh; overflow: hidden;
+            background-color: var(--bg); 
+            color: var(--text);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            margin: 0; 
+            padding: 0; 
+            height: 100dvh; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* FIX: Ultimate Z-Index to ensure components (like song-picker) are NEVER blocked */
+        /* COMPONENT Z-INDEX PRIORITY */
         song-picker, close-friends-selector, image-picker, file-picker { 
             position: absolute !important; 
-            z-index: 2147483647 !important; 
+            z-index: 999999 !important; 
             top: 0; left: 0;
         }
 
-        /* --- SLIDE-IN APP MODAL --- */
+        /* ==========================================================================
+           APP CONTAINER & NAVIGATION
+           ========================================================================== */
         .app-modal {
-            width: 100vw; height: 100dvh; 
-            display: flex; flex-direction: column;
+            width: 100vw; 
+            height: 100dvh; 
+            display: flex; 
+            flex-direction: column;
             background: var(--bg);
-            /* Slide animation removed per user request */
             position: relative;
         }
 
-        /* --- IMMERSIVE CANVAS (IG Story Style) --- */
+        /* --- IMMERSIVE CANVAS --- */
         .canvas-container {
-            position: absolute; inset: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            background: #1a1a1a; z-index: 1; overflow: hidden;
-            border-radius: 0; /* Edge to edge */
+            flex: 1;
+            position: relative; 
+            width: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            background: #0a0a0a; 
+            z-index: 1; 
+            overflow: hidden;
+            transition: var(--transition-main);
         }
 
-        /* Dynamic Blurred Backdrop for Media */
         #media-backdrop {
-            position: absolute; inset: -10%; width: 120%; height: 120%;
-            object-fit: cover; filter: blur(40px) brightness(0.6);
-            z-index: 0; display: none; opacity: 0; transition: opacity 0.5s;
+            position: absolute; 
+            inset: -15%; 
+            width: 130%; 
+            height: 130%;
+            object-fit: cover; 
+            filter: blur(50px) brightness(0.4) saturate(1.2);
+            z-index: 0; 
+            display: none; 
+            opacity: 0; 
+            transition: opacity 0.8s ease;
         }
 
-        /* Floating Header - Fixed Overlaps */
+        /* ==========================================================================
+           HEADER UI
+           ========================================================================== */
         header {
-            position: absolute; top: 0; left: 0; width: 100%; z-index: 50;
-            padding: calc(15px + var(--safe-top)) 20px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            z-index: 100;
+            padding: calc(15px + var(--safe-top)) 20px 30px;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%);
             pointer-events: none;
         }
         
         .header-left, .header-right {
-            display: flex; align-items: center; gap: 15px; pointer-events: auto;
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            pointer-events: auto;
         }
 
         .back-btn, .clear-media-btn { 
-            width: 40px; height: 40px; border-radius: 50%;
-            background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
-            transition: 0.2s;
+            width: 44px; 
+            height: 44px; 
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px);
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            color: #fff; 
+            cursor: pointer; 
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .back-btn:active, .clear-media-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+        .back-btn:active, .clear-media-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.25); }
         
-        /* Clear btn logic handled via display classes now */
         .clear-media-btn { display: none; }
-        .clear-media-btn.show { display: flex; }
+        .clear-media-btn.show { display: flex; animation: fadeInScale 0.3s ease forwards; }
         .back-btn.hide { display: none; }
 
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
         .post-btn { 
-            background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.6); 
-            padding: 8px 22px; border-radius: 100px; backdrop-filter: blur(10px);
-            font-weight: 700; font-size: 14px; border: 1px solid rgba(255,255,255,0.1); 
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            background: rgba(255,255,255,0.05); 
+            color: rgba(255,255,255,0.3); 
+            padding: 10px 24px; 
+            border-radius: 100px; 
+            backdrop-filter: blur(15px);
+            font-weight: 800; 
+            font-size: 14px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(255,255,255,0.1); 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             pointer-events: none;
         }
-        /* Updated Share Button Style per request: White BG, Black Text */
+
         .post-btn.active { 
-            pointer-events: auto; background: #ffffff; color: #000000; 
+            pointer-events: auto; 
+            background: #ffffff; 
+            color: #000000; 
             border-color: #ffffff;
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3); 
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.4); 
             animation: pulseBtnWhite 2s infinite;
         }
+
         @keyframes pulseBtnWhite {
             0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            70% { box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
         }
 
-        /* Mode Selection UI */
+        /* ==========================================================================
+           MODE SELECTOR (CENTER UI)
+           ========================================================================== */
         .mode-selector {
-            display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 280px; z-index: 20;
-        }
-        .mode-btn {
-            background: rgba(20,20,20,0.6); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.1); color: #fff; 
-            padding: 16px 20px; border-radius: 24px; font-size: 15px; font-weight: 600;
-            display: flex; align-items: center; gap: 14px; cursor: pointer; transition: 0.2s;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-        }
-        .mode-btn:active { transform: scale(0.95); background: rgba(40,40,40,0.8); }
-        .mode-btn .material-icons-round { font-size: 24px; color: var(--accent); }
-
-        /* Media Elements - Perfect centering with object-fit contain */
-        #media-preview, #video-preview { 
-            width: 100%; height: 100%; object-fit: contain; display: none; 
-            position: absolute; inset: 0; margin: auto; z-index: 1; 
-        }
-        
-        #text-preview { 
-            width: 100%; height: 100%; display: none; align-items: center; justify-content: center; 
-            padding: 40px 30px 140px; font-size: 36px; font-weight: 800; text-align: center; word-break: break-word; outline: none; 
-            z-index: 2; position: absolute; inset: 0; white-space: pre-wrap; line-height: 1.25;
-            transition: all 0.3s ease;
-        }
-        #text-preview:empty:before { content: 'Tap to type...'; opacity: 0.5; }
-
-        /* NEW TEXT EFFECTS */
-        .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-        .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
-
-        /* Floating Text Tools */
-        .text-tools {
-            position: absolute; bottom: calc(200px + var(--safe-bottom)); left: 0; width: 100%;
-            display: none; align-items: center; gap: 12px; overflow-x: auto; 
-            padding: 10px 20px; scrollbar-width: none; z-index: 30;
-        }
-        .text-tools::-webkit-scrollbar { display: none; }
-        .t-btn { width: 44px; height: 44px; border-radius: 14px; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; color:#fff;}
-        .t-btn:active { transform: scale(0.9); }
-        .color-dot { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;}
-        .color-dot:active { transform: scale(0.85); }
-        .font-pill { padding: 10px 18px; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; font-size: 14px; flex-shrink: 0; cursor: pointer; color:#fff; transition: 0.2s;}
-
-        /* --- BOTTOM CONTROLS PANEL (Floating Glass) --- */
-        .controls-panel {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            padding: 20px 20px calc(20px + var(--safe-bottom));
-            display: flex; flex-direction: column; gap: 12px; 
-            background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, rgba(0,0,0,0.6) 80%, transparent);
+            display: flex; 
+            flex-direction: column; 
+            gap: 18px; 
+            width: 100%; 
+            max-width: 300px; 
             z-index: 50;
         }
 
-        /* Input Wrappers */
-        .input-wrapper { position: relative; width: 100%; display: flex; align-items: flex-end; }
-        
-        /* MULTILINE TEXTAREA UPGRADES */
-        .caption-input {
-            flex: 1; background: rgba(255,255,255,0.1); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.15);
-            color: #fff; padding: 16px 85px 16px 16px; border-radius: 20px; font-size: 15px; outline: none;
-            transition: border-color 0.2s, background 0.2s;
-            resize: none; /* Prevents manual resizing */
-            min-height: 52px; /* Starting height */
-            max-height: 120px; /* Max height before scrolling inside */
-            overflow-y: auto;
-            line-height: 1.4;
-            font-family: inherit;
+        .mode-btn {
+            background: rgba(255,255,255,0.08); 
+            backdrop-filter: blur(25px); 
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255,255,255,0.12); 
+            color: #fff; 
+            padding: 18px 24px; 
+            border-radius: 28px; 
+            font-size: 16px; 
+            font-weight: 700;
+            display: flex; 
+            align-items: center; 
+            gap: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
         }
-        .caption-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.15); }
-        .caption-input::placeholder { color: rgba(255,255,255,0.5); }
+        .mode-btn:active { transform: scale(0.96); background: rgba(255,255,255,0.15); }
+        .mode-btn .material-icons-round { font-size: 26px; color: var(--accent); }
+
+        /* ==========================================================================
+           PREVIEW ELEMENTS
+           ========================================================================== */
+        #media-preview, #video-preview { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            display: none; 
+            position: absolute; 
+            inset: 0; 
+            margin: auto; 
+            z-index: 2; 
+        }
+        
+        #text-preview { 
+            width: 100%; 
+            height: 100%; 
+            display: none; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 60px 40px 160px; 
+            font-size: 38px; 
+            font-weight: 800; 
+            text-align: center; 
+            word-break: break-word; 
+            outline: none; 
+            z-index: 10; 
+            position: absolute; 
+            inset: 0; 
+            white-space: pre-wrap; 
+            line-height: 1.2;
+            transition: all 0.3s ease;
+        }
+        #text-preview:empty:before { content: 'Tap to express...'; opacity: 0.4; }
+
+        /* TEXT EFFECTS */
+        .fx-glow { text-shadow: 0 0 15px currentColor, 0 0 30px currentColor; }
+        .fx-shadow { text-shadow: 4px 4px 0px rgba(0,0,0,0.8); }
+
+        /* ==========================================================================
+           TEXT TOOLS (FLOATING BAR)
+           ========================================================================== */
+        .text-tools {
+            position: absolute; 
+            bottom: 20px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            display: none; 
+            align-items: center; 
+            gap: 12px; 
+            overflow-x: auto; 
+            padding: 12px 20px; 
+            scrollbar-width: none; 
+            z-index: 150;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .text-tools::-webkit-scrollbar { display: none; }
+        
+        .t-btn { 
+            width: 48px; 
+            height: 48px; 
+            border-radius: 16px; 
+            background: rgba(255,255,255,0.1); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            flex-shrink: 0; 
+            cursor: pointer; 
+            color:#fff;
+            transition: 0.2s;
+        }
+        .color-dot { 
+            width: 34px; 
+            height: 34px; 
+            border-radius: 50%; 
+            border: 2.5px solid rgba(255,255,255,0.4); 
+            flex-shrink: 0; 
+            cursor: pointer; 
+            transition: 0.2s;
+        }
+        .font-pill { 
+            padding: 10px 20px; 
+            background: rgba(255,255,255,0.1); 
+            border-radius: 16px; 
+            font-size: 14px; 
+            font-weight: 700;
+            flex-shrink: 0; 
+            cursor: pointer; 
+            color:#fff;
+        }
+
+        /* ==========================================================================
+           BOTTOM CONTROLS PANEL (THE FIXED BAR)
+           ========================================================================== */
+        .controls-panel {
+            position: relative; /* Changed from absolute to ensure visibility */
+            width: 100%;
+            padding: 20px 20px calc(25px + var(--safe-bottom));
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            background: #000;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 200;
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.9);
+        }
+
+        /* CAPTION AREA */
+        .input-wrapper { 
+            position: relative; 
+            width: 100%; 
+            display: flex; 
+            align-items: flex-end; 
+        }
+        
+        .caption-input {
+            flex: 1; 
+            background: rgba(255,255,255,0.07); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff; 
+            padding: 16px 90px 16px 20px; 
+            border-radius: 22px; 
+            font-size: 15px; 
+            transition: var(--transition-main);
+            resize: none; 
+            min-height: 56px; 
+            max-height: 140px; 
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        .caption-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.1); }
         
         .char-count {
-            position: absolute; right: 50px; bottom: 18px;
-            font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); pointer-events: none;
+            position: absolute; 
+            right: 55px; 
+            bottom: 18px;
+            font-size: 10px; 
+            font-weight: 800; 
+            color: var(--text-dim); 
+            pointer-events: none;
+            letter-spacing: 1px;
         }
-        .char-count.limit { color: #ff3b30; }
 
         .emoji-trigger-btn {
-            position: absolute; right: 8px; bottom: 8px;
-            background: none; border: none; font-size: 22px; cursor: pointer;
-            padding: 6px; display: flex; align-items: center; justify-content: center;
-            opacity: 0.8; transition: 0.2s;
+            position: absolute; 
+            right: 10px; 
+            bottom: 10px;
+            background: rgba(255,255,255,0.05); 
+            border-radius: 12px;
+            font-size: 24px; 
+            padding: 8px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: 0.2s;
         }
-        .emoji-trigger-btn:active { transform: scale(0.9); opacity: 1; }
 
+        /* MUSIC TRIGGER */
         .song-btn {
-            background: rgba(255,255,255,0.1); backdrop-filter: blur(15px); border: 1px dashed rgba(255,255,255,0.3);
-            color: #fff; padding: 14px 16px; border-radius: 20px; font-size: 14px; font-weight: 600;
-            display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s;
+            background: rgba(255,255,255,0.05); 
+            border: 1.5px dashed rgba(255,255,255,0.2);
+            color: #fff; 
+            padding: 16px 20px; 
+            border-radius: 24px; 
+            font-size: 14px; 
+            font-weight: 700;
+            display: flex; 
+            align-items: center; 
+            gap: 14px; 
+            cursor: pointer; 
+            transition: 0.3s;
         }
-        .song-btn.has-song { border-style: solid; border-color: var(--accent); background: rgba(255, 0, 127, 0.15); }
-        .song-btn span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .song-icon { background: rgba(255,255,255,0.15); padding: 6px; border-radius: 12px; display: flex; }
+        .song-btn.has-song { 
+            border-style: solid; 
+            border-color: var(--accent); 
+            background: linear-gradient(90deg, rgba(255, 0, 127, 0.2), transparent); 
+        }
+        
+        .song-icon { 
+            background: rgba(255,255,255,0.1); 
+            padding: 8px; 
+            border-radius: 14px; 
+            display: flex; 
+            color: var(--accent);
+        }
 
-        /* Settings Row */
-        .settings-row { display: flex; align-items: center; gap: 10px; }
+        /* SETTINGS ROW */
+        .settings-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
         
         .setting-toggle {
-            flex: 1; background: rgba(255,255,255,0.08); backdrop-filter: blur(15px); padding: 12px; border-radius: 16px;
-            display: flex; align-items: center; justify-content: center; gap: 8px; 
-            font-size: 12px; font-weight: 700; color: #aaa; cursor: pointer;
-            border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;
+            flex: 1; 
+            background: rgba(255,255,255,0.05); 
+            padding: 14px; 
+            border-radius: 18px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            font-size: 13px; 
+            font-weight: 700; 
+            color: var(--text-dim); 
+            border: 1px solid transparent; 
+            transition: 0.3s;
         }
-        .setting-toggle.active { color: #fff; border-color: var(--accent); background: rgba(255, 0, 127, 0.15); }
-        .setting-toggle:active { transform: scale(0.97); }
+        .setting-toggle.active { 
+            color: #fff; 
+            border-color: rgba(255, 0, 127, 0.4); 
+            background: rgba(255, 0, 127, 0.1); 
+        }
 
         #edit-cf-btn {
-            text-align: center; font-size: 11px; color: var(--accent); 
-            font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
-            padding: 5px; display: none; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-align: center; 
+            font-size: 11px; 
+            color: var(--accent); 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            letter-spacing: 1.2px;
+            padding: 8px; 
+            display: none; 
+            animation: fadeIn 0.4s ease;
         }
 
-        /* --- EMOJI MODAL BOTTOM SHEET --- */
+        /* ==========================================================================
+           EMOJI MODAL
+           ========================================================================== */
         .emoji-modal-overlay {
-            position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,0.5);
-            display: none; align-items: flex-end; backdrop-filter: blur(2px);
-            opacity: 0; transition: opacity 0.2s;
+            position: fixed; inset: 0; z-index: 1000000; background: rgba(0,0,0,0.8);
+            display: none; align-items: flex-end; backdrop-filter: blur(8px);
+            opacity: 0; transition: opacity 0.3s;
         }
         .emoji-modal-overlay.open { display: flex; opacity: 1; }
         
         .emoji-sheet {
-            width: 100%; height: 55vh; background: #121212;
-            border-top-left-radius: 24px; border-top-right-radius: 24px;
-            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1);
+            width: 100%; height: 60vh; background: #0a0a0a;
+            border-top-left-radius: 32px; border-top-right-radius: 32px;
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             overflow: hidden; display: flex; flex-direction: column;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+            border-top: 1px solid rgba(255,255,255,0.1);
         }
         .emoji-modal-overlay.open .emoji-sheet { transform: translateY(0); }
         
         .emoji-sheet-header {
-            display: flex; justify-content: center; padding: 10px;
-            background: #121212; border-bottom: 1px solid #222;
+            display: flex; justify-content: center; padding: 15px;
+            background: transparent;
         }
-        .drag-handle { width: 40px; height: 5px; background: #444; border-radius: 10px; }
+        .drag-handle { width: 44px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -275,62 +495,62 @@
             </div>
         </header>
 
-        <div class="canvas-container" id="canvas-bg">
-            <img id="media-backdrop" src="">
+        <main class="canvas-container" id="canvas-bg">
+            <img id="media-backdrop" src="" alt="Backdrop">
 
             <div class="mode-selector" id="mode-selector">
                 <div class="mode-btn" onclick="setMode('text')">
                     <div class="song-icon"><span class="material-icons-round">text_fields</span></div> 
-                    Write a Text Moment
+                    Type a Story
                 </div>
                 <div class="mode-btn" onclick="triggerHaptic(); document.getElementById('img-picker').openPicker()">
                     <div class="song-icon"><span class="material-icons-round">image</span></div> 
-                    Upload a Photo
+                    Gallery Photo
                 </div>
                 <div class="mode-btn" onclick="triggerHaptic(); document.getElementById('file-picker').openPicker()">
                     <div class="song-icon"><span class="material-icons-round">videocam</span></div> 
-                    Upload a Video
+                    Pick a Video
                 </div>
             </div>
 
-            <div id="text-preview" contenteditable="true" spellcheck="false"></div>
-            <img id="media-preview" src="">
+            <div id="text-preview" contenteditable="true" spellcheck="false" data-placeholder="Tap to start typing..."></div>
+            <img id="media-preview" src="" alt="Preview">
             <video id="video-preview" loop muted playsinline autoplay></video>
 
             <div class="text-tools" id="text-tools">
                 <div class="t-btn" onclick="toggleAlign()"><span class="material-icons-round" id="align-icon">format_align_center</span></div>
                 <div class="t-btn" onclick="toggleEffect()" id="fx-btn"><span class="material-icons-round">auto_fix_high</span></div>
-                <div style="width:1px; height:24px; background:rgba(255,255,255,0.3); margin:0 4px;"></div>
-            </div>
-        </div>
+                <div style="width:1px; height:30px; background:rgba(255,255,255,0.2); margin:0 8px;"></div>
+                </div>
+        </main>
 
-        <div class="controls-panel">
+        <footer class="controls-panel">
             <div class="input-wrapper">
-                <textarea class="caption-input" id="caption-input" placeholder="Write a caption (Required)..." maxlength="300" rows="1"></textarea>
+                <textarea class="caption-input" id="caption-input" placeholder="What's happening? (Required)" maxlength="300" rows="1"></textarea>
                 <span class="char-count" id="char-count">0/300</span>
                 <button class="emoji-trigger-btn" onclick="openEmojiPicker()">😀</button>
             </div>
             
             <button class="song-btn" id="song-trigger" onclick="triggerHaptic(); document.getElementById('song-picker').open()">
                 <div class="song-icon" id="song-icon-wrap"><span class="material-icons-round">music_note</span></div>
-                <span id="song-label">Select a Song (Required)</span>
+                <span id="song-label">Add Soundtrack (Required)</span>
             </button>
 
             <div class="settings-row">
                 <div class="setting-toggle" id="audience-toggle" onclick="toggleAudience()">
-                    <span class="material-icons-round" id="aud-icon" style="font-size:16px;">public</span>
+                    <span class="material-icons-round" id="aud-icon" style="font-size:18px;">public</span>
                     <span id="aud-label">Public</span>
                 </div>
                 <div class="setting-toggle active" id="comments-toggle" onclick="toggleComments()">
-                    <span class="material-icons-round" id="com-icon" style="font-size:16px;">chat_bubble</span>
+                    <span class="material-icons-round" id="com-icon" style="font-size:18px;">chat_bubble</span>
                     <span id="com-label">Comments On</span>
                 </div>
             </div>
             
             <div id="edit-cf-btn" onclick="document.getElementById('cf-selector').open()">
-                Edit Close Friends List <span class="material-icons-round" style="font-size: 12px; vertical-align: middle;">edit</span>
+                Manage Close Friends <span class="material-icons-round" style="font-size: 14px; vertical-align: middle;">settings</span>
             </div>
-        </div>
+        </footer>
     </div>
 
     <div class="emoji-modal-overlay" id="emoji-modal-overlay">
@@ -350,7 +570,12 @@
     <file-picker id="file-picker"></file-picker>
 
 <script>
-    // --- FIREBASE INIT ---
+    /**
+     * GOORAC CORE LOGIC
+     * Handles state, Firebase interactions, and UI updates.
+     */
+
+    // --- FIREBASE INITIALIZATION ---
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
     } else if (!firebase.apps.length && window.firebaseConfig) {
@@ -361,32 +586,48 @@
     let currentUser = null;
     let isPosting = false;
 
-    // --- TEXT MODE CONFIG ---
+    // --- CONFIGURATION ---
     const bgColors = [
         '#1a1a1a', '#ff007f', '#00d2ff', '#00ba7c', '#ff3b30', 
-        'linear-gradient(45deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
-        'radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)',
-        'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
-        'linear-gradient(to top, #0ba360 0%, #3cba92 100%)'
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(45deg, #ff9a9e 0%, #fecfef 100%)',
+        'radial-gradient(circle, #3f5efb 0%, #fc466b 100%)',
+        'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)'
     ];
-    const fonts = ['-apple-system, sans-serif', '"Abril Fatface"', '"Bangers"', '"Dancing Script"', '"Orbitron"', '"Fredoka"', '"Righteous"'];
     
-    // NEW TEXT EFFECTS CONFIG
+    const fonts = [
+        '-apple-system, sans-serif', 
+        '"Abril Fatface"', 
+        '"Bangers"', 
+        '"Dancing Script"', 
+        '"Orbitron"', 
+        '"Fredoka"', 
+        '"Righteous"'
+    ];
+    
     const effects = [
         { name: 'none', class: '' },
         { name: 'glow', class: 'fx-glow' },
         { name: 'shadow', class: 'fx-shadow' }
     ];
 
-    // --- STATE ---
+    // --- STATE MANAGEMENT ---
     let state = {
-        mode: null, // 'text', 'image', 'video'
-        text: '', colorIdx: 0, fontIdx: 0, align: 'center', effectIdx: 0,
-        mediaUrl: null, videoMeta: null,
-        caption: '', song: null,
-        audience: 'public', allowComments: true
+        mode: null, 
+        text: '', 
+        colorIdx: 0, 
+        fontIdx: 0, 
+        align: 'center', 
+        effectIdx: 0,
+        mediaUrl: null, 
+        videoMeta: null,
+        caption: '', 
+        song: null,
+        audience: 'public', 
+        allowComments: true
     };
 
+    // DOM Cache
     const els = {
         selector: document.getElementById('mode-selector'),
         textPreview: document.getElementById('text-preview'),
@@ -407,37 +648,49 @@
         fxBtn: document.getElementById('fx-btn')
     };
 
+    // --- UTILITIES ---
     function triggerHaptic() {
-        if (navigator.vibrate) navigator.vibrate(15);
+        if (navigator.vibrate) navigator.vibrate(12);
     }
 
-    // --- AUTO RESIZE MULTILINE CAPTION ---
     function autoResizeTextarea() {
-        els.captionInput.style.height = 'auto'; // Reset height
-        els.captionInput.style.height = (els.captionInput.scrollHeight) + 'px'; // Set to scroll height
+        els.captionInput.style.height = 'auto';
+        els.captionInput.style.height = (els.captionInput.scrollHeight) + 'px';
     }
 
-    // --- INIT ---
+    // --- INITIALIZATION ---
     function init() {
+        // Auth Guardian
         auth.onAuthStateChanged(user => {
             if (user) currentUser = user;
             else window.location.href = 'login.html';
         });
 
-        // Build Text Formatting Row
+        // Setup Text Tools
         bgColors.forEach((c, i) => {
             const dot = document.createElement('div');
             dot.className = 'color-dot';
             dot.style.background = c;
-            dot.onclick = () => { triggerHaptic(); state.colorIdx = i; updateTextVisuals(); saveDraft(); };
+            dot.onclick = () => { 
+                triggerHaptic(); 
+                state.colorIdx = i; 
+                updateTextVisuals(); 
+                saveDraft(); 
+            };
             els.textTools.appendChild(dot);
         });
+
         fonts.forEach((f, i) => {
             const pill = document.createElement('div');
             pill.className = 'font-pill';
             pill.style.fontFamily = f;
-            pill.innerText = "Abc";
-            pill.onclick = () => { triggerHaptic(); state.fontIdx = i; updateTextVisuals(); saveDraft(); };
+            pill.innerText = "Aa";
+            pill.onclick = () => { 
+                triggerHaptic(); 
+                state.fontIdx = i; 
+                updateTextVisuals(); 
+                saveDraft(); 
+            };
             els.textTools.appendChild(pill);
         });
 
@@ -447,37 +700,43 @@
             updateCaptionState(e.target.value);
         });
         
-        els.textPreview.addEventListener('input', (e) => { state.text = e.target.innerText; saveDraft(); });
+        els.textPreview.addEventListener('input', (e) => { 
+            state.text = e.target.innerText; 
+            saveDraft(); 
+        });
         
         // Listeners for Web Components
-        document.addEventListener('song-selected', (e) => { state.song = e.detail; updateSongUI(); saveDraft(); });
+        document.addEventListener('song-selected', (e) => { 
+            state.song = e.detail; 
+            updateSongUI(); 
+            saveDraft(); 
+        });
         
         document.addEventListener('image-uploaded', (e) => {
-            state.mediaUrl = e.detail.url; setMode('image');
+            state.mediaUrl = e.detail.url; 
+            setMode('image');
         });
         
         document.addEventListener('file-uploaded', (e) => {
             if(e.detail.metadata.type === 'video') {
-                state.mediaUrl = e.detail.url; state.videoMeta = e.detail.metadata; setMode('video');
+                state.mediaUrl = e.detail.url; 
+                state.videoMeta = e.detail.metadata; 
+                setMode('video');
             } else {
-                alert("Only videos are supported in Moments.");
+                alert("Please upload a video file.");
             }
         });
 
-        // Emoji Integration
+        // Emoji System
         document.addEventListener('emoji-click', (e) => {
             triggerHaptic();
             if (state.mode === 'text' && document.activeElement === els.textPreview) {
-                els.textPreview.innerText += e.detail.emoji;
-                state.text = els.textPreview.innerText;
-                const range = document.createRange();
-                const sel = window.getSelection();
-                range.selectNodeContents(els.textPreview);
-                range.collapse(false);
-                sel.removeAllRanges();
-                sel.addRange(range);
+                document.execCommand('insertText', false, e.detail.emoji);
             } else {
-                els.captionInput.value += e.detail.emoji;
+                const start = els.captionInput.selectionStart;
+                const end = els.captionInput.selectionEnd;
+                const text = els.captionInput.value;
+                els.captionInput.value = text.substring(0, start) + e.detail.emoji + text.substring(end);
                 autoResizeTextarea();
                 updateCaptionState(els.captionInput.value);
             }
@@ -488,18 +747,14 @@
             if (e.target === els.emojiOverlay) closeEmojiPicker();
         });
 
-        // HANDLE DEVICE BACK BUTTON FOR EMOJI PICKER
         window.addEventListener('popstate', (e) => {
-            if (els.emojiOverlay.classList.contains('open')) {
-                closeEmojiPicker(true);
-            }
+            if (els.emojiOverlay.classList.contains('open')) closeEmojiPicker(true);
         });
 
         loadDraft();
-        autoResizeTextarea(); // Initialize correct height if draft loaded
     }
 
-    // --- EMOJI MODAL ---
+    // --- NAVIGATION & MODALS ---
     function openEmojiPicker() {
         triggerHaptic();
         els.emojiOverlay.classList.add('open');
@@ -537,13 +792,13 @@
         els.mediaBackdrop.style.display = 'none';
         els.mediaBackdrop.style.opacity = '0';
         els.textTools.style.display = 'none';
-        els.canvasBg.style.background = '#1a1a1a';
+        els.canvasBg.style.background = '#0a0a0a';
 
         if (mode === 'text') {
             els.textPreview.style.display = 'flex';
             els.textTools.style.display = 'flex';
             updateTextVisuals();
-            els.textPreview.focus();
+            setTimeout(() => els.textPreview.focus(), 100);
         } else if (mode === 'image') {
             els.imgPreview.style.display = 'block';
             els.imgPreview.src = state.mediaUrl;
@@ -551,7 +806,7 @@
         } else if (mode === 'video') {
             els.vidPreview.style.display = 'block';
             els.vidPreview.src = state.mediaUrl;
-            applyMediaBackdrop(state.mediaUrl); // Basic poster fallback if needed, but video centers itself
+            applyMediaBackdrop(state.mediaUrl);
         }
         saveDraft();
     }
@@ -559,15 +814,20 @@
     function applyMediaBackdrop(url) {
         els.mediaBackdrop.src = url;
         els.mediaBackdrop.style.display = 'block';
-        // Fade in slightly after load for smooth transition
-        setTimeout(() => { els.mediaBackdrop.style.opacity = '1'; }, 50);
+        setTimeout(() => { els.mediaBackdrop.style.opacity = '1'; }, 100);
     }
 
     function clearMedia() {
         triggerHaptic();
-        state.mode = null; state.mediaUrl = null; state.text = ''; state.videoMeta = null;
+        state.mode = null; 
+        state.mediaUrl = null; 
+        state.text = ''; 
+        state.videoMeta = null;
+        
         els.textPreview.innerText = '';
-        els.imgPreview.src = ''; els.vidPreview.src = ''; els.mediaBackdrop.src = '';
+        els.imgPreview.src = ''; 
+        els.vidPreview.src = ''; 
+        els.mediaBackdrop.src = '';
         
         els.selector.style.display = 'flex';
         els.clearBtn.classList.remove('show');
@@ -578,7 +838,7 @@
         els.vidPreview.style.display = 'none';
         els.mediaBackdrop.style.display = 'none';
         els.textTools.style.display = 'none';
-        els.canvasBg.style.background = '#1a1a1a';
+        els.canvasBg.style.background = '#0a0a0a';
         saveDraft();
     }
 
@@ -586,19 +846,16 @@
         els.canvasBg.style.background = bgColors[state.colorIdx];
         els.textPreview.style.fontFamily = fonts[state.fontIdx];
         els.textPreview.style.textAlign = state.align;
-        els.textPreview.style.color = '#fff'; 
         
-        // Reset and Apply Effect Class
         els.textPreview.className = '';
         const currentEffect = effects[state.effectIdx];
         if (currentEffect && currentEffect.class) {
             els.textPreview.classList.add(currentEffect.class);
         }
         
-        // Update Effect Button UI
         if (els.fxBtn) {
-            els.fxBtn.style.background = state.effectIdx !== 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0,0,0,0.6)';
-            els.fxBtn.style.color = state.effectIdx !== 0 ? 'var(--accent)' : '#fff';
+            els.fxBtn.style.background = state.effectIdx !== 0 ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
+            els.fxBtn.style.color = state.effectIdx !== 0 ? '#fff' : '#fff';
         }
     }
 
@@ -609,10 +866,10 @@
         let curr = alignments.indexOf(state.align);
         state.align = alignments[(curr + 1) % 3];
         document.getElementById('align-icon').innerText = icons[(curr + 1) % 3];
-        updateTextVisuals(); saveDraft();
+        updateTextVisuals(); 
+        saveDraft();
     }
 
-    // NEW FUNCTION: Toggle Text Effects
     function toggleEffect() {
         triggerHaptic();
         state.effectIdx = (state.effectIdx + 1) % effects.length;
@@ -647,33 +904,50 @@
         if (state.song) {
             els.songBtn.classList.add('has-song');
             els.songLabel.innerText = `${state.song.trackName} • ${state.song.artistName}`;
+            els.songIconWrap.style.color = '#fff';
             els.songIconWrap.style.background = 'var(--accent)';
         } else {
             els.songBtn.classList.remove('has-song');
-            els.songLabel.innerText = "Select a Song (Required)";
-            els.songIconWrap.style.background = 'rgba(255,255,255,0.15)';
+            els.songLabel.innerText = "Add Soundtrack (Required)";
+            els.songIconWrap.style.color = 'var(--accent)';
+            els.songIconWrap.style.background = 'rgba(255,255,255,0.1)';
         }
     }
 
-    // --- DRAFT & VALIDATION ---
+    // --- PERSISTENCE ---
     function saveDraft() {
         localStorage.setItem('goorac_moment_draft', JSON.stringify(state));
         validatePost();
     }
 
     function loadDraft() {
-        const draft = JSON.parse(localStorage.getItem('goorac_moment_draft'));
-        if (draft) {
+        const draftStr = localStorage.getItem('goorac_moment_draft');
+        if (!draftStr) {
+            validatePost();
+            return;
+        }
+        
+        try {
+            const draft = JSON.parse(draftStr);
             state = { ...state, ...draft };
+            
             updateCaptionState(state.caption || '');
-            els.textPreview.innerText = state.text;
+            els.textPreview.innerText = state.text || '';
             updateSongUI();
             
-            if (state.audience === 'close_friends') { state.audience = 'public'; toggleAudience(); } 
-            if (!state.allowComments) { state.allowComments = true; toggleComments(); }
+            if (state.audience === 'close_friends') {
+                state.audience = 'public'; 
+                toggleAudience();
+            }
+            
+            if (!state.allowComments) {
+                state.allowComments = true; 
+                toggleComments();
+            }
 
             if (state.mode) setMode(state.mode);
-        }
+        } catch(e) { console.error("Draft error", e); }
+        
         validatePost();
     }
 
@@ -685,16 +959,13 @@
         const hasSong = state.song !== null;
 
         if (hasMedia && hasCaption && hasSong) {
-            if(!els.postBtn.classList.contains('active')) triggerHaptic(); 
             els.postBtn.classList.add('active');
-            els.postBtn.innerText = "Share";
         } else {
             els.postBtn.classList.remove('active');
-            els.postBtn.innerText = "Share";
         }
     }
 
-    // --- POSTING ---
+    // --- SUBMISSION ---
     async function postMoment() {
         if (isPosting || !els.postBtn.classList.contains('active')) return;
         if (!currentUser) return;
@@ -702,20 +973,20 @@
         triggerHaptic();
         isPosting = true;
         els.postBtn.classList.add('loading');
-        els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:14px; animation:spin 1s linear infinite;">refresh</span> Sending...`;
+        els.postBtn.innerHTML = `<span class="material-icons-round" style="font-size:16px; animation:spin 1.5s linear infinite; margin-right:8px;">sync</span> Sending...`;
 
         try {
             const userDoc = await db.collection("users").doc(currentUser.uid).get();
             const userData = userDoc.data() || {};
             
             const expiry = new Date();
-            expiry.setHours(expiry.getHours() + 24); // Expires in 24 hours
+            expiry.setHours(expiry.getHours() + 24);
 
             const payload = {
                 uid: currentUser.uid,
-                username: userData.username || "",
-                displayName: userData.name || "",
-                pfp: userData.photoURL || currentUser.photoURL,
+                username: userData.username || "anonymous",
+                displayName: userData.name || "User",
+                pfp: userData.photoURL || currentUser.photoURL || "",
                 verified: userData.verified || false,
                 
                 type: state.mode, 
@@ -723,7 +994,6 @@
                 audience: state.audience,
                 allowComments: state.allowComments,
                 
-                // Saving accurate Song Data to Firebase
                 songName: state.song.trackName,
                 songArtist: state.song.artistName,
                 songPreview: state.song.previewUrl,
@@ -741,7 +1011,7 @@
                 payload.bgColor = bgColors[state.colorIdx];
                 payload.font = fonts[state.fontIdx];
                 payload.align = state.align;
-                payload.effect = effects[state.effectIdx].name; // Added Effect Export
+                payload.effect = effects[state.effectIdx].name;
             } else {
                 payload.mediaUrl = state.mediaUrl;
                 if (state.mode === 'video') payload.videoMeta = state.videoMeta;
@@ -753,15 +1023,15 @@
             window.location.href = 'home.html';
 
         } catch (error) {
-            console.error(error);
-            alert("Failed to post Moment. Try again.");
+            console.error("Post Error:", error);
+            alert("Upload failed. Please check your connection.");
             els.postBtn.innerHTML = 'Share';
-            els.postBtn.classList.remove('loading');
             isPosting = false;
         }
     }
 
-    init();
+    // Initialize the engine
+    document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
