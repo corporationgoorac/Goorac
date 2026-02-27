@@ -156,33 +156,17 @@ class ViewMoments extends HTMLElement {
         });
 
         // 🚀 CRITICAL BUG FIX: Smart Keyboard Handling using Visual Viewport
-        // STRICTLY absolute positioning to stick above the keyboard without hanging
+        // Instead of margin-bottom which pushes things off screen, we tightly bind the height
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
                 const activeOverlay = this.querySelector('.c-overlay.open');
                 if (activeOverlay) {
-                    // Match overlay exactly to visual viewport height and rigidly position it.
-                    activeOverlay.style.position = 'absolute';
+                    // Match overlay exactly to visual viewport height.
+                    // This prevents the OS from shoving the entire container upwards into oblivion.
                     activeOverlay.style.height = `${window.visualViewport.height}px`;
-                    activeOverlay.style.top = `${window.visualViewport.offsetTop || 0}px`;
-                    
-                    // Target the actual sheet and force it to stick directly above the keyboard
-                    const sheet = activeOverlay.querySelector('.c-sheet');
-                    if (sheet) {
-                        sheet.style.position = 'absolute';
-                        sheet.style.bottom = '0px';
-                        sheet.style.left = '0px';
-                        sheet.style.right = '0px';
-                    }
+                    // STICK STRICTLY ABOVE KEYBOARD: offsetTop adjusts absolute positioning dynamically
+                    activeOverlay.style.top = `${window.visualViewport.offsetTop}px`;
                     window.scrollTo(0, 0); // Lock body scroll to prevent native browser jump
-                }
-            });
-            
-            // Keep the absolute panel strictly locked even during native scroll bounces
-            window.visualViewport.addEventListener('scroll', () => {
-                const activeOverlay = this.querySelector('.c-overlay.open');
-                if (activeOverlay && activeOverlay.style.position === 'absolute') {
-                    activeOverlay.style.top = `${window.visualViewport.offsetTop || 0}px`;
                 }
             });
         }
@@ -200,9 +184,8 @@ class ViewMoments extends HTMLElement {
             input.addEventListener('blur', () => {
                 const activeOverlay = this.querySelector('.c-overlay.open');
                 if (activeOverlay) {
-                    activeOverlay.style.position = 'fixed';
                     activeOverlay.style.height = '100dvh'; // Reset to default
-                    activeOverlay.style.top = '0';
+                    activeOverlay.style.top = '0px'; // Reset top offset
                 }
             });
         });
@@ -1010,14 +993,15 @@ class ViewMoments extends HTMLElement {
                     justify-content: center; 
                 }
 
-                /* Generic Bottom Sheet (Comments/Reply Overlays) */
+                /* 🚀 CRITICAL FIX: Generic STANDARD Modal (Comments/Reply Overlays) */
                 .c-overlay { 
                     position: fixed; 
                     inset: 0; 
                     background: rgba(0,0,0,0.6); 
                     z-index: 3000; 
                     display: none; 
-                    align-items: flex-end; 
+                    align-items: center; /* Center horizontally/vertically */
+                    justify-content: center; /* Center horizontally */
                     opacity: 0; 
                     transition: 0.3s ease; 
                     backdrop-filter: blur(4px); 
@@ -1028,50 +1012,44 @@ class ViewMoments extends HTMLElement {
                     opacity: 1; 
                 }
                 
-                /* STRICTLY ABSOLUTE STICKY POSITION TO AVOID HANGING OFF SCREEN */
                 .c-sheet { 
-                    width: 100%; 
-                    height: 75vh; 
+                    width: 90%; /* Standard Modal Width */
+                    max-width: 450px;
+                    height: auto; 
+                    max-height: 80vh; 
                     background: #121212; 
-                    border-top-left-radius: 24px; 
-                    border-top-right-radius: 24px; 
+                    border-radius: 20px; /* Rounded all corners for normal modal */
                     display: flex; 
                     flex-direction: column; 
-                    transform: translateY(100%); 
+                    transform: scale(0.95); /* Pop-up animation instead of slide up */
                     transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); 
-                    box-shadow: 0 -10px 40px rgba(0,0,0,0.5); 
-                    position: absolute; /* Add absolute to strictly stick */
-                    bottom: 0; /* Add bottom 0 to strictly stick above keyboard */
-                    left: 0;
-                    right: 0;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+                    overflow: hidden; /* Prevent inner content bleeding over rounded edges */
                 }
                 .c-sheet.auto-height { 
                     height: auto; 
-                    min-height: 250px; 
-                    padding-bottom: calc(20px + env(safe-area-inset-bottom)); 
+                    min-height: unset; 
+                    padding-bottom: 0; 
                 }
                 .c-overlay.open .c-sheet { 
-                    transform: translateY(0); 
+                    transform: scale(1); /* Pop-in to full size */
                 }
                 
                 .c-header { 
                     display: flex; 
                     justify-content: center; 
-                    padding: 12px; 
+                    padding: 20px 12px; /* Adjusted padding for standard modal */
                     border-bottom: 1px solid rgba(255,255,255,0.05); 
                     position: relative; 
                 }
                 .c-drag { 
-                    width: 40px; 
-                    height: 4px; 
-                    background: #444; 
-                    border-radius: 10px; 
+                    display: none; /* Removed the drag handle visually since it's a popup now */
                 }
                 .c-title { 
                     position: absolute; 
                     top: 15px; 
                     font-weight: 700; 
-                    font-size: 14px; 
+                    font-size: 15px; 
                 }
                 
                 /* Chat / Comments Inner Layout */
@@ -1128,7 +1106,7 @@ class ViewMoments extends HTMLElement {
                 
                 /* Interactive Form Area */
                 .c-input-area { 
-                    padding: 10px 15px calc(15px + env(safe-area-inset-bottom)); 
+                    padding: 10px 15px 15px; /* Removed safe-area-inset for standard popup */
                     border-top: 1px solid rgba(255,255,255,0.05); 
                     display: flex; 
                     align-items: center; 
