@@ -7,16 +7,16 @@
 class ViewMoments extends HTMLElement {
     constructor() {
         super();
-        this.db = null;
-        this.auth = null;
+        this.db = firebase.firestore();
+        this.auth = firebase.auth();
         this.moments = [];
         this.mutualUids = [];
-        this.myCF = []; 
+        this.myCF = []; // My Close Friends list
         
         // Audio & Observer
         this.audioPlayer = new Audio();
         this.audioPlayer.loop = true;
-        this.isMuted = true; 
+        this.isMuted = true; // Auto-play policies usually require starting muted
         this.observer = null;
         this.seenTimers = {}; 
         
@@ -34,16 +34,54 @@ class ViewMoments extends HTMLElement {
         this.currentUserData = null;
     }
 
-    getIcons() {
-        return {
-            heartEmpty: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
-            heartFilled: `<svg width="28" height="28" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`,
-            send: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0095f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            verified: `<span class="material-icons-round" style="color:#0095f6; font-size:16px; margin-left:4px; vertical-align:middle;">verified</span>`,
-            closeFriendsBadge: `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:18px; height:18px; margin-left:6px; box-shadow:0 0 5px rgba(0,186,124,0.4);"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`
-        };
+    async connectedCallback() {
+        this.render();
+        this.setupEventListeners();
+        
+        // 🚀 INSTANT LOAD: Render from cache immediately (0ms) before network requests block it
+        this.loadCachedMoments();
+        
+        this.auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const doc = await this.db.collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    this.currentUserData = { uid: user.uid, ...doc.data() };
+                    this.initFeed(user.uid);
+                }
+            }
+        });
     }
 
+    setupEventListeners() {
+        // Infinite scroll for body (Feed)
+        window.addEventListener('scroll', () => {
+            if (!this.loading && !this.feedEnd && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
+                this.fetchMoments(true);
+            }
+        });
+
+        // Infinite scroll for comments sheet
+        const cList = this.querySelector('#comment-list-container');
+        if(cList) {
+            cList.addEventListener('scroll', () => {
+                if (!this.loadingComments && (cList.scrollTop + cList.clientHeight >= cList.scrollHeight - 100)) {
+                    this.loadComments(this.activeMomentId, true);
+                }
+            });
+        }
+
+        // Handle Mobile Back Button for Modals
+        window.addEventListener('popstate', (e) => {
+            if (this.querySelector('#full-moment-modal').classList.contains('open') && (!e.state || e.state.modal !== 'momentFull')) {
+                this.closeFullModal(true);
+            }
+            if (this.querySelector('#comment-sheet').classList.contains('open') && (!e.state || e.state.modal !== 'momentComments')) {
+                this.closeComments(true);
+            }
+        });
+    }
+
+    // --- TIMESTAMPS ---
     getRelativeTime(timestamp) {
         if (!timestamp) return 'Just now';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -59,81 +97,31 @@ class ViewMoments extends HTMLElement {
         return `${diffInDays}d`;
     }
 
-    async connectedCallback() {
-        if (window.firebase) {
-            this.db = firebase.firestore();
-            this.auth = firebase.auth();
-        }
-
-        this.render();
-        this.setupEventListeners();
-        
-        // Render from cache immediately
-        this.loadCachedMoments();
-        
-        if (this.auth) {
-            this.auth.onAuthStateChanged(async (user) => {
-                if (user) {
-                    const doc = await this.db.collection('users').doc(user.uid).get();
-                    this.currentUserData = { uid: user.uid, ...doc.data() };
-                    this.initFeed(user.uid);
-                }
-            });
-        }
-    }
-
-    setupEventListeners() {
-        window.addEventListener('scroll', () => {
-            if (!this.loading && !this.feedEnd && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
-                this.fetchMoments(true);
-            }
-        });
-
-        const cList = this.querySelector('#comment-list-container');
-        if(cList) {
-            cList.addEventListener('scroll', () => {
-                if (!this.loadingComments && (cList.scrollTop + cList.clientHeight >= cList.scrollHeight - 100)) {
-                    this.loadComments(this.activeMomentId, true);
-                }
-            });
-        }
-
-        window.addEventListener('popstate', (e) => {
-            if (this.querySelector('#full-moment-modal').classList.contains('open') && (!e.state || e.state.modal !== 'momentFull')) {
-                this.closeFullModal(true);
-            }
-            if (this.querySelector('#comment-sheet').classList.contains('open') && (!e.state || e.state.modal !== 'momentComments')) {
-                this.closeComments(true);
-            }
-        });
-    }
-
     async initFeed(uid) {
+        // 1. Fetch Mutuals & CF using logic matched with viewNotes.js
         await this.fetchRelations(uid);
+        
+        // 2. Setup Intersection Observer for Music & Seen Tracking
         this.setupMediaObserver();
+
+        // 3. Fetch Fresh Data (Batch)
         this.fetchMoments();
     }
 
     async fetchRelations(uid) {
         try {
-            // Mutual Followers Logic - Handling both pure string arrays and object arrays
-            const followingDoc = await this.db.collection('follows').doc(uid).get();
-            const rawFollowing = followingDoc.data()?.uids || followingDoc.data()?.following || [];
-            
-            const followersDoc = await this.db.collection('followers').doc(uid).get();
-            const rawFollowers = followersDoc.data()?.uids || followersDoc.data()?.followers || [];
+            // Retrieve mutuals directly from the user's document
+            const myFollowing = this.currentUserData.following || []; 
+            const myFollowers = this.currentUserData.followers || []; 
 
-            const mapUid = (i) => typeof i === 'string' ? i : i.uid;
-            const myFollowing = rawFollowing.map(mapUid);
-            const myFollowers = rawFollowers.map(mapUid);
+            const followingUIDs = myFollowing.map(i => typeof i === 'string' ? i : i.uid);
+            const followersUIDs = myFollowers.map(i => typeof i === 'string' ? i : i.uid);
 
-            this.mutualUids = myFollowing.filter(id => myFollowers.includes(id));
-            this.mutualUids.push(uid); // Always include myself
+            this.mutualUids = followingUIDs.filter(id => followersUIDs.includes(id));
+            this.mutualUids.push(uid); // Always include myself in the feed
 
-            // Close Friends Logic
-            const cfDoc = await this.db.collection('close_friends').doc(uid).get();
-            const rawCF = cfDoc.data()?.uids || cfDoc.data()?.closeFriends || [];
-            this.myCF = rawCF.map(mapUid);
+            // Close Friends List
+            this.myCF = this.currentUserData.closeFriends || [];
         } catch(e) { console.error("Relations error", e); }
     }
 
@@ -144,8 +132,8 @@ class ViewMoments extends HTMLElement {
 
         let query = this.db.collection('moments')
             .where('isActive', '==', true)
-            .orderBy('createdAt', 'desc')
-            .limit(20); 
+            .orderBy('createdAt', 'desc') // Order by creation to match feed flow
+            .limit(15); 
 
         if (isNextPage && this.lastDoc) {
             query = query.startAfter(this.lastDoc);
@@ -168,44 +156,39 @@ class ViewMoments extends HTMLElement {
             for (let doc of snap.docs) {
                 const data = doc.data();
                 
-                // Expiry Check
-                const expiresAt = data.expiresAt ? (data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt)) : new Date(0);
-                if (expiresAt < now) {
-                    doc.ref.update({ isActive: false });
-                    continue; // Skip rendering expired moment
+                // EXPIRE LOGIC: Check if expired in real-time
+                if (data.expiresAt && data.expiresAt.toDate() < now) {
+                    // Update server to archive it (so it stays in DB but leaves active feed)
+                    this.db.collection('moments').doc(doc.id).update({ isActive: false });
+                    continue; // Skip rendering
                 }
                 
                 // FILTER: Mutuals Only
                 if (!this.mutualUids.includes(data.uid)) continue;
 
-                // FILTER: Close Friends Only 
+                // FILTER: Close Friends Only (Check author's CF list)
                 if (data.audience === 'close_friends' && data.uid !== this.auth.currentUser.uid) {
-                    const creatorCF = await this.db.collection('users').doc(data.uid).get();
-                    const allowedListRaw = creatorCF.data()?.closeFriends || [];
-                    const allowedList = allowedListRaw.map(i => typeof i === 'string' ? i : i.uid);
-                    if (!allowedList.includes(this.auth.currentUser.uid)) continue;
+                    try {
+                        const authorDoc = await this.db.collection('users').doc(data.uid).get();
+                        const authorData = authorDoc.data();
+                        if (!authorData || !authorData.closeFriends || !authorData.closeFriends.includes(this.auth.currentUser.uid)) {
+                            continue; 
+                        }
+                    } catch (e) { continue; }
                 }
 
                 newMoments.push({ id: doc.id, ...data });
-                if (newMoments.length >= 8) break; // Reached target for this batch
+                if (newMoments.length >= 6) break; // Batch target reached
             }
 
             if (isNextPage) {
                 this.moments = [...this.moments, ...newMoments];
             } else {
                 this.moments = newMoments;
-                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 10))); 
+                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 6))); // Cache first 6
             }
 
             this.renderFeed();
-            
-            // If we filtered out too many and got none, recursively fetch next
-            if (newMoments.length === 0 && !this.feedEnd) {
-                this.loading = false;
-                this.fetchMoments(true);
-                return;
-            }
-
         } catch(e) {
             console.error("Feed error", e);
         } finally {
@@ -219,20 +202,15 @@ class ViewMoments extends HTMLElement {
         if (cache) {
             const parsedCache = JSON.parse(cache);
             const now = new Date();
-            
-            // Clean cache of expired moments before rendering
-            this.moments = parsedCache.filter(m => {
-                const exp = m.expiresAt ? new Date(m.expiresAt.seconds ? m.expiresAt.seconds * 1000 : m.expiresAt) : new Date(0);
-                return exp > now;
-            });
-            
-            localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments));
+            // Filter out locally expired cache before network loads
+            this.moments = parsedCache.filter(m => !m.expiresAt || new Date(m.expiresAt.seconds ? m.expiresAt.seconds * 1000 : m.expiresAt) > now);
             this.renderFeed();
         }
     }
 
+    // --- INTERSECTION OBSERVER (AUDIO & SEEN) ---
     setupMediaObserver() {
-        const options = { threshold: 0.65 }; 
+        const options = { threshold: 0.65 }; // 65% visible
         
         this.observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -240,15 +218,18 @@ class ViewMoments extends HTMLElement {
                 const moment = this.moments.find(m => m.id === momentId);
                 
                 if (entry.isIntersecting) {
+                    // Play Audio
                     if (moment && moment.songPreview) {
                         this.playMomentMusic(moment.songPreview);
                     }
                     
+                    // Mark as Seen (Debounced to 1.5 seconds)
                     this.seenTimers[momentId] = setTimeout(() => {
                         this.markAsSeen(momentId, moment);
                     }, 1500);
                     
                 } else {
+                    // Pause/Clear when out of view
                     clearTimeout(this.seenTimers[momentId]);
                 }
             });
@@ -260,26 +241,30 @@ class ViewMoments extends HTMLElement {
             this.audioPlayer.src = url;
         }
         this.audioPlayer.muted = this.isMuted;
-        this.audioPlayer.play().catch(() => {});
+        this.audioPlayer.play().catch(() => {
+            // Auto-play blocked by browser; wait for user interaction (mute toggle)
+        });
     }
 
     toggleMute() {
         this.isMuted = !this.isMuted;
         this.audioPlayer.muted = this.isMuted;
         if (!this.isMuted) this.audioPlayer.play().catch(()=>{});
-        this.renderFeed(); 
+        this.renderFeed(); // Update mute icons
     }
 
     async markAsSeen(momentId, moment) {
         const myUid = this.auth.currentUser.uid;
-        if (!moment.viewers) moment.viewers = [];
+        const viewers = moment.viewers || [];
         
-        if (moment.uid !== myUid && !moment.viewers.includes(myUid)) {
+        if (moment.uid !== myUid && !viewers.includes(myUid)) {
             try {
-                moment.viewers.push(myUid); // Optimistic UI Update
                 await this.db.collection('moments').doc(momentId).update({
                     viewers: firebase.firestore.FieldValue.arrayUnion(myUid)
                 });
+                // Update local state to prevent re-firing
+                if(!moment.viewers) moment.viewers = [];
+                moment.viewers.push(myUid);
             } catch(e) { console.error("Seen tracking error", e); }
         }
     }
@@ -290,8 +275,9 @@ class ViewMoments extends HTMLElement {
         const moment = this.moments.find(m => m.id === momentId);
         if (!moment) return;
 
-        if(!moment.likes) moment.likes = [];
-        const isLiked = moment.likes.includes(myUid);
+        if(navigator.vibrate) navigator.vibrate(10);
+
+        const isLiked = moment.likes && moment.likes.includes(myUid);
         const ref = this.db.collection('moments').doc(momentId);
 
         // Optimistic UI update
@@ -299,51 +285,48 @@ class ViewMoments extends HTMLElement {
             moment.likes = moment.likes.filter(id => id !== myUid);
             this.renderFeed();
             await ref.update({ likes: firebase.firestore.FieldValue.arrayRemove(myUid) });
-            
-            // Remove notification 
-            if (moment.uid !== myUid) {
-                const notifId = `like_moment_${myUid}_${momentId}`;
-                await this.db.collection('notifications').doc(notifId).delete().catch(()=>{});
-            }
         } else {
+            if(!moment.likes) moment.likes = [];
             moment.likes.push(myUid);
             this.renderFeed();
             await ref.update({ likes: firebase.firestore.FieldValue.arrayUnion(myUid) });
             
+            // Send Notification if it's someone else's moment
             if (moment.uid !== myUid) {
-                this.sendNotification(moment.uid, 'like_moment', momentId, 'liked your moment.', moment.caption || moment.text || '');
+                this.sendNotification(moment.uid, 'like_moment', momentId, 'liked your moment.');
             }
         }
     }
 
-    async sendNotification(toUid, type, referenceId, body, noteText = '') {
-        if (!this.currentUserData || toUid === this.currentUserData.uid) return;
+    async sendNotification(toUid, type, referenceId, body) {
+        if (!this.currentUserData || toUid === this.currentUserData.uid) return; // Don't notify self
         
         const notifId = `${type}_${this.currentUserData.uid}_${referenceId}`;
         const notifRef = this.db.collection('notifications').doc(notifId);
-        const receiverRef = this.db.collection('users').doc(toUid);
-        
+
         try {
             const docSnap = await notifRef.get();
+            // Prevent duplicate notifications for the same action
             if (!docSnap.exists) {
-                const batch = this.db.batch();
-                batch.set(notifRef, {
-                    type: type,
+                await notifRef.set({
                     toUid: toUid,
                     fromUid: this.currentUserData.uid,
                     senderName: this.currentUserData.name || this.currentUserData.username || 'User',
                     senderPfp: this.currentUserData.photoURL || 'https://via.placeholder.com/65',
                     isSenderVerified: this.currentUserData.verified || false,
-                    referenceId: referenceId,
+                    type: type, 
                     body: body,
-                    noteText: noteText,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    isSeen: false
+                    referenceId: referenceId,
+                    isSeen: false,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                batch.update(receiverRef, { unreadCount: firebase.firestore.FieldValue.increment(1) });
-                await batch.commit();
+
+                // Increment Unread Count exactly like viewNotes.js
+                await this.db.collection('users').doc(toUid).update({
+                    unreadCount: firebase.firestore.FieldValue.increment(1)
+                });
             }
-        } catch(e) { console.error("Notification failed:", e); }
+        } catch(e) { console.error("Notification Error", e); }
     }
 
     // --- UI RENDERING ---
@@ -355,26 +338,29 @@ class ViewMoments extends HTMLElement {
                 /* Feed Card */
                 .m-card { width: 100%; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px; }
                 .m-header { display: flex; align-items: center; padding: 12px 15px; gap: 10px; }
-                .m-pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+                .m-pfp { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); cursor: pointer; }
                 .m-user-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-                .m-name-row { display: flex; align-items: center; gap: 4px; font-weight: 700; font-size: 14.5px; color: #fff; }
-                .m-timestamp { font-size: 12px; color: #888; font-weight: 500; display:flex; align-items:center; gap:6px; }
-                .m-song { font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+                .m-name-row { display: flex; align-items: center; gap: 4px; font-weight: 700; font-size: 14px; color: #fff; }
+                .m-verified { color: #0095f6; font-size: 14px; }
+                .m-username { font-size: 12px; color: #aaa; font-weight: 400; }
+                .m-timestamp { font-size: 11px; color: #888; font-weight: 500; }
+                .m-song { font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
                 
                 .m-canvas { 
                     width: 100%; aspect-ratio: 4/5; background: #050505; 
                     position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
-                    cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
+                    cursor: pointer;
                 }
                 .m-media { width: 100%; height: 100%; object-fit: contain; z-index: 2; position: relative; }
                 .m-backdrop { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(30px) brightness(0.4); z-index: 0; }
                 
-                .mute-btn { position: absolute; bottom: 15px; right: 15px; z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color:#fff; border:1px solid rgba(255,255,255,0.1); cursor:pointer;}
+                .mute-btn { position: absolute; bottom: 15px; right: 15px; z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color:#fff; border:none; cursor:pointer;}
                 
                 .m-actions { display: flex; padding: 12px 15px; gap: 20px; align-items: center; }
                 .m-btn { background: none; border: none; color: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
                 .m-btn:active { transform: scale(0.9); }
-                .liked svg path { fill: #ff3b30; stroke: #ff3b30; }
+                .m-btn .material-icons-round { font-size: 28px; }
+                .liked { color: #ff3b30 !important; }
 
                 .m-caption { padding: 0 15px 10px; font-size: 14px; color: #fff; line-height: 1.4; word-break: break-word; }
                 .m-caption-name { font-weight: 700; margin-right: 5px; }
@@ -386,23 +372,30 @@ class ViewMoments extends HTMLElement {
                     display: flex; flex-direction: column; width: 100vw; height: 100dvh;
                 }
                 .m-full-modal.open { transform: translateX(0); }
-                .m-full-header { padding: calc(15px + env(safe-area-inset-top)) 20px 15px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #1a1a1a; }
+                .m-full-header { padding: calc(15px + env(safe-area-inset-top)) 20px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-bottom: 1px solid #1a1a1a; }
                 
-                /* Viewers List UI */
-                .my-stats-box { background: #111; border-radius: 16px; padding: 15px; margin: 15px 0; display: flex; justify-content: space-around; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+                /* My Moments Dashboard */
+                .my-stats-box { background: #111; border-radius: 16px; padding: 15px; margin: 15px 0; display: flex; justify-content: space-around; text-align: center; }
                 .stat-num { font-weight: 800; font-size: 20px; color: #fff; }
                 .stat-lbl { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
                 
-                .viewer-item { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; background:rgba(255,255,255,0.03); padding:12px; border-radius:16px; border:1px solid rgba(255,255,255,0.02); }
+                /* Advanced Viewer List */
+                .advanced-viewers-list { margin-top: 15px; max-height: 300px; overflow-y: auto; padding: 0 5px; scrollbar-width: none; }
+                .advanced-viewers-list::-webkit-scrollbar { display: none; }
+                .viewer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 16px; }
+                .viewer-info { display: flex; align-items: center; gap: 12px; }
+                .viewer-avatar { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); object-fit: cover; }
+                .viewer-name { color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+                .viewer-action-icon { display: flex; align-items: center; justify-content: center; }
 
                 /* Comment Bottom Sheet */
-                .c-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 3000; display: none; align-items: flex-end; opacity: 0; transition: 0.3s; }
+                .c-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: none; align-items: flex-end; opacity: 0; transition: 0.3s; }
                 .c-overlay.open { display: flex; opacity: 1; }
-                .c-sheet { width: 100%; height: 75vh; background: #121212; border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; flex-direction: column; transform: translateY(100%); transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+                .c-sheet { width: 100%; height: 75vh; background: #121212; border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; flex-direction: column; transform: translateY(100%); transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
                 .c-overlay.open .c-sheet { transform: translateY(0); }
                 
                 .c-header { display: flex; justify-content: center; padding: 12px; border-bottom: 1px solid #222; position: relative; }
-                .c-drag { width: 40px; height: 5px; background: #444; border-radius: 10px; }
+                .c-drag { width: 40px; height: 4px; background: #444; border-radius: 10px; }
                 .c-title { position: absolute; top: 15px; font-weight: 700; font-size: 14px; }
                 
                 .c-list { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 20px; }
@@ -414,12 +407,11 @@ class ViewMoments extends HTMLElement {
                 .c-meta { display: flex; gap: 15px; font-size: 11px; color: #888; margin-top: 6px; font-weight: 600; }
                 
                 .c-input-area { padding: 10px 15px calc(15px + env(safe-area-inset-bottom)); border-top: 1px solid #222; display: flex; align-items: center; gap: 10px; background: #121212; }
-                .c-input { flex: 1; background: #222; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px 15px; border-radius: 20px; font-size: 14px; outline: none; transition: border 0.2s;}
-                .c-input:focus { border-color: #0095f6; }
-                .c-send { color: #0095f6; font-weight: 700; background: none; border: none; padding: 8px; cursor: pointer; }
+                .c-input { flex: 1; background: #222; border: none; color: #fff; padding: 12px 15px; border-radius: 20px; font-size: 14px; outline: none; }
+                .c-send { color: var(--accent); font-weight: 700; background: none; border: none; padding: 8px; cursor: pointer; }
 
                 /* Loader */
-                .loader-spinner { text-align: center; padding: 20px; color: #fff; display: none; }
+                .loader-spinner { text-align: center; padding: 20px; color: var(--accent); display: none; }
                 .loader-spinner .material-icons-round { animation: spin 1s linear infinite; }
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             </style>
@@ -430,9 +422,9 @@ class ViewMoments extends HTMLElement {
             <div class="m-full-modal" id="full-moment-modal">
                 <div class="m-full-header">
                     <span class="material-icons-round" onclick="document.querySelector('view-moments').closeFullModal()" style="cursor:pointer; font-size:28px;">arrow_back</span>
-                    <span style="font-weight: 700; font-size: 16px;">Moment</span>
-                </div>
-                <div id="full-modal-content" style="flex:1; overflow-y:auto; overflow-x:hidden;"></div>
+                    <span style="font-weight: 700; font-size: 16px;">Moment Info</span>
+                    <span style="width:28px;"></span> </div>
+                <div id="full-modal-content" style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 40px;"></div>
             </div>
 
             <div class="c-overlay" id="comment-sheet" onclick="if(event.target === this) document.querySelector('view-moments').closeComments()">
@@ -455,28 +447,26 @@ class ViewMoments extends HTMLElement {
         
         container.innerHTML = '';
         const myUid = this.auth.currentUser?.uid;
-        const icons = this.getIcons();
 
         this.moments.forEach(moment => {
             const isLiked = moment.likes && moment.likes.includes(myUid);
-            const isCF = moment.audience === 'close_friends';
             const timeAgo = this.getRelativeTime(moment.createdAt);
-            
             const card = document.createElement('div');
             card.className = 'm-card';
             card.dataset.id = moment.id;
             
+            // Generate Media HTML based on type
             let mediaHtml = '';
             if (moment.type === 'video') {
                 mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop muted playsinline></video>`;
             } else if (moment.type === 'image') {
                 mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
             } else {
-                const effectClass = (moment.effect && moment.effect !== 'none') ? `fx-${moment.effect}` : '';
-                mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:28px; word-break:break-word;"><span class="${effectClass}">${moment.text}</span></div>`;
+                mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:28px; word-break:break-word;">${moment.text}</div>`;
             }
 
             const muteIcon = this.isMuted ? 'volume_off' : 'volume_up';
+            const cfBadge = moment.audience === 'close_friends' ? `<div style="display:inline-flex; align-items:center; justify-content:center; background:#00ba7c; border-radius:50%; width:14px; height:14px; margin-left:4px;"><svg width="8" height="8" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>` : '';
 
             card.innerHTML = `
                 <div class="m-header">
@@ -484,18 +474,16 @@ class ViewMoments extends HTMLElement {
                     <div class="m-user-info">
                         <div class="m-name-row">
                             ${moment.displayName} 
-                            ${moment.verified ? icons.verified : ''}
+                            ${moment.verified ? '<span class="material-icons-round m-verified">verified</span>' : ''}
+                            <span class="m-timestamp">• ${timeAgo}</span>
+                            ${cfBadge}
                         </div>
-                        <div class="m-timestamp">
-                            ${timeAgo}
-                            ${isCF ? icons.closeFriendsBadge : ''}
-                        </div>
-                        ${moment.songName ? `
-                            <div class="m-song">
+                        <div class="m-song">
+                            ${moment.songName ? `
                                 <span class="material-icons-round" style="font-size:12px;">music_note</span>
                                 ${moment.songName} • ${moment.songArtist}
-                            </div>
-                        ` : ''}
+                            ` : `<span class="m-username">@${moment.username}</span>`}
+                        </div>
                     </div>
                     <span class="material-icons-round" style="color:#fff; cursor:pointer;">more_vert</span>
                 </div>
@@ -512,12 +500,12 @@ class ViewMoments extends HTMLElement {
 
                 <div class="m-actions">
                     <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="document.querySelector('view-moments').toggleLike('${moment.id}')">
-                        ${isLiked ? icons.heartFilled : icons.heartEmpty}
+                        <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
                     </button>
                     <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        <span class="material-icons-round">chat_bubble_outline</span>
                     </button>
-                    <button class="m-btn">${icons.send}</button>
+                    <button class="m-btn"><span class="material-icons-round">send</span></button>
                 </div>
                 
                 ${moment.caption ? `
@@ -529,15 +517,17 @@ class ViewMoments extends HTMLElement {
 
             container.appendChild(card);
             
+            // Re-observe for audio/seen tracking
             if(this.observer) this.observer.observe(card);
         });
     }
 
     formatCaption(text) {
-        return text.replace(/(#[a-zA-Z0-9]+)/g, '<span style="color:#0095f6;">$1</span>');
+        // Highlight hashtags
+        return text.replace(/(#[a-zA-Z0-9]+)/g, '<span style="color:var(--accent);">$1</span>');
     }
 
-    // --- FULL SCREEN MODAL & VIEWERS ---
+    // --- FULL SCREEN MODAL ---
     async openFullModal(momentId) {
         const moment = this.moments.find(m => m.id === momentId);
         if (!moment) return;
@@ -545,8 +535,8 @@ class ViewMoments extends HTMLElement {
         this.activeMomentId = momentId;
         const modal = this.querySelector('#full-moment-modal');
         const content = this.querySelector('#full-modal-content');
-        const icons = this.getIcons();
         
+        // Push state for mobile back button
         window.history.pushState({ modal: 'momentFull' }, '');
         modal.classList.add('open');
 
@@ -555,31 +545,65 @@ class ViewMoments extends HTMLElement {
         const likesCount = moment.likes ? moment.likes.length : 0;
 
         let mediaHtml = '';
-        if (moment.type === 'video') {
-            mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop autoplay playsinline ${this.isMuted ? 'muted' : ''}></video>`;
-        } else if (moment.type === 'image') {
-            mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
-        } else {
-            const effectClass = (moment.effect && moment.effect !== 'none') ? `fx-${moment.effect}` : '';
-            mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:32px; word-break:break-word;"><span class="${effectClass}">${moment.text}</span></div>`;
+        if (moment.type === 'video') mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop autoplay playsinline ${this.isMuted ? 'muted' : ''}></video>`;
+        else if (moment.type === 'image') mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
+        else mediaHtml = `<div class="m-media" style="background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; font-family:${moment.font}; text-align:${moment.align}; color:#fff; padding:30px; font-size:32px; word-break:break-word;">${moment.text}</div>`;
+
+        // Generate Advanced Viewers List
+        let viewersHtml = '';
+        if (isMe) {
+            viewersHtml = `<div class="advanced-viewers-list">`;
+            
+            // Get unique UIDs for Viewers + Likers
+            const likers = moment.likes || [];
+            const viewers = moment.viewers || [];
+            const allUids = [...new Set([...likers, ...viewers])];
+            
+            // Sort: Likers first
+            allUids.sort((a, b) => {
+                const aLiked = likers.includes(a);
+                const bLiked = likers.includes(b);
+                return aLiked === bLiked ? 0 : aLiked ? -1 : 1;
+            });
+
+            if (allUids.length === 0) {
+                viewersHtml += `<div style="text-align:center; color:#666; font-size:13px; padding: 20px;">No views yet. Share it around!</div>`;
+            } else {
+                for (let vid of allUids) {
+                    try {
+                        const vDoc = await this.db.collection('users').doc(vid).get();
+                        if (vDoc.exists) {
+                            const vData = vDoc.data();
+                            const hasLiked = likers.includes(vid);
+                            
+                            viewersHtml += `
+                                <div class="viewer-row">
+                                    <div class="viewer-info">
+                                        <img src="${vData.photoURL || 'https://via.placeholder.com/40'}" class="viewer-avatar">
+                                        <div class="viewer-name">
+                                            ${vData.name || vData.username}
+                                            ${vData.verified ? '<span class="material-icons-round" style="color:#0095f6; font-size:14px;">verified</span>' : ''}
+                                        </div>
+                                    </div>
+                                    <div class="viewer-action-icon">
+                                        ${hasLiked ? 
+                                            `<span class="material-icons-round" style="color:#ff3b30; font-size:20px;">favorite</span>` : 
+                                            `<span class="material-icons-round" style="color:#888; font-size:20px;">visibility</span>`
+                                        }
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    } catch(e) {}
+                }
+            }
+            viewersHtml += `</div>`;
         }
 
-        let viewersSection = '';
-        if (isMe) {
-            viewersSection = `
-                <div class="my-stats-box">
-                    <div><div class="stat-num">${likesCount}</div><div class="stat-lbl">Likes</div></div>
-                    <div><div class="stat-num">${viewsCount}</div><div class="stat-lbl">Views</div></div>
-                </div>
-                <div id="modal-viewers-list" style="margin-top:20px;">
-                    <div style="color:#aaa; font-size:12px; font-weight:800; margin-bottom:15px; text-transform:uppercase; letter-spacing:1px;">Viewers List</div>
-                    <div id="viewers-content"><div class="loader-spinner" style="display:block;"><span class="material-icons-round">refresh</span></div></div>
-                </div>
-            `;
-        }
+        const timerDisplay = moment.isActive !== false ? "Active 24h" : "Archived";
 
         content.innerHTML = `
-            <div class="m-canvas" style="aspect-ratio: auto; height: 65vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
                  ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                  ${mediaHtml}
                  ${moment.songPreview ? `
@@ -589,68 +613,40 @@ class ViewMoments extends HTMLElement {
                 ` : ''}
             </div>
             
-            <div style="padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom));">
-                <div class="m-header" style="padding:0; margin-bottom:15px;">
+            <div style="padding: 20px;">
+                <div class="m-header" style="padding:0;">
                     <img src="${moment.pfp}" class="m-pfp">
                     <div class="m-user-info">
-                        <div class="m-name-row">${moment.displayName}</div>
+                        <div class="m-name-row">${moment.displayName} <span style="font-size:11px; color:#888; font-weight:normal;">• ${this.getRelativeTime(moment.createdAt)}</span></div>
                         ${moment.songName ? `<div class="m-song"><span class="material-icons-round" style="font-size:12px;">music_note</span>${moment.songName}</div>` : ''}
                     </div>
                 </div>
 
-                ${moment.caption ? `<div class="m-caption" style="padding: 0 0 15px; font-size:15px; border-bottom: 1px solid rgba(255,255,255,0.05);">${this.formatCaption(moment.caption)}</div>` : ''}
+                <div class="m-caption" style="padding: 15px 0 0; font-size:15px;">
+                    ${this.formatCaption(moment.caption)}
+                </div>
 
                 ${isMe ? `
-                    ${viewersSection}
-                    <div style="display:flex; gap:10px; margin-top:25px;">
+                    <div class="my-stats-box">
+                        <div><div class="stat-num">${likesCount}</div><div class="stat-lbl">Likes</div></div>
+                        <div><div class="stat-num">${viewsCount}</div><div class="stat-lbl">Views</div></div>
+                        <div><div class="stat-num" style="font-size: 14px; margin-top: 4px; color:#00ba7c;">${timerDisplay}</div><div class="stat-lbl">Status</div></div>
+                    </div>
+                    
+                    <h3 style="font-size: 14px; margin: 25px 0 5px; border-bottom: 1px solid #222; padding-bottom: 10px;">Activity Viewers</h3>
+                    ${viewersHtml}
+                    
+                    <div style="display:flex; gap:10px; margin-top:20px;">
                         <button style="flex:1; padding:14px; border-radius:16px; background:rgba(255,59,48,0.1); color:#ff3b30; border:1px solid rgba(255,59,48,0.2); font-weight:700; cursor:pointer;" onclick="document.querySelector('view-moments').deleteMoment('${moment.id}')">Delete Moment</button>
+                        <button style="flex:1; padding:14px; border-radius:16px; background:#222; color:#fff; border:none; font-weight:700; cursor:pointer;" onclick="window.location.href='moments.html'">+ New Moment</button>
                     </div>
                 ` : ''}
             </div>
         `;
 
-        if (isMe) this.loadViewersList(moment);
-
+        // Ensure current active video in feed is paused
         const feedVideo = this.querySelector(`.m-card[data-id="${momentId}"] video`);
         if(feedVideo) feedVideo.pause();
-    }
-
-    async loadViewersList(moment) {
-        const container = this.querySelector('#viewers-content');
-        if (!container || !moment.viewers || moment.viewers.length === 0) {
-            if (container) container.innerHTML = '<div style="color:#666; font-size:13px; text-align:center; padding:20px;">No viewers yet.</div>';
-            return;
-        }
-        
-        const likes = moment.likes || [];
-        const icons = this.getIcons();
-        
-        // Sort: Likers at the top
-        const sortedViewers = [...moment.viewers].sort((a, b) => likes.includes(b) - likes.includes(a));
-        
-        let html = '';
-        for (let uid of sortedViewers) {
-            try {
-                const doc = await this.db.collection('users').doc(uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    const hasLiked = likes.includes(uid);
-                    html += `
-                        <div class="viewer-item">
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <img src="${data.photoURL || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border: 1px solid rgba(255,255,255,0.1);">
-                                <div style="font-size:14px; font-weight:700; color:#fff; display:flex; align-items:center;">
-                                    ${data.name || data.username || 'User'}
-                                    ${data.verified ? icons.verified : ''}
-                                </div>
-                            </div>
-                            ${hasLiked ? `<span style="color:#ff3b30;">${icons.heartFilled}</span>` : ''}
-                        </div>
-                    `;
-                }
-            } catch (e) { console.error("Error loading viewer", e); }
-        }
-        container.innerHTML = html;
     }
 
     closeFullModal(fromHistory = false) {
@@ -676,6 +672,7 @@ class ViewMoments extends HTMLElement {
         this.activeMomentId = momentId;
         const overlay = this.querySelector('#comment-sheet');
         
+        // Set my PFP in input
         if(this.currentUserData) {
             this.querySelector('#c-my-pfp').src = this.currentUserData.photoURL;
         }
@@ -683,6 +680,7 @@ class ViewMoments extends HTMLElement {
         window.history.pushState({ modal: 'momentComments' }, '');
         overlay.classList.add('open');
         
+        // Reset and Load
         this.commentsLastDoc = null;
         this.querySelector('#comment-list-container').innerHTML = '<div class="loader-spinner" style="display:block;"><span class="material-icons-round">refresh</span></div>';
         await this.loadComments(momentId, false);
@@ -702,7 +700,7 @@ class ViewMoments extends HTMLElement {
 
         let query = this.db.collection('moments').doc(momentId).collection('comments')
             .orderBy('timestamp', 'desc')
-            .limit(15);
+            .limit(10);
 
         if (isNextPage && this.commentsLastDoc) {
             query = query.startAfter(this.commentsLastDoc);
@@ -713,7 +711,7 @@ class ViewMoments extends HTMLElement {
         
         if (!isNextPage) cList.innerHTML = '';
         if (snap.empty && !isNextPage) {
-            cList.innerHTML = '<div style="text-align:center; color:#666; padding:40px 20px;">No comments yet. Start the conversation!</div>';
+            cList.innerHTML = '<div style="text-align:center; color:#666; padding:30px;">No comments yet. Start the conversation!</div>';
             this.loadingComments = false;
             return;
         }
@@ -736,7 +734,7 @@ class ViewMoments extends HTMLElement {
                         <span style="cursor:pointer;">Reply</span>
                     </div>
                 </div>
-                <span class="material-icons-round" style="font-size:16px; color:#666; margin-top:5px; cursor:pointer;">favorite_border</span>
+                <span class="material-icons-round" style="font-size:14px; color:#666; margin-top:5px; cursor:pointer;">favorite_border</span>
             `;
             cList.appendChild(div);
         });
@@ -749,11 +747,12 @@ class ViewMoments extends HTMLElement {
         const text = input.value.trim();
         if (!text || !this.activeMomentId || !this.currentUserData) return;
 
-        input.value = ''; 
+        input.value = ''; // clear instantly
         const momentId = this.activeMomentId;
         const moment = this.moments.find(m => m.id === momentId);
 
         try {
+            // Add to subcollection
             await this.db.collection('moments').doc(momentId).collection('comments').add({
                 uid: this.currentUserData.uid,
                 name: this.currentUserData.name || this.currentUserData.username,
@@ -762,11 +761,13 @@ class ViewMoments extends HTMLElement {
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            // Reload top comments
             this.commentsLastDoc = null;
             this.loadComments(momentId, false);
 
+            // Send Notification
             if (moment && moment.uid !== this.currentUserData.uid) {
-                this.sendNotification(moment.uid, 'comment_moment', momentId, `commented: "${text}"`, moment.caption || moment.text || '');
+                this.sendNotification(moment.uid, 'comment_moment', momentId, `commented: "${text}"`);
             }
         } catch(e) { console.error("Comment error", e); }
     }
