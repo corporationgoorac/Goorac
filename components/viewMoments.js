@@ -90,6 +90,9 @@ class ViewMoments extends HTMLElement {
             if (this.querySelector('#comment-sheet').classList.contains('open') && (!e.state || e.state.modal !== 'momentComments')) {
                 this.closeComments(true);
             }
+            if (this.querySelector('#reply-sheet').classList.contains('open') && (!e.state || e.state.modal !== 'momentReply')) {
+                this.closeReplySheet(true);
+            }
         });
     }
 
@@ -100,7 +103,8 @@ class ViewMoments extends HTMLElement {
         } else {
             const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
             const sheetOpen = this.querySelector('#comment-sheet').classList.contains('open');
-            if (!modalOpen && !sheetOpen) {
+            const replyOpen = this.querySelector('#reply-sheet').classList.contains('open');
+            if (!modalOpen && !sheetOpen && !replyOpen) {
                 document.body.style.overflow = '';
             }
         }
@@ -413,10 +417,11 @@ class ViewMoments extends HTMLElement {
                 .viewer-name { color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
                 .viewer-action-icon { display: flex; align-items: center; justify-content: center; }
 
-                /* Comment Bottom Sheet */
+                /* Generic Bottom Sheet (Comments/Reply) */
                 .c-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: none; align-items: flex-end; opacity: 0; transition: 0.3s; backdrop-filter: blur(4px); }
                 .c-overlay.open { display: flex; opacity: 1; }
                 .c-sheet { width: 100%; height: 75vh; background: #121212; border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; flex-direction: column; transform: translateY(100%); transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+                .c-sheet.auto-height { height: auto; min-height: 250px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
                 .c-overlay.open .c-sheet { transform: translateY(0); }
                 
                 .c-header { display: flex; justify-content: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); position: relative; }
@@ -436,6 +441,11 @@ class ViewMoments extends HTMLElement {
                 .c-input-area { padding: 10px 15px calc(15px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px; background: #121212; }
                 .c-input { flex: 1; background: #222; border: none; color: #fff; padding: 12px 15px; border-radius: 20px; font-size: 14px; outline: none; }
                 .c-send { color: var(--accent); font-weight: 700; background: none; border: none; padding: 8px; cursor: pointer; }
+
+                /* Emoji specific styles */
+                .vn-emoji-bar { display: flex; justify-content: space-between; margin-bottom: 15px; padding: 0 10px; }
+                .vn-quick-emoji { font-size: 2.2rem; cursor: pointer; transition: transform 0.2s; user-select: none; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3)); }
+                .vn-quick-emoji:active { transform: scale(1.4); }
 
                 /* Loader */
                 .loader-spinner { text-align: center; padding: 20px; color: var(--accent); display: none; }
@@ -465,6 +475,28 @@ class ViewMoments extends HTMLElement {
                         <img src="" id="c-my-pfp" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
                         <input type="text" class="c-input" id="c-input-field" placeholder="Add a comment...">
                         <button class="c-send" onclick="document.querySelector('view-moments').postComment()">Post</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="c-overlay" id="reply-sheet" onclick="if(event.target === this) document.querySelector('view-moments').closeReplySheet()">
+                <div class="c-sheet auto-height" onclick="event.stopPropagation()">
+                    <div class="c-header" onclick="document.querySelector('view-moments').closeReplySheet()">
+                        <div class="c-drag"></div><div class="c-title">Reply to Moment</div>
+                    </div>
+                    <div style="padding: 20px 15px 5px;">
+                        <div class="vn-emoji-bar">
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('😂')">😂</span>
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('😮')">😮</span>
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('😍')">😍</span>
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('😢')">😢</span>
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('🔥')">🔥</span>
+                            <span class="vn-quick-emoji" onclick="document.querySelector('view-moments').sendReply('👏')">👏</span>
+                        </div>
+                        <div class="c-input-area" style="border-top:none; background:transparent; padding:0; margin-top:10px;">
+                            <input type="text" class="c-input" id="r-input-field" placeholder="Send a message..." style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);">
+                            <button class="c-send" onclick="document.querySelector('view-moments').sendReply()">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -534,7 +566,9 @@ class ViewMoments extends HTMLElement {
                     <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
                         <span class="material-icons-round">chat_bubble_outline</span>
                     </button>
-                    <button class="m-btn"><span class="material-icons-round">send</span></button>
+                    <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
+                        <span class="material-icons-round">send</span>
+                    </button>
                 </div>
                 
                 ${moment.caption ? `
@@ -568,6 +602,7 @@ class ViewMoments extends HTMLElement {
         modal.classList.add('open');
 
         const isMe = moment.uid === this.auth.currentUser.uid;
+        const isLiked = moment.likes && moment.likes.includes(this.auth.currentUser.uid);
         const viewsCount = moment.viewers ? moment.viewers.length : 0;
         const likesCount = moment.likes ? moment.likes.length : 0;
 
@@ -641,7 +676,11 @@ class ViewMoments extends HTMLElement {
                 <div class="m-header" style="padding:0;">
                     <img src="${moment.pfp}" class="m-pfp">
                     <div class="m-user-info">
-                        <div class="m-name-row">${moment.displayName} <span style="font-size:11px; color:#888; font-weight:normal;">• ${this.getRelativeTime(moment.createdAt)}</span></div>
+                        <div class="m-name-row">
+                            ${moment.displayName} 
+                            ${moment.verified ? '<span class="material-icons-round m-verified">verified</span>' : ''}
+                            <span style="font-size:11px; color:#888; font-weight:normal;">• ${this.getRelativeTime(moment.createdAt)}</span>
+                        </div>
                         ${moment.songName ? `<div class="m-song"><span class="material-icons-round" style="font-size:12px;">music_note</span>${moment.songName}</div>` : ''}
                     </div>
                 </div>
@@ -671,7 +710,19 @@ class ViewMoments extends HTMLElement {
 
                     <h3 style="font-size: 14px; margin: 15px 0 5px; border-bottom: 1px solid #222; padding-bottom: 10px;">Activity Viewers</h3>
                     ${viewersHtml}
-                ` : ''}
+                ` : `
+                    <div class="m-actions" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); justify-content: space-around;">
+                        <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="const vm = document.querySelector('view-moments'); vm.toggleLike('${moment.id}'); const icon = this.querySelector('span'); if(this.classList.contains('liked')){this.classList.remove('liked');icon.innerText='favorite_border';}else{this.classList.add('liked');icon.innerText='favorite';}">
+                            <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
+                        </button>
+                        <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
+                            <span class="material-icons-round">chat_bubble_outline</span>
+                        </button>
+                        <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
+                            <span class="material-icons-round">send</span>
+                        </button>
+                    </div>
+                `}
             </div>
         `;
 
@@ -707,6 +758,96 @@ class ViewMoments extends HTMLElement {
         }
     }
 
+    // --- QUICK REPLY MODAL (HTML PAYLOAD) ---
+    openReplySheet(momentId) {
+        this.activeMomentId = momentId;
+        const overlay = this.querySelector('#reply-sheet');
+        
+        window.history.pushState({ modal: 'momentReply' }, '');
+        this.toggleBodyScroll(true);
+        overlay.classList.add('open');
+        
+        setTimeout(() => this.querySelector('#r-input-field').focus(), 300);
+    }
+
+    closeReplySheet(fromHistory = false) {
+        this.querySelector('#reply-sheet').classList.remove('open');
+        this.querySelector('#r-input-field').value = ''; // Reset input
+        
+        // Restore body scroll IF no other modals are open
+        const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
+        if (!modalOpen) this.toggleBodyScroll(false);
+
+        if (!fromHistory && window.history.state?.modal === 'momentReply') {
+            window.history.back();
+        }
+    }
+
+    async sendReply(quickEmoji = null) {
+        const input = this.querySelector('#r-input-field');
+        const text = quickEmoji || input.value.trim();
+        if (!text || !this.activeMomentId || !this.currentUserData) return;
+
+        const momentId = this.activeMomentId;
+        const moment = this.moments.find(m => m.id === momentId);
+        if (!moment) return;
+
+        const myUid = this.currentUserData.uid;
+        const targetUid = moment.uid;
+        if (myUid === targetUid) return; 
+
+        input.value = '';
+        this.closeReplySheet();
+        if(navigator.vibrate) navigator.vibrate(10);
+
+        const chatId = myUid < targetUid ? `${myUid}_${targetUid}` : `${targetUid}_${myUid}`;
+        
+        // 🚀 Generating Mini HTML Box Payload
+        let mediaThumb = '';
+        if (moment.type === 'image' || moment.type === 'video') {
+            mediaThumb = `<img src="${moment.mediaUrl}" style="width:45px; height:45px; object-fit:cover; border-radius:8px; flex-shrink:0;">`;
+        } else if (moment.type === 'text') {
+            mediaThumb = `<div style="width:45px; height:45px; border-radius:8px; background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:bold; overflow:hidden; flex-shrink:0; border:1px solid rgba(255,255,255,0.1);">Aa</div>`;
+        }
+
+        const snippet = moment.caption || (moment.type === 'text' ? moment.text : 'A moment');
+
+        const htmlPayload = `
+            <div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:14px; border-left:4px solid #ff007f; margin-bottom:8px; display:flex; gap:12px; align-items:center;">
+                ${mediaThumb}
+                <div style="display:flex; flex-direction:column; overflow:hidden; flex:1;">
+                    <span style="font-size:11px; color:#aaa; margin-bottom:3px; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Replied to your moment</span>
+                    <span style="font-size:13px; color:#fff; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">"${snippet}"</span>
+                </div>
+            </div>
+            <div style="font-size:15px; color:#fff; word-break:break-word;">${text}</div>
+        `;
+
+        try {
+            const chatRef = this.db.collection("chats").doc(chatId);
+            await chatRef.collection("messages").add({
+                text: htmlPayload,
+                sender: myUid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                seen: false,
+                isHtml: true // Optional flag you can use in your chat app
+            });
+
+            await chatRef.set({
+                lastMessage: "Replied to a moment", 
+                lastSender: myUid,
+                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                participants: [myUid, targetUid],
+                seen: false, 
+                [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+            }, { merge: true });
+
+            this.sendNotification(targetUid, 'reply_moment', momentId, `replied to your moment: "${text}"`);
+        } catch(e) {
+            console.error("Failed to send reply", e);
+        }
+    }
+
     // --- COMMENTS MODAL ---
     async openComments(momentId) {
         this.activeMomentId = momentId;
@@ -727,8 +868,13 @@ class ViewMoments extends HTMLElement {
 
     closeComments(fromHistory = false) {
         this.querySelector('#comment-sheet').classList.remove('open');
-        this.activeMomentId = null;
-        this.toggleBodyScroll(false);
+        
+        const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
+        if (!modalOpen) {
+            this.activeMomentId = null;
+            this.toggleBodyScroll(false);
+        }
+        
         if (!fromHistory && window.history.state?.modal === 'momentComments') {
             window.history.back();
         }
