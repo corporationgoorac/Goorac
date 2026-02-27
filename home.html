@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta 
+        name="viewport" 
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    >
     <title>Goorac | Quantum Home</title>
     
     <script src="config.js"></script>
@@ -12,9 +15,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
@@ -22,6 +24,9 @@
     <script type="module" src="components/presence.js"></script>
 
     <style>
+        /* ==========================================================================
+           CSS VARIABLES & THEMING
+           ========================================================================== */
         :root {
             --bg: #000000;
             --surface: #0a0a0a;
@@ -31,275 +36,606 @@
             --text-main: #ffffff;
             --text-dim: #888888;
             --danger: #ff3b30;
-            --nav-bg: rgba(5, 5, 5, 0.85);
+            
+            /* Enhanced Variables for the Sleek Professional Navbar */
+            --nav-bg: rgba(255, 255, 255, 0.90);
+            --nav-border: rgba(0, 0, 0, 0.06);
+            --icon-inactive: #9aa0a6; /* Professional sleek gray */
+            --icon-active: #202124;   /* Deep slate for active items */
+            --nav-height: 60px;
+            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        /* Dark Mode Override for Navbar */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --nav-bg: rgba(15, 15, 15, 0.90);
+                --nav-border: rgba(255, 255, 255, 0.08);
+                --icon-inactive: #757575; 
+                --icon-active: #ffffff;   
+            }
+        }
 
+        /* ==========================================================================
+           GLOBAL RESET
+           ========================================================================== */
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none; 
+        }
+
+        /* ==========================================================================
+           BODY STYLING
+           ========================================================================== */
         body {
             background-color: var(--bg);
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
-            padding-bottom: calc(100px + env(safe-area-inset-bottom)); /* Prevents content hiding behind nav */
+            /* Prevents content from hiding behind the new taller nav */
+            padding-bottom: calc(100px + env(safe-area-inset-bottom)); 
             overflow-x: hidden;
             -webkit-touch-callout: none;
         }
 
-        /* --- HEADER --- */
+        /* ==========================================================================
+           HEADER STYLES
+           ========================================================================== */
         header {
-            position: sticky; top: 0; 
+            position: sticky; 
+            top: 0; 
             background: rgba(0,0,0,0.85);
             padding: 15px 20px; 
-            display: flex; justify-content: space-between; align-items: center; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
             border-bottom: 1px solid var(--border); 
             z-index: 1000;
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
             height: max(70px, calc(55px + env(safe-area-inset-top)));
         }
 
         .logo { 
-            font-size: 1.3rem; font-weight: 900; letter-spacing: -1px;
+            font-size: 1.3rem; 
+            font-weight: 900; 
+            letter-spacing: -1px;
             background: linear-gradient(to right, #fff, var(--accent)); 
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
         }
 
-        .header-right { display: flex; align-items: center; gap: 20px; height: 100%; }
+        .header-right { 
+            display: flex; 
+            align-items: center; 
+            gap: 20px; 
+            height: 100%; 
+        }
 
         /* SLEEK BELL ICON & BADGE */
         .notif-btn {
-            position: relative; cursor: pointer;
-            width: 32px; height: 32px;
-            display: flex; align-items: center; justify-content: center;
+            position: relative; 
+            cursor: pointer;
+            width: 32px; 
+            height: 32px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
             transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        .notif-btn:active { transform: scale(0.85); }
+
+        .notif-btn:active { 
+            transform: scale(0.85); 
+        }
 
         .notif-icon {
-            width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+            width: 26px; 
+            height: 26px; 
+            fill: none; 
+            stroke: #fff; 
+            stroke-width: 1.8; 
+            stroke-linecap: round; 
+            stroke-linejoin: round;
         }
 
         .notif-badge {
-            position: absolute; top: -2px; right: -2px;
-            background: var(--danger); color: #fff;
-            font-size: 10px; font-weight: 800;
-            min-width: 18px; height: 18px; padding: 0 4px;
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            opacity: 0; transform: scale(0);
+            position: absolute; 
+            top: -2px; 
+            right: -2px;
+            background: var(--danger); 
+            color: #fff;
+            font-size: 10px; 
+            font-weight: 800;
+            min-width: 18px; 
+            height: 18px; 
+            padding: 0 4px;
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            opacity: 0; 
+            transform: scale(0);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none; border: 2px solid var(--bg); z-index: 2;
+            pointer-events: none; 
+            border: 2px solid var(--bg); 
+            z-index: 2;
         }
-        .notif-badge.visible { opacity: 1; transform: scale(1); }
+
+        .notif-badge.visible { 
+            opacity: 1; 
+            transform: scale(1); 
+        }
 
         .header-pfp { 
-            width: 38px; height: 38px; min-width: 38px; min-height: 38px;
-            border-radius: 12px; object-fit: cover; border: 1px solid var(--border);
-            cursor: pointer; background: #111; display: block;
+            width: 38px; 
+            height: 38px; 
+            min-width: 38px; 
+            min-height: 38px;
+            border-radius: 12px; 
+            object-fit: cover; 
+            border: 1px solid var(--border);
+            cursor: pointer; 
+            background: #111; 
+            display: block;
         }
 
-        /* --- NOTES --- */
+        /* ==========================================================================
+           NOTES SECTION STYLES
+           ========================================================================== */
         #notes-container {
-            display: flex; gap: 15px; padding: 15px 20px;
-            overflow-x: auto; scrollbar-width: none;
+            display: flex; 
+            gap: 15px; 
+            padding: 15px 20px;
+            overflow-x: auto; 
+            scrollbar-width: none;
             border-bottom: 1px solid var(--border);
             min-height: 105px;
         }
-        #notes-container::-webkit-scrollbar { display: none; }
+
+        #notes-container::-webkit-scrollbar { 
+            display: none; 
+        }
         
         .note-item { 
-            display: flex; flex-direction: column; align-items: center; 
-            min-width: 70px; cursor: pointer; position: relative;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-width: 70px; 
+            cursor: pointer; 
+            position: relative;
         }
         
         .note-pfp {
-            width: 65px; height: 65px; min-width: 65px; min-height: 65px;
-            border-radius: 24px; object-fit: cover; border: 2px solid var(--border);
-            padding: 2px; background: #000; transition: transform 0.2s;
+            width: 65px; 
+            height: 65px; 
+            min-width: 65px; 
+            min-height: 65px;
+            border-radius: 24px; 
+            object-fit: cover; 
+            border: 2px solid var(--border);
+            padding: 2px; 
+            background: #000; 
+            transition: transform 0.2s;
         }
-        .note-item:active .note-pfp { transform: scale(0.92); border-color: var(--accent); }
+
+        .note-item:active .note-pfp { 
+            transform: scale(0.92); 
+            border-color: var(--accent); 
+        }
         
         .note-username {
-            margin-top: 6px; font-size: 0.7rem; color: var(--text-dim);
-            max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-top: 6px; 
+            font-size: 0.7rem; 
+            color: var(--text-dim);
+            max-width: 70px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
         }
 
-        /* --- CONTENT DASHBOARD --- */
-        .content { padding: 20px; animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* ==========================================================================
+           CONTENT DASHBOARD STYLES
+           ========================================================================== */
+        .content { 
+            padding: 20px; 
+            animation: fadeIn 0.4s ease-out; 
+        }
+
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
 
         .section-label { 
-            font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); 
-            font-weight: 800; letter-spacing: 1.5px; margin-bottom: 15px; display: block;
+            font-size: 0.7rem; 
+            text-transform: uppercase; 
+            color: var(--text-dim); 
+            font-weight: 800; 
+            letter-spacing: 1.5px; 
+            margin-bottom: 15px; 
+            display: block;
         }
 
         .welcome-card { 
-            background: var(--surface); border: 1px solid var(--border); 
-            padding: 25px; border-radius: 24px; margin-bottom: 25px; 
-            position: relative; overflow: hidden;
-            display: flex; flex-direction: column;
+            background: var(--surface); 
+            border: 1px solid var(--border); 
+            padding: 25px; 
+            border-radius: 24px; 
+            margin-bottom: 25px; 
+            position: relative; 
+            overflow: hidden;
+            display: flex; 
+            flex-direction: column;
         }
 
-        .quantum-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .status-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 0.7rem; font-weight: 700; }
-        .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); animation: pulse-glow 2s infinite; }
-        .live-clock { color: var(--text-dim); font-family: monospace; font-size: 0.8rem; }
+        .quantum-info { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px; 
+        }
 
-        .welcome-card h1 { margin: 0; font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.2; word-wrap: break-word; min-height: 34px; }
-        .welcome-card p { color: var(--text-dim); margin-top: 10px; font-size: 0.85rem; line-height: 1.5; min-height: 21px; }
+        .status-tag { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px; 
+            color: var(--accent); 
+            font-size: 0.7rem; 
+            font-weight: 700; 
+        }
 
-        /* --- ACTIVITY GRID --- */
-        .activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
+        .dot { 
+            width: 6px; 
+            height: 6px; 
+            background: var(--accent); 
+            border-radius: 50%; 
+            box-shadow: 0 0 8px var(--accent); 
+            animation: pulse-glow 2s infinite; 
+        }
+
+        .live-clock { 
+            color: var(--text-dim); 
+            font-family: monospace; 
+            font-size: 0.8rem; 
+        }
+
+        .welcome-card h1 { 
+            margin: 0; 
+            font-size: 1.7rem; 
+            font-weight: 800; 
+            color: #fff; 
+            line-height: 1.2; 
+            word-wrap: break-word; 
+            min-height: 34px; 
+        }
+
+        .welcome-card p { 
+            color: var(--text-dim); 
+            margin-top: 10px; 
+            font-size: 0.85rem; 
+            line-height: 1.5; 
+            min-height: 21px; 
+        }
+
+        /* ==========================================================================
+           ACTIVITY GRID STYLES
+           ========================================================================== */
+        .activity-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+            margin-top: 25px; 
+        }
         
         .activity-card { 
-            background: #0d0d0d; border: 1px solid var(--border); padding: 20px; 
-            border-radius: 20px; position: relative; min-height: 130px; 
-            display: flex; flex-direction: column; justify-content: flex-end;
-            transition: 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); cursor: pointer;
+            background: #0d0d0d; 
+            border: 1px solid var(--border); 
+            padding: 20px; 
+            border-radius: 20px; 
+            position: relative; 
+            min-height: 130px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: flex-end;
+            transition: 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); 
+            cursor: pointer;
             overflow: hidden; /* For ripple effect */
         }
-        .activity-card:active { transform: scale(0.96); background: #151515; }
+
+        .activity-card:active { 
+            transform: scale(0.96); 
+            background: #151515; 
+        }
         
         .card-icon-area { 
-            position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; 
-            border-radius: 10px; background: #1a1a1a; 
-            display: flex; align-items: center; justify-content: center; 
-            overflow: hidden; border: 1px solid var(--border); 
+            position: absolute; 
+            top: 20px; 
+            right: 20px; 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 10px; 
+            background: #1a1a1a; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            border: 1px solid var(--border); 
         }
-        .card-icon-area img { width: 100%; height: 100%; object-fit: cover; }
-        .card-icon-area div { color: var(--text-dim); font-size: 9px; font-weight: 800; }
 
-        .time-badge { font-size: 0.7rem; color: var(--accent); margin-bottom: 4px; font-weight: 600; }
-        .count-num { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 2px; }
-        .count-label { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; }
+        .card-icon-area img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
 
-        .activity-card.has-count { border-color: rgba(0, 210, 255, 0.3); background: rgba(0, 210, 255, 0.05); }
-        .activity-card.missed-alert { border-color: rgba(255, 68, 68, 0.3); background: rgba(255, 68, 68, 0.05); }
-        .missed-alert .count-num { color: var(--danger); }
+        .card-icon-area div { 
+            color: var(--text-dim); 
+            font-size: 9px; 
+            font-weight: 800; 
+        }
 
-        /* --- SKELETONS --- */
-        .skeleton { background: #151515; color: transparent !important; border-radius: 6px; animation: pulse-skel 1.5s infinite; }
-        @keyframes pulse-skel { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .time-badge { 
+            font-size: 0.7rem; 
+            color: var(--accent); 
+            margin-bottom: 4px; 
+            font-weight: 600; 
+        }
 
-        /* --- HARDCODED LUCIDE NAVBAR CSS --- */
-        .bottom-nav {
+        .count-num { 
+            font-size: 1.3rem; 
+            font-weight: 800; 
+            color: #fff; 
+            margin-bottom: 2px; 
+        }
+
+        .count-label { 
+            font-size: 0.7rem; 
+            color: var(--text-dim); 
+            font-weight: 600; 
+        }
+
+        .activity-card.has-count { 
+            border-color: rgba(0, 210, 255, 0.3); 
+            background: rgba(0, 210, 255, 0.05); 
+        }
+
+        .activity-card.missed-alert { 
+            border-color: rgba(255, 68, 68, 0.3); 
+            background: rgba(255, 68, 68, 0.05); 
+        }
+
+        .missed-alert .count-num { 
+            color: var(--danger); 
+        }
+
+        /* ==========================================================================
+           SKELETON LOADING ANIMATIONS
+           ========================================================================== */
+        .skeleton { 
+            background: #151515; 
+            color: transparent !important; 
+            border-radius: 6px; 
+            animation: pulse-skel 1.5s infinite; 
+        }
+
+        @keyframes pulse-skel { 
+            0% { opacity: 0.6; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.6; } 
+        }
+
+
+        /* ==========================================================================
+           PROFESSIONAL BOTTOM NAVIGATION BAR (Replaces Old Native Nav)
+           ========================================================================== */
+        .native-bottom-nav {
             position: fixed;
-            bottom: 0; 
-            left: 0; 
-            right: 0;
-            height: calc(65px + env(safe-area-inset-bottom));
-            background: rgba(5, 5, 5, 0.85);
-            backdrop-filter: blur(25px); 
-            -webkit-backdrop-filter: blur(25px);
-            border-top: 1px solid rgba(255,255,255,0.05);
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 600px;
+            
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding-bottom: env(safe-area-inset-bottom);
-            z-index: 900; /* Low enough to stay under modals naturally */
-            pointer-events: auto;
-            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
+            height: calc(var(--nav-height) + var(--safe-area-bottom));
+            padding-bottom: var(--safe-area-bottom);
+            
+            /* High-End Glassmorphism */
+            background: var(--nav-bg);
+            backdrop-filter: blur(24px) saturate(150%);
+            -webkit-backdrop-filter: blur(24px) saturate(150%);
+            
+            border-top: 1px solid var(--nav-border);
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.03);
+            
+            /* Z-index below modals (1000+) but above content */
+            z-index: 990; 
+            
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                        background-color 0.3s ease;
         }
 
-        /* Toggled class to hide navbar */
-        .nav-hidden {
-            transform: translateY(150%) !important;
-            pointer-events: none !important;
+        /* Desktop Optimization */
+        @media (min-width: 601px) {
+            .native-bottom-nav {
+                bottom: 24px;
+                border-radius: 32px;
+                border: 1px solid var(--nav-border);
+                height: var(--nav-height);
+                padding-bottom: 0;
+                box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
+            }
+        }
+
+        /* Toggled by JS Observer */
+        .native-bottom-nav.hidden-nav { 
             opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translate(-50%, calc(100% + 20px)) !important; 
         }
 
         .nav-item {
-            color: #888888;
+            position: relative;
             text-decoration: none;
+            color: var(--icon-inactive);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            width: 50px; 
-            height: 50px;
-            border-radius: 50%;
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
+            flex: 1;
+            height: 100%;
+            -webkit-tap-highlight-color: transparent; 
+            cursor: pointer;
         }
 
-        .nav-item i {
-            width: 26px;
-            height: 26px;
-            stroke-width: 2px;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .nav-item .material-icons-round {
+            font-size: 26px; 
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                        color 0.3s ease,
+                        filter 0.3s ease;
         }
 
-        .nav-item:active { 
-            background: rgba(255,255,255,0.05); 
-            transform: scale(0.9); 
+        /* Hide text labels for clean professional look */
+        .nav-item span:not(.material-icons-round) {
+            display: none; 
         }
 
-        .nav-item.active {
-            color: #00d2ff;
+        /* Active Item State */
+        .nav-item.active .material-icons-round {
+            color: var(--icon-active);
+            transform: scale(1.15);
+            filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15)); 
         }
 
-        /* Premium Glow & Lift Effect */
-        .nav-item.active i {
-            transform: translateY(-2px);
-            filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.5));
-            stroke-width: 2.5px;
+        .nav-item:active .material-icons-round {
+            transform: scale(0.9);
+            opacity: 0.7;
         }
 
-        /* Pulse Specific Animation */
-        .pulse-anim {
-            animation: nav-pulse-anim 2s infinite;
-            color: #00d2ff;
-        }
-        @keyframes nav-pulse-anim { 
-            0% { opacity: 0.6; transform: scale(0.95); } 
-            50% { opacity: 1; transform: scale(1.05); } 
-            100% { opacity: 0.6; transform: scale(0.95); } 
+        /* Pulse / Wave Animation Classes */
+        .pulse-icon-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        /* --- MOMENTS FAB STYLE --- */
+        .nav-item .pulse-graphic {
+            color: var(--accent);
+            animation: pulse-skel 2s infinite ease-in-out;
+        }
+
+        .nav-item.active .pulse-graphic {
+            filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
+            animation: pulse-skel-active 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-skel-active {
+            0% { opacity: 0.8; transform: scale(1.1); }
+            50% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(0, 210, 255, 0.8)); }
+            100% { opacity: 0.8; transform: scale(1.1); }
+        }
+
+        /* ==========================================================================
+           MOMENTS FAB STYLES
+           ========================================================================== */
         .moments-fab {
             position: fixed;
+            /* Ensures it sits dynamically above the nav bar even on iPhones with bottom bars */
             bottom: calc(85px + env(safe-area-inset-bottom)); 
             right: 20px;
-            width: 56px; height: 56px;
+            width: 56px; 
+            height: 56px;
             border-radius: 50%;
             background: var(--surface);
             border: 2px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            z-index: 9998; 
+            z-index: 9998; /* Just below the navbar if they ever overlap */
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .moments-fab:active { transform: scale(0.85); }
-        .moments-fab.has-moment { border-color: var(--accent); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
-        @keyframes pulse-glow { 0% { box-shadow: 0 0 5px var(--accent); } 50% { box-shadow: 0 0 15px var(--accent); } 100% { box-shadow: 0 0 5px var(--accent); } }
-        .moments-fab img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        .moments-fab .material-icons-round { color: var(--accent); font-size: 30px; }
-        .moments-fab.hidden-fab { transform: scale(0) translateY(50px) rotate(45deg); pointer-events: none; opacity: 0; }
 
-        /* --- QUANTUM RIPPLE EFFECT --- */
+        .moments-fab:active { 
+            transform: scale(0.85); 
+        }
+
+        .moments-fab.has-moment { 
+            border-color: var(--accent); 
+            box-shadow: 0 0 15px rgba(0,210,255,0.3); 
+        }
+
+        @keyframes pulse-glow { 
+            0% { box-shadow: 0 0 5px var(--accent); } 
+            50% { box-shadow: 0 0 15px var(--accent); } 
+            100% { box-shadow: 0 0 5px var(--accent); } 
+        }
+
+        .moments-fab img { 
+            width: 100%; 
+            height: 100%; 
+            border-radius: 50%; 
+            object-fit: cover; 
+        }
+
+        .moments-fab .material-icons-round { 
+            color: var(--accent); 
+            font-size: 30px; 
+        }
+
+        .moments-fab.hidden-fab { 
+            transform: scale(0) translateY(50px) rotate(45deg); 
+            pointer-events: none; 
+            opacity: 0; 
+        }
+
+        /* ==========================================================================
+           QUANTUM RIPPLE EFFECT
+           ========================================================================== */
         .ripple {
-            position: absolute; border-radius: 50%; transform: scale(0);
-            animation: quantum-ripple 600ms linear; background-color: rgba(255, 255, 255, 0.1);
+            position: absolute; 
+            border-radius: 50%; 
+            transform: scale(0);
+            animation: quantum-ripple 600ms linear; 
+            background-color: rgba(255, 255, 255, 0.1);
             pointer-events: none;
         }
-        @keyframes quantum-ripple { to { transform: scale(4); opacity: 0; } }
 
-        view-notes { z-index: 10000 !important; position: relative; }
+        @keyframes quantum-ripple { 
+            to { transform: scale(4); opacity: 0; } 
+        }
+
+        view-notes { 
+            z-index: 10000 !important; 
+            position: relative; 
+        }
     </style>
 
     <script>
+        // Check for cached data to prevent DOM layout shifts on load
         const cached = localStorage.getItem('goorac_home_data');
         let preloadedData = null;
+        
         if (cached) {
-            try { preloadedData = JSON.parse(cached); } 
-            catch (e) { console.error("Cache parsing error", e); }
+            try { 
+                preloadedData = JSON.parse(cached); 
+            } 
+            catch (e) { 
+                console.error("Cache parsing error", e); 
+            }
         }
     </script>
 </head>
 
 <body oncontextmenu="return false;"> 
+
 <script src="components/chatLoader.js" defer></script>
 <chat-loader></chat-loader>
     
@@ -328,28 +664,38 @@
 
 <div class="content" id="dashboard-content">
     <span class="section-label">DASHBOARD</span>
+    
     <div class="welcome-card">
         <div class="quantum-info">
-            <div class="status-tag"><div class="dot"></div> ONLINE</div>
+            <div class="status-tag">
+                <div class="dot"></div> ONLINE
+            </div>
             <div class="live-clock" id="clock">00:00</div>
         </div>
+        
         <h1 id="welcome-name" class="skeleton" style="width: 60%; min-height: 35px;"></h1>
         <p id="welcome-text" class="skeleton" style="width: 90%; min-height: 20px; margin-top: 10px;"></p>
         
         <div class="activity-grid">
+            
             <div class="activity-card quantum-touch" id="msg-card" onclick="window.location.href='messages.html'">
-                <div class="card-icon-area" id="msg-pfp-area"><div>MSG</div></div>
+                <div class="card-icon-area" id="msg-pfp-area">
+                    <div>MSG</div>
+                </div>
                 <span id="msg-time" class="time-badge">--:--</span>
                 <span id="msg-header" class="count-num">Inbox</span>
                 <span id="msg-subtext" class="count-label">Check Messages</span>
             </div>
             
             <div class="activity-card quantum-touch" id="call-card" onclick="window.location.href='calls.html'">
-                <div class="card-icon-area" id="call-pfp-area"><div>LOG</div></div>
+                <div class="card-icon-area" id="call-pfp-area">
+                    <div>LOG</div>
+                </div>
                 <span id="call-time" class="time-badge">--:--</span>
                 <span id="call-count" class="count-num">Calls</span>
                 <span id="call-label" class="count-label">Call History</span>
             </div>
+            
         </div>
     </div>
 </div>
@@ -358,132 +704,163 @@
     <span class="material-icons-round">add</span>
 </div>
 
-<nav class="bottom-nav" id="main-nav-container">
-    <a href="index.html" class="nav-item">
-        <i data-lucide="home"></i>
+<nav class="native-bottom-nav" id="main-nav" aria-label="Main Navigation">
+    
+    <a href="home.html" class="nav-item active" aria-label="Home">
+        <span class="material-icons-round">home</span>
+        <span>Home</span>
     </a>
-    <a href="messages.html" class="nav-item">
-        <i data-lucide="message-circle"></i>
+    
+    <a href="messages.html" class="nav-item" aria-label="Messages">
+        <span class="material-icons-round">chat_bubble_outline</span>
+        <span>Messages</span>
     </a>
-    <a href="add-contact.html" class="nav-item">
-        <i data-lucide="search"></i>
+    
+    <a href="add-contact.html" class="nav-item" aria-label="Add Contact">
+        <span class="material-icons-round">person_add</span>
+        <span>Add Contact</span>
     </a>
-    <a href="pulseLobby.html" class="nav-item">
-        <i data-lucide="radio" class="pulse-anim"></i>
+    
+    <a href="pulseLobby.html" class="nav-item" aria-label="Pulse Lobby">
+        <div class="pulse-icon-container">
+            <span class="material-icons-round pulse-graphic">graphic_eq</span>
+        </div>
+        <span>Pulse</span>
     </a>
-    <a href="calls.html" class="nav-item">
-        <i data-lucide="phone"></i>
+    
+    <a href="calls.html" class="nav-item" aria-label="Calls">
+        <span class="material-icons-round">phone</span>
+        <span>Calls</span>
     </a>
+
 </nav>
 
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
 
 <script>
-    // --- 1. APPLY CACHE INSTANTLY (Prevents DOM Glitch) ---
+    // =========================================================================
+    // 1. APPLY CACHE INSTANTLY (Prevents DOM Glitch)
+    // =========================================================================
     if (preloadedData) {
         document.addEventListener('DOMContentLoaded', () => {
-            if(preloadedData.name) {
-                document.getElementById('welcome-name').innerText = preloadedData.name;
-                document.getElementById('welcome-name').classList.remove('skeleton');
+            // Restore Welcome Name
+            if (preloadedData.name) {
+                const nameEl = document.getElementById('welcome-name');
+                nameEl.innerText = preloadedData.name;
+                nameEl.classList.remove('skeleton');
             }
-            if(preloadedData.text) {
-                document.getElementById('welcome-text').innerText = preloadedData.text;
-                document.getElementById('welcome-text').classList.remove('skeleton');
+            
+            // Restore Welcome Text
+            if (preloadedData.text) {
+                const textEl = document.getElementById('welcome-text');
+                textEl.innerText = preloadedData.text;
+                textEl.classList.remove('skeleton');
             }
-            if(preloadedData.photoURL) {
-                document.getElementById('header-pfp').src = preloadedData.photoURL;
-                document.getElementById('header-pfp').classList.remove('skeleton');
-                document.getElementById('my-note-pfp').src = preloadedData.photoURL;
-                document.getElementById('my-note-pfp').classList.remove('skeleton');
+            
+            // Restore Profile Pictures
+            if (preloadedData.photoURL) {
+                const headerPfp = document.getElementById('header-pfp');
+                const notePfp = document.getElementById('my-note-pfp');
+                
+                headerPfp.src = preloadedData.photoURL;
+                headerPfp.classList.remove('skeleton');
+                
+                notePfp.src = preloadedData.photoURL;
+                notePfp.classList.remove('skeleton');
             }
-            if(preloadedData.msgState) {
+            
+            // Restore Dashboard Message State
+            if (preloadedData.msgState) {
                 document.getElementById('msg-header').innerText = preloadedData.msgState.header;
                 document.getElementById('msg-subtext').innerText = preloadedData.msgState.sub;
                 document.getElementById('msg-pfp-area').innerHTML = preloadedData.msgState.pfpHTML;
-                if (preloadedData.msgState.hasCount) document.getElementById('msg-card').classList.add('has-count');
+                
+                if (preloadedData.msgState.hasCount) {
+                    document.getElementById('msg-card').classList.add('has-count');
+                }
             }
         });
     }
 
-    // --- QUANTUM RIPPLE FEATURE ---
+    // =========================================================================
+    // 2. QUANTUM RIPPLE FEATURE
+    // =========================================================================
     document.addEventListener('DOMContentLoaded', () => {
         const buttons = document.querySelectorAll('.quantum-touch');
+        
         buttons.forEach(btn => {
             btn.addEventListener('click', function(e) {
+                // Calculate position relative to the clicked element
                 const rect = btn.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
+                
+                // Create ripple element
                 const circle = document.createElement('span');
                 circle.classList.add('ripple');
                 circle.style.left = `${x}px`;
                 circle.style.top = `${y}px`;
                 
-                // Diameter based on the furthest corner
+                // Set diameter based on the furthest corner
                 const diameter = Math.max(btn.clientWidth, btn.clientHeight);
-                circle.style.width = circle.style.height = `${diameter}px`;
+                circle.style.width = `${diameter}px`;
+                circle.style.height = `${diameter}px`;
                 
+                // Append and clean up after animation
                 this.appendChild(circle);
-                setTimeout(() => circle.remove(), 600);
+                setTimeout(() => {
+                    circle.remove();
+                }, 600);
             });
         });
     });
 
-    // --- NAVBAR INITIALIZATION, ACTIVE HIGHLIGHTING & VISIBILITY OBSERVERS ---
+    // =========================================================================
+    // 3. VISIBILITY OBSERVERS (Hides UI Elements during Modals/Calls)
+    // =========================================================================
     document.addEventListener('DOMContentLoaded', () => {
-        
-        // 1. Initialize Lucide Icons
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
-
-        // 2. Highlight Active Page
-        const path = window.location.pathname;
-        const page = path.split("/").pop() || "index.html";
-        const links = document.querySelectorAll('#main-nav-container .nav-item');
-        
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            if (page === href) {
-                link.classList.add('active');
-            }
-        });
-
         const noteViewer = document.getElementById('note-viewer');
-        const mainNav = document.getElementById('main-nav-container');
+        const mainNav = document.getElementById('main-nav');
         const fab = document.getElementById('moments-fab');
         const momentsFeed = document.getElementById('moments-feed');
         const dashboardContent = document.getElementById('dashboard-content');
 
-        // General toggle function to hide components when modals are open
+        /**
+         * Toggles the UI Overlays safely
+         * @param {boolean} shouldHide - Whether to hide or show components
+         */
         function toggleOverlays(shouldHide) {
             if (shouldHide) {
-                if (mainNav) mainNav.classList.add('nav-hidden');
-                if (fab) fab.classList.add('hidden-fab');
+                mainNav.classList.add('hidden-nav');
+                fab.classList.add('hidden-fab');
             } else {
-                if (mainNav) mainNav.classList.remove('nav-hidden');
-                if (fab) fab.classList.remove('hidden-fab');
+                mainNav.classList.remove('hidden-nav');
+                fab.classList.remove('hidden-fab');
             }
         }
 
-        // Aggressive app-wide modal check
-        function checkGlobalModals() {
-            const isAnyModalOpen = document.querySelector('.m-full-modal.open, .c-overlay.open, view-notes[open], view-notes.open, .modal-active, #install-popup.show');
-            const callScreen = document.getElementById('call-screen');
-            const isCallActive = callScreen && (callScreen.style.display === 'flex' || callScreen.classList.contains('active'));
-            
-            toggleOverlays(isAnyModalOpen || isCallActive);
-        }
-
+        // Observe Note Viewer Modal Logic
         if (noteViewer) {
             new MutationObserver(() => {
                 const style = window.getComputedStyle(noteViewer);
                 const isNotesOpen = (style.display !== 'none' && style.opacity !== '0') || noteViewer.classList.contains('open');
-                const isModalOpen = momentsFeed && (momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open'));
+                
+                // Check if moments modal is also open
+                let isModalOpen = false;
+                if (momentsFeed) {
+                    isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
+                }
+                
                 toggleOverlays(isNotesOpen || isModalOpen);
-            }).observe(noteViewer, { attributes: true, attributeFilter: ['style', 'class', 'open'] });
+                
+            }).observe(noteViewer, { 
+                attributes: true, 
+                attributeFilter: ['style', 'class', 'open'] 
+            });
         }
 
+        // Observe Moments Feed Modal Logic
         if (momentsFeed) {
             new MutationObserver(() => {
                 const isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
@@ -492,19 +869,28 @@
                 // Instantly hide dashboard if moments exist to prevent scrolling bugs
                 const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
                 if (dashboardContent) {
-                    dashboardContent.style.display = hasMoments ? 'none' : 'block';
+                    if (hasMoments) {
+                        dashboardContent.style.display = 'none';
+                    } else {
+                        dashboardContent.style.display = 'block';
+                    }
                 }
-            }).observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+                
+            }).observe(momentsFeed, { 
+                childList: true, 
+                subtree: true, 
+                attributes: true, 
+                attributeFilter: ['class'] 
+            });
         }
-
-        // Global DOM Observer for dynamically injected modals and Call Screen
-        setTimeout(() => {
-            const bodyObserver = new MutationObserver(() => checkGlobalModals());
-            bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'open'] });
-            checkGlobalModals();
-        }, 1000);
     });
 
+    // =========================================================================
+    // 4. CACHE MANAGEMENT
+    // =========================================================================
+    /**
+     * Saves the current UI state to local storage for instant loading on refresh
+     */
     function saveHomeState() {
         const state = {
             name: document.getElementById('welcome-name').innerText,
@@ -520,140 +906,305 @@
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
 
-    // --- FIREBASE INIT ---
-    if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
-    else if (typeof firebase !== 'undefined' && !firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
+    // =========================================================================
+    // 5. FIREBASE INITIALIZATION
+    // =========================================================================
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } else if (typeof firebase !== 'undefined' && !firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
 
+    // Initialize Auth and DB references
     const auth = firebase.auth();
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     const db = firebase.firestore();
 
+    // =========================================================================
+    // 6. CLOCK AND UTILITIES
+    // =========================================================================
+    // Update the live clock every second
     setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
+        const clockElement = document.getElementById('clock');
+        if (clockElement) {
+            clockElement.innerText = new Date().toLocaleTimeString([], { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
     }, 1000);
 
+    /**
+     * Formats the firebase timestamp into a readable relative string
+     * @param {Object} ts - Firebase Timestamp or standard Date
+     * @returns {string} - Formatted time string
+     */
     function formatTime(ts) {
         if (!ts) return "";
+        
         const date = ts.toDate ? ts.toDate() : new Date(ts);
         const sec = Math.floor((new Date() - date) / 1000);
+        
         if (sec < 60) return "Just now";
         if (sec < 3600) return Math.floor(sec/60) + "m ago";
         if (sec < 86400) return Math.floor(sec/3600) + "h ago";
+        
         return Math.floor(sec/86400) + "d ago";
     }
 
+    // =========================================================================
+    // 7. AUTHENTICATION LISTENER
+    // =========================================================================
     auth.onAuthStateChanged(async (user) => {
         if (user) {
+            // User is signed in, fetch data
             const doc = await db.collection("users").doc(user.uid).get();
+            
             if (doc.exists) {
-                updateUI(doc.data());
+                const userData = doc.data();
+                
+                // Initialize Core Systems
+                updateUI(userData);
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
-                checkMyMoment(user.uid, doc.data().photoURL);
-            } else window.location.href = "setup.html";
-        } else window.location.href = "login.html";
+                checkMyMoment(user.uid, userData.photoURL);
+                
+            } else {
+                // Document doesn't exist, redirect to setup
+                window.location.href = "setup.html";
+            }
+        } else {
+            // No user signed in, bounce to login page
+            window.location.href = "login.html";
+        }
     });
 
-    // --- MOMENTS FAB LOGIC ---
+    // =========================================================================
+    // 8. MOMENTS FAB LOGIC
+    // =========================================================================
+    /**
+     * Checks if the active user has an active moment posted
+     * @param {string} uid - User ID
+     * @param {string} photoURL - Users profile photo
+     */
     function checkMyMoment(uid, photoURL) {
-        db.collection('moments').where('uid', '==', uid).where('isActive', '==', true).where('expiresAt', '>', firebase.firestore.Timestamp.now()).limit(1).onSnapshot(snap => {
-            const fab = document.getElementById('moments-fab');
-            if(!snap.empty) {
-                fab.dataset.momentId = snap.docs[0].id;
-                fab.classList.add('has-moment');
-                fab.innerHTML = `<img src="${photoURL || 'https://via.placeholder.com/150'}">`;
-            } else {
-                fab.dataset.momentId = '';
-                fab.classList.remove('has-moment');
-                fab.innerHTML = `<span class="material-icons-round">add</span>`;
-            }
-        });
+        db.collection('moments')
+            .where('uid', '==', uid)
+            .where('isActive', '==', true)
+            .where('expiresAt', '>', firebase.firestore.Timestamp.now())
+            .limit(1)
+            .onSnapshot(snap => {
+                const fab = document.getElementById('moments-fab');
+                
+                if (!snap.empty) {
+                    // Moment exists, update FAB to show profile picture
+                    fab.dataset.momentId = snap.docs[0].id;
+                    fab.classList.add('has-moment');
+                    fab.innerHTML = `<img src="${photoURL || 'https://via.placeholder.com/150'}">`;
+                } else {
+                    // No moment, reset FAB to add state
+                    fab.dataset.momentId = '';
+                    fab.classList.remove('has-moment');
+                    fab.innerHTML = `<span class="material-icons-round">add</span>`;
+                }
+            });
     }
 
+    /**
+     * Handles clicks on the Moments Floating Action Button
+     */
     window.handleFabClick = function() {
         const fab = document.getElementById('moments-fab');
-        if(fab.classList.contains('has-moment') && fab.dataset.momentId) {
+        
+        if (fab.classList.contains('has-moment') && fab.dataset.momentId) {
             const vm = document.querySelector('view-moments');
-            if(vm) {
+            
+            if (vm) {
                 const exists = vm.moments.find(m => m.id === fab.dataset.momentId);
-                if(!exists) {
+                
+                if (!exists) {
+                    // Fetch the moment and inject it into the viewer if not loaded
                     db.collection('moments').doc(fab.dataset.momentId).get().then(doc => {
-                        if(doc.exists) {
+                        if (doc.exists) {
                             vm.moments.unshift({ id: doc.id, ...doc.data() });
                             vm.openFullModal(doc.id);
                         }
                     });
-                } else vm.openFullModal(fab.dataset.momentId);
+                } else {
+                    // Moment is already loaded, just open it
+                    vm.openFullModal(fab.dataset.momentId);
+                }
             }
-        } else window.location.href = 'moments.html';
-    }
+        } else {
+            // No moment exists, route to creation page
+            window.location.href = 'moments.html';
+        }
+    };
 
+    // =========================================================================
+    // 9. UI UPDATE LOGIC
+    // =========================================================================
+    /**
+     * Updates the basic DOM elements with user information
+     * @param {Object} data - User document data
+     */
     function updateUI(data) {
         const nameEl = document.getElementById('welcome-name');
         const textEl = document.getElementById('welcome-text');
         const pfpEl = document.getElementById('header-pfp');
         const notePfp = document.getElementById('my-note-pfp');
         
+        // Calculate appropriate greeting based on local hour
         const hour = new Date().getHours();
         let greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+        
+        // Update Name Element
         nameEl.innerText = `${greeting}, ` + (data.name.split(' ')[0] || "Agent");
         nameEl.classList.remove('skeleton');
         
+        // Update Profile Pictures
         const src = data.photoURL || 'https://via.placeholder.com/150';
-        pfpEl.src = src; pfpEl.classList.remove('skeleton');
-        notePfp.src = src; notePfp.classList.remove('skeleton');
         
+        pfpEl.src = src; 
+        pfpEl.classList.remove('skeleton');
+        
+        notePfp.src = src; 
+        notePfp.classList.remove('skeleton');
+        
+        // Update Subtext Element
         textEl.innerText = "System operational. Connection secure.";
         textEl.classList.remove('skeleton');
+        
+        // Cache state immediately after rendering
         saveHomeState();
     }
 
+    // =========================================================================
+    // 10. NOTIFICATION SYSTEM
+    // =========================================================================
+    /**
+     * Listens for unread notification count on the user document
+     * @param {string} uid - User ID
+     */
     function listenNotifications(uid) {
         db.collection("users").doc(uid).onSnapshot(doc => {
             const data = doc.data();
             const count = data ? (data.unreadCount || 0) : 0;
             const badge = document.getElementById('notif-count');
-            if (count > 0) { badge.innerText = count > 99 ? '99+' : count; badge.classList.add('visible'); } 
-            else badge.classList.remove('visible');
-        });
-    }
-
-    function startLiveCounters(uid) {
-        db.collection("chats").where("participants", "array-contains", uid).orderBy("lastTimestamp", "desc").onSnapshot(snap => {
-            let latest = null;
-            for (const doc of snap.docs) {
-                const d = doc.data();
-                if ((d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0)) { latest = d; break; }
-            }
-            const header = document.getElementById('msg-header'), sub = document.getElementById('msg-subtext'), time = document.getElementById('msg-time'), card = document.getElementById('msg-card'), pfp = document.getElementById('msg-pfp-area');
-            if (latest) {
-                header.innerText = "New Message"; sub.innerText = latest.lastSenderName || "Incoming";
-                time.innerText = formatTime(latest.lastTimestamp); card.classList.add('has-count');
-                if(latest.lastSenderPfp) pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
+            
+            if (count > 0) {
+                badge.innerText = count > 99 ? '99+' : count; 
+                badge.classList.add('visible'); 
             } else {
-                header.innerText = "Inbox"; sub.innerText = "No new messages";
-                time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
-                card.classList.remove('has-count'); pfp.innerHTML = `<div>MSG</div>`;
+                badge.classList.remove('visible');
             }
-            saveHomeState();
-        });
-
-        db.collection("call_logs").where("participants", "array-contains", uid).orderBy("timestamp", "desc").limit(1).onSnapshot(snap => {
-            const el = document.getElementById('call-count'), lbl = document.getElementById('call-label'), time = document.getElementById('call-time'), card = document.getElementById('call-card'), pfp = document.getElementById('call-pfp-area');
-            if (!snap.empty) {
-                const call = snap.docs[0].data();
-                time.innerText = formatTime(call.timestamp);
-                if (call.receiverId === uid && (call.status === "missed")) {
-                    el.innerText = "Missed Call"; lbl.innerText = call.callerName || "Unknown";
-                    card.classList.add('missed-alert'); if(call.callerPfp) pfp.innerHTML = `<img src="${call.callerPfp}">`;
-                } else {
-                    el.innerText = "Calls"; lbl.innerText = "Recent activity";
-                    card.classList.remove('missed-alert'); pfp.innerHTML = `<div>LOG</div>`;
-                }
-            }
-            saveHomeState();
         });
     }
+
+    // =========================================================================
+    // 11. LIVE DASHBOARD COUNTERS (Chats & Calls)
+    // =========================================================================
+    /**
+     * Initializes listeners for recent chats and call history on the dashboard
+     * @param {string} uid - User ID
+     */
+    function startLiveCounters(uid) {
+        
+        // --- CHATS LISTENER ---
+        db.collection("chats")
+            .where("participants", "array-contains", uid)
+            .orderBy("lastTimestamp", "desc")
+            .onSnapshot(snap => {
+                let latest = null;
+                
+                // Find the latest unread message
+                for (const doc of snap.docs) {
+                    const d = doc.data();
+                    const isUnread = (d.lastSender !== uid && d.seen === false) || 
+                                     (d.unreadCount && d.unreadCount[uid] > 0);
+                                     
+                    if (isUnread) { 
+                        latest = d; 
+                        break; 
+                    }
+                }
+                
+                // DOM References
+                const header = document.getElementById('msg-header');
+                const sub = document.getElementById('msg-subtext');
+                const time = document.getElementById('msg-time');
+                const card = document.getElementById('msg-card');
+                const pfp = document.getElementById('msg-pfp-area');
+                
+                // Update Dashboard Card
+                if (latest) {
+                    header.innerText = "New Message"; 
+                    sub.innerText = latest.lastSenderName || "Incoming";
+                    time.innerText = formatTime(latest.lastTimestamp); 
+                    card.classList.add('has-count');
+                    
+                    if (latest.lastSenderPfp) {
+                        pfp.innerHTML = `<img src="${latest.lastSenderPfp}">`;
+                    }
+                } else {
+                    header.innerText = "Inbox"; 
+                    sub.innerText = "No new messages";
+                    time.innerText = snap.empty ? "" : formatTime(snap.docs[0]?.data()?.lastTimestamp);
+                    card.classList.remove('has-count'); 
+                    pfp.innerHTML = `<div>MSG</div>`;
+                }
+                
+                saveHomeState();
+            });
+
+        // --- CALLS LISTENER ---
+        db.collection("call_logs")
+            .where("participants", "array-contains", uid)
+            .orderBy("timestamp", "desc")
+            .limit(1)
+            .onSnapshot(snap => {
+                
+                // DOM References
+                const el = document.getElementById('call-count');
+                const lbl = document.getElementById('call-label');
+                const time = document.getElementById('call-time');
+                const card = document.getElementById('call-card');
+                const pfp = document.getElementById('call-pfp-area');
+                
+                if (!snap.empty) {
+                    const call = snap.docs[0].data();
+                    time.innerText = formatTime(call.timestamp);
+                    
+                    // Check if it was a missed call for the active user
+                    if (call.receiverId === uid && call.status === "missed") {
+                        el.innerText = "Missed Call"; 
+                        lbl.innerText = call.callerName || "Unknown";
+                        card.classList.add('missed-alert'); 
+                        
+                        if (call.callerPfp) {
+                            pfp.innerHTML = `<img src="${call.callerPfp}">`;
+                        }
+                    } else {
+                        // Standard call history state
+                        el.innerText = "Calls"; 
+                        lbl.innerText = "Recent activity";
+                        card.classList.remove('missed-alert'); 
+                        pfp.innerHTML = `<div>LOG</div>`;
+                    }
+                }
+                
+                saveHomeState();
+            });
+    }
+    
+    // =========================================================================
+    // 12. HIGHLIGHT ACTIVE NAV LOGIC
+    // =========================================================================
+    // Professional touch: When the script loads, we can ensure the chat bubble
+    // swaps from outline to filled depending on the active URL logic if needed 
+    // dynamically, but since we hardcoded this for home.html, it's already set 
+    // gracefully in the HTML above.
 </script>
 </body>
 </html>
