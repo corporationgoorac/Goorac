@@ -6,7 +6,7 @@ window.effectKeywords = {
     balloons: ['surprise', '🎈', 'celebrate', 'bday'],
     stars: ['star', 'amazing', 'magic', '⭐', 'wow'],
     snow: ['cold', 'snow', 'winter', 'freeze', '❄️', '⛄'],
-    fireworks: ['new year', 'boom', 'diwali', 'fireworks', '🎇', '🎆'],
+    fireworks: ['new year', 'boom', 'best', 'fireworks', '🎇', '🎆'],
     thumbsup: ['good job', 'well done', 'awesome', '👍', 'great'],
     rain: ['rain', 'sad', 'crying', 'storm', '🌧️', '☔'],
     
