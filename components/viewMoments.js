@@ -156,15 +156,33 @@ class ViewMoments extends HTMLElement {
         });
 
         // 🚀 CRITICAL BUG FIX: Smart Keyboard Handling using Visual Viewport
-        // Instead of margin-bottom which pushes things off screen, we tightly bind the height
+        // STRICTLY absolute positioning to stick above the keyboard without hanging
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
                 const activeOverlay = this.querySelector('.c-overlay.open');
                 if (activeOverlay) {
-                    // Match overlay exactly to visual viewport height.
-                    // This prevents the OS from shoving the entire container upwards into oblivion.
+                    // Match overlay exactly to visual viewport height and rigidly position it.
+                    activeOverlay.style.position = 'absolute';
                     activeOverlay.style.height = `${window.visualViewport.height}px`;
+                    activeOverlay.style.top = `${window.visualViewport.offsetTop || 0}px`;
+                    
+                    // Target the actual sheet and force it to stick directly above the keyboard
+                    const sheet = activeOverlay.querySelector('.c-sheet');
+                    if (sheet) {
+                        sheet.style.position = 'absolute';
+                        sheet.style.bottom = '0px';
+                        sheet.style.left = '0px';
+                        sheet.style.right = '0px';
+                    }
                     window.scrollTo(0, 0); // Lock body scroll to prevent native browser jump
+                }
+            });
+            
+            // Keep the absolute panel strictly locked even during native scroll bounces
+            window.visualViewport.addEventListener('scroll', () => {
+                const activeOverlay = this.querySelector('.c-overlay.open');
+                if (activeOverlay && activeOverlay.style.position === 'absolute') {
+                    activeOverlay.style.top = `${window.visualViewport.offsetTop || 0}px`;
                 }
             });
         }
@@ -182,7 +200,9 @@ class ViewMoments extends HTMLElement {
             input.addEventListener('blur', () => {
                 const activeOverlay = this.querySelector('.c-overlay.open');
                 if (activeOverlay) {
+                    activeOverlay.style.position = 'fixed';
                     activeOverlay.style.height = '100dvh'; // Reset to default
+                    activeOverlay.style.top = '0';
                 }
             });
         });
@@ -1008,6 +1028,7 @@ class ViewMoments extends HTMLElement {
                     opacity: 1; 
                 }
                 
+                /* STRICTLY ABSOLUTE STICKY POSITION TO AVOID HANGING OFF SCREEN */
                 .c-sheet { 
                     width: 100%; 
                     height: 75vh; 
@@ -1019,6 +1040,10 @@ class ViewMoments extends HTMLElement {
                     transform: translateY(100%); 
                     transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); 
                     box-shadow: 0 -10px 40px rgba(0,0,0,0.5); 
+                    position: absolute; /* Add absolute to strictly stick */
+                    bottom: 0; /* Add bottom 0 to strictly stick above keyboard */
+                    left: 0;
+                    right: 0;
                 }
                 .c-sheet.auto-height { 
                     height: auto; 
