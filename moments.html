@@ -55,13 +55,7 @@
             display: flex; flex-direction: column;
             background: var(--bg);
             /* Slide animation removed per user request */
-            /* animation: slideInRight 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; */
             position: relative;
-        }
-
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0.5; }
-            to { transform: translateX(0); opacity: 1; }
         }
 
         /* --- IMMERSIVE CANVAS (IG Story Style) --- */
@@ -72,24 +66,39 @@
             border-radius: 0; /* Edge to edge */
         }
 
-        /* Floating Header */
+        /* Dynamic Blurred Backdrop for Media */
+        #media-backdrop {
+            position: absolute; inset: -10%; width: 120%; height: 120%;
+            object-fit: cover; filter: blur(40px) brightness(0.6);
+            z-index: 0; display: none; opacity: 0; transition: opacity 0.5s;
+        }
+
+        /* Floating Header - Fixed Overlaps */
         header {
             position: absolute; top: 0; left: 0; width: 100%; z-index: 50;
             padding: calc(15px + var(--safe-top)) 20px 20px;
             display: flex; justify-content: space-between; align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
             pointer-events: none;
         }
-        header > * { pointer-events: auto; }
+        
+        .header-left, .header-right {
+            display: flex; align-items: center; gap: 15px; pointer-events: auto;
+        }
 
-        .back-btn { 
+        .back-btn, .clear-media-btn { 
             width: 40px; height: 40px; border-radius: 50%;
             background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
             display: flex; align-items: center; justify-content: center;
             color: #fff; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
             transition: 0.2s;
         }
-        .back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+        .back-btn:active, .clear-media-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+        
+        /* Clear btn logic handled via display classes now */
+        .clear-media-btn { display: none; }
+        .clear-media-btn.show { display: flex; }
+        .back-btn.hide { display: none; }
 
         .post-btn { 
             background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.6); 
@@ -98,16 +107,17 @@
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             pointer-events: none;
         }
+        /* Updated Share Button Style per request: White BG, Black Text */
         .post-btn.active { 
-            pointer-events: auto; background: var(--accent); color: #fff; 
-            border-color: var(--accent);
-            box-shadow: 0 4px 20px var(--accent-glow); 
-            animation: pulseBtn 2s infinite;
+            pointer-events: auto; background: #ffffff; color: #000000; 
+            border-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3); 
+            animation: pulseBtnWhite 2s infinite;
         }
-        @keyframes pulseBtn {
-            0% { box-shadow: 0 0 0 0 var(--accent-glow); }
-            70% { box-shadow: 0 0 0 10px rgba(255,0,127,0); }
-            100% { box-shadow: 0 0 0 0 rgba(255,0,127,0); }
+        @keyframes pulseBtnWhite {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
         }
 
         /* Mode Selection UI */
@@ -124,9 +134,10 @@
         .mode-btn:active { transform: scale(0.95); background: rgba(40,40,40,0.8); }
         .mode-btn .material-icons-round { font-size: 24px; color: var(--accent); }
 
-        /* Media Elements - Changed object-fit from cover to contain so image/video is not cropped */
+        /* Media Elements - Perfect centering with object-fit contain */
         #media-preview, #video-preview { 
-            width: 100%; height: 100%; object-fit: contain; display: none; position: absolute; inset: 0; z-index: 1; 
+            width: 100%; height: 100%; object-fit: contain; display: none; 
+            position: absolute; inset: 0; margin: auto; z-index: 1; 
         }
         
         #text-preview { 
@@ -140,12 +151,6 @@
         /* NEW TEXT EFFECTS */
         .fx-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
         .fx-shadow { text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
-
-        .clear-media-btn {
-            position: absolute; top: calc(15px + var(--safe-top)); left: 20px; z-index: 60;
-            background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); color: white; border: 1px solid rgba(255,255,255,0.2);
-            width: 40px; height: 40px; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer;
-        }
 
         /* Floating Text Tools */
         .text-tools {
@@ -257,16 +262,22 @@
     <div class="app-modal">
         
         <header>
-            <div class="back-btn" id="header-back-btn" onclick="history.back()">
-                <span class="material-icons-round">arrow_back</span>
+            <div class="header-left">
+                <div class="back-btn" id="header-back-btn" onclick="history.back()">
+                    <span class="material-icons-round">arrow_back</span>
+                </div>
+                <button class="clear-media-btn" id="clear-btn" onclick="clearMedia()">
+                    <span class="material-icons-round">close</span>
+                </button>
             </div>
-            <button class="clear-media-btn" id="clear-btn" onclick="clearMedia()">
-                <span class="material-icons-round">close</span>
-            </button>
-            <button class="post-btn" id="post-btn" onclick="postMoment()">Share</button>
+            <div class="header-right">
+                <button class="post-btn" id="post-btn" onclick="postMoment()">Share</button>
+            </div>
         </header>
 
         <div class="canvas-container" id="canvas-bg">
+            <img id="media-backdrop" src="">
+
             <div class="mode-selector" id="mode-selector">
                 <div class="mode-btn" onclick="setMode('text')">
                     <div class="song-icon"><span class="material-icons-round">text_fields</span></div> 
@@ -381,6 +392,7 @@
         textPreview: document.getElementById('text-preview'),
         imgPreview: document.getElementById('media-preview'),
         vidPreview: document.getElementById('video-preview'),
+        mediaBackdrop: document.getElementById('media-backdrop'),
         clearBtn: document.getElementById('clear-btn'),
         backBtn: document.getElementById('header-back-btn'),
         canvasBg: document.getElementById('canvas-bg'),
@@ -515,12 +527,15 @@
         triggerHaptic();
         state.mode = mode;
         els.selector.style.display = 'none';
-        els.clearBtn.style.display = 'flex';
-        els.backBtn.style.display = 'none'; 
+        
+        els.clearBtn.classList.add('show');
+        els.backBtn.classList.add('hide');
         
         els.textPreview.style.display = 'none';
         els.imgPreview.style.display = 'none';
         els.vidPreview.style.display = 'none';
+        els.mediaBackdrop.style.display = 'none';
+        els.mediaBackdrop.style.opacity = '0';
         els.textTools.style.display = 'none';
         els.canvasBg.style.background = '#1a1a1a';
 
@@ -532,26 +547,36 @@
         } else if (mode === 'image') {
             els.imgPreview.style.display = 'block';
             els.imgPreview.src = state.mediaUrl;
+            applyMediaBackdrop(state.mediaUrl);
         } else if (mode === 'video') {
             els.vidPreview.style.display = 'block';
             els.vidPreview.src = state.mediaUrl;
+            applyMediaBackdrop(state.mediaUrl); // Basic poster fallback if needed, but video centers itself
         }
         saveDraft();
+    }
+
+    function applyMediaBackdrop(url) {
+        els.mediaBackdrop.src = url;
+        els.mediaBackdrop.style.display = 'block';
+        // Fade in slightly after load for smooth transition
+        setTimeout(() => { els.mediaBackdrop.style.opacity = '1'; }, 50);
     }
 
     function clearMedia() {
         triggerHaptic();
         state.mode = null; state.mediaUrl = null; state.text = ''; state.videoMeta = null;
         els.textPreview.innerText = '';
-        els.imgPreview.src = ''; els.vidPreview.src = '';
+        els.imgPreview.src = ''; els.vidPreview.src = ''; els.mediaBackdrop.src = '';
         
         els.selector.style.display = 'flex';
-        els.clearBtn.style.display = 'none';
-        els.backBtn.style.display = 'flex';
+        els.clearBtn.classList.remove('show');
+        els.backBtn.classList.remove('hide');
         
         els.textPreview.style.display = 'none';
         els.imgPreview.style.display = 'none';
         els.vidPreview.style.display = 'none';
+        els.mediaBackdrop.style.display = 'none';
         els.textTools.style.display = 'none';
         els.canvasBg.style.background = '#1a1a1a';
         saveDraft();
