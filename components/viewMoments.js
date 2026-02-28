@@ -528,6 +528,8 @@ class ViewMoments extends HTMLElement {
                     // PLAY VIDEO IN FEED WHEN VISIBLE
                     const videoEl = entry.target.querySelector('video.m-media');
                     if (videoEl && !this.isModalOpen) {
+                        // FIX: Check if there's a song so video audio doesn't clash, else follow global mute state
+                        videoEl.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
                         videoEl.play().catch(()=>{});
                     }
                     
@@ -627,15 +629,30 @@ class ViewMoments extends HTMLElement {
                 // Also trigger video if it exists
                 const vid = this.querySelector('#full-modal-content video');
                 if(vid) {
-                    vid.muted = this.isMuted;
+                    // FIX: Keep muted if a song preview is playing!
+                    const moment = this.moments.find(m => m.id === this.activeMomentId);
+                    vid.muted = moment && moment.songPreview ? true : false;
                     vid.play().catch(()=>{});
                 }
             } else {
                 this.audioPlayer.play().catch(()=>{});
+                // FIX: Unmute and play feed videos dynamically based on toggle interaction
+                const feedVideos = this.querySelectorAll('.m-card video');
+                feedVideos.forEach(v => {
+                    const mId = v.closest('.m-card').dataset.id;
+                    const m = this.moments.find(x => x.id === mId);
+                    v.muted = m && m.songPreview ? true : false; // Respect song override
+                    v.play().catch(()=>{});
+                });
             }
         } else {
             this.audioPlayer.pause();
             this.modalAudioPlayer.pause();
+            // FIX: Mute feed videos seamlessly when muting
+            const feedVideos = this.querySelectorAll('.m-card video');
+            feedVideos.forEach(v => v.muted = true);
+            const modalVid = this.querySelector('#full-modal-content video');
+            if(modalVid) modalVid.muted = true;
         }
         
         // Update live modal UI mute icon instantly
@@ -643,9 +660,15 @@ class ViewMoments extends HTMLElement {
         modalMutes.forEach(modalMute => {
              modalMute.innerText = this.isMuted ? 'volume_off' : 'volume_up';
         });
+
+        // ADDED: Seamlessly update feed UI mute icons instantly to prevent feed refresh video flicker
+        const feedMutes = this.querySelectorAll('.m-card .mute-btn span');
+        feedMutes.forEach(feedMute => {
+             feedMute.innerText = this.isMuted ? 'volume_off' : 'volume_up';
+        });
         
         // Render feed purely to update icon states
-        this.renderFeed(); 
+        // this.renderFeed(); // DISABLED: Modifying feed dynamically via DOM queries above so playing video isn't rebuilt & interrupted
     }
 
     /**
@@ -1452,7 +1475,9 @@ class ViewMoments extends HTMLElement {
             // Generate Media Markup based on type
             let mediaHtml = '';
             if (moment.type === 'video') {
-                mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop muted playsinline></video>`;
+                // FIX: Added dynamic mute checking including prioritizing song presence!
+                const shouldMuteVideo = this.isMuted || moment.songPreview;
+                mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop ${shouldMuteVideo ? 'muted' : ''} playsinline></video>`;
             } else if (moment.type === 'image') {
                 mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
             } else {
@@ -1754,7 +1779,9 @@ class ViewMoments extends HTMLElement {
         const likesCount = moment.likes ? moment.likes.length : 0;
 
         let mediaHtml = '';
-        if (moment.type === 'video') mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop autoplay playsinline ${this.isMuted ? 'muted' : ''}></video>`;
+        // FIX: Prioritize muting modal video if a song replaces the audio track
+        const shouldMuteModalVideo = this.isMuted || (moment && moment.songPreview);
+        if (moment.type === 'video') mediaHtml = `<video src="${moment.mediaUrl}" class="m-media" loop autoplay playsinline ${shouldMuteModalVideo ? 'muted' : ''}></video>`;
         else if (moment.type === 'image') mediaHtml = `<img src="${moment.mediaUrl}" class="m-media">`;
         else {
             let effectClass = '';
@@ -1927,7 +1954,8 @@ class ViewMoments extends HTMLElement {
             };
 
             if (vid) {
-                vid.muted = this.isMuted; // Match global state
+                // FIX: If we have a song preview, video MUST remain muted during play so audio doesn't clash
+                vid.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
                 const vp = vid.play(); // Always attempt to play (muted videos auto-play fine)
                 if (vp !== undefined) {
                     vp.catch(() => {
@@ -1958,7 +1986,7 @@ class ViewMoments extends HTMLElement {
                     
                     // Resync audio muting in case state drifted during pause
                     if(vid) {
-                        vid.muted = this.isMuted;
+                        vid.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
                         vid.play().catch(()=>{});
                     } else {
                         this.modalAudioPlayer.muted = this.isMuted;
@@ -2008,7 +2036,16 @@ class ViewMoments extends HTMLElement {
         // RESUME FEED VIDEO IF APPLICABLE
         if (this.activeMomentId) {
             const feedVideo = this.querySelector(`.m-card[data-id="${this.activeMomentId}"] video`);
-            if (feedVideo) feedVideo.play().catch(()=>{});
+            const moment = this.moments.find(m => m.id === this.activeMomentId);
+            if (feedVideo) {
+                // FIX: Safely resume feed video audio if unmuted! 
+                feedVideo.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
+                feedVideo.play().catch(()=>{});
+            }
+            // FIX: Safely resume the music if the returning moment is a song preview!
+            if (moment && moment.songPreview && !this.isMuted) {
+                this.playMomentMusic(moment.songPreview);
+            }
         }
 
         this.activeMomentId = null;
