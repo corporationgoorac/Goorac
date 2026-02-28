@@ -763,6 +763,13 @@
         <span class="note-username">You</span>
     </div>
 </div>
+<script>
+    // 🚀 INSTANT 0ms NOTES CACHE INJECTION
+    const cachedNotesHtml = localStorage.getItem('goorac_notes_html_cache');
+    if (cachedNotesHtml) {
+        document.getElementById('notes-container').innerHTML = cachedNotesHtml;
+    }
+</script>
 
 <view-moments id="moments-feed"></view-moments> 
 
@@ -839,8 +846,10 @@
                 const notePfp = document.getElementById('my-note-pfp');
                 headerPfp.src = preloadedData.photoURL;
                 headerPfp.classList.remove('skeleton');
-                notePfp.src = preloadedData.photoURL;
-                notePfp.classList.remove('skeleton');
+                if(notePfp) {
+                    notePfp.src = preloadedData.photoURL;
+                    notePfp.classList.remove('skeleton');
+                }
             }
             // FAST LOAD BADGE VALUE RESTORE
             if (preloadedData.msgState && preloadedData.msgState.unreadTotal && preloadedData.msgState.unreadTotal > 0) {
@@ -922,6 +931,14 @@
                 pingEl.innerText = `(${ping}ms)`;
             }
         }, 3500);
+
+        // 🚀 LIVE CACHE SAVER FOR NOTES (0ms latency prep)
+        const notesContainerEl = document.getElementById('notes-container');
+        if (notesContainerEl) {
+            new MutationObserver(() => {
+                localStorage.setItem('goorac_notes_html_cache', notesContainerEl.innerHTML);
+            }).observe(notesContainerEl, { childList: true, subtree: true, attributes: true, characterData: true });
+        }
     });
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1089,8 +1106,10 @@
         const src = data.photoURL || 'https://via.placeholder.com/150';
         pfpEl.src = src; 
         pfpEl.classList.remove('skeleton');
-        notePfp.src = src; 
-        notePfp.classList.remove('skeleton');
+        if(notePfp) {
+            notePfp.src = src; 
+            notePfp.classList.remove('skeleton');
+        }
         textEl.innerText = "System operational. Connection secure.";
         textEl.classList.remove('skeleton');
         saveHomeState();
