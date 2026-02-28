@@ -1713,6 +1713,11 @@ class ViewMoments extends HTMLElement {
         }
 
         const timerDisplay = moment.isActive !== false ? "Active 24h" : "Archived";
+        
+        // Hide Archive Button Logic for 24+ hour moments or natively inactive moments
+        const nowMs = Date.now();
+        const isExpired = moment.expiresAt && (moment.expiresAt.toDate ? moment.expiresAt.toDate().getTime() : (moment.expiresAt.seconds ? moment.expiresAt.seconds * 1000 : new Date(moment.expiresAt).getTime())) < nowMs;
+        const showArchiveBtn = moment.isActive !== false && !isExpired;
 
         // Inject Content
         content.innerHTML = `
@@ -1760,9 +1765,11 @@ class ViewMoments extends HTMLElement {
                         <button class="m-action-btn primary" onclick="window.location.href='moments.html'">
                             <span class="material-icons-round">add_circle_outline</span> New
                         </button>
+                        ${showArchiveBtn ? `
                         <button class="m-action-btn secondary" onclick="document.querySelector('view-moments').archiveMoment('${moment.id}')">
                             <span class="material-icons-round">inventory_2</span> Archive
                         </button>
+                        ` : ''}
                         <button class="m-action-btn danger" onclick="document.querySelector('view-moments').deleteMoment('${moment.id}')">
                             <span class="material-icons-round">delete_outline</span> Delete
                         </button>
@@ -1978,8 +1985,10 @@ class ViewMoments extends HTMLElement {
         
         // Generating Mini HTML Box Payload matching Goorac Chat specifications
         let mediaThumb = '';
-        if (moment.type === 'image' || moment.type === 'video') {
-            mediaThumb = `<img src="${moment.mediaUrl}" style="width:45px; height:45px; object-fit:cover; border-radius:8px; flex-shrink:0;">`;
+        if (moment.type === 'image') {
+            mediaThumb = `<div style="width:45px; height:45px; border-radius:8px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; border:1px solid rgba(255,255,255,0.1);"><span class="material-icons-round" style="font-size:24px;">image</span></div>`;
+        } else if (moment.type === 'video') {
+            mediaThumb = `<div style="width:45px; height:45px; border-radius:8px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; border:1px solid rgba(255,255,255,0.1);"><span class="material-icons-round" style="font-size:24px;">videocam</span></div>`;
         } else if (moment.type === 'text') {
             mediaThumb = `<div style="width:45px; height:45px; border-radius:8px; background:${moment.bgColor}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:bold; overflow:hidden; flex-shrink:0; border:1px solid rgba(255,255,255,0.1);">Aa</div>`;
         }
