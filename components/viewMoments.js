@@ -521,8 +521,14 @@ class ViewMoments extends HTMLElement {
                 
                 if (entry.isIntersecting) {
                     // Prevent background music playing if the Full Modal is actively open
-                    if (moment && moment.songPreview && !this.isModalOpen) {
-                        this.playMomentMusic(moment.songPreview);
+                    if (!this.isModalOpen) {
+                        if (moment && moment.songPreview) {
+                            this.playMomentMusic(moment.songPreview);
+                        } else {
+                            // FIX: Ensure global audio stops bleeding if the intersecting card has no music
+                            this.audioPlayer.pause();
+                            this.audioPlayer.src = ''; 
+                        }
                     }
 
                     // PLAY VIDEO IN FEED WHEN VISIBLE
@@ -545,6 +551,7 @@ class ViewMoments extends HTMLElement {
                     // Stop audio if the moment passing out of view was the one playing
                     if (moment && moment.songPreview && this.audioPlayer.src.includes(moment.songPreview)) {
                         this.audioPlayer.pause();
+                        this.audioPlayer.src = ''; // FIX: Clear it so it doesn't auto-resume mistakenly
                     }
 
                     // PAUSE VIDEO IN FEED WHEN OUT OF VIEW
@@ -635,14 +642,17 @@ class ViewMoments extends HTMLElement {
                     vid.play().catch(()=>{});
                 }
             } else {
-                this.audioPlayer.play().catch(()=>{});
+                if (this.audioPlayer.src) this.audioPlayer.play().catch(()=>{});
                 // FIX: Unmute and play feed videos dynamically based on toggle interaction
                 const feedVideos = this.querySelectorAll('.m-card video');
                 feedVideos.forEach(v => {
                     const mId = v.closest('.m-card').dataset.id;
                     const m = this.moments.find(x => x.id === mId);
                     v.muted = m && m.songPreview ? true : false; // Respect song override
-                    v.play().catch(()=>{});
+                    // FIX: Only trigger play on visible/intersecting videos rather than all of them!
+                    const rect = v.getBoundingClientRect();
+                    const inView = rect.top >= -50 && rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) + 50;
+                    if(inView) v.play().catch(()=>{}); 
                 });
             }
         } else {
@@ -1761,6 +1771,7 @@ class ViewMoments extends HTMLElement {
         // Swap Audio Player Control to Modal Context
         this.isModalOpen = true;
         this.audioPlayer.pause(); // Always pause the background feed audio
+        this.audioPlayer.src = ''; // FIX: Clear it strictly to prevent bleed when closing
         if (moment.songPreview) {
             this.modalAudioPlayer.src = moment.songPreview;
             this.modalAudioPlayer.muted = this.isMuted; // Respect global mute state
@@ -2011,8 +2022,9 @@ class ViewMoments extends HTMLElement {
         }, 50);
 
         // Suspend background feed video playback to save memory/processing
-        const feedVideo = this.querySelector(`.m-card[data-id="${momentId}"] video`);
-        if(feedVideo) feedVideo.pause();
+        // FIX: Pause ALL feed videos broadly to ensure nothing bleeds over into the modal
+        const feedVideos = this.querySelectorAll(`.m-card video`);
+        feedVideos.forEach(v => v.pause());
     }
 
     /**
@@ -2045,6 +2057,9 @@ class ViewMoments extends HTMLElement {
             // FIX: Safely resume the music if the returning moment is a song preview!
             if (moment && moment.songPreview && !this.isMuted) {
                 this.playMomentMusic(moment.songPreview);
+            } else {
+                this.audioPlayer.pause();
+                this.audioPlayer.src = ''; // Clear source to eliminate next-moment bug
             }
         }
 
@@ -2064,9 +2079,7 @@ class ViewMoments extends HTMLElement {
         this.modalAudioPlayer.pause();
         this.modalAudioPlayer.src = '';
         
-        if (!this.isMuted && this.audioPlayer.src) {
-            this.audioPlayer.play().catch(()=>{});
-        }
+        // FIX: Removed the unconditional broad audioPlayer resume that caused the "next moment playing" bug
     }
 
     /**
