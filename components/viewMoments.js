@@ -560,8 +560,10 @@ class ViewMoments extends HTMLElement {
         }
         
         // Update live modal UI mute icon instantly
-        const modalMute = this.querySelector('#full-moment-modal .mute-btn span');
-        if (modalMute) modalMute.innerText = this.isMuted ? 'volume_off' : 'volume_up';
+        const modalMutes = this.querySelectorAll('#full-moment-modal .mute-btn span');
+        modalMutes.forEach(modalMute => {
+             modalMute.innerText = this.isMuted ? 'volume_off' : 'volume_up';
+        });
         
         // Render feed purely to update icon states
         this.renderFeed(); 
@@ -1638,7 +1640,7 @@ class ViewMoments extends HTMLElement {
             const playPromise = this.modalAudioPlayer.play();
             if (playPromise !== undefined) {
                 playPromise.catch(() => {
-                    if (!this.isMuted) this.handleAutoplayBlock();
+                    this.handleAutoplayBlock(); // Forcefully trigger visual pulsing cue
                 });
             }
         }
@@ -1719,6 +1721,12 @@ class ViewMoments extends HTMLElement {
                  ${mediaHtml}
                  <span class="material-icons-round double-tap-heart">favorite</span>
                  
+                 ${moment.songPreview || moment.type === 'video' ? `
+                     <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()" style="left: 15px; right: auto; bottom: 15px;">
+                         <span class="material-icons-round" style="font-size:18px;">${this.isMuted ? 'volume_off' : 'volume_up'}</span>
+                     </button>
+                 ` : ''}
+
                  <div class="tap-to-enable-audio" id="audio-enable-overlay">
                     <span class="material-icons-round" style="font-size:48px; margin-bottom:10px;">volume_up</span>Tap to enable audio
                  </div>
@@ -1801,7 +1809,7 @@ class ViewMoments extends HTMLElement {
                 const vp = vid.play(); // Always attempt to play (muted videos auto-play fine)
                 if (vp !== undefined) {
                     vp.catch(() => {
-                        if (!this.isMuted) this.handleAutoplayBlock();
+                        this.handleAutoplayBlock(); // Forcefully trigger visual pulsing cue
                     });
                 }
                 vid.addEventListener('timeupdate', handleProgress);
@@ -1825,8 +1833,15 @@ class ViewMoments extends HTMLElement {
                 clearTimeout(this.pressTimer);
                 if(this.isPressing) {
                     this.isPressing = false;
-                    if(vid) vid.play().catch(()=>{});
-                    else this.modalAudioPlayer.play().catch(()=>{});
+                    
+                    // Resync audio muting in case state drifted during pause
+                    if(vid) {
+                        vid.muted = this.isMuted;
+                        vid.play().catch(()=>{});
+                    } else {
+                        this.modalAudioPlayer.muted = this.isMuted;
+                        this.modalAudioPlayer.play().catch(()=>{});
+                    }
                     
                     if(hBar) hBar.classList.remove('hide-ui');
                     if(actionsBlock) actionsBlock.classList.remove('hide-ui');
