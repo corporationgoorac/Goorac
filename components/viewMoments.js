@@ -547,7 +547,10 @@ class ViewMoments extends HTMLElement {
                 this.modalAudioPlayer.play().catch(()=>{});
                 // Also trigger video if it exists
                 const vid = this.querySelector('#full-modal-content video');
-                if(vid) vid.play().catch(()=>{});
+                if(vid) {
+                    vid.muted = this.isMuted;
+                    vid.play().catch(()=>{});
+                }
             } else {
                 this.audioPlayer.play().catch(()=>{});
             }
@@ -1628,15 +1631,15 @@ class ViewMoments extends HTMLElement {
 
         // Swap Audio Player Control to Modal Context
         this.isModalOpen = true;
-        if (!this.isMuted) {
-            this.audioPlayer.pause();
-            if (moment.songPreview) {
-                this.modalAudioPlayer.src = moment.songPreview;
-                this.modalAudioPlayer.muted = false;
-                const playPromise = this.modalAudioPlayer.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => this.handleAutoplayBlock());
-                }
+        this.audioPlayer.pause(); // Always pause the background feed audio
+        if (moment.songPreview) {
+            this.modalAudioPlayer.src = moment.songPreview;
+            this.modalAudioPlayer.muted = this.isMuted; // Respect global mute state
+            const playPromise = this.modalAudioPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                    if (!this.isMuted) this.handleAutoplayBlock();
+                });
             }
         }
 
@@ -1794,9 +1797,12 @@ class ViewMoments extends HTMLElement {
             };
 
             if (vid) {
-                if (!this.isMuted) {
-                    const vp = vid.play();
-                    if (vp !== undefined) vp.catch(() => this.handleAutoplayBlock());
+                vid.muted = this.isMuted; // Match global state
+                const vp = vid.play(); // Always attempt to play (muted videos auto-play fine)
+                if (vp !== undefined) {
+                    vp.catch(() => {
+                        if (!this.isMuted) this.handleAutoplayBlock();
+                    });
                 }
                 vid.addEventListener('timeupdate', handleProgress);
             } else if (moment.songPreview) {
