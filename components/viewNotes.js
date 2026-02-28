@@ -1312,6 +1312,34 @@ const NotesManager = {
         
         if (!btn || !preview) return; 
 
+        try {
+            const cached = localStorage.getItem('my_note_cache_' + user.uid);
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (!data.expiresAt || new Date(data.expiresAt) > new Date()) {
+                    preview.classList.add('visible');
+                    preview.style.background = data.bgColor || '#262626'; 
+                    preview.style.color = data.textColor || '#fff';
+                    preview.innerHTML = `
+                        ${data.text ? `<div class="note-text-content" style='text-align:${data.textAlign || 'center'}; font-family:${data.font || 'system-ui'}'>${data.text}</div>` : ''}
+                        ${data.songName ? `
+                            <div class="note-music-tag">
+                                <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                <span>${data.songName.substring(0, 10)}${data.songName.length>10?'...':''}</span>
+                            </div>
+                        ` : ''}
+                    `;
+                    btn.classList.add('has-note');
+                    btn.onclick = () => {
+                        const viewer = document.querySelector('view-notes');
+                        if(data && viewer) viewer.open({ ...data }, true);
+                    };
+                } else {
+                    localStorage.removeItem('my_note_cache_' + user.uid);
+                }
+            }
+        } catch(e) {}
+
         db.collection("notes")
             .where("uid", "==", user.uid)
             .where("isActive", "==", true)
@@ -1329,6 +1357,17 @@ const NotesManager = {
                         db.collection("notes").doc(noteId).update({ isActive: false });
                         data = null;
                     }
+                }
+
+                if (data) {
+                    try {
+                        let cacheData = { ...data, id: noteId };
+                        if(cacheData.createdAt && cacheData.createdAt.toDate) cacheData.createdAt = cacheData.createdAt.toDate().toISOString();
+                        if(cacheData.expiresAt && cacheData.expiresAt.toDate) cacheData.expiresAt = cacheData.expiresAt.toDate().toISOString();
+                        localStorage.setItem('my_note_cache_' + user.uid, JSON.stringify(cacheData));
+                    } catch(e){}
+                } else {
+                    localStorage.removeItem('my_note_cache_' + user.uid);
                 }
 
                 preview.classList.add('visible');
@@ -1366,6 +1405,58 @@ const NotesManager = {
         const db = firebase.firestore();
         const container = document.getElementById('notes-container');
         if(!container) return;
+
+        let cachedMutualNotes = {};
+        try {
+            const cached = localStorage.getItem('mutual_notes_cache_' + user.uid);
+            if (cached) {
+                cachedMutualNotes = JSON.parse(cached);
+                for (const [userUid, noteData] of Object.entries(cachedMutualNotes)) {
+                    if (noteData.expiresAt && new Date(noteData.expiresAt) > new Date()) {
+                        const existingEl = document.getElementById(`note-${userUid}`);
+                        if(existingEl) existingEl.remove();
+
+                        const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
+                        const isCF = noteData.audience === 'close_friends';
+                        const div = document.createElement('div');
+                        div.id = `note-${userUid}`; 
+                        div.className = 'note-item friend-note has-note';
+                        
+                        const bgStyle = `background:${noteData.bgColor || '#262626'}; color:${noteData.textColor || '#fff'}`;
+                        const cfClass = isCF ? 'cf-note' : '';
+
+                        div.innerHTML = `
+                            <div class="note-bubble visible ${cfClass}" style="${bgStyle}">
+                                <div class="note-text-content" style='text-align:${noteData.textAlign || 'center'}; font-family:${noteData.font || 'system-ui'}'>${noteData.text}</div>
+                                ${noteData.songName ? `
+                                    <div class="note-music-tag">
+                                        <svg viewBox="0 0 24 24" style="width:10px; fill:currentColor;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                        <span>${noteData.songName.substring(0, 10)}${noteData.songName.length>10?'...':''}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <img src="${noteData.pfp || 'https://via.placeholder.com/65'}" class="note-pfp">
+                            ${isLiked ? `
+                                <div class="note-like-indicator">
+                                    <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                </div>` : ''}
+                            <span class="note-username">${(noteData.username || 'User').split(' ')[0]}</span>
+                        `;
+                        div.onclick = () => {
+                            const viewer = document.querySelector('view-notes');
+                            const nav = document.querySelector('main-navbar');
+                            if(nav) nav.classList.add('hidden');
+                            if(navigator.vibrate) navigator.vibrate([10, 40]);
+                            viewer.open({ ...noteData, id: noteData.id }, false);
+                        };
+                        container.appendChild(div);
+                    } else {
+                        delete cachedMutualNotes[userUid];
+                    }
+                }
+                localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
+            }
+        } catch(e) {}
 
         try {
             const myProfileDoc = await db.collection("users").doc(user.uid).get();
@@ -1407,12 +1498,33 @@ const NotesManager = {
                                         const authorDoc = await db.collection('users').doc(noteData.uid).get();
                                         const authorData = authorDoc.data();
                                         if (!authorData || !authorData.closeFriends || !authorData.closeFriends.includes(user.uid)) {
+                                            if (cachedMutualNotes[userUid]) {
+                                                delete cachedMutualNotes[userUid];
+                                                localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
+                                            }
                                             return; 
                                         }
                                     } catch (e) {
                                         return;
                                     }
                                 }
+
+                                try {
+                                    let cacheData = { ...noteData, id: noteId };
+                                    if(cacheData.createdAt && cacheData.createdAt.toDate) cacheData.createdAt = cacheData.createdAt.toDate().toISOString();
+                                    if(cacheData.expiresAt && cacheData.expiresAt.toDate) cacheData.expiresAt = cacheData.expiresAt.toDate().toISOString();
+                                    
+                                    if(cacheData.likes && Array.isArray(cacheData.likes)) {
+                                        cacheData.likes = cacheData.likes.map(l => {
+                                            let cleanedLike = {...l};
+                                            if(cleanedLike.timestamp && cleanedLike.timestamp.toDate) cleanedLike.timestamp = cleanedLike.timestamp.toDate().toISOString();
+                                            return cleanedLike;
+                                        });
+                                    }
+
+                                    cachedMutualNotes[userUid] = cacheData;
+                                    localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
+                                } catch(e){}
 
                                 const isLiked = noteData.likes && noteData.likes.some(l => l.uid === user.uid);
                                 const isCF = noteData.audience === 'close_friends';
@@ -1451,6 +1563,13 @@ const NotesManager = {
                                     viewer.open({ ...noteData, id: noteId }, false);
                                 };
                                 container.appendChild(div);
+                            } else {
+                                try {
+                                    if (cachedMutualNotes[userUid]) {
+                                        delete cachedMutualNotes[userUid];
+                                        localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
+                                    }
+                                } catch(e){}
                             }
                         });
                     });
