@@ -110,34 +110,42 @@ function renderLockoutScreen() {
     overlay.id = 'nexus-lockout';
     overlay.innerHTML = `
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Inter:wght@400;600;800&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
             #nexus-lockout {
                 position: fixed; inset: 0;
-                background: radial-gradient(circle at center, #111111 0%, #000000 100%);
+                background: rgba(10, 10, 12, 0.95);
                 z-index: 9999999; display: flex; align-items: center; justify-content: center;
-                font-family: 'Inter', sans-serif; backdrop-filter: blur(25px);
-                -webkit-backdrop-filter: blur(25px); animation: nexus-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+                font-family: 'Inter', sans-serif; backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px); animation: fade-in 0.4s ease-out;
             }
             .nexus-lock-card {
-                background: rgba(15, 15, 15, 0.6); border: 1px solid rgba(255, 68, 68, 0.2);
-                padding: 60px 40px; border-radius: 40px; text-align: center;
-                max-width: 480px; width: 90%; box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
-                position: relative; overflow: hidden;
+                background: #1A1A1D; border: 1px solid #333;
+                padding: 48px 40px; border-radius: 16px; text-align: center;
+                max-width: 440px; width: 90%; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             }
-            .nexus-lock-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, #ff4444, transparent); }
-            .nexus-glow-icon { font-size: 80px; color: #ff4444; margin-bottom: 30px; display: inline-block; filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.5)); animation: nexus-pulse 2s infinite; }
-            .nexus-title { color: #ffffff; font-size: 32px; font-weight: 800; margin-bottom: 15px; letter-spacing: -1.5px; text-transform: uppercase; }
-            .nexus-message { color: #888888; font-size: 16px; line-height: 1.6; margin-bottom: 40px; }
-            .nexus-badge { font-family: 'JetBrains Mono', monospace; background: rgba(255, 68, 68, 0.1); color: #ff4444; padding: 14px 28px; border-radius: 100px; font-size: 12px; display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(255, 68, 68, 0.2); font-weight: 700; letter-spacing: 1px; }
-            .nexus-dot { width: 6px; height: 6px; background: #ff4444; border-radius: 50%; box-shadow: 0 0 10px #ff4444; }
-            @keyframes nexus-pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
-            @keyframes nexus-fade-in { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); } }
+            .nexus-icon {
+                width: 64px; height: 64px; margin: 0 auto 24px auto; color: #64748B;
+            }
+            .nexus-title { color: #F8FAFC; font-size: 24px; font-weight: 600; margin-bottom: 12px; }
+            .nexus-message { color: #94A3B8; font-size: 15px; line-height: 1.6; margin-bottom: 32px; }
+            .nexus-support {
+                background: #0F172A; padding: 20px; border-radius: 12px;
+                color: #CBD5E1; font-size: 14px; line-height: 1.5; border: 1px solid #1E293B;
+            }
+            .nexus-support a { color: #38BDF8; text-decoration: none; font-weight: 500; display: inline-block; margin-top: 8px; transition: opacity 0.2s; }
+            .nexus-support a:hover { opacity: 0.8; }
+            @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         </style>
         <div class="nexus-lock-card">
-            <div class="nexus-glow-icon">🛡️</div>
-            <h1 class="nexus-title">Access Revoked</h1>
-            <p class="nexus-message">Your Goorac account has been restricted by system administration.</p>
-            <div class="nexus-badge"><span class="nexus-dot"></span>RESTRICTION_CODE: CORE_SYS_01</div>
+            <svg class="nexus-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h1 class="nexus-title">Account Suspended</h1>
+            <p class="nexus-message">Your account was suspended due to a policy or security reason. You cannot use Goorac Quantum at this time.</p>
+            <div class="nexus-support">
+                To appeal this decision, please contact our support team.<br>
+                <a href="mailto:support@goorac.biz">support@goorac.biz</a>
+            </div>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -145,4 +153,4 @@ function renderLockoutScreen() {
 }
 
 // Export isn't strictly needed if loaded as a normal script, but kept for compatibility
-// export { app, auth, firestore };
+// export { app, auth, firestore };exportxport
