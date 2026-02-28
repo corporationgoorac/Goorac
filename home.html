@@ -98,6 +98,64 @@
             height: 100%; 
         }
 
+        /* --- NEW MESSAGES ICON STYLES --- */
+        .msg-btn {
+            position: relative; 
+            cursor: pointer;
+            width: 32px; 
+            height: 32px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .msg-btn:active { 
+            transform: scale(0.85); 
+        }
+
+        .msg-icon {
+            color: #fff;
+            font-size: 26px;
+        }
+
+        .msg-badge {
+            position: absolute; 
+            top: -2px; 
+            right: -2px;
+            background: var(--accent);
+            color: var(--bg);
+            font-size: 10px; 
+            font-weight: 800;
+            min-width: 18px; 
+            height: 18px; 
+            padding: 0 4px;
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            opacity: 0; 
+            transform: scale(0);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none; 
+            border: 2px solid var(--bg); 
+            z-index: 2;
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse-msg-badge 2s infinite;
+        }
+
+        @keyframes pulse-msg-badge {
+            0% { box-shadow: 0 0 4px var(--accent); }
+            50% { box-shadow: 0 0 14px var(--accent); }
+            100% { box-shadow: 0 0 4px var(--accent); }
+        }
+
+        .msg-badge.visible { 
+            opacity: 1; 
+            transform: scale(1); 
+        }
+
+        /* --- NOTIFICATION STYLES --- */
         .notif-btn {
             position: relative; 
             cursor: pointer;
@@ -250,6 +308,14 @@
             color: var(--accent); 
             font-size: 0.7rem; 
             font-weight: 700; 
+        }
+        
+        /* NEW FEATURE: Network Latency Style */
+        .ping-indicator {
+            color: var(--text-dim);
+            font-size: 0.65rem;
+            font-weight: 500;
+            margin-left: 2px;
         }
 
         .dot { 
@@ -440,6 +506,12 @@
         .moments-fab .material-icons-round { 
             color: var(--accent); 
             font-size: 30px; 
+            /* Fixes glitching fallback text flash */
+            font-family: 'Material Icons Round', sans-serif;
+            font-feature-settings: 'liga';
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
         }
 
         .moments-fab.hidden-fab { 
@@ -468,6 +540,54 @@
             z-index: 9999 !important; 
             position: relative; 
         }
+
+        /* ==========================================================================
+           FULL-SCREEN GREETING OVERLAY ANIMATIONS
+           ========================================================================== */
+        .greeting-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 100000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.8s ease;
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+        }
+        .greeting-overlay.active { opacity: 1; pointer-events: all; }
+        .greeting-content { 
+            z-index: 2; text-align: center; transform: translateY(30px) scale(0.9); 
+            transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            padding: 0 20px;
+        }
+        .greeting-overlay.active .greeting-content { transform: translateY(0) scale(1); }
+        
+        .greeting-name { 
+            font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+            margin-bottom: 15px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); 
+        }
+        .greeting-text { 
+            font-size: 3.5rem; font-weight: 900; line-height: 1.1;
+            background: linear-gradient(to right, #ffffff, rgba(255,255,255,0.7)); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+            filter: drop-shadow(0 4px 15px rgba(0,0,0,0.4));
+        }
+        
+        .theme-morning { background: linear-gradient(135deg, rgba(255,154,158,0.9) 0%, rgba(254,207,239,0.9) 100%); color: #fff; }
+        .theme-afternoon { background: linear-gradient(135deg, rgba(0,198,251,0.9) 0%, rgba(0,91,234,0.9) 100%); color: #fff; }
+        .theme-evening { background: linear-gradient(135deg, rgba(246,211,101,0.9) 0%, rgba(253,160,133,0.9) 100%); color: #fff; }
+        .theme-night { background: linear-gradient(135deg, rgba(15,32,39,0.95) 0%, rgba(32,58,67,0.95) 50%, rgba(44,83,100,0.95) 100%); color: #fff; }
+        
+        .g-fx-obj { 
+            position: absolute; border-radius: 50%; width: 150px; height: 150px; 
+            top: -50px; right: -50px; filter: blur(30px); opacity: 0.8; 
+            animation: floatObj 4s ease-in-out infinite alternate;
+        }
+        
+        @keyframes floatObj { from { transform: translateY(0); } to { transform: translateY(20px); } }
+        
+        .theme-morning .g-fx-obj { background: #ffeb3b; box-shadow: 0 0 80px #ffeb3b; }
+        .theme-afternoon .g-fx-obj { background: #fff; box-shadow: 0 0 120px #fff; width: 250px; height: 250px; top: -100px; right: -100px; }
+        .theme-evening .g-fx-obj { background: #ff5722; box-shadow: 0 0 100px #ff5722; top: auto; bottom: 5%; right: 10%; filter: blur(20px); }
+        .theme-night .g-fx-obj { background: #e0e0e0; box-shadow: 0 0 60px #fff; width: 100px; height: 100px; filter: blur(10px); right: 20%; top: 15%; animation: floatMoon 6s ease-in-out infinite alternate;}
+        @keyframes floatMoon { from { transform: translateY(0) scale(1); } to { transform: translateY(15px) scale(1.1); } }
     </style>
 
     <script>
@@ -483,10 +603,23 @@
         if (cachedMoments && cachedMoments.length > 5) {
             document.write('<style>#dashboard-content { display: none !important; }</style>');
         }
+
+        // 🚀 INSTANT MSG BADGE LOAD FIX
+        if (preloadedData && preloadedData.msgState && preloadedData.msgState.unreadTotal && preloadedData.msgState.unreadTotal > 0) {
+            document.write('<style>#header-msg-count { opacity: 1 !important; transform: scale(1) !important; }</style>');
+        }
     </script>
 </head>
 
 <body oncontextmenu="return false;"> 
+
+<div id="greeting-overlay" class="greeting-overlay">
+    <div class="g-fx-obj"></div>
+    <div class="greeting-content">
+        <div id="greeting-name" class="greeting-name"></div>
+        <div id="greeting-text" class="greeting-text"></div>
+    </div>
+</div>
 
 <script src="components/chatLoader.js" defer></script>
 <chat-loader></chat-loader>
@@ -494,6 +627,10 @@
 <header>
     <div class="logo">GOORAC</div>
     <div class="header-right">
+        <div class="msg-btn" id="header-msg-btn" onclick="window.location.href='messages.html'">
+            <span class="material-icons-round msg-icon">chat_bubble_outline</span>
+            <div id="header-msg-count" class="msg-badge">0</div>
+        </div>
         <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
             <svg class="notif-icon" viewBox="0 0 24 24">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -521,7 +658,7 @@
     <div class="welcome-card">
         <div class="quantum-info">
             <div class="status-tag">
-                <div class="dot"></div> ONLINE
+                <div class="dot"></div> ONLINE <span class="ping-indicator" id="quantum-ping"></span>
             </div>
             <div class="live-clock" id="clock">00:00</div>
         </div>
@@ -550,6 +687,21 @@
     <span class="material-icons-round">add</span>
 </div>
 
+<script>
+    const cachedMyMoment = localStorage.getItem('goorac_my_moment_state');
+    if (cachedMyMoment) {
+        try {
+            const parsedMyMoment = JSON.parse(cachedMyMoment);
+            if (parsedMyMoment.hasMoment) {
+                const fabEl = document.getElementById('moments-fab');
+                fabEl.dataset.momentId = parsedMyMoment.id;
+                fabEl.classList.add('has-moment');
+                fabEl.innerHTML = `<img src="${parsedMyMoment.photoURL}">`;
+            }
+        } catch(e) {}
+    }
+</script>
+
 <main-navbar id="main-nav"></main-navbar>
 
 <call-notifier></call-notifier>
@@ -576,8 +728,52 @@
                 notePfp.src = preloadedData.photoURL;
                 notePfp.classList.remove('skeleton');
             }
+            // FAST LOAD BADGE VALUE RESTORE
+            if (preloadedData.msgState && preloadedData.msgState.unreadTotal && preloadedData.msgState.unreadTotal > 0) {
+                const badge = document.getElementById('header-msg-count');
+                if(badge) {
+                    badge.innerText = preloadedData.msgState.unreadTotal;
+                    badge.classList.add('visible');
+                }
+            }
         });
     }
+
+    // FULL SCREEN GREETING ANIMATION LOGIC
+    window.checkGreeting = function(text, sender, msgId) {
+        if (!text) return;
+        const playedKey = 'played_greeting_' + msgId;
+        if (sessionStorage.getItem(playedKey)) return; 
+        
+        const t = text.toLowerCase();
+        let theme = '';
+        let displayTxt = '';
+        
+        if (t.includes('good morning')) { theme = 'morning'; displayTxt = 'Good Morning'; }
+        else if (t.includes('good afternoon')) { theme = 'afternoon'; displayTxt = 'Good Afternoon'; }
+        else if (t.includes('good evening')) { theme = 'evening'; displayTxt = 'Good Evening'; }
+        else if (t.includes('good night')) { theme = 'night'; displayTxt = 'Good Night'; }
+        
+        if (theme) {
+            sessionStorage.setItem(playedKey, 'true');
+            const overlay = document.getElementById('greeting-overlay');
+            const nameEl = document.getElementById('greeting-name');
+            const textEl = document.getElementById('greeting-text');
+            
+            overlay.className = 'greeting-overlay theme-' + theme;
+            nameEl.innerText = `${sender} wished you`;
+            textEl.innerText = displayTxt;
+            
+            void overlay.offsetWidth; // Force CSS reflow
+            
+            overlay.classList.add('active');
+            if(window.navigator && window.navigator.vibrate) navigator.vibrate([100, 50, 100]); // Gentle haptic
+            
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 4500); 
+        }
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
         const buttons = document.querySelectorAll('.quantum-touch');
@@ -597,6 +793,15 @@
                 setTimeout(() => circle.remove(), 600);
             });
         });
+
+        // New Feature initialization: Network Ping Sim
+        setInterval(() => {
+            const pingEl = document.getElementById('quantum-ping');
+            if(pingEl) {
+                const ping = Math.floor(Math.random() * (45 - 12 + 1)) + 12; // Simulate 12-45ms latency
+                pingEl.innerText = `(${ping}ms)`;
+            }
+        }, 3500);
     });
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -650,9 +855,14 @@
                 header: document.getElementById('msg-header').innerText,
                 sub: document.getElementById('msg-subtext').innerText,
                 pfpHTML: document.getElementById('msg-pfp-area').innerHTML,
-                hasCount: document.getElementById('msg-card').classList.contains('has-count')
+                hasCount: document.getElementById('msg-card').classList.contains('has-count'),
+                unreadTotal: 0
             }
         };
+        const headerBadge = document.getElementById('header-msg-count');
+        if (headerBadge && headerBadge.classList.contains('visible')) {
+             state.msgState.unreadTotal = headerBadge.innerText;
+        }
         localStorage.setItem('goorac_home_data', JSON.stringify(state));
     }
 
@@ -709,13 +919,18 @@
             .onSnapshot(snap => {
                 const fab = document.getElementById('moments-fab');
                 if (!snap.empty) {
-                    fab.dataset.momentId = snap.docs[0].id;
+                    const momentId = snap.docs[0].id;
+                    fab.dataset.momentId = momentId;
                     fab.classList.add('has-moment');
                     fab.innerHTML = `<img src="${photoURL || 'https://via.placeholder.com/150'}">`;
+                    // Update LocalStorage Cache for instant load next time
+                    localStorage.setItem('goorac_my_moment_state', JSON.stringify({ hasMoment: true, id: momentId, photoURL: photoURL }));
                 } else {
                     fab.dataset.momentId = '';
                     fab.classList.remove('has-moment');
                     fab.innerHTML = `<span class="material-icons-round">add</span>`;
+                    // Clear cache state
+                    localStorage.setItem('goorac_my_moment_state', JSON.stringify({ hasMoment: false }));
                 }
             });
     }
@@ -780,11 +995,36 @@
             .orderBy("lastTimestamp", "desc")
             .onSnapshot(snap => {
                 let latest = null;
+                let latestDoc = null;
+                let unreadTotal = 0; // Added to count total unread chats
+                
                 for (const doc of snap.docs) {
                     const d = doc.data();
                     const isUnread = (d.lastSender !== uid && d.seen === false) || (d.unreadCount && d.unreadCount[uid] > 0);
-                    if (isUnread) { latest = d; break; }
+                    if (isUnread) { 
+                        unreadTotal++;
+                        if (!latest) { latest = d; latestDoc = doc; } // Capture the very first one for the dashboard card
+                    }
                 }
+                
+                // --- NEW HEADER MESSAGE BADGE UPDATE ---
+                const headerMsgBadge = document.getElementById('header-msg-count');
+                if (headerMsgBadge) {
+                    if (unreadTotal > 0) {
+                        headerMsgBadge.innerText = unreadTotal > 99 ? '99+' : unreadTotal;
+                        headerMsgBadge.classList.add('visible');
+                    } else {
+                        headerMsgBadge.classList.remove('visible');
+                    }
+                }
+
+                // --- GREETING DETECTION LOGIC ---
+                if (latest && latestDoc && latest.lastSender !== uid) {
+                    let txt = latest.lastMessage || latest.text || latest.message || "";
+                    if (window.checkGreeting) window.checkGreeting(txt, latest.lastSenderName || "Someone", latestDoc.id);
+                }
+
+                // --- EXISTING DASHBOARD CARD UPDATE ---
                 const header = document.getElementById('msg-header');
                 const sub = document.getElementById('msg-subtext');
                 const time = document.getElementById('msg-time');
