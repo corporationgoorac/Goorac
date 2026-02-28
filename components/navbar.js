@@ -365,25 +365,33 @@ class MainNavbar extends HTMLElement {
 
     /**
      * Listens for unread messages and updates the badge.
-     * Uses localStorage cache to prevent visual delays before Firebase loads.
+     * Uses a polling mechanism to ensure Firebase is fully loaded before attaching.
      */
     _initUnreadListener() {
-        // 1. Instantly display cached count to prevent layout popping while DB loads
+        // 1. Instantly display cached count to prevent layout popping
         const cachedCount = localStorage.getItem('goorac_unread_chat_count');
         if (cachedCount) {
             this._updateBadgeUI(parseInt(cachedCount, 10));
         }
 
-        // 2. Safely check if Firebase exists (loaded via external config.js)
-        if (typeof firebase === 'undefined') return;
+        // 2. Poll for Firebase initialization (fixes Web Component timing issues)
+        const checkFirebaseReady = setInterval(() => {
+            if (typeof window.firebase !== 'undefined' && firebase.apps.length > 0) {
+                clearInterval(checkFirebaseReady); // Stop polling
+                this._startFirestoreListener();    // Start the real listener
+            }
+        }, 500); // Check every half second
+    }
 
-        // 3. Attach real-time listener once user state is confirmed
+    /**
+     * Safely attaches the Firebase Snapshot listener once Firebase is confirmed active.
+     */
+    _startFirestoreListener() {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 const db = firebase.firestore();
                 
                 // Optimized query: Only fetches chats where the user is a participant.
-                // Standard Firebase pricing limits read costs since this is a single, narrow listener.
                 this._unsubscribeChats = db.collection('chats')
                     .where('participants', 'array-contains', user.uid)
                     .onSnapshot(snapshot => {
@@ -391,7 +399,7 @@ class MainNavbar extends HTMLElement {
                         
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            // Check if the current user has unread messages in this specific chat document
+                            // Safely check the nested unreadCount object map for the current user's UID
                             if (data.unreadCount && data.unreadCount[user.uid] > 0) {
                                 unreadChats++;
                             }
