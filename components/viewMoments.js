@@ -1727,7 +1727,7 @@ class ViewMoments extends HTMLElement {
                  <span class="material-icons-round double-tap-heart">favorite</span>
                  
                  ${moment.songPreview || moment.type === 'video' ? `
-                     <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()" style="left: 15px; right: auto; bottom: 15px;">
+                     <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
                          <span class="material-icons-round" style="font-size:18px;">${this.isMuted ? 'volume_off' : 'volume_up'}</span>
                      </button>
                  ` : ''}
@@ -1765,6 +1765,11 @@ class ViewMoments extends HTMLElement {
                         <button class="m-action-btn primary" onclick="window.location.href='moments.html'">
                             <span class="material-icons-round">add_circle_outline</span> New
                         </button>
+                        ${moment.allowComments !== false ? `
+                        <button class="m-action-btn primary" onclick="document.querySelector('view-moments').openComments('${moment.id}')" style="background: rgba(255, 255, 255, 0.15); color: #fff;">
+                            <span class="material-icons-round">chat_bubble_outline</span> Comments
+                        </button>
+                        ` : ''}
                         ${showArchiveBtn ? `
                         <button class="m-action-btn secondary" onclick="document.querySelector('view-moments').archiveMoment('${moment.id}')">
                             <span class="material-icons-round">inventory_2</span> Archive
