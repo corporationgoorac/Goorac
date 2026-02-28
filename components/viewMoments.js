@@ -9,9 +9,11 @@
  * - Dedicated Audio Players (Feed vs Full Modal)
  * - Smart Mobile Keyboard Handling via Visual Viewport API
  * - Instant Optimistic UI Updates (Likes & View Counts)
- * - Bottom Sheet Modals (Comments & Replies)
+ * - Bottom Sheet Modals (Comments & Replies & Options)
  * - Toast Notification System
  * - Advanced CSS Architecture & Animations
+ * - Instagram-style Long Press to Pause & Progress Bar
+ * - Smart Autoplay Block Recovery
  * ============================================================================
  */
 
@@ -62,6 +64,10 @@ class ViewMoments extends HTMLElement {
 
         // Current User Identity Cache
         this.currentUserData = null;
+        
+        // Press interaction state for Instagram-style hold
+        this.pressTimer = null;
+        this.isPressing = false;
     }
 
     /**
@@ -143,6 +149,7 @@ class ViewMoments extends HTMLElement {
             const fullModal = this.querySelector('#full-moment-modal');
             const commentSheet = this.querySelector('#comment-sheet');
             const replySheet = this.querySelector('#reply-sheet');
+            const optionsSheet = this.querySelector('#options-sheet');
             
             if (fullModal && fullModal.classList.contains('open') && (!e.state || e.state.modal !== 'momentFull')) {
                 this.closeFullModal(true);
@@ -152,6 +159,9 @@ class ViewMoments extends HTMLElement {
             }
             if (replySheet && replySheet.classList.contains('open') && (!e.state || e.state.modal !== 'momentReply')) {
                 this.closeReplySheet(true);
+            }
+            if (optionsSheet && optionsSheet.classList.contains('open') && (!e.state || e.state.modal !== 'momentOptions')) {
+                this.closeOptions(true);
             }
         });
     }
@@ -172,8 +182,9 @@ class ViewMoments extends HTMLElement {
             const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
             const sheetOpen = this.querySelector('#comment-sheet').classList.contains('open');
             const replyOpen = this.querySelector('#reply-sheet').classList.contains('open');
+            const optionsOpen = this.querySelector('#options-sheet').classList.contains('open');
             
-            if (!modalOpen && !sheetOpen && !replyOpen) {
+            if (!modalOpen && !sheetOpen && !replyOpen && !optionsOpen) {
                 document.body.style.overflow = '';
                 document.body.style.position = '';
                 document.body.style.width = '';
@@ -208,8 +219,25 @@ class ViewMoments extends HTMLElement {
     }
 
     /**
+     * UTILS: Calculates exact time remaining until moment expiration.
+     */
+    getTimeLeft(expiresAt) {
+        if (!expiresAt) return 'Unknown';
+        const date = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
+        const now = new Date();
+        const diffMs = date - now;
+        
+        if (diffMs <= 0) return 'Expired';
+        
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 60) return `${diffMins}m`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        return `${diffHours}h`;
+    }
+
+    /**
      * UTILS: Displays a non-intrusive notification toast on the screen.
-     * Useful for feedback on actions like replying or saving.
      * @param {string} message - The text to display
      * @param {string} icon - Material icon name
      */
@@ -458,7 +486,7 @@ class ViewMoments extends HTMLElement {
         this.modalAudioPlayer.muted = true;
         
         // Notify the user subtly
-        this.showToast("Tap speaker to enable audio", "volume_off");
+        this.showToast("Tap screen to enable audio", "volume_off");
         
         // Apply pulsing visual cue to all mute buttons visible to attract tap interaction
         const mutes = this.querySelectorAll('.mute-btn');
@@ -467,6 +495,12 @@ class ViewMoments extends HTMLElement {
             if (icon) icon.innerText = 'volume_off';
             btn.classList.add('pulse-attention');
         });
+
+        // Show big explicit tap overlay in modal if blocked there
+        const audioOverlay = this.querySelector('#audio-enable-overlay');
+        if (this.isModalOpen && audioOverlay) {
+            audioOverlay.classList.add('show');
+        }
     }
 
     /**
@@ -505,8 +539,15 @@ class ViewMoments extends HTMLElement {
             const pulsingBtns = this.querySelectorAll('.pulse-attention');
             pulsingBtns.forEach(btn => btn.classList.remove('pulse-attention'));
 
+            // Hide explicit modal overlay
+            const audioOverlay = this.querySelector('#audio-enable-overlay');
+            if (audioOverlay) audioOverlay.classList.remove('show');
+
             if (this.isModalOpen) {
                 this.modalAudioPlayer.play().catch(()=>{});
+                // Also trigger video if it exists
+                const vid = this.querySelector('#full-modal-content video');
+                if(vid) vid.play().catch(()=>{});
             } else {
                 this.audioPlayer.play().catch(()=>{});
             }
@@ -815,6 +856,24 @@ class ViewMoments extends HTMLElement {
                     border: 2px solid #fff !important;
                 }
 
+                /* Audio Overlay */
+                .tap-to-enable-audio {
+                    position: absolute; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+                    display: none; flex-direction: column; align-items: center; justify-content: center;
+                    color: white; font-weight: bold; pointer-events: none;
+                }
+                .tap-to-enable-audio.show { display: flex; }
+
+                /* Progress Bar */
+                .m-progress-container {
+                    position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: rgba(255,255,255,0.2); z-index: 100;
+                }
+                .m-progress-fill { height: 100%; background: #fff; width: 0%; transition: width 0.1s linear; }
+
+                /* Hide UI for long press */
+                .hide-ui-transition { transition: opacity 0.2s; }
+                .hide-ui { opacity: 0 !important; pointer-events: none; }
+
                 /* UI Buttons overlaying canvas */
                 .mute-btn { 
                     position: absolute; 
@@ -902,6 +961,7 @@ class ViewMoments extends HTMLElement {
                     justify-content: space-between; 
                     gap: 15px; 
                     border-bottom: 1px solid #1a1a1a; 
+                    position: relative;
                 }
                 
                 /* Advanced Action Buttons (Creator specific tools) */
@@ -942,6 +1002,15 @@ class ViewMoments extends HTMLElement {
                 .m-action-btn:active { 
                     transform: scale(0.95); 
                 }
+
+                /* Button Loaders */
+                .btn-spinner {
+                    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid #fff; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
+                }
+                .c-opt-btn { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); padding: 14px; border-radius: 12px; font-weight: 600; width: 100%; margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 15px; transition: 0.2s;}
+                .c-opt-btn.danger { color: #ff3b30; background: rgba(255,59,48,0.1); border-color: rgba(255,59,48,0.3); }
+                .c-opt-btn:active { transform: scale(0.98); }
+                .c-opt-btn:disabled { opacity: 0.6; pointer-events: none; }
 
                 /* Creator Statistics Dashboard */
                 .my-stats-box { 
@@ -1188,12 +1257,32 @@ class ViewMoments extends HTMLElement {
             <div class="loader-spinner" id="feed-loader"><span class="material-icons-round">refresh</span></div>
 
             <div class="m-full-modal" id="full-moment-modal">
-                <div class="m-full-header">
+                <div class="m-progress-container"><div class="m-progress-fill" id="modal-progress"></div></div>
+                <div class="m-full-header hide-ui-transition">
                     <span class="material-icons-round" onclick="document.querySelector('view-moments').closeFullModal()" style="cursor:pointer; font-size:28px;">arrow_back</span>
                     <span style="font-weight: 700; font-size: 16px;">Moment Info</span>
-                    <span style="width:28px;"></span> 
+                    <span class="material-icons-round" id="modal-more-btn" onclick="" style="cursor:pointer; font-size:24px; display:none;">more_vert</span>
                 </div>
-                <div id="full-modal-content" style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 40px;"></div>
+                <div id="full-modal-content" class="hide-ui-transition" style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 40px; position:relative;"></div>
+            </div>
+
+            <div class="c-overlay" id="options-sheet" onclick="if(event.target === this) document.querySelector('view-moments').closeOptions()">
+                <div class="c-sheet auto-height" onclick="event.stopPropagation()">
+                    <div class="c-header" onclick="document.querySelector('view-moments').closeOptions()">
+                        <div class="c-drag"></div><div class="c-title">More Options</div>
+                    </div>
+                    <div style="padding: 20px 15px;">
+                        <div style="text-align:center; color:#aaa; font-size:13px; margin-bottom: 20px; font-weight:600;" id="opt-expires-text">
+                            Moment expires in --
+                        </div>
+                        <button class="c-opt-btn" id="opt-unfollow-btn" onclick="document.querySelector('view-moments').actionUnfollow(this)">
+                            <span class="material-icons-round">person_remove</span> Unfollow
+                        </button>
+                        <button class="c-opt-btn danger" id="opt-block-btn" onclick="document.querySelector('view-moments').actionBlock(this)">
+                            <span class="material-icons-round">block</span> Block User
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="c-overlay" id="comment-sheet" onclick="if(event.target === this) document.querySelector('view-moments').closeComments()">
@@ -1287,7 +1376,7 @@ class ViewMoments extends HTMLElement {
                             ` : `<span class="m-username">@${moment.username}</span>`}
                         </div>
                     </div>
-                    <span class="material-icons-round" style="color:#fff; cursor:pointer;" onclick="document.querySelector('view-moments').nativeShare('${moment.id}')">share</span>
+                    <span class="material-icons-round" style="color:#fff; cursor:pointer;" onclick="document.querySelector('view-moments').openOptions('${moment.id}')">more_vert</span>
                 </div>
 
                 <div class="m-canvas" onclick="document.querySelector('view-moments').openFullModal('${moment.id}')">
@@ -1359,6 +1448,141 @@ class ViewMoments extends HTMLElement {
     }
 
     /**
+     * --- OPTIONS MENU & ACTIONS ---
+     */
+    openOptions(momentId) {
+        this.activeMomentId = momentId;
+        const moment = this.moments.find(m => m.id === momentId);
+        if(!moment) return;
+
+        const overlay = this.querySelector('#options-sheet');
+        const isMe = moment.uid === this.auth.currentUser?.uid;
+        
+        // Setup text dynamically
+        this.querySelector('#opt-expires-text').innerText = `Moment expires in ${this.getTimeLeft(moment.expiresAt)}`;
+        
+        // Hide unfollow/block for my own moments
+        const unfollowBtn = this.querySelector('#opt-unfollow-btn');
+        const blockBtn = this.querySelector('#opt-block-btn');
+        if(isMe) {
+            unfollowBtn.style.display = 'none';
+            blockBtn.style.display = 'none';
+        } else {
+            unfollowBtn.style.display = 'flex';
+            blockBtn.style.display = 'flex';
+        }
+
+        // Reset button states
+        unfollowBtn.disabled = false;
+        blockBtn.disabled = false;
+        unfollowBtn.innerHTML = `<span class="material-icons-round">person_remove</span> Unfollow`;
+        blockBtn.innerHTML = `<span class="material-icons-round">block</span> Block User`;
+
+        window.history.pushState({ modal: 'momentOptions' }, '');
+        this.toggleBodyScroll(true);
+        overlay.classList.add('open');
+    }
+
+    closeOptions(fromHistory = false) {
+        this.querySelector('#options-sheet').classList.remove('open');
+        
+        const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
+        if (!modalOpen) this.toggleBodyScroll(false);
+
+        if (!fromHistory && window.history.state?.modal === 'momentOptions') {
+            window.history.back();
+        }
+    }
+
+    async actionUnfollow(btnElement) {
+        if(!this.activeMomentId) return;
+        const moment = this.moments.find(m => m.id === this.activeMomentId);
+        if(!moment) return;
+        
+        const targetUid = moment.uid;
+        const myUid = this.auth.currentUser.uid;
+        
+        // Prevent multiple clicks
+        btnElement.disabled = true;
+        btnElement.innerHTML = `<div class="btn-spinner"></div> Unfollowing...`;
+
+        try {
+            const myRef = this.db.collection('users').doc(myUid);
+            const theirRef = this.db.collection('users').doc(targetUid);
+            
+            await this.db.runTransaction(async t => {
+                const myDoc = await t.get(myRef);
+                const theirDoc = await t.get(theirRef);
+                if(myDoc.exists && theirDoc.exists) {
+                    const myFollowing = (myDoc.data().following || []).filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const theirFollowers = (theirDoc.data().followers || []).filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
+                    t.update(myRef, { following: myFollowing, followingCount: firebase.firestore.FieldValue.increment(-1) });
+                    t.update(theirRef, { followers: theirFollowers, followerCount: firebase.firestore.FieldValue.increment(-1) });
+                }
+            });
+            
+            this.showToast("Unfollowed successfully");
+            this.closeOptions();
+            
+            // Remove target's moments from the feed locally
+            this.moments = this.moments.filter(m => m.uid !== targetUid);
+            this.renderFeed();
+            if(this.isModalOpen) this.closeFullModal();
+            
+        } catch(e) {
+            console.error(e);
+            this.showToast("Error unfollowing");
+            btnElement.disabled = false;
+            btnElement.innerHTML = `<span class="material-icons-round">person_remove</span> Unfollow`;
+        }
+    }
+
+    async actionBlock(btnElement) {
+        if(!this.activeMomentId) return;
+        const moment = this.moments.find(m => m.id === this.activeMomentId);
+        if(!moment) return;
+        
+        const targetUid = moment.uid;
+        const myUid = this.auth.currentUser.uid;
+        
+        btnElement.disabled = true;
+        btnElement.innerHTML = `<div class="btn-spinner" style="border-top-color:#ff3b30;"></div> Blocking...`;
+
+        try {
+            const myRef = this.db.collection('users').doc(myUid);
+            const theirRef = this.db.collection('users').doc(targetUid);
+            
+            await this.db.runTransaction(async t => {
+                const myDoc = await t.get(myRef);
+                const theirDoc = await t.get(theirRef);
+                if(myDoc.exists && theirDoc.exists) {
+                    const myFollowing = (myDoc.data().following || []).filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const myFollowers = (myDoc.data().followers || []).filter(i => (typeof i === 'string' ? i : i.uid) !== targetUid);
+                    const theirFollowing = (theirDoc.data().following || []).filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
+                    const theirFollowers = (theirDoc.data().followers || []).filter(i => (typeof i === 'string' ? i : i.uid) !== myUid);
+                    
+                    t.update(myRef, { blocked: firebase.firestore.FieldValue.arrayUnion(targetUid), following: myFollowing, followers: myFollowers });
+                    t.update(theirRef, { following: theirFollowing, followers: theirFollowers });
+                }
+            });
+            
+            this.showToast("User blocked");
+            this.closeOptions();
+            
+            this.moments = this.moments.filter(m => m.uid !== targetUid);
+            this.renderFeed();
+            if(this.isModalOpen) this.closeFullModal();
+            
+        } catch(e) {
+            console.error(e);
+            this.showToast("Error blocking user");
+            btnElement.disabled = false;
+            btnElement.innerHTML = `<span class="material-icons-round">block</span> Block User`;
+        }
+    }
+
+
+    /**
      * --- FULL SCREEN MODAL ENGINE ---
      * Opens the detailed view, calculates complex metrics, triggers views,
      * and handles media playback handoffs.
@@ -1386,6 +1610,7 @@ class ViewMoments extends HTMLElement {
         this.activeMomentId = momentId;
         const modal = this.querySelector('#full-moment-modal');
         const content = this.querySelector('#full-modal-content');
+        const moreBtn = this.querySelector('#modal-more-btn');
         
         // Push state for Android Back Button trapping ONLY if it's not already open
         if (!this.isModalOpen) {
@@ -1393,6 +1618,10 @@ class ViewMoments extends HTMLElement {
             this.toggleBodyScroll(true);
             modal.classList.add('open');
         }
+
+        // Setup Header Option Button
+        moreBtn.style.display = 'block';
+        moreBtn.setAttribute('onclick', `document.querySelector('view-moments').openOptions('${moment.id}')`);
 
         // 🚀 CRITICAL FIX: EXPLICITLY TRIGGER "VIEWED" EVENT IMMEDIATELY ON MODAL OPEN
         this.markAsSeen(momentId, moment);
@@ -1482,18 +1711,17 @@ class ViewMoments extends HTMLElement {
 
         // Inject Content
         content.innerHTML = `
-            <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" onclick="document.querySelector('view-moments').openFullModal('${moment.id}')">
+            <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
                  ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
                  ${mediaHtml}
                  <span class="material-icons-round double-tap-heart">favorite</span>
-                 ${moment.songPreview || moment.type === 'video' ? `
-                    <button class="mute-btn" onclick="event.stopPropagation(); document.querySelector('view-moments').toggleMute()">
-                        <span class="material-icons-round" style="font-size:18px;">${this.isMuted ? 'volume_off' : 'volume_up'}</span>
-                    </button>
-                ` : ''}
+                 
+                 <div class="tap-to-enable-audio" id="audio-enable-overlay">
+                    <span class="material-icons-round" style="font-size:48px; margin-bottom:10px;">volume_up</span>Tap to enable audio
+                 </div>
             </div>
             
-            <div style="padding: 20px;">
+            <div style="padding: 20px;" class="hide-ui-transition m-actions-container">
                 <div class="m-header" style="padding:0; cursor:pointer;" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${moment.username}'">
                     <img src="${moment.pfp}" class="m-pfp">
                     <div class="m-user-info">
@@ -1544,24 +1772,72 @@ class ViewMoments extends HTMLElement {
                         <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
                             <span class="material-icons-round">send</span>
                         </button>
-                        <button class="m-btn" onclick="document.querySelector('view-moments').nativeShare('${moment.id}')">
-                            <span class="material-icons-round">share</span>
-                        </button>
                     </div>
                 `}
             </div>
         `;
 
-        // If inner content is a video, strictly attach the autoplay block catch
+        // Wait a tick for DOM
         setTimeout(() => {
             const vid = content.querySelector('video');
-            if (vid && !this.isMuted) {
-                const vp = vid.play();
-                if (vp !== undefined) {
-                    vp.catch(() => this.handleAutoplayBlock());
+            const canvas = content.querySelector('.m-canvas');
+            const pFill = this.querySelector('#modal-progress');
+            const hBar = this.querySelector('.m-full-header');
+            const actionsBlock = content.querySelector('.m-actions-container');
+
+            // Handle Video Play & Progress Updates
+            const handleProgress = (e) => {
+                const media = e.target;
+                if(!media || !media.duration) return;
+                const pct = (media.currentTime / media.duration) * 100;
+                if(pFill) pFill.style.width = `${pct}%`;
+            };
+
+            if (vid) {
+                if (!this.isMuted) {
+                    const vp = vid.play();
+                    if (vp !== undefined) vp.catch(() => this.handleAutoplayBlock());
                 }
+                vid.addEventListener('timeupdate', handleProgress);
+            } else if (moment.songPreview) {
+                this.modalAudioPlayer.addEventListener('timeupdate', handleProgress);
             }
-        }, 100);
+
+            // Instagram Long Press / Tap logic
+            const startPress = (e) => {
+                this.pressTimer = setTimeout(() => {
+                    this.isPressing = true;
+                    if(vid) vid.pause();
+                    else this.modalAudioPlayer.pause();
+                    
+                    if(hBar) hBar.classList.add('hide-ui');
+                    if(actionsBlock) actionsBlock.classList.add('hide-ui');
+                }, 200); // 200ms delay to distinguish from quick tap
+            };
+
+            const endPress = (e) => {
+                clearTimeout(this.pressTimer);
+                if(this.isPressing) {
+                    this.isPressing = false;
+                    if(vid) vid.play().catch(()=>{});
+                    else this.modalAudioPlayer.play().catch(()=>{});
+                    
+                    if(hBar) hBar.classList.remove('hide-ui');
+                    if(actionsBlock) actionsBlock.classList.remove('hide-ui');
+                } else {
+                    // It was a quick tap. Toggle Audio state.
+                    this.toggleMute();
+                }
+            };
+
+            if(canvas) {
+                canvas.addEventListener('touchstart', startPress);
+                canvas.addEventListener('touchend', endPress);
+                canvas.addEventListener('mousedown', startPress);
+                canvas.addEventListener('mouseup', endPress);
+                canvas.addEventListener('mouseleave', endPress);
+            }
+        }, 50);
 
         // Suspend background feed video playback to save memory/processing
         const feedVideo = this.querySelector(`.m-card[data-id="${momentId}"] video`);
@@ -1577,6 +1853,10 @@ class ViewMoments extends HTMLElement {
         this.activeMomentId = null;
         this.toggleBodyScroll(false);
         
+        // Reset Progress Bar
+        const pFill = this.querySelector('#modal-progress');
+        if(pFill) pFill.style.width = '0%';
+
         if (!fromHistory && window.history.state?.modal === 'momentFull') {
             window.history.back();
         }
@@ -1642,7 +1922,8 @@ class ViewMoments extends HTMLElement {
         
         // Restore body scroll IF no other modals are still layered underneath
         const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
-        if (!modalOpen) this.toggleBodyScroll(false);
+        const optionsOpen = this.querySelector('#options-sheet').classList.contains('open');
+        if (!modalOpen && !optionsOpen) this.toggleBodyScroll(false);
 
         if (!fromHistory && window.history.state?.modal === 'momentReply') {
             window.history.back();
@@ -1754,7 +2035,8 @@ class ViewMoments extends HTMLElement {
         this.querySelector('#comment-sheet').classList.remove('open');
         
         const modalOpen = this.querySelector('#full-moment-modal').classList.contains('open');
-        if (!modalOpen) {
+        const optionsOpen = this.querySelector('#options-sheet').classList.contains('open');
+        if (!modalOpen && !optionsOpen) {
             this.activeMomentId = null;
             this.toggleBodyScroll(false);
         }
