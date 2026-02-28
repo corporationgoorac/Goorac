@@ -68,6 +68,9 @@ class ViewMoments extends HTMLElement {
         // Press interaction state for Instagram-style hold
         this.pressTimer = null;
         this.isPressing = false;
+
+        // Local Storage Cache for Likes to prevent flicker
+        this.localLikes = JSON.parse(localStorage.getItem('goorac_local_likes') || '[]');
     }
 
     /**
@@ -91,8 +94,10 @@ class ViewMoments extends HTMLElement {
                 // Clear cache immediately if a different user logs in
                 if (cachedUid !== user.uid) {
                     localStorage.removeItem('goorac_moments_cache');
+                    localStorage.removeItem('goorac_local_likes');
                     localStorage.setItem('goorac_moments_last_uid', user.uid);
                     this.moments = [];
+                    this.localLikes = [];
                     this.renderFeed(); // clear UI
                 }
 
@@ -110,6 +115,7 @@ class ViewMoments extends HTMLElement {
             } else {
                 // User logged out, clear sensitive cache
                 localStorage.removeItem('goorac_moments_cache');
+                localStorage.removeItem('goorac_local_likes');
                 localStorage.removeItem('goorac_moments_last_uid');
                 this.currentUserData = null;
             }
@@ -593,6 +599,11 @@ class ViewMoments extends HTMLElement {
                 if (viewsStatNode) {
                     viewsStatNode.innerText = moment.viewers.length;
                 }
+                
+                const viewsStatNodeBasic = this.querySelector('.live-views-count-basic');
+                if (viewsStatNodeBasic) {
+                    viewsStatNodeBasic.innerText = moment.viewers.length;
+                }
             }
             
             // 3. Database Sync
@@ -646,18 +657,27 @@ class ViewMoments extends HTMLElement {
         // Micro-interaction Haptic
         if(navigator.vibrate) navigator.vibrate(10);
 
-        const isLiked = moment.likes && moment.likes.includes(myUid);
+        // Updated check: Utilize both DB state and local cached state to prevent flicker
+        const isLiked = (moment.likes && moment.likes.includes(myUid)) || this.localLikes.includes(momentId);
         const ref = this.db.collection('moments').doc(momentId);
 
         if (isLiked) {
             // Unlike Sequence
-            moment.likes = moment.likes.filter(id => id !== myUid);
+            if (moment.likes) moment.likes = moment.likes.filter(id => id !== myUid);
+            
+            // Local Storage Sequence Update
+            this.localLikes = this.localLikes.filter(id => id !== momentId);
+            localStorage.setItem('goorac_local_likes', JSON.stringify(this.localLikes));
+
             this.renderFeed(); // Re-render feed card icons
             
             // Re-render modal stats dynamically if open
             if (this.isModalOpen && this.activeMomentId === momentId) {
                 const likesStatNode = this.querySelector('.live-likes-count');
-                if (likesStatNode) likesStatNode.innerText = moment.likes.length;
+                if (likesStatNode && moment.likes) likesStatNode.innerText = moment.likes.length;
+                
+                const likesStatNodeBasic = this.querySelector('.live-likes-count-basic');
+                if (likesStatNodeBasic && moment.likes) likesStatNodeBasic.innerText = moment.likes.length;
             }
             
             await ref.update({ likes: firebase.firestore.FieldValue.arrayRemove(myUid) }).catch(e=>console.warn(e));
@@ -665,11 +685,19 @@ class ViewMoments extends HTMLElement {
             // Like Sequence
             if(!moment.likes) moment.likes = [];
             moment.likes.push(myUid);
+            
+            // Local Storage Sequence Update
+            if (!this.localLikes.includes(momentId)) this.localLikes.push(momentId);
+            localStorage.setItem('goorac_local_likes', JSON.stringify(this.localLikes));
+
             this.renderFeed(); 
             
             if (this.isModalOpen && this.activeMomentId === momentId) {
                 const likesStatNode = this.querySelector('.live-likes-count');
                 if (likesStatNode) likesStatNode.innerText = moment.likes.length;
+                
+                const likesStatNodeBasic = this.querySelector('.live-likes-count-basic');
+                if (likesStatNodeBasic) likesStatNodeBasic.innerText = moment.likes.length;
             }
             
             await ref.update({ likes: firebase.firestore.FieldValue.arrayUnion(myUid) }).catch(e=>console.warn(e));
@@ -1340,7 +1368,8 @@ class ViewMoments extends HTMLElement {
         const myUid = this.auth.currentUser?.uid;
 
         this.moments.forEach(moment => {
-            const isLiked = moment.likes && moment.likes.includes(myUid);
+            // Enhanced with local cached likes list to prevent flicker
+            const isLiked = (moment.likes && moment.likes.includes(myUid)) || (this.localLikes && this.localLikes.includes(moment.id));
             const timeAgo = this.getRelativeTime(moment.createdAt);
             const card = document.createElement('div');
             
@@ -1645,9 +1674,9 @@ class ViewMoments extends HTMLElement {
             }
         }
 
-        // Setup Meta View Data
+        // Setup Meta View Data - using cache state fallback for optimistic rendering
         const isMe = moment.uid === this.auth.currentUser.uid;
-        const isLiked = moment.likes && moment.likes.includes(this.auth.currentUser.uid);
+        const isLiked = (moment.likes && moment.likes.includes(this.auth.currentUser.uid)) || (this.localLikes && this.localLikes.includes(momentId));
         const viewsCount = moment.viewers ? moment.viewers.length : 0;
         const likesCount = moment.likes ? moment.likes.length : 0;
 
@@ -1783,10 +1812,13 @@ class ViewMoments extends HTMLElement {
                     <h3 style="font-size: 14px; margin: 15px 0 5px; border-bottom: 1px solid #222; padding-bottom: 10px;">Activity Viewers</h3>
                     ${viewersHtml}
                 ` : `
-                    <div class="m-actions" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); justify-content: space-around;">
-                        <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="const vm = document.querySelector('view-moments'); vm.toggleLike('${moment.id}'); const icon = this.querySelector('span'); if(this.classList.contains('liked')){this.classList.remove('liked');icon.innerText='favorite_border';}else{this.classList.add('liked');icon.innerText='favorite';}">
-                            <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
-                        </button>
+                    <div class="m-actions" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); justify-content: space-around; align-items: center;">
+                        <div style="display:flex; align-items:center; gap: 8px;">
+                            <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="const vm = document.querySelector('view-moments'); vm.toggleLike('${moment.id}'); const icon = this.querySelector('span.material-icons-round'); if(this.classList.contains('liked')){this.classList.remove('liked');icon.innerText='favorite_border';}else{this.classList.add('liked');icon.innerText='favorite';}">
+                                <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
+                            </button>
+                            <span class="live-likes-count-basic" style="font-weight:600; font-size:14px; color:#fff;">${likesCount}</span>
+                        </div>
                         ${moment.allowComments !== false ? `
                         <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
                             <span class="material-icons-round">chat_bubble_outline</span>
@@ -1795,6 +1827,10 @@ class ViewMoments extends HTMLElement {
                         <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
                             <span class="material-icons-round">send</span>
                         </button>
+                        <div style="display:flex; align-items:center; gap: 5px; color:#888; font-size:13px; font-weight:600;">
+                            <span class="material-icons-round" style="font-size:18px;">visibility</span>
+                            <span class="live-views-count-basic">${viewsCount}</span>
+                        </div>
                     </div>
                 `}
             </div>
