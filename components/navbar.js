@@ -8,6 +8,7 @@
  * - Mobile safe-area support for modern smartphones (notch/home indicator)
  * - Dynamic active states and high-fidelity micro-animations
  * - MutationObserver to automatically hide during active calls
+ * - Real-time Unread Messages Badge (Firebase + Local Cache optimized)
  */
 class MainNavbar extends HTMLElement {
     
@@ -38,6 +39,9 @@ class MainNavbar extends HTMLElement {
         
         // Initialize the logic to hide the nav when calls are active
         this._setupVisibilityToggle();
+
+        // Initialize the unread message listener
+        this._initUnreadListener();
     }
 
     /**
@@ -182,6 +186,46 @@ class MainNavbar extends HTMLElement {
             }
 
             /* ==========================================================================
+               UNREAD BADGE STYLING (Professional look)
+               ========================================================================== */
+            .icon-wrapper {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .unread-badge {
+                position: absolute;
+                top: -2px;
+                right: -6px;
+                background-color: #FF3B30; /* Professional iOS Red */
+                color: #FFFFFF;
+                font-size: 10px;
+                font-weight: 700;
+                min-width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 4px;
+                box-sizing: border-box;
+                border: 2px solid var(--nav-bg); /* Punches out the background naturally */
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                opacity: 0;
+                transform: scale(0);
+                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease, border-color 0.4s ease;
+                pointer-events: none; /* Let clicks pass through to the nav item */
+                z-index: 2;
+            }
+
+            .unread-badge.show {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            /* ==========================================================================
                PULSE ICON ENHANCEMENTS
                ========================================================================== */
             .pulse-icon-container {
@@ -241,7 +285,10 @@ class MainNavbar extends HTMLElement {
                 <span>Home</span>
             </a>
             <a href="messages.html" class="nav-item" aria-label="Messages">
-                <span class="material-icons-round">chat_bubble_outline</span>
+                <div class="icon-wrapper">
+                    <span class="material-icons-round">chat_bubble_outline</span>
+                    <div class="unread-badge" id="chat-badge"></div>
+                </div>
                 <span>Chats</span>
             </a>
             <a href="add-contact.html" class="nav-item" aria-label="Add Contact">
@@ -274,6 +321,7 @@ class MainNavbar extends HTMLElement {
             const href = link.getAttribute('href');
             if (page === href) {
                 link.classList.add('active');
+                // The icon lookup has been updated to search within the wrapper properly
                 const icon = link.querySelector('.material-icons-round');
                 if (icon && icon.innerText === 'chat_bubble_outline') {
                     icon.innerText = 'chat_bubble';
@@ -313,6 +361,72 @@ class MainNavbar extends HTMLElement {
             }
             checkVisibility();
         }, 1000);
+    }
+
+    /**
+     * Listens for unread messages and updates the badge.
+     * Uses localStorage cache to prevent visual delays before Firebase loads.
+     */
+    _initUnreadListener() {
+        // 1. Instantly display cached count to prevent layout popping while DB loads
+        const cachedCount = localStorage.getItem('goorac_unread_chat_count');
+        if (cachedCount) {
+            this._updateBadgeUI(parseInt(cachedCount, 10));
+        }
+
+        // 2. Safely check if Firebase exists (loaded via external config.js)
+        if (typeof firebase === 'undefined') return;
+
+        // 3. Attach real-time listener once user state is confirmed
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                const db = firebase.firestore();
+                
+                // Optimized query: Only fetches chats where the user is a participant.
+                // Standard Firebase pricing limits read costs since this is a single, narrow listener.
+                this._unsubscribeChats = db.collection('chats')
+                    .where('participants', 'array-contains', user.uid)
+                    .onSnapshot(snapshot => {
+                        let unreadChats = 0;
+                        
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            // Check if the current user has unread messages in this specific chat document
+                            if (data.unreadCount && data.unreadCount[user.uid] > 0) {
+                                unreadChats++;
+                            }
+                        });
+                        
+                        // Update cache and UI
+                        localStorage.setItem('goorac_unread_chat_count', unreadChats.toString());
+                        this._updateBadgeUI(unreadChats);
+                        
+                    }, error => {
+                        console.error("Navbar Unread Listener Error:", error);
+                    });
+            } else {
+                // Clear state if logged out
+                this._updateBadgeUI(0);
+                localStorage.removeItem('goorac_unread_chat_count');
+                if (this._unsubscribeChats) this._unsubscribeChats();
+            }
+        });
+    }
+
+    /**
+     * Updates the physical DOM element for the badge.
+     */
+    _updateBadgeUI(count) {
+        const badge = this.querySelector('#chat-badge');
+        if (!badge) return;
+
+        if (count > 0) {
+            // Cap the visual number at 99+ for a clean UI
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.classList.add('show');
+        } else {
+            badge.classList.remove('show');
+        }
     }
 }
 
