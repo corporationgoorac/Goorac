@@ -438,6 +438,11 @@ class ViewMoments extends HTMLElement {
                 } else {
                     // Clear timer if user scrolls past too quickly
                     clearTimeout(this.seenTimers[momentId]);
+
+                    // Stop audio if the moment passing out of view was the one playing
+                    if (moment && moment.songPreview && this.audioPlayer.src.includes(moment.songPreview)) {
+                        this.audioPlayer.pause();
+                    }
                 }
             });
         }, options);
@@ -854,6 +859,8 @@ class ViewMoments extends HTMLElement {
                 }
                 .m-btn .material-icons-round { 
                     font-size: 28px; 
+                    font-weight: 300;
+                    -webkit-font-smoothing: antialiased;
                 }
                 .liked { 
                     color: #ff3b30 !important; 
@@ -1265,9 +1272,9 @@ class ViewMoments extends HTMLElement {
 
             card.innerHTML = `
                 <div class="m-header">
-                    <img src="${moment.pfp}" class="m-pfp">
+                    <img src="${moment.pfp}" class="m-pfp" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${moment.username}'">
                     <div class="m-user-info">
-                        <div class="m-name-row">
+                        <div class="m-name-row" style="cursor:pointer;" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${moment.username}'">
                             ${moment.displayName} 
                             ${moment.verified ? '<span class="material-icons-round m-verified">verified</span>' : ''}
                             <span class="m-timestamp">• ${timeAgo}</span>
@@ -1360,13 +1367,18 @@ class ViewMoments extends HTMLElement {
     async openFullModal(momentId) {
         // 🚀 DOUBLE TAP DETECTOR LOGIC
         const now = Date.now();
-        if (this.lastClickTime && (now - this.lastClickTime) < 300 && this.activeMomentId === momentId) {
+        if (this.lastClickTime && (now - this.lastClickTime) < 300) {
             this.toggleLike(momentId);
-            this.showHeartAnimation(momentId, true);
+            this.showHeartAnimation(momentId, this.isModalOpen);
             this.lastClickTime = 0; 
             return;
         }
         this.lastClickTime = now;
+
+        // Prevent pushing history state multiple times if the user single-taps the already open modal
+        if (this.isModalOpen && this.activeMomentId === momentId) {
+            return;
+        }
 
         const moment = this.moments.find(m => m.id === momentId);
         if (!moment) return;
@@ -1375,10 +1387,12 @@ class ViewMoments extends HTMLElement {
         const modal = this.querySelector('#full-moment-modal');
         const content = this.querySelector('#full-modal-content');
         
-        // Push state for Android Back Button trapping
-        window.history.pushState({ modal: 'momentFull' }, '');
-        this.toggleBodyScroll(true);
-        modal.classList.add('open');
+        // Push state for Android Back Button trapping ONLY if it's not already open
+        if (!this.isModalOpen) {
+            window.history.pushState({ modal: 'momentFull' }, '');
+            this.toggleBodyScroll(true);
+            modal.classList.add('open');
+        }
 
         // 🚀 CRITICAL FIX: EXPLICITLY TRIGGER "VIEWED" EVENT IMMEDIATELY ON MODAL OPEN
         this.markAsSeen(momentId, moment);
@@ -1480,7 +1494,7 @@ class ViewMoments extends HTMLElement {
             </div>
             
             <div style="padding: 20px;">
-                <div class="m-header" style="padding:0;">
+                <div class="m-header" style="padding:0; cursor:pointer;" onclick="event.stopPropagation(); window.location.href='userProfile.html?user=${moment.username}'">
                     <img src="${moment.pfp}" class="m-pfp">
                     <div class="m-user-info">
                         <div class="m-name-row">
