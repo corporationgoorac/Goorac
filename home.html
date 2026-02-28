@@ -99,12 +99,23 @@
         }
 
         /* --- NEW MESSAGES ICON STYLES --- */
+        #header-msg-btn {
+            display: none; /* Hidden by default if no messages */
+        }
+        #header-msg-btn.show-msg-btn {
+            display: flex;
+            animation: popInBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes popInBounce {
+            0% { opacity: 0; transform: scale(0.5) translateY(-10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
         .msg-btn {
             position: relative; 
             cursor: pointer;
             width: 32px; 
             height: 32px;
-            display: flex; 
             align-items: center; 
             justify-content: center;
             transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -506,7 +517,6 @@
         .moments-fab .material-icons-round { 
             color: var(--accent); 
             font-size: 30px; 
-            /* Fixes glitching fallback text flash */
             font-family: 'Material Icons Round', sans-serif;
             font-feature-settings: 'liga';
             display: inline-block;
@@ -542,32 +552,55 @@
         }
 
         /* ==========================================================================
-           FULL-SCREEN GREETING OVERLAY ANIMATIONS
+           FULL-SCREEN GREETING OVERLAY ANIMATIONS (PREMIUM CINEMATIC UI)
            ========================================================================== */
         .greeting-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             z-index: 100000; display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             opacity: 0; pointer-events: none; transition: opacity 0.8s ease;
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            overflow: hidden;
         }
         .greeting-overlay.active { opacity: 1; pointer-events: all; }
-        .greeting-content { 
-            z-index: 2; text-align: center; transform: translateY(30px) scale(0.9); 
-            transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            padding: 0 20px;
-        }
-        .greeting-overlay.active .greeting-content { transform: translateY(0) scale(1); }
         
+        .g-beam {
+            position: absolute; width: 200%; height: 100px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: rotate(-45deg) translateY(-100vh);
+            animation: beamSweep 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes beamSweep {
+            0% { transform: rotate(-45deg) translateY(-100vh) translateX(-50vw); }
+            100% { transform: rotate(-45deg) translateY(100vh) translateX(50vw); }
+        }
+
+        .greeting-content { 
+            z-index: 2; text-align: center; 
+            padding: 40px 30px; border-radius: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateY(50px) scale(0.9); 
+            opacity: 0;
+            transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s; 
+        }
+        .greeting-overlay.active .greeting-content { transform: translateY(0) scale(1); opacity: 1; }
+        
+        .greeting-pretext {
+            font-size: 0.75rem; color: rgba(255,255,255,0.7); font-weight: 800;
+            letter-spacing: 4px; margin-bottom: 10px; text-transform: uppercase;
+        }
         .greeting-name { 
-            font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-            margin-bottom: 15px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); 
+            font-size: 1.5rem; font-weight: 900; letter-spacing: 1px; text-transform: capitalize;
+            margin-bottom: 20px; color: #fff; text-shadow: 0 4px 15px rgba(0,0,0,0.3); 
         }
         .greeting-text { 
-            font-size: 3.5rem; font-weight: 900; line-height: 1.1;
-            background: linear-gradient(to right, #ffffff, rgba(255,255,255,0.7)); 
+            font-size: 4rem; font-weight: 900; line-height: 1.1;
+            background: linear-gradient(to bottom right, #ffffff 20%, rgba(255,255,255,0.5) 100%); 
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
-            filter: drop-shadow(0 4px 15px rgba(0,0,0,0.4));
+            filter: drop-shadow(0 8px 20px rgba(0,0,0,0.4));
         }
         
         .theme-morning { background: linear-gradient(135deg, rgba(255,154,158,0.9) 0%, rgba(254,207,239,0.9) 100%); color: #fff; }
@@ -588,6 +621,14 @@
         .theme-evening .g-fx-obj { background: #ff5722; box-shadow: 0 0 100px #ff5722; top: auto; bottom: 5%; right: 10%; filter: blur(20px); }
         .theme-night .g-fx-obj { background: #e0e0e0; box-shadow: 0 0 60px #fff; width: 100px; height: 100px; filter: blur(10px); right: 20%; top: 15%; animation: floatMoon 6s ease-in-out infinite alternate;}
         @keyframes floatMoon { from { transform: translateY(0) scale(1); } to { transform: translateY(15px) scale(1.1); } }
+
+        /* ==========================================================================
+           FOUT ICON TEXT FLASH FIX (Pure CSS logic)
+           ========================================================================== */
+        .material-icons-round { color: transparent !important; text-shadow: none !important; }
+        body.fonts-ready .material-icons-round { color: inherit !important; }
+        body.fonts-ready .msg-icon { color: #fff !important; }
+        body.fonts-ready .moments-fab .material-icons-round { color: var(--accent) !important; }
     </style>
 
     <script>
@@ -604,18 +645,26 @@
             document.write('<style>#dashboard-content { display: none !important; }</style>');
         }
 
-        // 🚀 INSTANT MSG BADGE LOAD FIX
+        // 🚀 INSTANT MSG BADGE LOAD FIX: Only show if messages > 0
         if (preloadedData && preloadedData.msgState && preloadedData.msgState.unreadTotal && preloadedData.msgState.unreadTotal > 0) {
-            document.write('<style>#header-msg-count { opacity: 1 !important; transform: scale(1) !important; }</style>');
+            document.write('<style>#header-msg-btn { display: flex !important; } #header-msg-count { opacity: 1 !important; transform: scale(1) !important; }</style>');
         }
     </script>
 </head>
 
 <body oncontextmenu="return false;"> 
 
+<script>
+    document.fonts.ready.then(() => {
+        document.body.classList.add('fonts-ready');
+    });
+</script>
+
 <div id="greeting-overlay" class="greeting-overlay">
+    <div class="g-beam"></div>
     <div class="g-fx-obj"></div>
     <div class="greeting-content">
+        <div class="greeting-pretext">New Message From</div>
         <div id="greeting-name" class="greeting-name"></div>
         <div id="greeting-text" class="greeting-text"></div>
     </div>
@@ -731,15 +780,17 @@
             // FAST LOAD BADGE VALUE RESTORE
             if (preloadedData.msgState && preloadedData.msgState.unreadTotal && preloadedData.msgState.unreadTotal > 0) {
                 const badge = document.getElementById('header-msg-count');
-                if(badge) {
+                const btn = document.getElementById('header-msg-btn');
+                if(badge && btn) {
                     badge.innerText = preloadedData.msgState.unreadTotal;
                     badge.classList.add('visible');
+                    btn.classList.add('show-msg-btn');
                 }
             }
         });
     }
 
-    // FULL SCREEN GREETING ANIMATION LOGIC
+    // FULL SCREEN GREETING ANIMATION LOGIC (Upgraded Cinematic)
     window.checkGreeting = function(text, sender, msgId) {
         if (!text) return;
         const playedKey = 'played_greeting_' + msgId;
@@ -761,7 +812,7 @@
             const textEl = document.getElementById('greeting-text');
             
             overlay.className = 'greeting-overlay theme-' + theme;
-            nameEl.innerText = `${sender} wished you`;
+            nameEl.innerText = `${sender}`;
             textEl.innerText = displayTxt;
             
             void overlay.offsetWidth; // Force CSS reflow
@@ -1008,13 +1059,16 @@
                 }
                 
                 // --- NEW HEADER MESSAGE BADGE UPDATE ---
+                const headerMsgBtn = document.getElementById('header-msg-btn');
                 const headerMsgBadge = document.getElementById('header-msg-count');
-                if (headerMsgBadge) {
+                if (headerMsgBadge && headerMsgBtn) {
                     if (unreadTotal > 0) {
                         headerMsgBadge.innerText = unreadTotal > 99 ? '99+' : unreadTotal;
                         headerMsgBadge.classList.add('visible');
+                        headerMsgBtn.classList.add('show-msg-btn');
                     } else {
                         headerMsgBadge.classList.remove('visible');
+                        headerMsgBtn.classList.remove('show-msg-btn');
                     }
                 }
 
