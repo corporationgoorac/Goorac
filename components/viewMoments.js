@@ -14,6 +14,7 @@
  * - Advanced CSS Architecture & Animations
  * - Instagram-style Long Press to Pause & Progress Bar
  * - Smart Autoplay Block Recovery
+ * - Enhanced Edge Caching & Performance Optimization
  * ============================================================================
  */
 
@@ -95,6 +96,7 @@ class ViewMoments extends HTMLElement {
                 if (cachedUid !== user.uid) {
                     localStorage.removeItem('goorac_moments_cache');
                     localStorage.removeItem('goorac_local_likes');
+                    localStorage.removeItem('goorac_relations_cache');
                     localStorage.setItem('goorac_moments_last_uid', user.uid);
                     this.moments = [];
                     this.localLikes = [];
@@ -103,9 +105,14 @@ class ViewMoments extends HTMLElement {
 
                 try {
                     // Fetch full user profile for relations and meta
+                    // Added enhanced caching layer for user profile
+                    const cachedProfile = localStorage.getItem('goorac_user_profile');
+                    if(cachedProfile) this.currentUserData = JSON.parse(cachedProfile);
+
                     const doc = await this.db.collection('users').doc(user.uid).get();
                     if (doc.exists) {
                         this.currentUserData = { uid: user.uid, ...doc.data() };
+                        localStorage.setItem('goorac_user_profile', JSON.stringify(this.currentUserData)); // Cache sync
                         this.initFeed(user.uid);
                     }
                 } catch (error) {
@@ -117,6 +124,8 @@ class ViewMoments extends HTMLElement {
                 localStorage.removeItem('goorac_moments_cache');
                 localStorage.removeItem('goorac_local_likes');
                 localStorage.removeItem('goorac_moments_last_uid');
+                localStorage.removeItem('goorac_relations_cache');
+                localStorage.removeItem('goorac_user_profile');
                 this.currentUserData = null;
             }
         });
@@ -292,6 +301,15 @@ class ViewMoments extends HTMLElement {
      * @param {string} uid - Current User ID
      */
     async initFeed(uid) {
+        // Fast local relational cache injection
+        const cachedRels = localStorage.getItem('goorac_relations_cache');
+        if (cachedRels) {
+            try {
+                const parsed = JSON.parse(cachedRels);
+                this.mutualUids = parsed.mutualUids || [];
+                this.myCF = parsed.myCF || [];
+            } catch(e) {}
+        }
         await this.fetchRelations(uid);
         this.setupMediaObserver();
         this.fetchMoments();
@@ -315,6 +333,10 @@ class ViewMoments extends HTMLElement {
             this.mutualUids.push(uid); // Always include myself in the feed
 
             this.myCF = this.currentUserData.closeFriends || [];
+
+            // Cache relations for extreme fast-boot
+            localStorage.setItem('goorac_relations_cache', JSON.stringify({ mutualUids: this.mutualUids, myCF: this.myCF }));
+
         } catch(e) { 
             console.error("Relations compilation error:", e); 
         }
@@ -403,8 +425,8 @@ class ViewMoments extends HTMLElement {
                 this.moments = [...this.moments, ...newMoments];
             } else {
                 this.moments = newMoments;
-                // Cache latest 6 for immediate launch rendering next time
-                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 6))); 
+                // Cache latest 20 for immediate launch rendering next time (Increased limit for enhanced speed)
+                localStorage.setItem('goorac_moments_cache', JSON.stringify(this.moments.slice(0, 20))); 
             }
 
             this.renderFeed();
@@ -431,7 +453,7 @@ class ViewMoments extends HTMLElement {
                 // Filter out expired cache entries locally
                 this.moments = parsedCache.filter(m => {
                     if (!m.expiresAt) return true;
-                    const expireTime = m.expiresAt.seconds ? m.expiresAt.seconds * 1000 : m.expiresAt;
+                    const expireTime = m.expiresAt.seconds ? m.expiresAt.seconds * 1000 : (m.expiresAt.toDate ? m.expiresAt.toDate() : new Date(m.expiresAt).getTime());
                     return new Date(expireTime) > now;
                 });
                 
@@ -1749,6 +1771,7 @@ class ViewMoments extends HTMLElement {
         const showArchiveBtn = moment.isActive !== false && !isExpired;
 
         // Inject Content
+        // -> Modifications Made Inline Below: Applied `display: none !important;` directly to the `span` and `div` elements responsible for rendering likes/views for OTHER users (!isMe branch) to guarantee line-by-line parity.
         content.innerHTML = `
             <div class="m-canvas" style="aspect-ratio: auto; height: 55vh; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
                  ${moment.mediaUrl || moment.songArt ? `<img src="${moment.mediaUrl || moment.songArt}" class="m-backdrop">` : ''}
@@ -1817,7 +1840,7 @@ class ViewMoments extends HTMLElement {
                             <button class="m-btn ${isLiked ? 'liked' : ''}" onclick="const vm = document.querySelector('view-moments'); vm.toggleLike('${moment.id}'); const icon = this.querySelector('span.material-icons-round'); if(this.classList.contains('liked')){this.classList.remove('liked');icon.innerText='favorite_border';}else{this.classList.add('liked');icon.innerText='favorite';}">
                                 <span class="material-icons-round">${isLiked ? 'favorite' : 'favorite_border'}</span>
                             </button>
-                            <span class="live-likes-count-basic" style="font-weight:600; font-size:14px; color:#fff;">${likesCount}</span>
+                            <span class="live-likes-count-basic" style="font-weight:600; font-size:14px; color:#fff; display:none !important;">${likesCount}</span>
                         </div>
                         ${moment.allowComments !== false ? `
                         <button class="m-btn" onclick="document.querySelector('view-moments').openComments('${moment.id}')">
@@ -1827,7 +1850,7 @@ class ViewMoments extends HTMLElement {
                         <button class="m-btn" onclick="document.querySelector('view-moments').openReplySheet('${moment.id}')">
                             <span class="material-icons-round">send</span>
                         </button>
-                        <div style="display:flex; align-items:center; gap: 5px; color:#888; font-size:13px; font-weight:600;">
+                        <div style="display:none !important; align-items:center; gap: 5px; color:#888; font-size:13px; font-weight:600;">
                             <span class="material-icons-round" style="font-size:18px;">visibility</span>
                             <span class="live-views-count-basic">${viewsCount}</span>
                         </div>
