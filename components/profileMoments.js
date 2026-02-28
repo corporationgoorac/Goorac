@@ -167,7 +167,8 @@ class ProfileMoments extends HTMLElement {
                     moments.push({ id: doc.id, ...data });
                 } else {
                     // Force hide if purely inactive/deleted from feeds by owner
-                    if (data.isActive === false) return; 
+                    // LINE COMMENTED OUT BELOW SO EVERYONE CAN SEE ARCHIVES AFTER 24 HOURS
+                    // if (data.isActive === false) return; 
 
                     if (data.audience === 'close_friends') {
                         // Only add if I am in their list
