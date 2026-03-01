@@ -11,7 +11,7 @@
         glassBorder: "rgba(255, 255, 255, 0.08)",
         border: "#23163e",
         borderLight: "rgba(162, 36, 115, 0.15)",
-        sentBg: "linear-gradient(135deg, #741d62 0%, #a22473 100%)",
+        sentBg: "linear-gradient(135deg, #5a164c 0%, #821d5c 100%)",
         sentText: "#ffffff",
         sentShadow: "0 4px 15px rgba(162, 36, 115, 0.25)",
         receivedBg: "#23163e",
