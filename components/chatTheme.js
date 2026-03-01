@@ -1,28 +1,28 @@
 // components/chatTheme.js
 (function() {
     window.chatTheme = {
-        bg: "#100a1c",
-        bgGradient: "radial-gradient(circle at 50% 30%, #1c1032 0%, #100a1c 70%)",
-        headerBg: "#100a1c",
+        bg: "#090909",
+        bgGradient: "radial-gradient(circle at 50% 30%, #141312 0%, #090909 70%)",
+        headerBg: "#11100F",
         headerBlur: "blur(25px)",
-        accent: "#a22473",
-        accentDark: "#741d62",
-        accentDim: "rgba(162, 36, 115, 0.2)",
-        glassBorder: "rgba(255, 255, 255, 0.08)",
-        border: "#23163e",
-        borderLight: "rgba(162, 36, 115, 0.15)",
-        sentBg: "linear-gradient(135deg, #5a164c 0%, #821d5c 100%)",
-        sentText: "#ffffff",
-        sentShadow: "0 4px 15px rgba(162, 36, 115, 0.25)",
-        receivedBg: "#23163e",
-        receivedText: "#ffffff",
-        receivedShadow: "0 2px 5px rgba(0,0,0,0.3)",
-        text: "#ffffff",
-        textSecondary: "#B4A5C9",
-        textMuted: "#6D5B87",
-        mobileToolbarBg: "#100a1c",
+        accent: "#4A4641",
+        accentDark: "#2D2A27",
+        accentDim: "rgba(74, 70, 65, 0.2)",
+        glassBorder: "rgba(255, 255, 255, 0.05)",
+        border: "#1C1A18",
+        borderLight: "rgba(255, 255, 255, 0.06)",
+        sentBg: "linear-gradient(135deg, #33302C 0%, #4A4641 100%)",
+        sentText: "#EBE9E5",
+        sentShadow: "0 4px 15px rgba(0, 0, 0, 0.3)",
+        receivedBg: "#1A1817",
+        receivedText: "#E0DEDC",
+        receivedShadow: "0 2px 5px rgba(0,0,0,0.4)",
+        text: "#EBE9E5",
+        textSecondary: "#9B9793",
+        textMuted: "#666360",
+        mobileToolbarBg: "#11100F",
         // SOLID HEX for Android Status Bar to remove the top border line
-        statusBarColor: "#100a1c"
+        statusBarColor: "#11100F"
     };
 
     // Apply the theme directly to the root CSS variables
