@@ -2034,7 +2034,7 @@ class ViewMoments extends HTMLElement {
         const modal = this.querySelector('#full-moment-modal');
         modal.classList.remove('open');
 
-        // STOP VIDEO PLAYBACK IN MODAL (Audio Bleeding Fix)
+        // 1. STOP VIDEO PLAYBACK IN MODAL (Audio Bleeding Fix)
         const modalContent = this.querySelector('#full-modal-content');
         if (modalContent) {
             const modalVideo = modalContent.querySelector('video');
@@ -2045,24 +2045,14 @@ class ViewMoments extends HTMLElement {
             }
         }
 
-        // RESUME FEED VIDEO IF APPLICABLE
-        if (this.activeMomentId) {
-            const feedVideo = this.querySelector(`.m-card[data-id="${this.activeMomentId}"] video`);
-            const moment = this.moments.find(m => m.id === this.activeMomentId);
-            if (feedVideo) {
-                // FIX: Safely resume feed video audio if unmuted! 
-                feedVideo.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
-                feedVideo.play().catch(()=>{});
-            }
-            // FIX: Safely resume the music if the returning moment is a song preview!
-            if (moment && moment.songPreview && !this.isMuted) {
-                this.playMomentMusic(moment.songPreview);
-            } else {
-                this.audioPlayer.pause();
-                this.audioPlayer.src = ''; // Clear source to eliminate next-moment bug
-            }
-        }
+        // 2. Revert Audio Context back to Background Feed IMMEDIATELY
+        this.isModalOpen = false;
+        this.modalAudioPlayer.pause();
+        this.modalAudioPlayer.src = '';
+        this.audioPlayer.pause(); // Ensure global feed player is also paused before resync
+        this.audioPlayer.src = '';
 
+        // 3. Clean up modal states
         this.activeMomentId = null;
         this.toggleBodyScroll(false);
         
@@ -2074,12 +2064,47 @@ class ViewMoments extends HTMLElement {
             window.history.back();
         }
 
-        // Revert Audio Context back to Background Feed
-        this.isModalOpen = false;
-        this.modalAudioPlayer.pause();
-        this.modalAudioPlayer.src = '';
-        
-        // FIX: Removed the unconditional broad audioPlayer resume that caused the "next moment playing" bug
+        // 4. RESUME CORRECT FEED MEDIA (Scan for the most visible element on screen)
+        const cards = this.querySelectorAll('.m-card');
+        let mostVisibleCard = null;
+        let maxIntersection = 0;
+
+        cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+            // Calculate how much of the card is visible in the viewport
+            const visibleTop = Math.max(0, rect.top);
+            const visibleBottom = Math.min(windowHeight, rect.bottom);
+            const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+            
+            // Only consider it if a decent portion is visible on the screen
+            if (visibleHeight > maxIntersection && visibleHeight > windowHeight * 0.3) {
+                maxIntersection = visibleHeight;
+                mostVisibleCard = card;
+            }
+            
+            // Explicitly pause all videos in the feed just to ensure no background bleed
+            const vid = card.querySelector('video.m-media');
+            if (vid) vid.pause();
+        });
+
+        if (mostVisibleCard) {
+            const mId = mostVisibleCard.dataset.id;
+            const moment = this.moments.find(m => m.id === mId);
+            
+            if (moment) {
+                const feedVideo = mostVisibleCard.querySelector('video.m-media');
+                if (feedVideo) {
+                    feedVideo.muted = this.isMuted || (moment && moment.songPreview) ? true : false;
+                    feedVideo.play().catch(()=>{});
+                }
+                
+                // If it has background music, play it dynamically based on the specific moment visible
+                if (moment.songPreview && !this.isMuted) {
+                    this.playMomentMusic(moment.songPreview);
+                }
+            }
+        }
     }
 
     /**
