@@ -18,6 +18,20 @@
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
+    <script>
+        const cachedIconsCss = localStorage.getItem('goorac_icons_css_cache');
+        if (cachedIconsCss) {
+            document.write('<style>' + cachedIconsCss + '</style>');
+        }
+        // Fetch and update cache silently in the background
+        setTimeout(() => {
+            fetch('https://fonts.googleapis.com/icon?family=Material+Icons-Round')
+                .then(res => res.text())
+                .then(css => localStorage.setItem('goorac_icons_css_cache', css))
+                .catch(e => console.log('Icon cache update skipped'));
+        }, 2000);
+    </script>
+    
     <script src="components/navbar.js" defer></script>
     
     <script src="components/call-notifier.js" defer></script>
@@ -80,6 +94,7 @@
             -webkit-backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
             height: max(70px, calc(55px + env(safe-area-inset-top)));
+            box-sizing: border-box; /* PREVENT HEADER HEIGHT JUMP */
         }
 
         .logo { 
@@ -238,7 +253,9 @@
             display: flex; gap: 15px; padding: 15px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
-            min-height: 95px; /* Pre-reserve space for notes */
+            min-height: 96px; /* Pre-reserve space for notes */
+            height: 96px; /* STRICT HEIGHT TO PREVENT GLITCH/SHIFT */
+            box-sizing: border-box;
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
@@ -461,6 +478,16 @@
             0% { opacity: 0.6; } 
             50% { opacity: 1; } 
             100% { opacity: 0.6; } 
+        }
+        
+        /* --- NAVBAR GLITCH FIX --- */
+        main-navbar {
+            display: block;
+            width: 100%;
+            height: calc(85px + env(safe-area-inset-bottom));
+            position: fixed;
+            bottom: 0;
+            z-index: 9997;
         }
 
         /* Toggled by JS Observer on component */
@@ -831,6 +858,13 @@
 </script>
 
 <main-navbar id="main-nav"></main-navbar>
+<script>
+    // 🚀 INSTANT 0ms NAVBAR CACHE INJECTION TO PREVENT BOTTOM SHIFT
+    const cachedNavHtml = localStorage.getItem('goorac_navbar_html_cache');
+    if (cachedNavHtml) {
+        document.getElementById('main-nav').innerHTML = cachedNavHtml;
+    }
+</script>
 
 <call-notifier></call-notifier>
 <view-notes id="note-viewer"></view-notes>
@@ -953,6 +987,14 @@
             new MutationObserver(() => {
                 localStorage.setItem('goorac_moments_html_cache', momentsFeedEl.innerHTML);
             }).observe(momentsFeedEl, { childList: true, subtree: true, attributes: true, characterData: true });
+        }
+        
+        // 🚀 LIVE CACHE SAVER FOR NAVBAR (0ms latency prep)
+        const mainNavEl = document.getElementById('main-nav');
+        if (mainNavEl) {
+            new MutationObserver(() => {
+                localStorage.setItem('goorac_navbar_html_cache', mainNavEl.innerHTML);
+            }).observe(mainNavEl, { childList: true, subtree: true, attributes: true, characterData: true });
         }
     });
 
