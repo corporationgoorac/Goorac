@@ -18,26 +18,31 @@
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
-    <script>
-        const cachedIconsCss = localStorage.getItem('goorac_icons_css_cache');
-        if (cachedIconsCss) {
-            document.write('<style>' + cachedIconsCss + '</style>');
-        }
-        // Fetch and update cache silently in the background
-        setTimeout(() => {
-            fetch('https://fonts.googleapis.com/icon?family=Material+Icons-Round')
-                .then(res => res.text())
-                .then(css => localStorage.setItem('goorac_icons_css_cache', css))
-                .catch(e => console.log('Icon cache update skipped'));
-        }, 2000);
-    </script>
-    
     <script src="components/navbar.js" defer></script>
     
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
     <script src="components/viewMoments.js" defer></script> 
     <script type="module" src="components/presence.js"></script>
+
+    <script>
+        // 🚀 INSTANT ICON FONT CACHE FIX (Saves icons to local storage for 0ms visual load)
+        const cachedIcons = localStorage.getItem('goorac_icons_css_cache');
+        if (cachedIcons) {
+            const style = document.createElement('style');
+            style.innerHTML = cachedIcons;
+            document.head.appendChild(style);
+        } else {
+            fetch('https://fonts.googleapis.com/icon?family=Material+Icons-Round')
+                .then(response => response.text())
+                .then(css => {
+                    localStorage.setItem('goorac_icons_css_cache', css);
+                    const style = document.createElement('style');
+                    style.innerHTML = css;
+                    document.head.appendChild(style);
+                }).catch(e => console.error("Icon cache failed", e));
+        }
+    </script>
 
     <style>
         /* ==========================================================================
@@ -94,7 +99,6 @@
             -webkit-backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
             height: max(70px, calc(55px + env(safe-area-inset-top)));
-            box-sizing: border-box; /* PREVENT HEADER HEIGHT JUMP */
         }
 
         .logo { 
@@ -253,9 +257,7 @@
             display: flex; gap: 15px; padding: 15px 20px;
             overflow-x: auto; scrollbar-width: none;
             border-bottom: 1px solid var(--border);
-            min-height: 96px; /* Pre-reserve space for notes */
-            height: 96px; /* STRICT HEIGHT TO PREVENT GLITCH/SHIFT */
-            box-sizing: border-box;
+            min-height: 95px; /* Pre-reserve space for notes */
         }
         #notes-container::-webkit-scrollbar { display: none; }
         
@@ -479,15 +481,17 @@
             50% { opacity: 1; } 
             100% { opacity: 0.6; } 
         }
-        
-        /* --- NAVBAR GLITCH FIX --- */
+
+        /* 🚀 MAIN NAVBAR PRE-ALLOCATION TO FIX GLITCHING */
         main-navbar {
             display: block;
-            width: 100%;
-            height: calc(85px + env(safe-area-inset-bottom));
             position: fixed;
             bottom: 0;
-            z-index: 9997;
+            left: 0;
+            width: 100%;
+            height: calc(65px + env(safe-area-inset-bottom));
+            background-color: var(--bg);
+            z-index: 1000;
         }
 
         /* Toggled by JS Observer on component */
@@ -743,6 +747,10 @@
     document.fonts.ready.then(() => {
         document.body.classList.add('fonts-ready');
     });
+    // Fallback if cached icons are already loaded instantly
+    if (localStorage.getItem('goorac_icons_css_cache')) {
+        document.body.classList.add('fonts-ready');
+    }
 </script>
 
 <div id="greeting-overlay" class="greeting-overlay">
@@ -859,10 +867,10 @@
 
 <main-navbar id="main-nav"></main-navbar>
 <script>
-    // 🚀 INSTANT 0ms NAVBAR CACHE INJECTION TO PREVENT BOTTOM SHIFT
-    const cachedNavHtml = localStorage.getItem('goorac_navbar_html_cache');
-    if (cachedNavHtml) {
-        document.getElementById('main-nav').innerHTML = cachedNavHtml;
+    // 🚀 INSTANT 0ms NAVBAR CACHE INJECTION
+    const cachedNavbarHtmlData = localStorage.getItem('goorac_navbar_html_cache');
+    if (cachedNavbarHtmlData) {
+        document.getElementById('main-nav').innerHTML = cachedNavbarHtmlData;
     }
 </script>
 
@@ -988,7 +996,7 @@
                 localStorage.setItem('goorac_moments_html_cache', momentsFeedEl.innerHTML);
             }).observe(momentsFeedEl, { childList: true, subtree: true, attributes: true, characterData: true });
         }
-        
+
         // 🚀 LIVE CACHE SAVER FOR NAVBAR (0ms latency prep)
         const mainNavEl = document.getElementById('main-nav');
         if (mainNavEl) {
