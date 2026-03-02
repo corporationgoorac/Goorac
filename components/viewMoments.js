@@ -678,7 +678,7 @@ class ViewMoments extends HTMLElement {
         });
         
         // Render feed purely to update icon states
-        // this.renderFeed(); // DISABLED: Modifying feed dynamically via DOM queries above so playing video isn't rebuilt & interrupted
+        // this.renderFeed(); // DISABLED: Modifying feed dynamically via DOM queries above so playing video isnt rebuilt & interrupted
     }
 
     /**
@@ -818,19 +818,19 @@ class ViewMoments extends HTMLElement {
                 try {
                     const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
                     const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                    const deepLink = `https://www.goorac.biz/chat.html?user=${this.currentUserData.username}`;
                     
-                    fetch('/send-pusher-notification', {
+                    fetch('https://pish-uigm.onrender.com/send-push', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            toUid: moment.uid,
+                            targetUid: moment.uid,
                             title: `New Like ❤️`,
                             body: `${senderName} liked your moment`,
                             icon: senderPfp,
-                            type: 'like_moment',
-                            momentId: moment.id
+                            click_action: deepLink
                         })
-                    }).catch(e => console.error("Pusher Notification API failed:", e));
+                    }).catch(e => console.error("Push Notification API failed:", e));
 
                     if (window.pusherChannel) {
                         window.pusherChannel.trigger('client-new-notification', {
@@ -2278,19 +2278,19 @@ class ViewMoments extends HTMLElement {
             try {
                 const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
                 const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
-                
-                fetch('/send-pusher-notification', {
+                const deepLink = `https://www.goorac.biz/chat.html?user=${this.currentUserData.username}`;
+
+                fetch('https://pish-uigm.onrender.com/send-push', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        toUid: targetUid,
+                        targetUid: targetUid,
                         title: `New Reply from ${senderName} 💬`,
                         body: text,
                         icon: senderPfp,
-                        type: 'chat_reply',
-                        chatId: chatId
+                        click_action: deepLink
                     })
-                }).catch(e => console.error("Pusher Notification API failed:", e));
+                }).catch(e => console.error("Push Notification API failed:", e));
 
                 if (window.pusherChannel) {
                     window.pusherChannel.trigger('client-new-notification', {
