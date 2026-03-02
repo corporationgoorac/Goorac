@@ -1,249 +1,249 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="/manifest.json">
-    <link rel="preload" href="chat.html" as="document">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#000000"> <title>Goorac | Quantum Inbox</title>
-    
-    <script src="config.js"></script>
-    
-    <script src="components/chatTheme.js"></script>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="preload" href="chat.html" as="document">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#000000"> <title>Goorac | Quantum Inbox</title>
+    
+    <script src="config.js"></script>
+    
+    <script src="components/chatTheme.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script type="module" src="components/presence.js"></script>
-    <script src="components/chatLoader.js" defer></script>
-    <chat-loader></chat-loader>
+    <script type="module" src="components/presence.js"></script>
+    <script src="components/chatLoader.js" defer></script>
+    <chat-loader></chat-loader>
 
-    <style>
-        :root {
-            --bg: #000;
-            --accent: #00d2ff;
-            --border: rgba(255, 255, 255, 0.1);
-            --text-dim: #888;
-            --danger: #ff4444;
-            --glass: rgba(255, 255, 255, 0.03);
-            --sheet-bg: #121212;
-            --online: #00ff41;
-        }
+    <style>
+        :root {
+            --bg: #000;
+            --accent: #00d2ff;
+            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: #888;
+            --danger: #ff4444;
+            --glass: rgba(255, 255, 255, 0.03);
+            --sheet-bg: #121212;
+            --online: #00ff41;
+        }
 
-        body {
-            background: var(--bg); color: white; margin: 0;
-            font-family: -apple-system, system-ui, sans-serif;
-            padding-bottom: 90px; overflow-x: hidden;
-            -webkit-user-select: none; user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+        body {
+            background: var(--bg); color: white; margin: 0;
+            font-family: -apple-system, system-ui, sans-serif;
+            padding-bottom: 90px; overflow-x: hidden;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-        /* HEADER */
-        header {
-            position: sticky; top: 0; background: rgba(0,0,0,0.9);
-            padding: 15px 20px; display: flex; justify-content: space-between;
-            align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
-            backdrop-filter: blur(20px);
-            padding-top: max(15px, env(safe-area-inset-top));
-        }
-        .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
-        /* SEARCH */
-        .search-wrap { padding: 12px 20px; padding-bottom: 0; }
-        .search-input {
-            width: 100%; background: #111; border: 1px solid var(--border);
-            padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
-            font-size: 16px !important; transition: all 0.3s ease;
-        }
-        .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
+        /* HEADER */
+        header {
+            position: sticky; top: 0; background: rgba(0,0,0,0.9);
+            padding: 15px 20px; display: flex; justify-content: space-between;
+            align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
+            backdrop-filter: blur(20px);
+            padding-top: max(15px, env(safe-area-inset-top));
+        }
+        .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        /* SEARCH */
+        .search-wrap { padding: 12px 20px; padding-bottom: 0; }
+        .search-input {
+            width: 100%; background: #111; border: 1px solid var(--border);
+            padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
+            font-size: 16px !important; transition: all 0.3s ease;
+        }
+        .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
 
-        /* FILTER CHIPS */
-        .filter-scroll {
-            display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
-            scrollbar-width: none; -ms-overflow-style: none;
-        }
-        .filter-scroll::-webkit-scrollbar { display: none; }
-        
-        .filter-chip {
-            padding: 8px 16px; border-radius: 20px; background: #1a1a1a;
-            border: 1px solid var(--border); color: #888; font-size: 0.85rem;
-            font-weight: 600; white-space: nowrap; transition: all 0.2s;
-            cursor: pointer;
-        }
-        .filter-chip.active {
-            background: rgba(0, 210, 255, 0.15); color: var(--accent);
-            border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
-        }
+        /* FILTER CHIPS */
+        .filter-scroll {
+            display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
+            scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .filter-scroll::-webkit-scrollbar { display: none; }
+        
+        .filter-chip {
+            padding: 8px 16px; border-radius: 20px; background: #1a1a1a;
+            border: 1px solid var(--border); color: #888; font-size: 0.85rem;
+            font-weight: 600; white-space: nowrap; transition: all 0.2s;
+            cursor: pointer;
+        }
+        .filter-chip.active {
+            background: rgba(0, 210, 255, 0.15); color: var(--accent);
+            border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+        }
 
-        /* CHAT LIST ITEM */
-        .chat-item { 
-            display: flex; align-items: center; padding: 15px 20px; 
-            cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
-            transition: background 0.2s, transform 0.1s;
-            touch-action: pan-y; position: relative;
-        }
-        .chat-item:active { background: var(--glass); transform: scale(0.98); }
+        /* CHAT LIST ITEM */
+        .chat-item { 
+            display: flex; align-items: center; padding: 15px 20px; 
+            cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.2s, transform 0.1s;
+            touch-action: pan-y; position: relative;
+        }
+        .chat-item:active { background: var(--glass); transform: scale(0.98); }
 
-        /* PFP Container for Online Dot */
-        .pfp-container { position: relative; margin-right: 15px; }
-        .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
-        
-        /* The Real-Time Green Dot */
-        .online-indicator {
-            position: absolute; bottom: 2px; right: 2px;
-            width: 12px; height: 12px; background: var(--online);
-            border-radius: 50%; border: 2px solid #000;
-            box-shadow: 0 0 8px var(--online);
-            display: none; /* Hidden by default */
-            z-index: 2;
-        }
-        .online-indicator.active { display: block; }
+        /* PFP Container for Online Dot */
+        .pfp-container { position: relative; margin-right: 15px; }
+        .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
+        
+        /* The Real-Time Green Dot */
+        .online-indicator {
+            position: absolute; bottom: 2px; right: 2px;
+            width: 12px; height: 12px; background: var(--online);
+            border-radius: 50%; border: 2px solid #000;
+            box-shadow: 0 0 8px var(--online);
+            display: none; /* Hidden by default */
+            z-index: 2;
+        }
+        .online-indicator.active { display: block; }
 
-        .chat-info { flex: 1; min-width: 0; pointer-events: none; }
-        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        
-        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
-        .v-badge { height: 14px; width: 14px; }
-        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; transition: color 0.3s; }
-        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
-        @keyframes pulseType { 50% { opacity: 0.6; } }
+        .chat-info { flex: 1; min-width: 0; pointer-events: none; }
+        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        
+        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
+        .v-badge { height: 14px; width: 14px; }
+        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; transition: color 0.3s; }
+        .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
+        @keyframes pulseType { 50% { opacity: 0.6; } }
 
-        .pin-indicator { 
-            width: 14px; height: 14px; 
-            background: var(--accent);
-            clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
-            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px;
-        }
+        .pin-indicator { 
+            width: 14px; height: 14px; 
+            background: var(--accent);
+            clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
+            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px;
+        }
 
-        .follow-btn { 
-            background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
-            padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-            pointer-events: auto; /* MUST BE AUTO TO CLICK */
-        }
+        .follow-btn { 
+            background: rgba(0, 210, 255, 0.1); color: var(--accent); border: 1px solid rgba(0, 210, 255, 0.3); 
+            padding: 6px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+            pointer-events: auto; /* MUST BE AUTO TO CLICK */
+        }
 
-        /* UNREAD BADGE */
-        .unread-badge { 
-            width: 12px; height: 12px; 
-            border-radius: 50%; 
-            display: block;
-            box-shadow: 0 0 10px rgba(255,255,255,0.3);
-            flex-shrink: 0;
-            animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
+        /* UNREAD BADGE */
+        .unread-badge { 
+            width: 12px; height: 12px; 
+            border-radius: 50%; 
+            display: block;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+            flex-shrink: 0;
+            animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
 
-        /* SKELETON */
-        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
-        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
-        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
-        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
+        /* SKELETON */
+        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
+        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
+        .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
+        @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
 
-        /* MODAL */
-        #delete-menu {
-            position: fixed; bottom: -100%; left: 0; width: 100%;
-            background: var(--sheet-bg); border-top: 1px solid var(--border);
-            z-index: 100000; border-radius: 30px 30px 0 0;
-            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 20px 20px calc(30px + env(safe-area-inset-bottom)); box-sizing: border-box;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
-        }
-        #delete-menu.active { bottom: 0; }
-        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); }
+        /* MODAL */
+        #delete-menu {
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: var(--sheet-bg); border-top: 1px solid var(--border);
+            z-index: 100000; border-radius: 30px 30px 0 0;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 20px 20px calc(30px + env(safe-area-inset-bottom)); box-sizing: border-box;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
+        }
+        #delete-menu.active { bottom: 0; }
+        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); }
 
-        @media (min-width: 768px) {
-            #delete-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; }
-            #delete-menu.active { bottom: 50%; transform: translate(-50%, 50%); }
-        }
+        @media (min-width: 768px) {
+            #delete-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; }
+            #delete-menu.active { bottom: 50%; transform: translate(-50%, 50%); }
+        }
 
-        /* CONTEXT UI */
-        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; }
-        .context-pfp { width: 70px; height: 70px; border-radius: 25px; border: 2px solid var(--accent); margin-bottom: 12px; object-fit: cover; }
-        .context-name { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
-        .context-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
-        .action-list { display: flex; flex-direction: column; gap: 12px; }
-        .btn-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; }
-        .del-btn-big { background: rgba(255, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(255, 68, 68, 0.2); }
-        .pin-btn-big { background: #1a1a1a; color: var(--accent); border: 1px solid var(--border); }
-        .cancel-btn { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; }
+        /* CONTEXT UI */
+        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; }
+        .context-pfp { width: 70px; height: 70px; border-radius: 25px; border: 2px solid var(--accent); margin-bottom: 12px; object-fit: cover; }
+        .context-name { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
+        .context-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
+        .action-list { display: flex; flex-direction: column; gap: 12px; }
+        .btn-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; }
+        .del-btn-big { background: rgba(255, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(255, 68, 68, 0.2); }
+        .pin-btn-big { background: #1a1a1a; color: var(--accent); border: 1px solid var(--border); }
+        .cancel-btn { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; }
 
-        #search-results { display: none; background: #000; min-height: 100vh; }
-        .hide-nav { opacity: 0 !important; pointer-events: none !important; transform: translateY(20px); }
-        main-navbar { transition: all 0.4s ease; }
+        #search-results { display: none; background: #000; min-height: 100vh; }
+        .hide-nav { opacity: 0 !important; pointer-events: none !important; transform: translateY(20px); }
+        main-navbar { transition: all 0.4s ease; }
 
-        /* FULL SCREEN CHAT MODAL CSS */
-        #chat-modal {
-            position: fixed;
-            top: 0;
-            left: 100%; /* Start completely off-screen to the right */
-            width: 100%;
-            height: 100%;
-            background: #000;
-            z-index: 999999;
-            transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1);
-            display: none; /* Hidden until clicked */
-            flex-direction: column;
-            will-change: transform;
-            contain: strict;
-            overflow: hidden; /* Prevent native scroll conflicts while panning */
-        }
+        /* FULL SCREEN CHAT MODAL CSS */
+        #chat-modal {
+            position: fixed;
+            top: 0;
+            left: 100%; /* Start completely off-screen to the right */
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 999999;
+            transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1);
+            display: none; /* Hidden until clicked */
+            flex-direction: column;
+            will-change: transform;
+            contain: strict;
+            overflow: hidden; /* Prevent native scroll conflicts while panning */
+        }
 
-        #chat-modal.active {
-            transform: translateX(-100%); /* Slide into view */
-        }
+        #chat-modal.active {
+            transform: translateX(-100%); /* Slide into view */
+        }
 
-        #chat-frame {
-            flex: 1;
-            border: none;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            -webkit-overflow-scrolling: touch;
-        }
-    </style>
+        #chat-frame {
+            flex: 1;
+            border: none;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
 </head>
 <body oncontextmenu="return false;">
 
 <header>
-    <div class="header-logo">GOORAC</div>
+    <div class="header-logo">GOORAC</div>
 </header>
 
 <div class="search-wrap">
-    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
+    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
 </div>
 
 <div class="filter-scroll">
-    <div class="filter-chip active" onclick="setFilter('all', this)">All</div>
-    <div class="filter-chip" onclick="setFilter('unread', this)">Unread</div>
+    <div class="filter-chip active" onclick="setFilter('all', this)">All</div>
+    <div class="filter-chip" onclick="setFilter('unread', this)">Unread</div>
 </div>
 
 <div id="search-results"></div>
 
 <div id="inbox-content">
-    <div id="chats-list">
-        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
-        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:30%"></div><div class="skeleton-line" style="width:60%"></div></div></div>
-    </div>
+    <div id="chats-list">
+        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:40%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
+        <div class="skeleton-item"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:30%"></div><div class="skeleton-line" style="width:60%"></div></div></div>
+    </div>
 </div>
 
 <div class="menu-overlay" id="overlay" onclick="closeDeleteMenu(true)"></div>
 <div id="delete-menu">
-    <div class="sheet-context" id="sheet-user-info">
-        <img src="" class="context-pfp" id="active-pfp">
-        <div class="context-name" id="active-name">User Name</div>
-        <div class="context-username" id="active-username">@handle</div>
-    </div>
-    
-    <div class="action-list">
-        <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
-        <button class="btn-action del-btn-big" id="confirm-delete">Erase History For Both</button>
-        <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
-    </div>
+    <div class="sheet-context" id="sheet-user-info">
+        <img src="" class="context-pfp" id="active-pfp">
+        <div class="context-name" id="active-name">User Name</div>
+        <div class="context-username" id="active-username">@handle</div>
+    </div>
+    
+    <div class="action-list">
+        <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
+        <button class="btn-action del-btn-big" id="confirm-delete">Erase History For Both</button>
+        <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
+    </div>
 </div>
 
 <div id="chat-modal">
-    <iframe id="chat-frame" src="about:blank"></iframe>
+    <iframe id="chat-frame" src="about:blank"></iframe>
 </div>
 
 <script src="components/navbar.js" defer></script>
@@ -252,646 +252,612 @@
 <call-notifier></call-notifier>
 
 <script>
-    // --- FORCE INBOX THEME ON INITIAL LOAD AND CACHE RESTORE ---
-    (function enforceInboxTheme() {
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', '#000000');
-    })();
-    window.addEventListener('pageshow', () => {
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', '#000000');
-    });
+    // --- FORCE INBOX THEME ON INITIAL LOAD AND CACHE RESTORE ---
+    (function enforceInboxTheme() {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#000000');
+    })();
+    window.addEventListener('pageshow', () => {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#000000');
+    });
 
-    // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap) ---
-    (function loadInboxCache() {
-        const cachedHTML = localStorage.getItem('goorac_inbox_html');
-        if (cachedHTML && cachedHTML.trim() !== "") {
-            document.getElementById('chats-list').innerHTML = cachedHTML;
-            console.log("⚡ Loaded inbox from cache");
-        }
-    })();
-
-    // --- PRELOAD RECENT IFRAMES FOR 0MS ON RELOAD ---
-    (function preloadRecentChats() {
-        const recentChats = JSON.parse(localStorage.getItem('goorac_recent_iframes')) || [];
-        const modal = document.getElementById('chat-modal');
-        if (modal) {
-            recentChats.forEach(username => {
-                if (!document.getElementById('chat-frame-' + username)) {
-                    let frame = document.createElement('iframe');
-                    frame.id = 'chat-frame-' + username;
-                    frame.className = 'cached-chat-frame';
-                    frame.style.width = '100%';
-                    frame.style.height = '100%';
-                    frame.style.border = 'none';
-                    frame.style.position = 'absolute';
-                    frame.style.top = '0';
-                    frame.style.left = '0';
-                    frame.style.background = '#000';
-                    frame.style.webkitOverflowScrolling = 'touch';
-                    frame.style.display = 'none';
-                    try { frame.src = `chat.html?user=${username}`; } catch(err) {}
-                    modal.appendChild(frame);
-                }
-            });
+    // --- 1. IMMEDIATE CACHE LOAD (Zero-Gap) ---
+    (function loadInboxCache() {
+        const cachedHTML = localStorage.getItem('goorac_inbox_html');
+        if (cachedHTML && cachedHTML.trim() !== "") {
+            document.getElementById('chats-list').innerHTML = cachedHTML;
+            console.log("⚡ Loaded inbox from cache");
         }
     })();
 
-    // --- FIREBASE INIT ---
-    // 1. Check for shared init function (from config.js)
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
-    // 3. No fallback hardcoded keys anymore.
+    // --- FIREBASE INIT ---
+    // 1. Check for shared init function (from config.js)
+    if (typeof window.initFirebaseCore === 'function') {
+        window.initFirebaseCore();
+    } 
+    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
+    else if (!firebase.apps.length && window.firebaseConfig) {
+        firebase.initializeApp(window.firebaseConfig);
+    }
+    // 3. No fallback hardcoded keys anymore.
 
-    const db = firebase.firestore();
-    const rdb = firebase.database();
-    const auth = firebase.auth();
-    const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
+    const db = firebase.firestore();
+    const rdb = firebase.database();
+    const auth = firebase.auth();
+    const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
 
-    let myUid = "";
-    let myFollowingList = [];
-    let myFollowersList = [];
-    let myPinnedChats = [];
-    let myBlockedList = []; 
-    let myShowActivityStatus = true;
-    let offlineTimers = {}; // TRACKS OFFLINE DELAY FOR EACH USER
-    
-    // Interaction Variables
-    let longPressTimer;
-    let isLongPress = false;
-    let activeChatId = null;
-    let searchTimeout = null;
-    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
-    let inboxListener = null;
-    
-    // Filter Variable
-    let currentFilter = 'all'; 
-    let currentChatData = []; 
+    let myUid = "";
+    let myFollowingList = [];
+    let myFollowersList = [];
+    let myPinnedChats = [];
+    let myBlockedList = []; 
+    let myShowActivityStatus = true;
+    let offlineTimers = {}; // TRACKS OFFLINE DELAY FOR EACH USER
+    
+    // Interaction Variables
+    let longPressTimer;
+    let isLongPress = false;
+    let activeChatId = null;
+    let searchTimeout = null;
+    let userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
+    let inboxListener = null;
+    
+    // Filter Variable
+    let currentFilter = 'all'; 
+    let currentChatData = []; 
 
-    // Neon Palette for Badges
-    const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
+    // Neon Palette for Badges
+    const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
 
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            myUid = user.uid;
-            setupPresence(); 
-            fetchUserData();
-            db.collection("users").doc(myUid).onSnapshot(doc => {
-                const data = doc.data();
-                myFollowingList = data?.following || [];
-                myFollowersList = data?.followers || [];
-                myPinnedChats = data?.pinnedChats || [];
-                myBlockedList = (data?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
-                myShowActivityStatus = data?.showActivityStatus !== false;
-                listenToInbox();
-            });
-        } else { window.location.href = 'login.html'; }
-    });
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            myUid = user.uid;
+            setupPresence(); 
+            fetchUserData();
+            db.collection("users").doc(myUid).onSnapshot(doc => {
+                const data = doc.data();
+                myFollowingList = data?.following || [];
+                myFollowersList = data?.followers || [];
+                myPinnedChats = data?.pinnedChats || [];
+                myBlockedList = (data?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+                myShowActivityStatus = data?.showActivityStatus !== false;
+                listenToInbox();
+            });
+        } else { window.location.href = 'login.html'; }
+    });
 
-    window.addEventListener('pageshow', (event) => {
-        if (event.persisted && myUid) {
-            console.log("♻️ Page restored from cache - refreshing inbox");
-            listenToInbox();
-        }
-    });
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted && myUid) {
+            console.log("♻️ Page restored from cache - refreshing inbox");
+            listenToInbox();
+        }
+    });
 
-    // --- REALTIME PRESENCE HEARTBEAT (USER'S OWN STATUS) ---
-    function setupPresence() {
-        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
-        const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
-        const isOnlineForDatabase = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
+    // --- REALTIME PRESENCE HEARTBEAT (USER'S OWN STATUS) ---
+    function setupPresence() {
+        const userStatusDatabaseRef = rdb.ref('/status/' + myUid);
+        const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
+        const isOnlineForDatabase = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
-        rdb.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() === false) return;
-            userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
-                // INSTANT ONLINE
-                userStatusDatabaseRef.set(isOnlineForDatabase);
-            });
-        });
-    }
+        rdb.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === false) return;
+            userStatusDatabaseRef.onDisconnect().set(isOfflineForDatabase).then(() => {
+                // INSTANT ONLINE
+                userStatusDatabaseRef.set(isOnlineForDatabase);
+            });
+        });
+    }
 
-    async function fetchUserData() {
-        const userDoc = await db.collection("users").doc(myUid).get();
-        const data = userDoc.data();
-        myFollowingList = data?.following || [];
-        myFollowersList = data?.followers || [];
-    }
+    async function fetchUserData() {
+        const userDoc = await db.collection("users").doc(myUid).get();
+        const data = userDoc.data();
+        myFollowingList = data?.following || [];
+        myFollowersList = data?.followers || [];
+    }
 
-    async function syncUserProfile(uid) {
-        if(!uid) return null;
-        try {
-            const snap = await db.collection("users").doc(uid).get();
-            if(snap.exists) {
-                const freshData = snap.data();
-                const cachedData = userCache[uid];
-                if (!cachedData || JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
-                    userCache[uid] = freshData;
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                    return freshData;
-                }
-            }
-        } catch(e) { console.error("Sync error", e); }
-        return null; 
-    }
-
-    // --- REALTIME READ RECEIPT FUNCTION ---
-    window.markChatAsRead = function(chatId) {
-        if (!chatId || !myUid) return;
-        db.collection("chats").doc(chatId).update({
-            [`unreadCount.${myUid}`]: 0,
-            seen: true
-        }).catch(e => console.warn("Could not mark read:", e));
-    };
-
-    function listenToInbox() {
-        if(!myUid) return;
-        if(inboxListener) inboxListener();
-
-        inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
-        .onSnapshot(async snap => {
-            
-            const chatPromises = snap.docs.map(async d => {
-                const chat = d.data();
-                const otherUid = chat.participants.find(id => id !== myUid);
-                
-                // Fetch other user's block list for reciprocal block check
-                const otherDoc = await db.collection("users").doc(otherUid).get();
-                const otherData = otherDoc.data();
-                const theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
-
-                if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
-                    return null; // FILTER BLOCKED PERSON CHAT
-                }
-
-                let userData = otherData || userCache[otherUid];
-                syncUserProfile(otherUid).then(fresh => {
-                    if(fresh) {
-                        const nameEl = document.getElementById(`name-${d.id}`);
-                        if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
-                             nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
-                        }
-                    }
-                });
-
-                if (!userData) {
-                    userData = otherData;
-                    userCache[otherUid] = userData;
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
-                }
-                
-                const isPinned = myPinnedChats.includes(d.id);
-                return { id: d.id, chat, u: userData, otherUid, isPinned };
-            });
-
-            const results = await Promise.all(chatPromises);
-            currentChatData = results.filter(c => c !== null); 
-            
-            // --- INSTANTLY MARK READ IF CHAT IS ACTIVELY OPEN ---
-            currentChatData.forEach(c => {
-                if (window.currentActiveChatId === c.id) {
-                    let count = c.chat.unreadCount && c.chat.unreadCount[myUid] !== undefined ? Number(c.chat.unreadCount[myUid]) : 0;
-                    let unseen = (c.chat.lastSender !== myUid && c.chat.seen === false);
-                    if (count > 0 || unseen) {
-                        window.markChatAsRead(c.id);
-                        if (c.chat.unreadCount) c.chat.unreadCount[myUid] = 0;
-                        c.chat.seen = true;
-                    }
-                }
-            });
-
-            currentChatData.sort((a,b) => {
-                if (a.isPinned && !b.isPinned) return -1;
-                if (!a.isPinned && b.isPinned) return 1;
-                return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
-            });
-
-            renderInbox();
-        });
-    }
-
-    window.setFilter = function(filterType, el) {
-        currentFilter = filterType;
-        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-        el.classList.add('active');
-        renderInbox();
-    }
-
-    function renderInbox() {
-        if (!myUid) return;
-
-        const list = document.getElementById('chats-list');
-        list.innerHTML = "";
-
-        const filteredData = currentChatData.filter(({chat}) => {
-            if (currentFilter === 'all') return true;
-            if (currentFilter === 'unread') {
-                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) return Number(chat.unreadCount[myUid]) > 0;
-                return (chat.lastSender !== myUid && chat.seen === false);
-            }
-            return true;
-        });
-
-        if (filteredData.length === 0) {
-            list.innerHTML = `<p style='text-align:center; padding:50px; color:#444; font-weight:700;'>${currentFilter === 'unread' ? "All caught up!" : "No transmissions found."}</p>`;
-            return;
-        }
-
-        filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
-            if(!u) return;
-            
-            let isUnread = false;
-            let count = 0;
-            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) count = Number(chat.unreadCount[myUid]);
-            if (count > 0) isUnread = true;
-            else if (chat.lastSender && chat.lastSender !== myUid) isUnread = chat.seen === false;
-
-            const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
-            const amIFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
-
-            const finalName = u.name || u.displayName || u.username || "Unknown";
-            const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
-            
-            const safeUserStr = encodeURIComponent(JSON.stringify({ name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified }));
-
-            const item = document.createElement('div');
-            item.className = 'chat-item';
-            item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
-            item.setAttribute("ontouchend", "endLongPress(this)");
-            item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
-            item.setAttribute("onclick", `enterChat(event, '${u.username}', '${id}')`); 
-
-            item.innerHTML = `
-                <div class="pfp-container">
-                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                    <div class="online-indicator" id="online-${otherUid}"></div>
-                </div>
-                <div class="chat-info">
-                    <div class="chat-top-row">
-                        <span class="u-name" id="name-${id}">
-                            ${finalName} 
-                            ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
-                            ${isPinned ? `<span class="pin-indicator"></span>` : ''}
-                        </span>
-                        <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
-                            ${lastMsg}
-                        </div>
-                        <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                            ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
-                            ${isUnread ? `<div class="unread-badge" style="background:${randomColor}; box-shadow: 0 0 12px ${randomColor};"></div>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-            list.appendChild(item);
-            
-            rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
-                const msgEl = document.getElementById(`last-msg-${id}`);
-                if(!msgEl) return;
-                if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
-                else { msgEl.innerHTML = lastMsg; }
-            });
-
-            // --- INSTANT ONLINE / 20S OFFLINE DELAY LOGIC ---
-            if (myShowActivityStatus) {
-                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
-                    const dot = document.getElementById(`online-${otherUid}`);
-                    if (!dot) return;
-
-                    const state = snap.val();
-                    if (state === 'online') {
-                        // CANCEL ANY PENDING OFFLINE HIDE
-                        clearTimeout(offlineTimers[otherUid]);
-                        dot.classList.add('active'); // SHOW INSTANTLY
-                    } else {
-                        // DELAY REMOVAL BY 20 SECONDS
-                        clearTimeout(offlineTimers[otherUid]);
-                        offlineTimers[otherUid] = setTimeout(() => {
-                            dot.classList.remove('active');
-                        }, 20000);
-                    }
-                });
-            }
-        });
-
-        if(currentFilter === 'all') localStorage.setItem('goorac_inbox_html', list.innerHTML);
-    }
-
-    // --- GLOBAL HANDLERS ---
-    
-    window.startLongPress = function(el, chatId, isPinned, userStr) {
-        isLongPress = false;
-        const u = JSON.parse(decodeURIComponent(userStr));
-        longPressTimer = setTimeout(() => {
-            isLongPress = true; 
-            if(navigator.vibrate) navigator.vibrate(30);
-            el.style.transform = "scale(0.96)";
-            setTimeout(() => el.style.transform = "scale(1)", 200);
-            openDeleteMenu(chatId, isPinned, u);
-        }, 600);
-    };
-
-    window.cancelLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
-    window.endLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
-
-    // --- NEW ENTER CHAT LOGIC WITH MODAL & TOOLBAR COLOR SYNC & COMPONENT STOPPING ---
-    window.enterChat = function(e, username, chatId) {
-        if(isLongPress || (e && e.target.closest('button'))) return;
-
-        // --- CAPTURE INITIAL FULL SCREEN HEIGHT ---
-        window.initialScreenHeight = window.innerHeight;
-
-        // --- MARK READ INSTANTLY ---
-        window.currentActiveChatId = chatId;
-        if (chatId) window.markChatAsRead(chatId);
-
-        const modal = document.getElementById('chat-modal');
-        const nav = document.querySelector('main-navbar');
-
-        // 1. DISABLE NOTIFICATIONS TEMPORARILY
-        // We remove components from the DOM to effectively pause all triggers while the modal is open.
-        window._stashedCallNotifier = document.querySelectorAll('call-notifier');
-        window._stashedChatLoader = document.querySelectorAll('chat-loader');
-        window._stashedCallNotifier.forEach(el => el.remove());
-        window._stashedChatLoader.forEach(el => el.remove());
-
-        // 2. ZERO MS LOAD - CACHE IFRAMES BY ID
-        let frame = document.getElementById('chat-frame-' + username);
-        if (!frame) {
-            frame = document.createElement('iframe');
-            frame.id = 'chat-frame-' + username;
-            frame.className = 'cached-chat-frame';
-            frame.style.width = '100%';
-            
-            // Allow the iframe to naturally resize with the modal so the text box doesn't vanish
-            frame.style.height = '100%';
-            
-            frame.style.border = 'none';
-            frame.style.position = 'absolute';
-            frame.style.top = '0';
-            frame.style.left = '0';
-            frame.style.background = '#000';
-            frame.style.webkitOverflowScrolling = 'touch';
-            try { frame.src = `chat.html?user=${username}`; } catch(err) {}
-            modal.appendChild(frame);
-
-            // NEW FIX: Save to recent iframes for next page reload (tracks last 5 chats)
-            let recentChats = JSON.parse(localStorage.getItem('goorac_recent_iframes')) || [];
-            if (!recentChats.includes(username)) {
-                recentChats.unshift(username);
-                if (recentChats.length > 5) recentChats.pop(); 
-                localStorage.setItem('goorac_recent_iframes', JSON.stringify(recentChats));
+    async function syncUserProfile(uid) {
+        if(!uid) return null;
+        try {
+            const snap = await db.collection("users").doc(uid).get();
+            if(snap.exists) {
+                const freshData = snap.data();
+                const cachedData = userCache[uid];
+                if (!cachedData || JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
+                    userCache[uid] = freshData;
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                    return freshData;
+                }
             }
-        }
+        } catch(e) { console.error("Sync error", e); }
+        return null; 
+    }
 
-        // Only display the selected chat's iframe
-        document.querySelectorAll('#chat-frame, .cached-chat-frame').forEach(f => {
-            f.style.display = 'none';
-            f.style.height = '100%'; 
-        });
-        frame.style.display = 'block';
+    // --- REALTIME READ RECEIPT FUNCTION ---
+    window.markChatAsRead = function(chatId) {
+        if (!chatId || !myUid) return;
+        db.collection("chats").doc(chatId).update({
+            [`unreadCount.${myUid}`]: 0,
+            seen: true
+        }).catch(e => console.warn("Could not mark read:", e));
+    };
 
-        // 3. Hide bottom navigation
-        if(nav) nav.classList.add('hide-nav');
+    function listenToInbox() {
+        if(!myUid) return;
+        if(inboxListener) inboxListener();
 
-        // 4. Open the modal with slide animation immediately
-        modal.style.display = 'flex';
-        // Force Reflow
-        modal.offsetHeight; 
-        
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden'; 
-        
-        // Lock parent background
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
+        inboxListener = db.collection("chats").where("participants", "array-contains", myUid)
+        .onSnapshot(async snap => {
+            
+            const chatPromises = snap.docs.map(async d => {
+                const chat = d.data();
+                const otherUid = chat.participants.find(id => id !== myUid);
+                
+                // Fetch other user's block list for reciprocal block check
+                const otherDoc = await db.collection("users").doc(otherUid).get();
+                const otherData = otherDoc.data();
+                const theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
 
-        // Set starting height
-        modal.style.height = (window.visualViewport ? window.visualViewport.height : window.initialScreenHeight) + 'px';
-        if (window.visualViewport) modal.style.top = window.visualViewport.offsetTop + 'px';
+                if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
+                    return null; // FILTER BLOCKED PERSON CHAT
+                }
 
-        // 5. Apply External Theme dynamically from chatTheme.js
-        const applyThemeColor = () => {
-            const parentThemeMeta = document.querySelector('meta[name="theme-color"]');
-            if (parentThemeMeta) {
-                const targetColor = (window.chatTheme && window.chatTheme.statusBarColor) ? window.chatTheme.statusBarColor : '#0B1014';
-                parentThemeMeta.setAttribute('content', targetColor);
-            }
-        };
-        applyThemeColor(); // Apply instantly
-        frame.onload = applyThemeColor;
+                let userData = otherData || userCache[otherUid];
+                syncUserProfile(otherUid).then(fresh => {
+                    if(fresh) {
+                        const nameEl = document.getElementById(`name-${d.id}`);
+                        if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
+                             nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
+                        }
+                    }
+                });
 
-        // 6. Add history state for hardware back button support
-        history.pushState({ chatOpen: true }, "", "#quantum-chat");
-    };
+                if (!userData) {
+                    userData = otherData;
+                    userCache[otherUid] = userData;
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                }
+                
+                const isPinned = myPinnedChats.includes(d.id);
+                return { id: d.id, chat, u: userData, otherUid, isPinned };
+            });
 
-    // --- NEW CLOSE CHAT MODAL LOGIC (RESTORES COMPONENTS) ---
-    window.closeChatModal = function(shouldGoBack) {
-        // --- ENSURE CHAT IS MARKED READ ON CLOSE TOO ---
-        if (window.currentActiveChatId) {
-            window.markChatAsRead(window.currentActiveChatId);
-            window.currentActiveChatId = null; 
-        }
+            const results = await Promise.all(chatPromises);
+            currentChatData = results.filter(c => c !== null); 
+            
+            // --- INSTANTLY MARK READ IF CHAT IS ACTIVELY OPEN ---
+            currentChatData.forEach(c => {
+                if (window.currentActiveChatId === c.id) {
+                    let count = c.chat.unreadCount && c.chat.unreadCount[myUid] !== undefined ? Number(c.chat.unreadCount[myUid]) : 0;
+                    let unseen = (c.chat.lastSender !== myUid && c.chat.seen === false);
+                    if (count > 0 || unseen) {
+                        window.markChatAsRead(c.id);
+                        if (c.chat.unreadCount) c.chat.unreadCount[myUid] = 0;
+                        c.chat.seen = true;
+                    }
+                }
+            });
 
-        const modal = document.getElementById('chat-modal');
-        const nav = document.querySelector('main-navbar');
+            currentChatData.sort((a,b) => {
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+                return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
+            });
 
-        modal.classList.remove('active');
-        
-        // Show bottom navigation again
-        if(nav) nav.classList.remove('hide-nav');
+            renderInbox();
+        });
+    }
 
-        // Reset System Color back to your Inbox default
-        const parentThemeMeta = document.querySelector('meta[name="theme-color"]');
-        if (parentThemeMeta) {
-            parentThemeMeta.setAttribute('content', '#000000'); // Assuming #000000 is your default
-        }
+    window.setFilter = function(filterType, el) {
+        currentFilter = filterType;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        renderInbox();
+    }
 
-        setTimeout(() => {
-            modal.style.display = 'none';
-            
-            // 1. RESTORE COMPONENTS SO ALERTS CAN TRIGGER AGAIN
-            if (window._stashedCallNotifier) window._stashedCallNotifier.forEach(el => document.body.appendChild(el));
-            if (window._stashedChatLoader) window._stashedChatLoader.forEach(el => document.body.appendChild(el));
+    function renderInbox() {
+        if (!myUid) return;
 
-            // Note: We DO NOT reset iframe src to 'about:blank' so the cache stays active for next 0ms load!
-            
-            document.body.style.overflow = 'auto';
-            document.body.style.position = '';
-            document.body.style.width = '';
-            document.body.style.height = '';
-            
-            modal.style.height = '100%'; // Reset to default relative state
-            modal.style.top = '0';
-        }, 400); 
+        const list = document.getElementById('chats-list');
+        list.innerHTML = "";
 
-        if(shouldGoBack && window.location.hash === "#quantum-chat") {
-            history.back();
-        }
-    };
+        const filteredData = currentChatData.filter(({chat}) => {
+            if (currentFilter === 'all') return true;
+            if (currentFilter === 'unread') {
+                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) return Number(chat.unreadCount[myUid]) > 0;
+                return (chat.lastSender !== myUid && chat.seen === false);
+            }
+            return true;
+        });
 
-    window.visitProfile = function(e, username) { e.stopPropagation(); window.location.href = `userProfile.html?user=${username}`; };
+        if (filteredData.length === 0) {
+            list.innerHTML = `<p style='text-align:center; padding:50px; color:#444; font-weight:700;'>${currentFilter === 'unread' ? "All caught up!" : "No transmissions found."}</p>`;
+            return;
+        }
 
-    function openDeleteMenu(chatId, isPinned, userObj) {
-        activeChatId = chatId;
-        history.pushState({ menuOpen: true }, "", "#menu");
-        document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
-        document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
-        document.getElementById('active-username').innerText = `@${userObj.username}`;
-        const pinBtn = document.getElementById('pin-chat-btn');
-        pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
-        pinBtn.onclick = () => togglePin(chatId, isPinned);
-        document.getElementById('delete-menu').classList.add('active');
-        document.getElementById('overlay').style.display = 'block';
-        const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
-    }
+        filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
+            if(!u) return;
+            
+            let isUnread = false;
+            let count = 0;
+            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) count = Number(chat.unreadCount[myUid]);
+            if (count > 0) isUnread = true;
+            else if (chat.lastSender && chat.lastSender !== myUid) isUnread = chat.seen === false;
 
-    // --- UPDATED POPSTATE TO HANDLE BOTH MODALS ---
-    window.onpopstate = (e) => { 
-        if(document.getElementById('delete-menu').classList.contains('active')) {
-            closeDeleteMenu(false); 
-        }
-        if(document.getElementById('chat-modal').classList.contains('active')) {
-            closeChatModal(false);
-        }
-    };
+            const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
+            const amIFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
 
-    async function togglePin(chatId, isPinned) {
-        closeDeleteMenu(true);
-        const userRef = db.collection("users").doc(myUid);
-        if (isPinned) await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
-        else await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
-    }
+            const finalName = u.name || u.displayName || u.username || "Unknown";
+            const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+            
+            const safeUserStr = encodeURIComponent(JSON.stringify({ name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified }));
 
-    window.closeDeleteMenu = function(shouldGoBack) {
-        activeChatId = null;
-        document.getElementById('delete-menu').classList.remove('active');
-        document.getElementById('overlay').style.display = 'none';
-        const nav = document.querySelector('main-navbar');
-        if(nav && !document.getElementById('chat-modal').classList.contains('active')) {
-            nav.classList.remove('hide-nav');
-        }
-        if(shouldGoBack && window.location.hash === "#menu") history.back();
-    }
+            const item = document.createElement('div');
+            item.className = 'chat-item';
+            item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
+            item.setAttribute("ontouchend", "endLongPress(this)");
+            item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
+            item.setAttribute("onclick", `enterChat(event, '${u.username}', '${id}')`); 
 
-    document.getElementById('confirm-delete').onclick = async () => {
-        if(!activeChatId) return;
-        const cid = activeChatId; 
-        closeDeleteMenu(true);
-        if(confirm("Are you sure? This action is irreversible.")) {
-            // === 1. LOCAL STORAGE & CACHE CLEANUP ===
-            localStorage.removeItem('goorac_inbox_html'); 
-            localStorage.removeItem('chat_msgs_' + cid); 
-            
-            try {
-                // === 2. CRITICAL: DELETE CHAT DOCUMENT FIRST ===
-                await db.collection("chats").doc(cid).delete();
+            item.innerHTML = `
+                <div class="pfp-container">
+                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
+                    <div class="online-indicator" id="online-${otherUid}"></div>
+                </div>
+                <div class="chat-info">
+                    <div class="chat-top-row">
+                        <span class="u-name" id="name-${id}">
+                            ${finalName} 
+                            ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                            ${isPinned ? `<span class="pin-indicator"></span>` : ''}
+                        </span>
+                        <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
+                            ${lastMsg}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
+                            ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
+                            ${isUnread ? `<div class="unread-badge" style="background:${randomColor}; box-shadow: 0 0 12px ${randomColor};"></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            list.appendChild(item);
+            
+            rdb.ref(`typing/${id}/${otherUid}`).on('value', s => {
+                const msgEl = document.getElementById(`last-msg-${id}`);
+                if(!msgEl) return;
+                if(s.val() === true) { msgEl.innerHTML = `<span class="typing-text">typing...</span>`; } 
+                else { msgEl.innerHTML = lastMsg; }
+            });
 
-                // === 3. SUB-RESOURCE CLEANUP ===
-                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
-                rdb.ref(`typing/${cid}`).remove();
-                
-                // === 4. BATCH MESSAGE DELETION (WITH SAFETY LIMIT) ===
-                const msgs = await db.collection("chats").doc(cid).collection("messages").get();
-                if (!msgs.empty) {
-                    const batch = db.batch();
-                    let count = 0;
-                    msgs.docs.forEach((d, index) => {
-                        if (index < 480) { 
-                            batch.delete(d.ref);
-                            count++;
-                        }
-                    });
-                    if (count > 0) await batch.commit();
-                }
-                
-            } catch(e) { console.error("Erase failed:", e); }
-        }
-    };
+            // --- INSTANT ONLINE / 20S OFFLINE DELAY LOGIC ---
+            if (myShowActivityStatus) {
+                rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
+                    const dot = document.getElementById(`online-${otherUid}`);
+                    if (!dot) return;
 
-    window.handleSearch = function(val) { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => searchUsers(val), 400); }
+                    const state = snap.val();
+                    if (state === 'online') {
+                        // CANCEL ANY PENDING OFFLINE HIDE
+                        clearTimeout(offlineTimers[otherUid]);
+                        dot.classList.add('active'); // SHOW INSTANTLY
+                    } else {
+                        // DELAY REMOVAL BY 20 SECONDS
+                        clearTimeout(offlineTimers[otherUid]);
+                        offlineTimers[otherUid] = setTimeout(() => {
+                            dot.classList.remove('active');
+                        }, 20000);
+                    }
+                });
+            }
+        });
 
-    function searchUsers(val) {
-        const results = document.getElementById('search-results');
-        const content = document.getElementById('inbox-content');
-        if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
-        results.style.display = 'block'; content.style.display = 'none';
-        const q = val.toLowerCase();
-        const allContacts = [...new Set([...myFollowingList, ...myFollowersList].map(f => typeof f === 'string' ? f : f.uid))];
-        if(allContacts.length === 0) { results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>"; return; }
+        if(currentFilter === 'all') localStorage.setItem('goorac_inbox_html', list.innerHTML);
+    }
 
-        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
-        .get().then(snap => {
-            results.innerHTML = snap.docs.filter(d => {
-                const u = d.data();
-                return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
-            }).map(d => {
-                const u = d.data();
-                return `<div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'"><img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;"><div class="chat-info"><div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div><div style="font-size:0.8rem; color:#444;">@${u.username}</div></div></div>`;
-            }).join('');
-        });
-    }
+    // --- GLOBAL HANDLERS ---
+    
+    window.startLongPress = function(el, chatId, isPinned, userStr) {
+        isLongPress = false;
+        const u = JSON.parse(decodeURIComponent(userStr));
+        longPressTimer = setTimeout(() => {
+            isLongPress = true; 
+            if(navigator.vibrate) navigator.vibrate(30);
+            el.style.transform = "scale(0.96)";
+            setTimeout(() => el.style.transform = "scale(1)", 200);
+            openDeleteMenu(chatId, isPinned, u);
+        }, 600);
+    };
 
-    function formatTime(date) {
-        const now = new Date();
-        const diff = now - date;
-        const sec = Math.floor(diff / 1000), min = Math.floor(sec / 60), hour = Math.floor(min / 60), day = Math.floor(hour / 24);
-        if(sec < 60) return "Just now";
-        if(min < 60) return `${min}m ago`;
-        if(hour < 24) return `${hour}h ago`;
-        if(day < 7) return `${day}d ago`;
-        return date.toLocaleDateString();
-    }
+    window.cancelLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
+    window.endLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
 
-    // --- ADDED: Prefetch chat.html into browser disk cache for 0ms loads ---
-    setTimeout(() => {
-        if (!localStorage.getItem('goorac_chat_cached')) {
-            fetch('chat.html').then(r => r.text()).then(() => {
-                localStorage.setItem('goorac_chat_cached', 'true');
-            }).catch(e => console.warn("Cache prefetch failed", e));
-        }
-    }, 1500);
+    // --- NEW ENTER CHAT LOGIC WITH MODAL & TOOLBAR COLOR SYNC & COMPONENT STOPPING ---
+    window.enterChat = function(e, username, chatId) {
+        if(isLongPress || (e && e.target.closest('button'))) return;
 
-    // --- UPDATED: Visual Viewport API fixes to prevent chat background resize AND keep input visible ---
-    if (window.visualViewport) {
-        const handleKeyboardResize = () => {
-            const modal = document.getElementById('chat-modal');
-            if (modal.classList.contains('active')) {
-                const vvHeight = window.visualViewport.height;
-                const offsetTop = window.visualViewport.offsetTop;
-                
-                // 1. Shrink the modal strictly to the visible area above the keyboard.
-                // This keeps the header at the top and naturally brings the bottom input up into view!
-                modal.style.height = vvHeight + 'px';
-                modal.style.top = offsetTop + 'px';
+        // --- CAPTURE INITIAL FULL SCREEN HEIGHT ---
+        window.initialScreenHeight = window.innerHeight;
 
-                // 2. Prevent the iframe's internal background from squishing by dynamically locking its background height to the full original screen height.
-                document.querySelectorAll('.cached-chat-frame').forEach(frame => {
-                    if (frame.style.display === 'block') {
-                        try {
-                            const iframeDoc = frame.contentWindow.document;
-                            if (iframeDoc && iframeDoc.body) {
-                                iframeDoc.body.style.backgroundSize = `100vw ${window.initialScreenHeight}px`;
-                            }
-                        } catch(e) {}
-                    }
-                });
-                
-                window.scrollTo(0, 0); // Keep parent window from bleeding scroll
-            }
-        };
-        window.visualViewport.addEventListener('resize', handleKeyboardResize);
-        window.visualViewport.addEventListener('scroll', handleKeyboardResize);
-    }
+        // --- MARK READ INSTANTLY ---
+        window.currentActiveChatId = chatId;
+        if (chatId) window.markChatAsRead(chatId);
+
+        const modal = document.getElementById('chat-modal');
+        const nav = document.querySelector('main-navbar');
+
+        // 1. DISABLE NOTIFICATIONS TEMPORARILY
+        // We remove components from the DOM to effectively pause all triggers while the modal is open.
+        window._stashedCallNotifier = document.querySelectorAll('call-notifier');
+        window._stashedChatLoader = document.querySelectorAll('chat-loader');
+        window._stashedCallNotifier.forEach(el => el.remove());
+        window._stashedChatLoader.forEach(el => el.remove());
+
+        // 2. ZERO MS LOAD - CACHE IFRAMES BY ID
+        let frame = document.getElementById('chat-frame-' + username);
+        if (!frame) {
+            frame = document.createElement('iframe');
+            frame.id = 'chat-frame-' + username;
+            frame.className = 'cached-chat-frame';
+            frame.style.width = '100%';
+            
+            // Allow the iframe to naturally resize with the modal so the text box doesn't vanish
+            frame.style.height = '100%';
+            
+            frame.style.border = 'none';
+            frame.style.position = 'absolute';
+            frame.style.top = '0';
+            frame.style.left = '0';
+            frame.style.background = '#000';
+            frame.style.webkitOverflowScrolling = 'touch';
+            try { frame.src = `chat.html?user=${username}`; } catch(err) {}
+            modal.appendChild(frame);
+        }
+
+        // Only display the selected chat's iframe
+        document.querySelectorAll('#chat-frame, .cached-chat-frame').forEach(f => {
+            f.style.display = 'none';
+            f.style.height = '100%'; 
+        });
+        frame.style.display = 'block';
+
+        // 3. Hide bottom navigation
+        if(nav) nav.classList.add('hide-nav');
+
+        // 4. Open the modal with slide animation immediately
+        modal.style.display = 'flex';
+        // Force Reflow
+        modal.offsetHeight; 
+        
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden'; 
+        
+        // Lock parent background
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+
+        // Set starting height
+        modal.style.height = (window.visualViewport ? window.visualViewport.height : window.initialScreenHeight) + 'px';
+        if (window.visualViewport) modal.style.top = window.visualViewport.offsetTop + 'px';
+
+        // 5. Apply External Theme dynamically from chatTheme.js
+        const applyThemeColor = () => {
+            const parentThemeMeta = document.querySelector('meta[name="theme-color"]');
+            if (parentThemeMeta) {
+                const targetColor = (window.chatTheme && window.chatTheme.statusBarColor) ? window.chatTheme.statusBarColor : '#0B1014';
+                parentThemeMeta.setAttribute('content', targetColor);
+            }
+        };
+        applyThemeColor(); // Apply instantly
+        frame.onload = applyThemeColor;
+
+        // 6. Add history state for hardware back button support
+        history.pushState({ chatOpen: true }, "", "#quantum-chat");
+    };
+
+    // --- NEW CLOSE CHAT MODAL LOGIC (RESTORES COMPONENTS) ---
+    window.closeChatModal = function(shouldGoBack) {
+        // --- ENSURE CHAT IS MARKED READ ON CLOSE TOO ---
+        if (window.currentActiveChatId) {
+            window.markChatAsRead(window.currentActiveChatId);
+            window.currentActiveChatId = null; 
+        }
+
+        const modal = document.getElementById('chat-modal');
+        const nav = document.querySelector('main-navbar');
+
+        modal.classList.remove('active');
+        
+        // Show bottom navigation again
+        if(nav) nav.classList.remove('hide-nav');
+
+        // Reset System Color back to your Inbox default
+        const parentThemeMeta = document.querySelector('meta[name="theme-color"]');
+        if (parentThemeMeta) {
+            parentThemeMeta.setAttribute('content', '#000000'); // Assuming #000000 is your default
+        }
+
+        setTimeout(() => {
+            modal.style.display = 'none';
+            
+            // 1. RESTORE COMPONENTS SO ALERTS CAN TRIGGER AGAIN
+            if (window._stashedCallNotifier) window._stashedCallNotifier.forEach(el => document.body.appendChild(el));
+            if (window._stashedChatLoader) window._stashedChatLoader.forEach(el => document.body.appendChild(el));
+
+            // Note: We DO NOT reset iframe src to 'about:blank' so the cache stays active for next 0ms load!
+            
+            document.body.style.overflow = 'auto';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
+            
+            modal.style.height = '100%'; // Reset to default relative state
+            modal.style.top = '0';
+        }, 400); 
+
+        if(shouldGoBack && window.location.hash === "#quantum-chat") {
+            history.back();
+        }
+    };
+
+    window.visitProfile = function(e, username) { e.stopPropagation(); window.location.href = `userProfile.html?user=${username}`; };
+
+    function openDeleteMenu(chatId, isPinned, userObj) {
+        activeChatId = chatId;
+        history.pushState({ menuOpen: true }, "", "#menu");
+        document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
+        document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
+        document.getElementById('active-username').innerText = `@${userObj.username}`;
+        const pinBtn = document.getElementById('pin-chat-btn');
+        pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
+        pinBtn.onclick = () => togglePin(chatId, isPinned);
+        document.getElementById('delete-menu').classList.add('active');
+        document.getElementById('overlay').style.display = 'block';
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.add('hide-nav');
+    }
+
+    // --- UPDATED POPSTATE TO HANDLE BOTH MODALS ---
+    window.onpopstate = (e) => { 
+        if(document.getElementById('delete-menu').classList.contains('active')) {
+            closeDeleteMenu(false); 
+        }
+        if(document.getElementById('chat-modal').classList.contains('active')) {
+            closeChatModal(false);
+        }
+    };
+
+    async function togglePin(chatId, isPinned) {
+        closeDeleteMenu(true);
+        const userRef = db.collection("users").doc(myUid);
+        if (isPinned) await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(chatId) });
+        else await userRef.update({ pinnedChats: firebase.firestore.FieldValue.arrayUnion(chatId) });
+    }
+
+    window.closeDeleteMenu = function(shouldGoBack) {
+        activeChatId = null;
+        document.getElementById('delete-menu').classList.remove('active');
+        document.getElementById('overlay').style.display = 'none';
+        const nav = document.querySelector('main-navbar');
+        if(nav && !document.getElementById('chat-modal').classList.contains('active')) {
+            nav.classList.remove('hide-nav');
+        }
+        if(shouldGoBack && window.location.hash === "#menu") history.back();
+    }
+
+    document.getElementById('confirm-delete').onclick = async () => {
+        if(!activeChatId) return;
+        const cid = activeChatId; 
+        closeDeleteMenu(true);
+        if(confirm("Are you sure? This action is irreversible.")) {
+            // === 1. LOCAL STORAGE & CACHE CLEANUP ===
+            localStorage.removeItem('goorac_inbox_html'); 
+            localStorage.removeItem('chat_msgs_' + cid); 
+            
+            try {
+                // === 2. CRITICAL: DELETE CHAT DOCUMENT FIRST ===
+                await db.collection("chats").doc(cid).delete();
+
+                // === 3. SUB-RESOURCE CLEANUP ===
+                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
+                rdb.ref(`typing/${cid}`).remove();
+                
+                // === 4. BATCH MESSAGE DELETION (WITH SAFETY LIMIT) ===
+                const msgs = await db.collection("chats").doc(cid).collection("messages").get();
+                if (!msgs.empty) {
+                    const batch = db.batch();
+                    let count = 0;
+                    msgs.docs.forEach((d, index) => {
+                        if (index < 480) { 
+                            batch.delete(d.ref);
+                            count++;
+                        }
+                    });
+                    if (count > 0) await batch.commit();
+                }
+                
+            } catch(e) { console.error("Erase failed:", e); }
+        }
+    };
+
+    window.handleSearch = function(val) { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => searchUsers(val), 400); }
+
+    function searchUsers(val) {
+        const results = document.getElementById('search-results');
+        const content = document.getElementById('inbox-content');
+        if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
+        results.style.display = 'block'; content.style.display = 'none';
+        const q = val.toLowerCase();
+        const allContacts = [...new Set([...myFollowingList, ...myFollowersList].map(f => typeof f === 'string' ? f : f.uid))];
+        if(allContacts.length === 0) { results.innerHTML = "<p style='text-align:center; padding:50px; color:#444;'>No contacts found.</p>"; return; }
+
+        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
+        .get().then(snap => {
+            results.innerHTML = snap.docs.filter(d => {
+                const u = d.data();
+                return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
+            }).map(d => {
+                const u = d.data();
+                return `<div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'"><img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;"><div class="chat-info"><div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div><div style="font-size:0.8rem; color:#444;">@${u.username}</div></div></div>`;
+            }).join('');
+        });
+    }
+
+    function formatTime(date) {
+        const now = new Date();
+        const diff = now - date;
+        const sec = Math.floor(diff / 1000), min = Math.floor(sec / 60), hour = Math.floor(min / 60), day = Math.floor(hour / 24);
+        if(sec < 60) return "Just now";
+        if(min < 60) return `${min}m ago`;
+        if(hour < 24) return `${hour}h ago`;
+        if(day < 7) return `${day}d ago`;
+        return date.toLocaleDateString();
+    }
+
+    // --- ADDED: Prefetch chat.html into browser disk cache for 0ms loads ---
+    setTimeout(() => {
+        if (!localStorage.getItem('goorac_chat_cached')) {
+            fetch('chat.html').then(r => r.text()).then(() => {
+                localStorage.setItem('goorac_chat_cached', 'true');
+            }).catch(e => console.warn("Cache prefetch failed", e));
+        }
+    }, 1500);
+
+    // --- UPDATED: Visual Viewport API fixes to prevent chat background resize AND keep input visible ---
+    if (window.visualViewport) {
+        const handleKeyboardResize = () => {
+            const modal = document.getElementById('chat-modal');
+            if (modal.classList.contains('active')) {
+                const vvHeight = window.visualViewport.height;
+                const offsetTop = window.visualViewport.offsetTop;
+                
+                // 1. Shrink the modal strictly to the visible area above the keyboard.
+                // This keeps the header at the top and naturally brings the bottom input up into view!
+                modal.style.height = vvHeight + 'px';
+                modal.style.top = offsetTop + 'px';
+
+                // 2. Prevent the iframe's internal background from squishing by dynamically locking its background height to the full original screen height.
+                document.querySelectorAll('.cached-chat-frame').forEach(frame => {
+                    if (frame.style.display === 'block') {
+                        try {
+                            const iframeDoc = frame.contentWindow.document;
+                            if (iframeDoc && iframeDoc.body) {
+                                iframeDoc.body.style.backgroundSize = `100vw ${window.initialScreenHeight}px`;
+                            }
+                        } catch(e) {}
+                    }
+                });
+                
+                window.scrollTo(0, 0); // Keep parent window from bleeding scroll
+            }
+        };
+        window.visualViewport.addEventListener('resize', handleKeyboardResize);
+        window.visualViewport.addEventListener('scroll', handleKeyboardResize);
+    }
 </script>
 </body>
 </html>
