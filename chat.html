@@ -3385,29 +3385,65 @@ box-shadow: var(--received-shadow);
         // Get my own name to show on the notification, fallback to 'Someone'
         const senderName = myUserData && myUserData.name ? myUserData.name : "Someone";
 
-        try {
-            await fetch(`https://${instanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${instanceId}/publishes`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${primaryKey}` 
-                },
-                body: JSON.stringify({
-                    // Sends the notification directly to the person you are chatting with
-                    interests: [targetUid], 
-                    web: {
-                        // THIS PREVENTS THE NOTIFICATION IF THEY ARE LOOKING AT THE CHAT
-                        hide_notification_if_site_has_focus: true, 
-                        notification: {
-                            title: `New message from ${senderName}`,
-                            body: messageText,
-                            deep_link: "https://www.goorac.biz" 
+        const pusherUrl = `https://${instanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${instanceId}/publishes`;
+        
+        // 10+ CORS Proxies for fallback reliability
+        const proxies = [
+            "https://corsproxy.io/?",
+            "https://thingproxy.freeboard.io/fetch/",
+            "https://api.allorigins.win/raw?url=",
+            "https://api.codetabs.com/v1/proxy?quest=",
+            "https://cors-proxy.htmldriven.com/?url=",
+            "https://yacdn.org/proxy/",
+            "https://cors.eu.org/",
+            "https://proxy.cors.sh/",
+            "https://crossorigin.me/",
+            "https://jsonp.afeld.me/?url=",
+            "https://cors-anywhere.herokuapp.com/"
+        ];
+
+        let success = false;
+
+        for (const proxy of proxies) {
+            if (success) break;
+            try {
+                // Formatting URL properly depending on the proxy's requirement
+                const proxyUrl = proxy.endsWith('=') || proxy.endsWith('?') ? proxy + encodeURIComponent(pusherUrl) : proxy + pusherUrl;
+
+                const response = await fetch(proxyUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${primaryKey}` 
+                    },
+                    body: JSON.stringify({
+                        // Sends the notification directly to the person you are chatting with
+                        interests: [targetUid], 
+                        web: {
+                            // THIS PREVENTS THE NOTIFICATION IF THEY ARE LOOKING AT THE CHAT
+                            hide_notification_if_site_has_focus: true, 
+                            notification: {
+                                title: `New message from ${senderName}`,
+                                body: messageText,
+                                deep_link: "https://www.goorac.biz" 
+                            }
                         }
-                    }
-                })
-            });
-        } catch (error) {
-            console.error("Error sending push:", error);
+                    })
+                });
+
+                if (response.ok) {
+                    console.log("✅ Push notification sent successfully via:", proxy);
+                    success = true;
+                } else {
+                    console.warn(`⚠️ Proxy ${proxy} failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.warn(`⚠️ Proxy ${proxy} encountered a CORS or network error:`, error.message);
+            }
+        }
+
+        if (!success) {
+            console.error("❌ All 10+ CORS proxies failed to send the push notification.");
         }
     };
     
