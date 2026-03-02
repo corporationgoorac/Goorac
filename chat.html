@@ -3376,13 +3376,16 @@ box-shadow: var(--received-shadow);
     //  19. MESSAGING CORE ACTIONS
     // =========================================
 
-const sendPushNotification = async (messageText) => {
+    const sendPushNotification = async (messageText) => {
+        // Only run if we have a person to send it to
         if (!targetUid) return;
         
+        // Get your name and photo to show in their notification banner
         const senderName = myUserData && myUserData.name ? myUserData.name : "Someone";
+        const senderPhoto = myUserData && myUserData.photoURL ? myUserData.photoURL : "https://www.goorac.biz/icon.png";
 
         try {
-            // This is your unique Render URL
+            // Your unique, permanent Render URL
             const backendUrl = "https://pish-uigm.onrender.com/send-push";
 
             await fetch(backendUrl, {
@@ -3393,7 +3396,8 @@ const sendPushNotification = async (messageText) => {
                 body: JSON.stringify({
                     targetUid: targetUid,
                     title: `New message from ${senderName}`,
-                    body: messageText
+                    body: messageText,
+                    icon: senderPhoto // This sends your PFP to the notification
                 })
             });
             
@@ -3402,6 +3406,9 @@ const sendPushNotification = async (messageText) => {
             console.error("❌ Error sending push:", error);
         }
     };
+
+
+    
     
     async function sendImageMessage(imageUrl) {
         popSound.play().catch(e => {});
