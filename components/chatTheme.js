@@ -1,28 +1,49 @@
 // components/chatTheme.js
 (function() {
     window.chatTheme = {
-        bg: "#050709",
-        bgGradient: "radial-gradient(circle at 50% 30%, #0B1014 0%, #050709 70%)",
-        headerBg: "#0B1014",
-        headerBlur: "blur(25px)",
-        accent: "#2A3F4C",
-        accentDark: "#1D2C36",
-        accentDim: "rgba(42, 63, 76, 0.2)",
-        glassBorder: "rgba(255, 255, 255, 0.05)",
-        border: "#151D24",
-        borderLight: "rgba(255, 255, 255, 0.06)",
-        sentBg: "linear-gradient(135deg, #1D2C36 0%, #2A3F4C 100%)",
-        sentText: "#F0F4F8",
-        sentShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
-        receivedBg: "#121A21",
-        receivedText: "#E2E8F0",
-        receivedShadow: "0 2px 5px rgba(0,0,0,0.5)",
-        text: "#F0F4F8",
-        textSecondary: "#94A3B8",
-        textMuted: "#475569",
-        mobileToolbarBg: "#0B1014",
+        // App Core Backgrounds
+        bg: "#050709", // The absolute base background color of the entire app behind everything.
+        bgGradient: "radial-gradient(circle at 50% 30%, #0B1014 0%, #050709 70%)", // The immersive gradient overlay for depth.
+        
+        // Header
+        headerBg: "#0B1014", // Background color of the top sticky navigation bar.
+        headerBlur: "blur(25px)", // The intensity of the glassmorphism blur effect on the header.
+        
+        // Primary Brand Colors (Buttons, Highlights, Icons)
+        accent: "#2A3F4C", // Primary brand color. Controls send button, mic button, active states, and highlights.
+        accentDark: "#1D2C36", // Darker variant of the accent color, used for gradients or pressed states.
+        accentDim: "rgba(42, 63, 76, 0.2)", // Transparent variant of the accent color. Used for glows, reply previews, and soft backgrounds.
+        
+        // Borders and Dividers
+        glassBorder: "rgba(255, 255, 255, 0.05)", // Extremely subtle transparent white. Used for the edges of the input capsule, popups, and bubbles to give a glass look.
+        border: "#151D24", // Solid border color used for distinct separation lines (like in menus or dividers).
+        borderLight: "rgba(255, 255, 255, 0.06)", // Slightly brighter solid border for inner elements.
+        
+        // Outgoing (Sent) Message Bubbles
+        sentBg: "linear-gradient(135deg, #1D2C36 0%, #2A3F4C 100%)", // The background gradient of the messages you send.
+        sentText: "#F0F4F8", // The text color of the messages you send.
+        sentShadow: "0 4px 15px rgba(0, 0, 0, 0.4)", // The drop shadow beneath your sent bubbles.
+        
+        // Incoming (Received) Message Bubbles & Media Pills
+        receivedBg: "#121A21", // The background color of messages others send you, as well as audio and file pills.
+        receivedText: "#E2E8F0", // The text color of incoming messages.
+        receivedShadow: "0 2px 5px rgba(0,0,0,0.5)", // The drop shadow beneath incoming bubbles.
+        
+        // Typography / Text Variables
+        text: "#F0F4F8", // Primary global text color (Usernames, main text input, menu options).
+        textSecondary: "#94A3B8", // Secondary text color used for timestamps, 'Active now' status, and subtle info.
+        textMuted: "#475569", // Highly muted text color used for placeholders (e.g., "Message...").
+        
+        // Modals & Bottom Areas
+        mobileToolbarBg: "#0B1014", // The background color of the input text capsule, the attachment menu, emoji tray, and long-press popups.
+        
+        // Text Capsule Aura Glow (Dynamically linked to your accent color)
+        capsuleGlowUnfocused: "0 -2px 15px color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 25px rgba(0,0,0,0.4)", // The subtle aura glow around the text input when not typing. Change 15% to adjust brightness.
+        capsuleGlowFocused: "0 -4px 25px color-mix(in srgb, var(--accent) 35%, transparent), 0 8px 25px color-mix(in srgb, var(--accent) 20%, transparent)", // The brighter, larger aura glow when typing. Change 35% to adjust brightness.
+        
+        // System UI
         // SOLID HEX for Android Status Bar to remove the top border line
-        statusBarColor: "#0B1014"
+        statusBarColor: "#0B1014" // Changes the color of the physical phone's top notification bar (battery, wifi, time).
     };
 
     // Apply the theme directly to the root CSS variables
@@ -47,6 +68,8 @@
     root.style.setProperty('--text-secondary', window.chatTheme.textSecondary);
     root.style.setProperty('--text-muted', window.chatTheme.textMuted);
     root.style.setProperty('--mobileToolbarBg', window.chatTheme.mobileToolbarBg);
+    root.style.setProperty('--capsule-glow-unfocused', window.chatTheme.capsuleGlowUnfocused);
+    root.style.setProperty('--capsule-glow-focused', window.chatTheme.capsuleGlowFocused);
 
     // DYNAMIC META TAG INJECTION
     // This forces the Android system bar to match your theme color automatically
@@ -60,4 +83,63 @@
         meta.content = window.chatTheme.statusBarColor;
         document.getElementsByTagName('head')[0].appendChild(meta);
     }
+
+    // =========================================================================
+    // DYNAMIC CSS INJECTION: Forces chat.html to use the theme everywhere
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+        if (!document.getElementById('forced-theme-overrides')) {
+            const style = document.createElement('style');
+            style.id = 'forced-theme-overrides';
+            style.innerHTML = `
+                /* Input Capsule & Glow - Forced to theme colors */
+                .input-area {
+                    border: 1px solid var(--glass-border) !important;
+                    box-shadow: var(--capsule-glow-unfocused) !important;
+                }
+                .input-area:focus-within, .input-area.force-expand {
+                    border-color: var(--accent) !important;
+                    box-shadow: var(--capsule-glow-focused) !important;
+                }
+                .msg-input { color: var(--text) !important; }
+
+                /* Audio & File Pills - Forced to Received background */
+                .msg-audio-pill, .msg-file-pill {
+                    background: var(--received-bg) !important;
+                    border: 1px solid var(--glass-border) !important;
+                }
+                .file-icon { background: var(--mobileToolbarBg) !important; }
+
+                /* Modals, Menus, Emoji Tray - Forced to Mobile Toolbar Background */
+                #attachment-menu, .menu-card, .react-list-container, .picker-modal-content {
+                    background: var(--mobileToolbarBg) !important;
+                    border: 1px solid var(--glass-border) !important;
+                }
+                .reaction-bar {
+                    background: var(--bg) !important;
+                    border-bottom: 1px solid var(--border) !important;
+                }
+                .menu-opt {
+                    border-bottom: 1px solid var(--border) !important;
+                    color: var(--text) !important;
+                }
+                .picker-header, .react-list-header { border-bottom: 1px solid var(--border) !important; }
+
+                /* Pulse Invite Banner - Forced to Theme Accent */
+                #pulse-invite-banner {
+                    background: linear-gradient(135deg, var(--accent-dim), rgba(0, 0, 0, 0.8)) !important;
+                    border-bottom: 1px solid var(--accent) !important;
+                }
+
+                /* Highlight Flash Animation - Forced to Theme Accent */
+                @keyframes flashMessageTheme { 
+                    0% { background-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; transform: scale(1.02); box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 40%, transparent) !important; } 
+                    100% { background-color: transparent !important; transform: scale(1); box-shadow: none !important; } 
+                }
+                .flash-active { animation: flashMessageTheme 1.5s ease-out !important; }
+            `;
+            document.head.appendChild(style);
+        }
+    });
+
 })();
