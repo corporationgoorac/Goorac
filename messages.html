@@ -594,10 +594,8 @@
             frame.className = 'cached-chat-frame';
             frame.style.width = '100%';
             
-            // STRICTLY LOCK HEIGHT SO BACKGROUND DOESN'T SQUISH
-            frame.style.height = window.initialScreenHeight + 'px';
-            frame.style.minHeight = window.initialScreenHeight + 'px';
-            frame.style.maxHeight = window.initialScreenHeight + 'px';
+            // Allow the iframe to naturally resize with the modal so the text box doesn't vanish
+            frame.style.height = '100%';
             
             frame.style.border = 'none';
             frame.style.position = 'absolute';
@@ -609,12 +607,10 @@
             modal.appendChild(frame);
         }
 
-        // Only display the selected chat's iframe and lock all background sizes
+        // Only display the selected chat's iframe
         document.querySelectorAll('#chat-frame, .cached-chat-frame').forEach(f => {
             f.style.display = 'none';
-            f.style.height = window.initialScreenHeight + 'px';
-            f.style.minHeight = window.initialScreenHeight + 'px';
-            f.style.maxHeight = window.initialScreenHeight + 'px';
+            f.style.height = '100%'; 
         });
         frame.style.display = 'block';
 
@@ -634,7 +630,7 @@
         document.body.style.width = '100%';
         document.body.style.height = '100%';
 
-        // Lock modal to exact window height to start
+        // Set starting height
         modal.style.height = (window.visualViewport ? window.visualViewport.height : window.initialScreenHeight) + 'px';
         if (window.visualViewport) modal.style.top = window.visualViewport.offsetTop + 'px';
 
@@ -691,7 +687,6 @@
             
             modal.style.height = '100%'; // Reset to default relative state
             modal.style.top = '0';
-            modal.scrollTop = 0; // Reset internal pan
         }, 400); 
 
         if(shouldGoBack && window.location.hash === "#quantum-chat") {
@@ -830,17 +825,23 @@
                 const vvHeight = window.visualViewport.height;
                 const offsetTop = window.visualViewport.offsetTop;
                 
-                // 1. Shrink the modal wrapper strictly to the visible area above the keyboard
+                // 1. Shrink the modal strictly to the visible area above the keyboard.
+                // This keeps the header at the top and naturally brings the bottom input up into view!
                 modal.style.height = vvHeight + 'px';
                 modal.style.top = offsetTop + 'px';
-                
-                // 2. Pan the modal down so the bottom of the locked-height iframe (where the input is) is visible
-                if (window.initialScreenHeight && vvHeight < window.initialScreenHeight) {
-                    modal.scrollTop = window.initialScreenHeight - vvHeight;
-                } else {
-                    modal.scrollTop = 0;
-                }
 
+                // 2. Prevent the iframe's internal background from squishing by dynamically locking its background height to the full original screen height.
+                document.querySelectorAll('.cached-chat-frame').forEach(frame => {
+                    if (frame.style.display === 'block') {
+                        try {
+                            const iframeDoc = frame.contentWindow.document;
+                            if (iframeDoc && iframeDoc.body) {
+                                iframeDoc.body.style.backgroundSize = `100vw ${window.initialScreenHeight}px`;
+                            }
+                        } catch(e) {}
+                    }
+                });
+                
                 window.scrollTo(0, 0); // Keep parent window from bleeding scroll
             }
         };
