@@ -678,7 +678,7 @@ class ViewMoments extends HTMLElement {
         });
         
         // Render feed purely to update icon states
-        // this.renderFeed(); // DISABLED: Modifying feed dynamically via DOM queries above so playing video isnt rebuilt & interrupted
+        // this.renderFeed(); // DISABLED: Modifying feed dynamically via DOM queries above so playing video isn't rebuilt & interrupted
     }
 
     /**
@@ -816,9 +816,17 @@ class ViewMoments extends HTMLElement {
                 // ---> NEW CODE ADDED: PUSHER NOTIFICATION DISPATCH (LIKE)
                 // ==========================================================
                 try {
-                    const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
-                    const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
-                    const deepLink = `https://www.goorac.biz/chat.html?user=${this.currentUserData.username}`;
+                    let senderUsername = "User";
+                    let senderName = "User";
+                    let senderPfp = 'https://via.placeholder.com/65';
+                    
+                    if (this.currentUserData) {
+                        senderUsername = this.currentUserData.username || "User";
+                        senderName = this.currentUserData.name || this.currentUserData.username || "User";
+                        senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                    }
+
+                    const deepLink = `https://www.goorac.biz/chat.html?user=${senderUsername}`;
                     
                     fetch('https://pish-uigm.onrender.com/send-push', {
                         method: 'POST',
@@ -2276,9 +2284,17 @@ class ViewMoments extends HTMLElement {
             // ---> NEW CODE ADDED: PUSHER NOTIFICATION DISPATCH (REPLY)
             // ==========================================================
             try {
-                const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
-                const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
-                const deepLink = `https://www.goorac.biz/chat.html?user=${this.currentUserData.username}`;
+                let senderUsername = "User";
+                let senderName = "User";
+                let senderPfp = 'https://via.placeholder.com/65';
+                
+                if (this.currentUserData) {
+                    senderUsername = this.currentUserData.username || "User";
+                    senderName = this.currentUserData.name || this.currentUserData.username || "User";
+                    senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                }
+
+                const deepLink = `https://www.goorac.biz/chat.html?user=${senderUsername}`;
 
                 fetch('https://pish-uigm.onrender.com/send-push', {
                     method: 'POST',
@@ -2482,6 +2498,47 @@ class ViewMoments extends HTMLElement {
 
             if (moment && moment.uid !== this.currentUserData.uid) {
                 this.sendNotification(moment.uid, 'comment_moment', momentId, `commented: "${text}"`);
+                
+                // ==========================================================
+                // ---> NEW CODE ADDED: PUSHER NOTIFICATION DISPATCH (COMMENT)
+                // ==========================================================
+                try {
+                    let senderUsername = "User";
+                    let senderName = "User";
+                    let senderPfp = 'https://via.placeholder.com/65';
+                    
+                    if (this.currentUserData) {
+                        senderUsername = this.currentUserData.username || "User";
+                        senderName = this.currentUserData.name || this.currentUserData.username || "User";
+                        senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                    }
+
+                    const deepLink = `https://www.goorac.biz/chat.html?user=${senderUsername}`;
+
+                    fetch('https://pish-uigm.onrender.com/send-push', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            targetUid: moment.uid,
+                            title: `New Comment 💬`,
+                            body: `${senderName} commented: "${text}"`,
+                            icon: senderPfp,
+                            click_action: deepLink
+                        })
+                    }).catch(e => console.error("Push Notification API failed:", e));
+
+                    if (window.pusherChannel) {
+                        window.pusherChannel.trigger('client-new-notification', {
+                            toUid: moment.uid,
+                            title: `New Comment`,
+                            body: `${senderName} commented: "${text}"`,
+                            icon: senderPfp
+                        });
+                    }
+                } catch (pushErr) {
+                    console.error("Pusher logic failed to execute:", pushErr);
+                }
+                // ==========================================================
             }
         } catch(e) { 
             console.error("Comment dispatch error", e); 
