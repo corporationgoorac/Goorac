@@ -901,7 +901,7 @@ box-shadow: var(--received-shadow);
             z-index: 1000; 
             position: relative; /* Essential for overlay */
             margin-top: auto; /* Fix for older mobiles hanging */
-            touch-action: none; /* PREVENT SCROLLING PAGE WHEN DRAGGING CAPSULE */
+            touch-action: none !important; /* PREVENT SCROLLING PAGE WHEN DRAGGING CAPSULE */
         }
         
         .input-area { 
@@ -919,7 +919,7 @@ box-shadow: var(--received-shadow);
             transform: scale(0.96);
             transform-origin: bottom center;
             transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); /* Professional expansion */
-            touch-action: none; /* Prevent accidental page scrolls */
+            touch-action: none !important; /* Prevent accidental page scrolls */
         }
         
         /* EXPANDED CAPSULE STATE (Focused) */
@@ -956,6 +956,7 @@ box-shadow: var(--received-shadow);
             overflow-y: auto; 
             line-height: 1.4; 
             touch-action: pan-y; /* Allow internal scrolling for long text */
+            overscroll-behavior-y: contain; /* ADDED FIX: prevent dragging whole page from text area */
         }
         
         .plus-btn { 
@@ -1464,7 +1465,7 @@ box-shadow: var(--received-shadow);
 
 <div class="app-container" id="main-app">
     <header id="chat-header">
-        <div class="back-btn" onclick="history.back()">
+        <div class="back-btn" onclick="smartBack()">
             <span class="material-icons-round" style="font-size: 32px; font-weight: 500;">chevron_left</span>
         </div>
         <div class="h-profile-group" onclick="goToProfile()">
@@ -1821,15 +1822,32 @@ box-shadow: var(--received-shadow);
         }
     }, 100);
 
+    // =========================================
+    // FIX FOR INPUT BOUNCE & MODAL BACK BUTTON
+    // =========================================
+
     // BLOCK PAGE SCROLL WHEN DRAGGING THE CAPSULE UP
     const inputContainerObj = document.querySelector('.input-area-container');
     if (inputContainerObj) {
         inputContainerObj.addEventListener('touchmove', (e) => {
-            if(e.target.tagName !== 'TEXTAREA') {
-                e.preventDefault(); // Stop page scroll when dragging the capsule
+            // Strictly stop page scroll/drag when touching the capsule (unless scrolling the text inside)
+            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+                e.preventDefault(); 
+                e.stopPropagation();
             }
         }, { passive: false });
     }
+
+    // Multifunctional Back Button Logic
+    window.smartBack = function() {
+        if (window !== window.parent && typeof window.parent.closeChatModal === 'function') {
+            // We are inside the iframe modal, tell the parent to close it
+            window.parent.closeChatModal();
+        } else {
+            // Normal direct page access
+            history.back();
+        }
+    };
 
     // Double Tap Background to Scroll
     document.addEventListener('dblclick', (e) => {
