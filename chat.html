@@ -1954,7 +1954,9 @@ box-shadow: var(--received-shadow);
         window.visualViewport.addEventListener('resize', () => {
             const viewportHeight = window.visualViewport.height;
             document.getElementById('main-app').style.height = viewportHeight + 'px';
-            document.body.style.top = window.visualViewport.offsetTop + 'px';
+            // FIX: Keep body top at 0 to prevent the header from hiding when keyboard opens
+            document.body.style.top = '0px'; 
+            window.scrollTo(0, 0); // Force viewport to top
             window.scrollToBottom();
         });
     }
@@ -1963,6 +1965,8 @@ box-shadow: var(--received-shadow);
     window.addEventListener('resize', () => {
         if (!window.visualViewport || /android/i.test(navigator.userAgent)) {
             document.getElementById('main-app').style.height = window.innerHeight + 'px';
+            document.body.style.top = '0px'; // FIX: Keep body top at 0
+            window.scrollTo(0, 0); // Force viewport to top
             window.scrollToBottom();
         }
     });
@@ -1976,6 +1980,9 @@ box-shadow: var(--received-shadow);
     mInput.addEventListener("focus", () => { 
         if(emojiTray.style.display === 'block') closeEmojiTray();
         if(attachmentMenu.style.display === 'flex') closeAttachmentMenu();
+        // FIX: Force scroll to top so header remains visible when keyboard opens on old devices
+        setTimeout(() => { window.scrollTo(0, 0); document.body.scrollTop = 0; }, 50);
+        setTimeout(() => { window.scrollTo(0, 0); }, 300); // Double fallback for slower animations
     });
 
     function closeEmojiTray() {
