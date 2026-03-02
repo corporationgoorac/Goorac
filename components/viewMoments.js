@@ -811,6 +811,39 @@ class ViewMoments extends HTMLElement {
             // Fire background notification
             if (moment.uid !== myUid) {
                 this.sendNotification(moment.uid, 'like_moment', momentId, 'liked your moment.');
+                
+                // ==========================================================
+                // ---> NEW CODE ADDED: PUSHER NOTIFICATION DISPATCH (LIKE)
+                // ==========================================================
+                try {
+                    const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
+                    const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                    
+                    fetch('/send-pusher-notification', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            toUid: moment.uid,
+                            title: `New Like ❤️`,
+                            body: `${senderName} liked your moment`,
+                            icon: senderPfp,
+                            type: 'like_moment',
+                            momentId: moment.id
+                        })
+                    }).catch(e => console.error("Pusher Notification API failed:", e));
+
+                    if (window.pusherChannel) {
+                        window.pusherChannel.trigger('client-new-notification', {
+                            toUid: moment.uid,
+                            title: `New Like ❤️`,
+                            body: `${senderName} liked your moment`,
+                            icon: senderPfp
+                        });
+                    }
+                } catch (pushErr) {
+                    console.error("Pusher logic failed to execute:", pushErr);
+                }
+                // ==========================================================
             }
         }
     }
@@ -2238,6 +2271,39 @@ class ViewMoments extends HTMLElement {
 
             this.sendNotification(targetUid, 'reply_moment', momentId, `replied to your moment: "${text}"`);
             this.showToast("Reply Sent!", "check_circle");
+            
+            // ==========================================================
+            // ---> NEW CODE ADDED: PUSHER NOTIFICATION DISPATCH (REPLY)
+            // ==========================================================
+            try {
+                const senderName = this.currentUserData.name || this.currentUserData.username || 'User';
+                const senderPfp = this.currentUserData.photoURL || 'https://via.placeholder.com/65';
+                
+                fetch('/send-pusher-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        toUid: targetUid,
+                        title: `New Reply from ${senderName} 💬`,
+                        body: text,
+                        icon: senderPfp,
+                        type: 'chat_reply',
+                        chatId: chatId
+                    })
+                }).catch(e => console.error("Pusher Notification API failed:", e));
+
+                if (window.pusherChannel) {
+                    window.pusherChannel.trigger('client-new-notification', {
+                        toUid: targetUid,
+                        title: `New Reply from ${senderName}`,
+                        body: text,
+                        icon: senderPfp
+                    });
+                }
+            } catch (pushErr) {
+                console.error("Pusher logic failed to execute:", pushErr);
+            }
+            // ==========================================================
             
         } catch(e) {
             console.error("Failed to send reply payload", e);
