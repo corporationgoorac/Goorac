@@ -8,6 +8,8 @@
     <meta name="theme-color" content="#000000"> <title>Goorac | Quantum Inbox</title>
     
     <script src="config.js"></script>
+    
+    <script src="components/chatTheme.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -198,17 +200,6 @@
             background: #000;
             -webkit-overflow-scrolling: touch;
         }
-        
-        /* CSS for dynamic cached iframes */
-        .cached-chat-frame {
-            flex: 1;
-            border: none;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            -webkit-overflow-scrolling: touch;
-            display: none;
-        }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -251,7 +242,7 @@
 </div>
 
 <div id="chat-modal">
-    <iframe id="chat-frame" src="about:blank" style="display:none;"></iframe>
+    <iframe id="chat-frame" src="about:blank"></iframe>
 </div>
 
 <script src="components/navbar.js" defer></script>
@@ -551,51 +542,48 @@
     window.cancelLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
     window.endLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
 
-    // --- NEW ENTER CHAT LOGIC WITH MODAL & TOOLBAR COLOR SYNC & CACHING ---
+    // --- NEW ENTER CHAT LOGIC WITH MODAL & TOOLBAR COLOR SYNC & COMPONENT STOPPING ---
     window.enterChat = function(e, username) {
         if(isLongPress || (e && e.target.closest('button'))) return;
 
         const modal = document.getElementById('chat-modal');
         const nav = document.querySelector('main-navbar');
-        
-        // --- PAUSE ALERT COMPONENTS ---
-        const callNotifier = document.querySelector('call-notifier');
-        const chatLoader = document.querySelector('chat-loader');
-        if(callNotifier) callNotifier.style.display = 'none';
-        if(chatLoader) chatLoader.style.display = 'none';
 
-        // --- 0ms IFRAME CACHING LOGIC ---
-        // Hide all iframes first
-        const allFrames = modal.querySelectorAll('iframe');
-        allFrames.forEach(f => f.style.display = 'none');
-        
-        let targetFrame = document.getElementById('chat-frame-' + username);
-        
-        if (!targetFrame) {
-            targetFrame = document.createElement('iframe');
-            targetFrame.id = 'chat-frame-' + username;
-            targetFrame.className = 'cached-chat-frame';
-            modal.appendChild(targetFrame);
+        // 1. DISABLE NOTIFICATIONS TEMPORARILY
+        // We remove components from the DOM to effectively pause all triggers while the modal is open.
+        window._stashedCallNotifier = document.querySelectorAll('call-notifier');
+        window._stashedChatLoader = document.querySelectorAll('chat-loader');
+        window._stashedCallNotifier.forEach(el => el.remove());
+        window._stashedChatLoader.forEach(el => el.remove());
+
+        // 2. ZERO MS LOAD - CACHE IFRAMES BY ID
+        let frame = document.getElementById('chat-frame-' + username);
+        if (!frame) {
+            frame = document.createElement('iframe');
+            frame.id = 'chat-frame-' + username;
+            frame.className = 'cached-chat-frame';
+            frame.style.width = '100%';
+            frame.style.height = '100%';
+            frame.style.border = 'none';
+            frame.style.position = 'absolute';
+            frame.style.top = '0';
+            frame.style.left = '0';
+            frame.style.background = '#000';
+            frame.style.webkitOverflowScrolling = 'touch';
+            try { frame.src = `chat.html?user=${username}`; } catch(err) {}
+            modal.appendChild(frame);
         }
 
-        targetFrame.style.display = 'block';
+        // Only display the selected chat's iframe
+        document.querySelectorAll('#chat-frame, .cached-chat-frame').forEach(f => {
+            f.style.display = 'none';
+        });
+        frame.style.display = 'block';
 
-        // 1. Set the URL FIRST to trigger network loading while UI is transitioning
-        // Using replace() to keep history clean for hardware back button
-        try {
-            if(targetFrame.contentWindow.location.href === 'about:blank' || !targetFrame.contentWindow.location.href.includes(username)) {
-                targetFrame.contentWindow.location.replace(`chat.html?user=${username}`);
-            }
-        } catch(err) {
-            if(targetFrame.src === 'about:blank' || !targetFrame.src.includes(username)) {
-                targetFrame.src = `chat.html?user=${username}`;
-            }
-        }
-
-        // 2. Hide bottom navigation
+        // 3. Hide bottom navigation
         if(nav) nav.classList.add('hide-nav');
 
-        // 3. Open the modal with slide animation immediately
+        // 4. Open the modal with slide animation immediately
         modal.style.display = 'flex';
         // Force Reflow
         modal.offsetHeight; 
@@ -608,28 +596,22 @@
         document.body.style.width = '100%';
         document.body.style.height = '100%';
 
-        // 4. Wait for the iframe to load, then steal its toolbar color
-        targetFrame.onload = function() {
-            try {
-                const iframeDoc = targetFrame.contentDocument || targetFrame.contentWindow.document;
-                const chatThemeMeta = iframeDoc.querySelector('meta[name="theme-color"]');
-                if (chatThemeMeta) {
-                    const chatColor = chatThemeMeta.getAttribute('content');
-                    let parentThemeMeta = document.querySelector('meta[name="theme-color"]');
-                    if(parentThemeMeta) {
-                        parentThemeMeta.setAttribute('content', chatColor);
-                    }
-                }
-            } catch (error) {
-                console.warn("Could not read iframe color:", error);
+        // 5. Apply External Theme dynamically from chatTheme.js
+        const applyThemeColor = () => {
+            const parentThemeMeta = document.querySelector('meta[name="theme-color"]');
+            if (parentThemeMeta) {
+                const targetColor = (window.chatTheme && window.chatTheme.statusBarColor) ? window.chatTheme.statusBarColor : '#0B1014';
+                parentThemeMeta.setAttribute('content', targetColor);
             }
         };
+        applyThemeColor(); // Apply instantly
+        frame.onload = applyThemeColor;
 
-        // 5. Add history state for hardware back button support
+        // 6. Add history state for hardware back button support
         history.pushState({ chatOpen: true }, "", "#quantum-chat");
     };
 
-    // --- NEW CLOSE CHAT MODAL LOGIC WITH BACKGROUND CACHING ---
+    // --- NEW CLOSE CHAT MODAL LOGIC (RESTORES COMPONENTS) ---
     window.closeChatModal = function(shouldGoBack) {
         const modal = document.getElementById('chat-modal');
         const nav = document.querySelector('main-navbar');
@@ -648,8 +630,11 @@
         setTimeout(() => {
             modal.style.display = 'none';
             
-            // Bypass the about:blank reset to preserve the iframe cache for 0ms loads
-            // try { frame.contentWindow.location.replace('about:blank'); } catch(e) { frame.src = 'about:blank'; }
+            // 1. RESTORE COMPONENTS SO ALERTS CAN TRIGGER AGAIN
+            if (window._stashedCallNotifier) window._stashedCallNotifier.forEach(el => document.body.appendChild(el));
+            if (window._stashedChatLoader) window._stashedChatLoader.forEach(el => document.body.appendChild(el));
+
+            // Note: We DO NOT reset iframe src to 'about:blank' so the cache stays active for next 0ms load!
             
             document.body.style.overflow = 'auto';
             document.body.style.position = '';
@@ -658,13 +643,6 @@
             
             modal.style.height = '100%';
             modal.style.top = '0';
-            
-            // --- RESUME ALERT COMPONENTS ---
-            const callNotifier = document.querySelector('call-notifier');
-            const chatLoader = document.querySelector('chat-loader');
-            if(callNotifier) callNotifier.style.display = '';
-            if(chatLoader) chatLoader.style.display = '';
-            
         }, 400); 
 
         if(shouldGoBack && window.location.hash === "#quantum-chat") {
@@ -795,15 +773,15 @@
         }
     }, 1500);
 
-    // --- UPDATED: Visual Viewport API dynamically fixing the squished background image issue ---
-    let initialViewportHeight = window.innerHeight; // Cache the screen height BEFORE the keyboard opens
+    // --- UPDATED: Visual Viewport API fixes to prevent chat background resize issue ---
     if (window.visualViewport) {
         const handleKeyboardResize = () => {
             const modal = document.getElementById('chat-modal');
             if (modal.classList.contains('active')) {
-                // Apply fixed initial screen height so background doesn't resize, while allowing visual offset
-                modal.style.height = initialViewportHeight + 'px';
-                modal.style.top = window.visualViewport.offsetTop + 'px';
+                // FIXED: Do not shrink the modal height which causes the chat background image to resize
+                // Force full 100vh layout; chat.html will manage its internal scrolling on focus dynamically
+                modal.style.height = '100vh'; 
+                modal.style.top = '0px'; 
                 window.scrollTo(0, 0);
             }
         };
