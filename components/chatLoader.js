@@ -13,6 +13,11 @@ class ChatLoader extends HTMLElement {
 
         // Notification Audio (Crisp 'Ding' Sound)
         this.notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); 
+
+        // NEW: Variables to track multiple incoming messages
+        this.activeNotifCount = 0;
+        this.activeNotifUsers = new Set();
+        this.notifTimer = null;
     }
 
     connectedCallback() {
@@ -32,32 +37,33 @@ class ChatLoader extends HTMLElement {
         if(document.getElementById('cl-notif-container')) return;
 
         const style = document.createElement('style');
+        // Redesigned UI: Sleeker, glassmorphism pill-shape, smoother animations
         style.textContent = `
             #cl-notif-container {
-                position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-                width: 94%; max-width: 400px; z-index: 100000;
+                position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+                width: 90%; max-width: 380px; z-index: 100000;
                 display: flex; flex-direction: column; gap: 8px;
                 pointer-events: none;
             }
             .cl-toast {
-                background: rgba(20, 20, 20, 0.90);
-                backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-                border: 1px solid rgba(255,255,255,0.08);
-                color: #fff; padding: 12px; border-radius: 18px;
-                display: flex; align-items: center; gap: 12px;
-                box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                opacity: 0; transform: translateY(-20px) scale(0.95);
-                transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                background: rgba(30, 30, 30, 0.85);
+                backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                color: #fff; padding: 10px 14px; border-radius: 24px;
+                display: flex; align-items: center; gap: 14px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                opacity: 0; transform: translateY(-30px);
+                transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
                 pointer-events: auto; cursor: pointer;
             }
-            .cl-toast.show { opacity: 1; transform: translateY(0) scale(1); }
-            .cl-toast-pfp { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; object-fit: cover; background: #333; border: 1px solid rgba(255,255,255,0.1); }
-            .cl-toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-            .cl-toast-header { display: flex; justify-content: space-between; align-items: center; }
-            .cl-toast-name { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; color: #fff; }
+            .cl-toast.show { opacity: 1; transform: translateY(0); }
+            .cl-toast-pfp { width: 40px; height: 40px; min-width: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); background: #333;}
+            .cl-toast-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+            .cl-toast-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;}
+            .cl-toast-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; color: #fff; letter-spacing: 0.2px;}
             .cl-toast-verified { width: 14px; height: 14px; }
-            .cl-toast-time { font-size: 0.75rem; color: #888; font-variant-numeric: tabular-nums; }
-            .cl-toast-msg { font-size: 0.85rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+            .cl-toast-time { font-size: 0.7rem; color: #aaa; font-variant-numeric: tabular-nums; }
+            .cl-toast-msg { font-size: 0.85rem; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         `;
         document.head.appendChild(style);
 
@@ -186,24 +192,73 @@ class ChatLoader extends HTMLElement {
     showNotification(chat, user) {
         if (!user) return;
 
-        // Play Sound
-        this.notifSound.currentTime = 0;
-        this.notifSound.play().catch(() => {}); // Catch autoplay blocks
+        // Play Sound (Commented out as requested)
+        // this.notifSound.currentTime = 0;
+        // this.notifSound.play().catch(() => {}); // Catch autoplay blocks
         
-        // Vibrate
-        if(navigator.vibrate) navigator.vibrate(50);
+        // Vibrate (Commented out as requested)
+        // if(navigator.vibrate) navigator.vibrate(50);
 
         const container = document.getElementById('cl-notif-container');
-        const notif = document.createElement('div');
-        notif.className = 'cl-toast';
         
-        const pfp = user.photoURL || 'https://via.placeholder.com/150';
-        const name = user.name || user.username || "User";
         // Handle "Like" messages or images
         let msgText = chat.lastMessage || "New Message";
         if(msgText.includes('<svg') || msgText.includes('Sent a photo')) msgText = "Sent a photo 📷";
 
         const time = "Now";
+
+        // Check if there is already an active notification
+        let existingNotif = container.querySelector('.cl-toast');
+        
+        if (existingNotif) {
+            // Group notifications
+            this.activeNotifCount = (this.activeNotifCount || 1) + 1;
+            if (!this.activeNotifUsers) this.activeNotifUsers = new Set();
+            this.activeNotifUsers.add(user.username);
+
+            if (this.activeNotifUsers.size === 1) {
+                // Multiple messages from the SAME user
+                existingNotif.querySelector('.cl-toast-msg').innerText = `[${this.activeNotifCount} new messages] ${msgText}`;
+            } else {
+                // Messages from MULTIPLE users
+                existingNotif.querySelector('.cl-toast-name').innerText = `New Messages`;
+                existingNotif.querySelector('.cl-toast-msg').innerText = `You have ${this.activeNotifCount} new messages from ${this.activeNotifUsers.size} chats`;
+                existingNotif.querySelector('.cl-toast-pfp').src = 'https://via.placeholder.com/150'; // Generic icon for multiple
+                
+                // Clear the verified badge for multi-user grouping
+                const verifiedIcon = existingNotif.querySelector('.cl-toast-verified');
+                if (verifiedIcon) verifiedIcon.remove();
+
+                // Update onclick to go to the main inbox instead
+                existingNotif.onclick = () => {
+                    // if(navigator.vibrate) navigator.vibrate(10);
+                    window.location.href = `messages.html`; 
+                };
+            }
+
+            // Reset the removal timer
+            clearTimeout(this.notifTimer);
+            this.notifTimer = setTimeout(() => {
+                existingNotif.classList.remove('show');
+                setTimeout(() => { 
+                    if(existingNotif.parentNode) existingNotif.remove(); 
+                    this.activeNotifCount = 0;
+                    this.activeNotifUsers.clear();
+                }, 500);
+            }, 4000);
+
+            return; // Exit early so we don't create a second popup element
+        }
+
+        // Setup for a completely fresh notification
+        this.activeNotifCount = 1;
+        this.activeNotifUsers = new Set([user.username]);
+
+        const notif = document.createElement('div');
+        notif.className = 'cl-toast';
+        
+        const pfp = user.photoURL || 'https://via.placeholder.com/150';
+        const name = user.name || user.username || "User";
         const verifiedBadge = user.verified ? `<img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="cl-toast-verified">` : '';
 
         notif.innerHTML = `
@@ -219,7 +274,7 @@ class ChatLoader extends HTMLElement {
 
         // Click interaction
         notif.onclick = () => {
-            if(navigator.vibrate) navigator.vibrate(10);
+            // if(navigator.vibrate) navigator.vibrate(10);
             window.location.href = `chat.html?user=${user.username}`;
         };
 
@@ -229,9 +284,13 @@ class ChatLoader extends HTMLElement {
         requestAnimationFrame(() => notif.classList.add('show'));
 
         // Remove after 4 seconds
-        setTimeout(() => {
+        this.notifTimer = setTimeout(() => {
             notif.classList.remove('show');
-            setTimeout(() => { if(notif.parentNode) notif.remove(); }, 500); // Wait for transition
+            setTimeout(() => { 
+                if(notif.parentNode) notif.remove(); 
+                this.activeNotifCount = 0;
+                this.activeNotifUsers.clear();
+            }, 500); // Wait for transition
         }, 4000);
     }
 
