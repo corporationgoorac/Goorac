@@ -901,7 +901,7 @@ box-shadow: var(--received-shadow);
             z-index: 1000; 
             position: relative; /* Essential for overlay */
             margin-top: auto; /* Fix for older mobiles hanging */
-            touch-action: none !important; /* PREVENT SCROLLING PAGE WHEN DRAGGING CAPSULE */
+            touch-action: pan-y !important; /* ALLOW EMOJI SCROLLING */
         }
         
         .input-area { 
@@ -919,7 +919,8 @@ box-shadow: var(--received-shadow);
             transform: scale(0.96);
             transform-origin: bottom center;
             transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); /* Professional expansion */
-            touch-action: none !important; /* Prevent accidental page scrolls */
+            touch-action: none !important; /* Prevent accidental page scrolls when dragging capsule */
+            position: relative; /* Crucial for inner recording overlay alignment */
         }
         
         /* EXPANDED CAPSULE STATE (Focused) */
@@ -1042,13 +1043,17 @@ box-shadow: var(--received-shadow);
         }
 
         .recording-ui-overlay {
-            position: absolute; left: 0; bottom: 0; width: 100%; height: 100%;
-            background: var(--bg); 
+            position: absolute; left: 0; bottom: 0; top: 0; width: 100%; height: 100%;
+            background: var(--mobileToolbarBg, rgba(25, 25, 25, 0.95)); 
+            border-radius: inherit; /* Inherits the dynamic rounding of the capsule exactly */
             display: none; align-items: center; padding: 0 16px; z-index: 50;
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            box-sizing: border-box;
         }
         
         .rec-timer {
-            font-family: monospace; font-size: 1.1rem; color: #ff453a; font-weight: 600; min-width: 60px;
+            font-family: monospace; font-size: 1.1rem; color: var(--accent); font-weight: 600; min-width: 60px;
         }
         
         .rec-visualizer {
@@ -1057,7 +1062,7 @@ box-shadow: var(--received-shadow);
             mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
             -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
         }
-        .viz-bar { width: 4px; background: #ff453a; border-radius: 2px; animation: vizAnim 0.5s infinite ease-in-out; }
+        .viz-bar { width: 4px; background: var(--accent); border-radius: 2px; animation: vizAnim 0.5s infinite ease-in-out; }
         @keyframes vizAnim { 0%,100% { height: 20%; } 50% { height: 100%; } }
         
         .rec-slide-cancel-text {
@@ -1067,12 +1072,12 @@ box-shadow: var(--received-shadow);
             transform: translateY(-50%);
             left: auto; 
             color: #888; font-size: 0.9rem; font-weight: 500;
-            pointer-events: none;
             display: flex; align-items: center; gap: 6px;
             opacity: 0; transition: opacity 0.3s;
             white-space: nowrap;
             background: rgba(0,0,0,0.6); 
             padding: 4px 8px; border-radius: 12px;
+            cursor: pointer; /* Makes button-like when locked */
         }
         .rec-slide-cancel-text svg { width: 16px; height: 16px; fill: #888; }
         
@@ -1099,7 +1104,7 @@ box-shadow: var(--received-shadow);
             z-index: 101;
         }
         .cancel-trash-zone.visible { transform: scale(1); }
-        .cancel-trash-zone.active { transform: scale(1.3); background: #ff453a; color: white; }
+        .cancel-trash-zone.active { transform: scale(1.3); background: var(--accent); color: white; }
         .cancel-trash-zone svg { width: 24px; height: 24px; fill: currentColor; }
 
         .rec-ind-bubble {
@@ -1111,10 +1116,10 @@ box-shadow: var(--received-shadow);
             height: 38px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             border: 1px solid rgba(255,255,255,0.05);
-            color: #ff453a; font-size: 0.85rem; font-weight: 600;
+            color: var(--accent); font-size: 0.85rem; font-weight: 600;
         }
         .rec-wave-icon { display: flex; gap: 2px; align-items: center; height: 12px; }
-        .rec-wave-bar { width: 2px; height: 100%; background: #ff453a; animation: recWaveBody 1s infinite ease-in-out; }
+        .rec-wave-bar { width: 2px; height: 100%; background: var(--accent); animation: recWaveBody 1s infinite ease-in-out; }
         .rec-wave-bar:nth-child(2) { animation-delay: 0.1s; height: 60%; }
         .rec-wave-bar:nth-child(3) { animation-delay: 0.2s; height: 80%; }
         @keyframes recWaveBody { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
@@ -1122,8 +1127,17 @@ box-shadow: var(--received-shadow);
 
         /* EMOJI & ATTACHMENT MENUS */
         /* Modified height and layout for glitch-free smooth toggle */
-        #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
+        #emoji-tray { 
+            display: none; background: var(--bg); border-top: 1px solid var(--border); 
+            height: 320px; padding: 0; width: 100%; flex-shrink: 0; 
+            overflow-y: auto; touch-action: auto !important; z-index: 100;
+        }
         
+        /* Apply touch fix specifically to emoji component */
+        emoji-picker {
+            touch-action: pan-y !important; 
+        }
+
         /* NEW DYNAMIC EMOJI TOGGLE BUTTON */
         .emoji-toggle-btn {
             background: transparent;
@@ -1534,27 +1548,6 @@ box-shadow: var(--received-shadow);
 
     <div class="input-area-container">
         
-        <div id="recording-overlay" class="recording-ui-overlay">
-            <div class="rec-dot" style="width:10px;height:10px;background:#ff453a;border-radius:50%;margin-right:8px;animation:pulseGreen 1s infinite;"></div>
-            <div class="rec-timer" id="rec-timer">0:00</div>
-            <div class="rec-visualizer">
-                <div class="viz-bar" style="animation-delay:0.1s"></div>
-                <div class="viz-bar" style="animation-delay:0.2s"></div>
-                <div class="viz-bar" style="animation-delay:0.3s"></div>
-                <div class="viz-bar" style="animation-delay:0.4s"></div>
-                <div class="viz-bar" style="animation-delay:0.5s"></div>
-                <div class="viz-bar" style="animation-delay:0.2s"></div>
-                <div class="viz-bar" style="animation-delay:0.1s"></div>
-                <div class="viz-bar" style="animation-delay:0.3s"></div>
-                <div class="viz-bar" style="animation-delay:0.4s"></div>
-                <div class="viz-bar" style="animation-delay:0.1s"></div>
-            </div>
-            <div class="rec-slide-cancel-text" id="rec-cancel-text">
-                <span class="material-icons-round" style="font-size:16px;">chevron_left</span> 
-                Slide to cancel
-            </div>
-        </div>
-        
         <div class="lock-indicator-pill" id="lock-pill">
             <span class="material-icons-round lock-arrow">keyboard_arrow_up</span>
             <span class="material-icons-round" style="font-size:16px;">lock</span>
@@ -1569,10 +1562,6 @@ box-shadow: var(--received-shadow);
                 <div id="reply-text" style="font-size:0.85rem; color:#ccc; overflow:hidden; text-overflow:ellipsis;"></div>
             </div>
             <div onclick="cancelInteraction()" style="color:#fff; font-weight:bold; padding:8px; cursor:pointer;">✕</div>
-        </div>
-
-        <div id="emoji-tray">
-             <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
         </div>
 
         <div id="attachment-menu">
@@ -1591,6 +1580,28 @@ box-shadow: var(--received-shadow);
         </div>
 
         <div class="input-area">
+            
+            <div id="recording-overlay" class="recording-ui-overlay">
+                <div class="rec-dot" style="width:10px;height:10px;background:var(--accent);border-radius:50%;margin-right:8px;animation:pulseGreen 1s infinite;"></div>
+                <div class="rec-timer" id="rec-timer">0:00</div>
+                <div class="rec-visualizer">
+                    <div class="viz-bar" style="animation-delay:0.1s"></div>
+                    <div class="viz-bar" style="animation-delay:0.2s"></div>
+                    <div class="viz-bar" style="animation-delay:0.3s"></div>
+                    <div class="viz-bar" style="animation-delay:0.4s"></div>
+                    <div class="viz-bar" style="animation-delay:0.5s"></div>
+                    <div class="viz-bar" style="animation-delay:0.2s"></div>
+                    <div class="viz-bar" style="animation-delay:0.1s"></div>
+                    <div class="viz-bar" style="animation-delay:0.3s"></div>
+                    <div class="viz-bar" style="animation-delay:0.4s"></div>
+                    <div class="viz-bar" style="animation-delay:0.1s"></div>
+                </div>
+                <div class="rec-slide-cancel-text" id="rec-cancel-text">
+                    <span class="material-icons-round" style="font-size:16px;">chevron_left</span> 
+                    Slide to cancel
+                </div>
+            </div>
+
             <div class="plus-btn" onclick="toggleAttachmentMenu()">+</div>
             
             <div id="emoji-toggle-left" class="emoji-toggle-btn" style="display:none;" onclick="toggleEmojiKeyboard()">
@@ -1614,6 +1625,11 @@ box-shadow: var(--received-shadow);
                 </div>
             </div>
         </div>
+
+        <div id="emoji-tray">
+             <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
+        </div>
+
     </div>
 </div>
 
@@ -1634,11 +1650,15 @@ box-shadow: var(--received-shadow);
         } else {
             // Open Emoji Picker 
             mInput.blur(); // Hide soft keyboard seamlessly
-            emojiTray.style.display = 'block';
-            window.isEmojiTrayOpen = true;
-            document.getElementById('emoji-toggle-right').innerHTML = '<span class="material-icons-round">keyboard</span>';
-            document.getElementById('emoji-toggle-left').innerHTML = '<span class="material-icons-round">keyboard</span>';
-            window.scrollToBottom();
+            
+            // Wait slightly for the native keyboard to slide down before showing tray to prevent giant jumping
+            setTimeout(() => {
+                emojiTray.style.display = 'block';
+                window.isEmojiTrayOpen = true;
+                document.getElementById('emoji-toggle-right').innerHTML = '<span class="material-icons-round">keyboard</span>';
+                document.getElementById('emoji-toggle-left').innerHTML = '<span class="material-icons-round">keyboard</span>';
+                window.scrollToBottom();
+            }, 50); 
         }
     };
 
@@ -1882,12 +1902,12 @@ box-shadow: var(--received-shadow);
     // FIX FOR INPUT BOUNCE & MODAL BACK BUTTON
     // =========================================
 
-    // BLOCK PAGE SCROLL WHEN DRAGGING THE CAPSULE UP
+    // BLOCK PAGE SCROLL WHEN DRAGGING THE CAPSULE UP (But allow scrolling for Emoji tray & TextArea)
     const inputContainerObj = document.querySelector('.input-area-container');
     if (inputContainerObj) {
         inputContainerObj.addEventListener('touchmove', (e) => {
-            // Strictly stop page scroll/drag when touching the capsule (unless scrolling the text inside)
-            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+            // Strictly stop page scroll/drag when touching the capsule (unless scrolling the text inside or emoji picker)
+            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT' && !e.target.closest('#emoji-tray') && !e.target.closest('emoji-picker')) {
                 e.preventDefault(); 
                 e.stopPropagation();
             }
@@ -2009,7 +2029,7 @@ box-shadow: var(--received-shadow);
         mainPicker.addEventListener('emoji-click', event => {
             const emoji = event.detail.emoji || event.detail.unicode; 
             mInput.value += emoji;
-            // mInput.focus(); // CAUSES GLITCH! KEEP COMMENTED to allow multiple emoji scrolling clicks!
+            // Kept blurred so keyboard does not pop up automatically 
             mInput.dispatchEvent(new Event('input'));
         });
     }
@@ -4017,7 +4037,7 @@ box-shadow: var(--received-shadow);
                 uploadedUrl = await snapshot.ref.getDownloadURL();
             } catch (fbErr) {
                 console.error("Firebase Audio Upload Failed:", fbErr);
-                alert("Failed to send voice message");
+                // Fallback attempt: if storage is completely blocked, abort gracefully
                 isAudioProcessing = false;
                 return;
             }
@@ -4054,9 +4074,15 @@ box-shadow: var(--received-shadow);
             recStartTime = Date.now();
             
             // UI Update
+            mInput.blur(); // Prevent keyboard open
             micBtn.classList.add('recording');
             recOverlay.style.display = 'flex';
             lockPill.classList.add('visible');
+            
+            // Reset sliding text properly
+            cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">chevron_left</span> Slide to cancel';
+            cancelText.style.pointerEvents = 'none';
+            cancelText.onclick = null;
             cancelText.style.opacity = '1';
             
             // Notify Other User
@@ -4082,7 +4108,7 @@ box-shadow: var(--received-shadow);
         if (!mediaRecorder || !isRecording) return;
         
         isRecording = false;
-        mediaRecorder.stop();
+        try { mediaRecorder.stop(); } catch(e){} // Catch invalid state
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
         
         clearInterval(recInterval);
@@ -4105,8 +4131,9 @@ box-shadow: var(--received-shadow);
             setTimeout(() => {
                 // Fix format for iOS Support
                 const mime = mediaRecorder.mimeType || 'audio/webm';
-                const blob = new Blob(audioChunks, { type: mime });
-                let ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'ogg' : 'webm');
+                // iOS Safari sometimes produces empty mimeType but it's mp4/m4a
+                const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'ogg' : 'webm');
+                const blob = new Blob(audioChunks, { type: mime || 'audio/mp4' });
                 
                 const duration = Math.ceil((Date.now() - recStartTime) / 1000);
                 
@@ -4130,7 +4157,12 @@ box-shadow: var(--received-shadow);
         micBtn.classList.remove('recording');
         micBtn.classList.add('locked'); // Turns red/stop icon style
         lockPill.classList.remove('visible'); // Hide the hint
-        cancelText.style.opacity = '0'; // Hide slide text
+        
+        // Transform the slider text into a clickable cancel button
+        cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">delete</span> Cancel';
+        cancelText.style.opacity = '1'; 
+        cancelText.style.pointerEvents = 'auto'; // allow click
+        cancelText.onclick = function() { stopRecording(false); };
         
         vibrate(100);
     }
@@ -4139,6 +4171,9 @@ box-shadow: var(--received-shadow);
 
     micBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        
+        mInput.blur(); // Ensures keyboard is hidden securely
+        
         if (isLocked) {
             // If locked, tap stops and sends
             stopRecording(true);
@@ -4178,11 +4213,11 @@ box-shadow: var(--received-shadow);
             // FIX: Made slide-to-cancel trigger faster and smoother (changed 150 to 100 threshold)
             if (diffX > 100) {
                 cancelZone.classList.add('active'); // Trash turns red
-                cancelText.innerText = "Release to Cancel";
+                cancelText.innerHTML = "Release to Cancel";
                 vibrate(10);
             } else {
                 cancelZone.classList.remove('active');
-                cancelText.innerText = "Slide to cancel";
+                cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">chevron_left</span> Slide to cancel';
                 recOverlay.style.opacity = '1';
             }
         } else {
