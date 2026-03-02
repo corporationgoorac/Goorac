@@ -12,8 +12,15 @@ const firebaseConfig = {
   databaseURL: "https://goorac-c3b59-default-rtdb.firebaseio.com"
 };
 
+// Pusher Beams Configuration for Goorac Quantum (Learning Hack)
+const pusherConfig = {
+  instanceId: "66574b98-4518-443c-9245-7a3bd9ac0ab7",
+  primaryKey: "99DC07D1A9F9B584F776F46A3353B3C3FC28CB53EFE8B162D57EBAEB37669A6A"
+};
+
 // 1. Expose config globally so other scripts can access it if needed
 window.firebaseConfig = firebaseConfig;
+window.pusherConfig = pusherConfig;
 
 // 2. Define the Universal Initialization Function
 window.initFirebaseCore = function() {
