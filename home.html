@@ -9,6 +9,7 @@
     <title>Goorac | Quantum Home</title>
     
     <script src="config.js"></script>
+    <script src="https://js.pusher.com/beams/2.1.0/push-notifications-cdn.js"></script>
     <link rel="manifest" href="manifest.json">
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -1142,6 +1143,32 @@
                 startLiveCounters(user.uid);
                 listenNotifications(user.uid);
                 checkMyMoment(user.uid, userData.photoURL);
+
+                // ==========================================
+                // ADDED: PUSHER BEAMS REGISTRATION LOGIC
+                // ==========================================
+                if (window.pusherConfig && window.PusherPushNotifications) {
+                    try {
+                        const beamsClient = new window.PusherPushNotifications.Client({
+                            instanceId: window.pusherConfig.instanceId,
+                        });
+
+                        await beamsClient.start();
+                        
+                        // Subscribe to the global 'hello' channel
+                        await beamsClient.addDeviceInterest('hello'); 
+                        
+                        // Also subscribe the device to the user's personal UID!
+                        // This allows you to send private messages directly to them later.
+                        await beamsClient.addDeviceInterest(user.uid); 
+
+                        console.log('✅ Pusher Beams successfully registered and subscribed!');
+                    } catch (error) {
+                        console.error('❌ Pusher Beams registration failed:', error);
+                    }
+                }
+                // ==========================================
+
             } else {
                 window.location.href = "setup.html";
             }
