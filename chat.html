@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -909,7 +910,7 @@ box-shadow: var(--received-shadow);
             padding: 4px 8px; /* Capsule padding */
             display: flex; 
             align-items: flex-end; /* Bottom alignment */
-            gap: 8px; 
+            gap: 4px; 
             background: var(--mobileToolbarBg, rgba(30, 30, 30, 0.75));
             border-radius: 40px; /* Fully rounded Capsule shape */
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -959,10 +960,19 @@ box-shadow: var(--received-shadow);
             overscroll-behavior-y: contain; /* ADDED FIX: prevent dragging whole page from text area */
         }
         
-        .plus-btn { 
+        /* UPDATED BUTTONS SECTION - Professional Capsule Layout */
+        .input-left-buttons {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            align-self: flex-end;
+            margin-bottom: 3px;
+        }
+        
+        .plus-btn, .emoji-btn, .keyboard-btn { 
             background: rgba(255, 255, 255, 0.08); /* Solid subtle button inside capsule */
             border-radius: 50%;
-            font-size: 24px; 
+            font-size: 22px; 
             color: var(--accent); 
             cursor: pointer; 
             height: 38px; 
@@ -970,11 +980,16 @@ box-shadow: var(--received-shadow);
             display: flex; 
             align-items: center; 
             justify-content: center;
-            align-self: flex-end; 
-            margin-bottom: 3px; 
-            transition: transform 0.2s var(--ease-elastic), background 0.2s; 
+            transition: transform 0.2s var(--ease-elastic), background 0.2s, color 0.2s; 
         }
-        .plus-btn:active { transform: rotate(90deg); background: rgba(255,255,255,0.2); }
+        .plus-btn:active, .emoji-btn:active, .keyboard-btn:active { 
+            transform: scale(0.9); 
+            background: rgba(255,255,255,0.2); 
+        }
+        
+        .plus-btn.hide { display: none; }
+        .emoji-btn, .keyboard-btn { display: flex; }
+        .emoji-btn.hide, .keyboard-btn.hide { display: none; }
         
         /* NEW PROFESSIONAL SEND ICON BUTTON */
         .send-btn { 
@@ -1120,7 +1135,25 @@ box-shadow: var(--received-shadow);
 
 
         /* EMOJI & ATTACHMENT MENUS */
-        #emoji-tray { display: none; background: #000; border-top: 1px solid var(--border); height: 280px; padding: 0; }
+        #emoji-tray { 
+            display: none; 
+            background: #000; 
+            border-top: 1px solid var(--border); 
+            height: 280px; 
+            padding: 0;
+            position: relative;
+            z-index: 1001;
+        }
+        
+        #emoji-tray.show {
+            display: block;
+            animation: slideUpEmoji 0.25s ease-out;
+        }
+        
+        @keyframes slideUpEmoji {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
         
         #attachment-menu {
             display: none; 
@@ -1569,7 +1602,15 @@ box-shadow: var(--received-shadow);
         </div>
 
         <div class="input-area">
-            <div class="plus-btn" onclick="toggleAttachmentMenu()">+</div>
+            <div class="input-left-buttons">
+                <div class="plus-btn" onclick="toggleAttachmentMenu()">+</div>
+                <div class="emoji-btn hide" onclick="showEmojiPicker()">
+                    <span class="material-icons-round">emoji_emotions</span>
+                </div>
+                <div class="keyboard-btn hide" onclick="showKeyboard()">
+                    <span class="material-icons-round">keyboard</span>
+                </div>
+            </div>
             <div class="input-box" id="msg-input-box">
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
@@ -1704,6 +1745,7 @@ box-shadow: var(--received-shadow);
     let isFirstLoad = true;
     let statusTimeout = null;
     let pulseListener = null;
+    let typingTimeout = null;
     
     // Status Logic State
     let lastStatusData = null;
@@ -1729,6 +1771,9 @@ box-shadow: var(--received-shadow);
     const attachmentMenu = document.getElementById('attachment-menu');
     const micBtn = document.getElementById('mic-btn');
     const micWrapper = document.getElementById('mic-btn-wrapper');
+    const plusBtn = document.querySelector('.plus-btn');
+    const emojiBtn = document.querySelector('.emoji-btn');
+    const keyboardBtn = document.querySelector('.keyboard-btn');
 
     // =========================================
     //  12. INSTANT LOAD / 0ms RENDER
@@ -1886,22 +1931,36 @@ box-shadow: var(--received-shadow);
     sendBtnUI.addEventListener('mousedown', handleSendClick);
     sendBtnUI.addEventListener('touchstart', handleSendClick);
 
-    // Auto-Resize Textarea
+    // Auto-Resize Textarea and Button Toggle
     mInput.addEventListener('input', function() {
         this.style.height = 'auto'; 
         this.style.height = (this.scrollHeight) + 'px';
         if(this.value === '') this.style.height = 'auto';
         
-        // Toggle Send / Mic Button
+        // Toggle Send / Mic Button and Plus/Emoji Buttons
         if(this.value.trim().length > 0) {
             sendBtnUI.classList.add('active');
             micWrapper.style.display = 'none';
-            // Send Typing Indicator
+            // Hide plus, show emoji
+            plusBtn.classList.add('hide');
+            emojiBtn.classList.remove('hide');
+            keyboardBtn.classList.add('hide');
+            
+            // Send Typing Indicator with timeout to clear
             rdb.ref(`typing/${chatId}/${myUid}`).set(true);
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                rdb.ref(`typing/${chatId}/${myUid}`).set(false);
+            }, 3000);
         } else {
             sendBtnUI.classList.remove('active');
             micWrapper.style.display = 'flex';
+            // Show plus, hide emoji/keyboard
+            plusBtn.classList.remove('hide');
+            emojiBtn.classList.add('hide');
+            keyboardBtn.classList.add('hide');
             rdb.ref(`typing/${chatId}/${myUid}`).set(false);
+            if (typingTimeout) clearTimeout(typingTimeout);
         }
         
         // Auto-Scroll on Typing
@@ -1909,6 +1968,22 @@ box-shadow: var(--received-shadow);
              window.scrollToBottom();
         }
     });
+
+    // Emoji Picker Functions
+    window.showEmojiPicker = function() {
+        emojiTray.classList.add('show');
+        emojiBtn.classList.add('hide');
+        keyboardBtn.classList.remove('hide');
+        pushModalState('emoji');
+    };
+
+    window.showKeyboard = function() {
+        emojiTray.classList.remove('show');
+        keyboardBtn.classList.add('hide');
+        emojiBtn.classList.remove('hide');
+        mInput.focus();
+        if (history.state && history.state.modal === 'emoji') history.back();
+    };
 
     // Scroll Observer for "New Message" Button & Load More Fix
     chatFlow.addEventListener('scroll', () => {
@@ -1969,7 +2044,7 @@ box-shadow: var(--received-shadow);
         if (attachmentMenu.style.display === 'flex') {
             closeAttachmentMenu();
         } else {
-            emojiTray.style.display = 'none'; 
+            emojiTray.classList.remove('show');
             attachmentMenu.style.display = 'flex';
             pushModalState('attachment');
         }
@@ -1994,12 +2069,15 @@ box-shadow: var(--received-shadow);
 
     function toggleEmojiTray() {
         attachmentMenu.style.display = 'none'; 
-        if (emojiTray.style.display === 'block') {
-            emojiTray.style.display = 'none';
+        if (emojiTray.classList.contains('show')) {
+            emojiTray.classList.remove('show');
+            keyboardBtn.classList.add('hide');
+            emojiBtn.classList.remove('hide');
             if(history.state && history.state.modal === 'emoji') history.back();
         } else {
-            emojiTray.style.display = 'block';
-            window.scrollToBottom();
+            emojiTray.classList.add('show');
+            emojiBtn.classList.add('hide');
+            keyboardBtn.classList.remove('hide');
             pushModalState('emoji');
         }
     }
@@ -2047,7 +2125,7 @@ box-shadow: var(--received-shadow);
     
     mInput.addEventListener("focus", () => { 
         document.querySelector('.input-area').classList.add('force-expand'); // Expands the capsule smoothly
-        if(emojiTray.style.display === 'block') closeEmojiTray();
+        if(emojiTray.classList.contains('show')) showKeyboard();
         if(attachmentMenu.style.display === 'flex') closeAttachmentMenu();
         // FIX: Aggressively lock header and scroll when keyboard opens
         lockViewportAndHeader();
@@ -2060,11 +2138,6 @@ box-shadow: var(--received-shadow);
         // Reset safely when keyboard closes
         setTimeout(lockViewportAndHeader, 100);
     });
-
-    function closeEmojiTray() {
-        emojiTray.style.display = 'none';
-        if(history.state && history.state.modal === 'emoji') history.back();
-    }
 
     // =========================================
     //  15. STATUS & PRESENCE LOGIC (INSTANT)
@@ -3582,10 +3655,15 @@ box-shadow: var(--received-shadow);
         sendBtnUI.classList.remove('active'); 
         // Re-show mic button if empty
         micWrapper.style.display = 'flex';
+        // Show plus, hide emoji/keyboard
+        plusBtn.classList.remove('hide');
+        emojiBtn.classList.add('hide');
+        keyboardBtn.classList.add('hide');
         
-        emojiTray.style.display = 'none';
+        emojiTray.classList.remove('show');
         attachmentMenu.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
+        if (typingTimeout) clearTimeout(typingTimeout);
         mInput.focus(); 
 
         if (editModeId) {
@@ -4042,6 +4120,7 @@ box-shadow: var(--received-shadow);
             }, 200);
         } else {
             vibrate([30,50,30]); // Error vibe
+            isAudioProcessing = false; // Reset lock on cancel
         }
     }
 
@@ -4098,15 +4177,16 @@ box-shadow: var(--received-shadow);
             
             if (diffX > 150) {
                 cancelZone.classList.add('active'); // Trash turns red
-                cancelText.innerText = "Release to Cancel";
+                cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">delete</span> Release to Cancel';
                 vibrate(10);
             } else {
                 cancelZone.classList.remove('active');
-                cancelText.innerText = "Slide to cancel";
+                cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">chevron_left</span> Slide to cancel';
                 recOverlay.style.opacity = '1';
             }
         } else {
             cancelZone.classList.remove('visible');
+            cancelText.innerHTML = '<span class="material-icons-round" style="font-size:16px;">chevron_left</span> Slide to cancel';
         }
     }, { passive: false });
 
@@ -4136,7 +4216,7 @@ box-shadow: var(--received-shadow);
         // If state is null, user wants to go back or modals are closed
         // We manually check if any modal is open and force close it (redundancy)
         const modals = [
-            { id: 'emoji-tray', style: 'block' },
+            { id: 'emoji-tray', style: 'show' },
             { id: 'attachment-menu', style: 'flex' },
             { id: 'reaction-picker-modal', style: 'flex' },
             { id: 'menu-overlay', style: 'flex' },
@@ -4146,9 +4226,18 @@ box-shadow: var(--received-shadow);
         let modalClosed = false;
         modals.forEach(m => {
             const el = document.getElementById(m.id);
-            if(el && el.style.display === m.style) {
-                el.style.display = 'none';
-                modalClosed = true;
+            if (m.id === 'emoji-tray') {
+                if(el && el.classList.contains(m.style)) {
+                    el.classList.remove('show');
+                    keyboardBtn.classList.add('hide');
+                    emojiBtn.classList.remove('hide');
+                    modalClosed = true;
+                }
+            } else {
+                if(el && el.style.display === m.style) {
+                    el.style.display = 'none';
+                    modalClosed = true;
+                }
             }
         });
         
