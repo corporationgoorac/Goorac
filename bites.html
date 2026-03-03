@@ -264,8 +264,8 @@
         console.log(`🤖 Algorithm Learned: +${points} to [${cleanTopic}]`);
     }
 
-    // --- 3. THE INTERNET FETCHER (WITH CORS PROXY FIX) ---
-    // Uses Reddit's open JSON architecture, routed through a proxy to bypass the 403 Forbidden errors
+    // --- 3. THE INTERNET FETCHER (ALLORIGINS PROXY FIX) ---
+    // Swapped from corsproxy.io to allorigins.win to bypass Reddit's aggressive 403 blocks
     async function fetchFromInternet(topic, limit = 10) {
         try {
             let targetUrl = `https://www.reddit.com/r/${topic.replace(/\s+/g, '')}/hot.json?limit=${limit}`;
@@ -274,13 +274,16 @@
                 targetUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=hot&limit=${limit}`;
             }
             
-            // THE FIX: Wrap the URL in a CORS Proxy to bypass browser restrictions
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            // THE FIX: AllOrigins wraps the data safely so Reddit's CDN doesn't block it as easily
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
             
             const response = await fetch(proxyUrl);
             
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const json = await response.json();
+            
+            // Parse the wrapper payload
+            const wrapper = await response.json();
+            const json = JSON.parse(wrapper.contents);
             
             // Normalize data and filter out text-only posts
             let rawBites = json.data.children.map(c => c.data);
