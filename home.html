@@ -743,13 +743,13 @@
            ========================================================================== */
         /* 🚀 UNCOMMENTED TO FIX SPAN TEXT FLASHING BEFORE FONT LOAD */
         .material-icons-round { color: transparent !important; text-shadow: none !important; }
-        body.fonts-ready .material-icons-round { color: inherit !important; text-shadow: inherit !important; }
+        body.fonts-ready .material-icons-round { color: inherit; text-shadow: inherit; }
         body.fonts-ready .msg-icon { color: #fff !important; }
         body.fonts-ready .moments-fab .material-icons-round { color: var(--accent) !important; }
 
         /* INSTEAD: Added max-width and overflow hidden so fallback text doesn't stretch the layout */
         .material-icons-round {
-            color: inherit !important;
+            color: inherit; /* Fixed: Removed !important so verification badges keep their own color */
             max-width: 1em; 
             overflow: hidden;
             display: inline-flex;
@@ -757,6 +757,8 @@
             align-items: center;
             white-space: nowrap;
         }
+        /* Fix for Emoji/Verification Badges so they don't turn black/white */
+        .material-icons-round[class*="verif"], .verified, .verification-badge { color: var(--accent) !important; }
         .msg-icon { color: #fff !important; }
         .moments-fab .material-icons-round { color: var(--accent) !important; }
 
@@ -820,7 +822,7 @@
         // 🚀 INSTANT LOAD FIX: Hide dashboard instantly if moments cache exists to avoid flashing
         const cachedMoments = localStorage.getItem('goorac_moments_html_cache');
         if (cachedMoments && cachedMoments.length > 5) {
-            document.write('<style>#dashboard-content { display: none !important; }</style>');
+            document.write('<style id="dash-cache-hide">#dashboard-content { display: none !important; }</style>');
         }
 
         // 🚀 INSTANT MSG BADGE LOAD FIX: Only show if messages > 0
@@ -1177,7 +1179,10 @@
                 toggleOverlays(isModalOpen);
                 const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
                 if (dashboardContent) {
-                    dashboardContent.style.display = hasMoments ? 'none' : 'block';
+                    // Fix: Use setProperty with important to override the cache style, and remove the style tag
+                    dashboardContent.style.setProperty('display', hasMoments ? 'none' : 'block', 'important');
+                    const cacheHideStyle = document.getElementById('dash-cache-hide');
+                    if (cacheHideStyle) cacheHideStyle.remove();
                 }
             }).observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         }
