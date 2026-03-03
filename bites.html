@@ -15,7 +15,7 @@
     
     <style>
         /* ==========================================================================
-           CSS VARIABLES & QUANTUM THEME
+           QUANTUM UI DESIGN SYSTEM
            ========================================================================== */
         :root {
             --bg: #000000;
@@ -25,277 +25,128 @@
             --border: #1a1a1a;
             --text-main: #ffffff;
             --text-dim: #888888;
-            /* Reference height to ensure Bottom Nav doesn't hide content */
-            --nav-clearance: 120px; 
+            /* FIXED: Clearance for Bottom Navbar */
+            --nav-bottom-clearance: 140px; 
         }
 
         * { 
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
             user-select: none; 
+            outline: none;
         }
 
         body {
             background-color: var(--bg); 
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; /* Locked for full-screen snapping */
+            margin: 0; padding: 0; 
+            overflow: hidden; /* Strict scroll-lock for snapping */
             height: 100vh;
         }
 
-        /* ==========================================================================
-           HEADER COMPONENT
-           ========================================================================== */
+        /* HEADER */
         header {
-            position: fixed; 
-            top: 0; 
-            width: 100%;
+            position: fixed; top: 0; width: 100%;
             background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
             padding: max(15px, env(safe-area-inset-top)) 20px 25px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            z-index: 1000; 
-            pointer-events: none;
+            display: flex; justify-content: space-between; align-items: center; 
+            z-index: 1000; pointer-events: none;
         }
-
         .header-title { 
-            font-size: 1.6rem; 
-            font-weight: 900; 
-            letter-spacing: -1.2px;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8); 
-            pointer-events: auto;
-            background: linear-gradient(to right, #fff, var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.6rem; font-weight: 900; letter-spacing: -1px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8); pointer-events: auto;
+            color: var(--accent);
         }
-
         .search-icon-btn {
-            color: #fff; 
-            font-size: 32px; 
-            cursor: pointer; 
-            pointer-events: auto;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8); 
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: #fff; font-size: 32px; cursor: pointer; pointer-events: auto;
+            transition: transform 0.2s;
         }
+        .search-icon-btn:active { transform: scale(0.8); }
 
-        .search-icon-btn:active { 
-            transform: scale(0.8); 
-            color: var(--accent); 
-        }
-
-        /* ==========================================================================
-           MAIN FEED (SCROLL SNAP)
-           ========================================================================== */
+        /* FEED CONTAINER */
         #bites-feed-container {
-            height: 100vh; 
-            width: 100vw;
-            overflow-y: scroll; 
-            scroll-snap-type: y mandatory;
-            scrollbar-width: none; 
-            -ms-overflow-style: none;
+            height: 100vh; width: 100vw;
+            overflow-y: scroll; scroll-snap-type: y mandatory;
+            scrollbar-width: none; -ms-overflow-style: none;
             background: var(--bg);
         }
+        #bites-feed-container::-webkit-scrollbar { display: none; }
 
-        #bites-feed-container::-webkit-scrollbar { 
-            display: none; 
-        }
-
-        /* ==========================================================================
-           BITE CARD UI
-           ========================================================================== */
+        /* CARD COMPONENT */
         .bite-card {
-            height: 100vh; 
-            width: 100vw;
-            scroll-snap-align: start; 
-            scroll-snap-stop: always;
-            position: relative; 
-            display: flex; 
-            flex-direction: column;
-            justify-content: flex-end; 
-            padding: 20px; 
-            /* FIXED: Navbar Clearance applied to padding-bottom */
-            padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom));
-            background-size: cover; 
-            background-position: center;
+            height: 100vh; width: 100vw;
+            scroll-snap-align: start; scroll-snap-stop: always;
+            position: relative; display: flex; flex-direction: column;
+            justify-content: flex-end; padding: 20px; 
+            /* THE FIX: Padding prevents navbar from hiding text */
+            padding-bottom: calc(var(--nav-bottom-clearance) + env(safe-area-inset-bottom));
+            background-size: cover; background-position: center;
             background-color: #050505;
             border-bottom: 1px solid var(--border);
         }
 
         .bite-overlay {
-            position: absolute; 
-            inset: 0;
-            background: linear-gradient(to top, 
-                rgba(0,0,0,1) 0%, 
-                rgba(0,0,0,0.6) 30%, 
-                rgba(0,0,0,0.2) 100%);
-            z-index: 1; 
-            pointer-events: none;
-        }
-        
-        .bite-content { 
-            position: relative; 
-            z-index: 2; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-end; 
-            width: 100%; 
-        }
-        
-        .bite-info { 
-            flex: 1; 
-            padding-right: 15px; 
-            animation: quantumReveal 0.6s ease-out;
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 100%);
+            z-index: 1; pointer-events: none;
         }
 
-        @keyframes quantumReveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* VIDEO PLAYER STYLING */
+        .video-container {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            z-index: 0; background: #000; display: none;
         }
+        .video-container iframe { width: 100%; height: 100%; border: none; }
+        .bite-card.playing .video-container { display: block; }
         
-        .source-row { 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-            margin-bottom: 15px; 
-        }
-
+        .bite-content { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; }
+        
+        .bite-info { flex: 1; padding-right: 15px; }
+        .source-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
         .source-pfp { 
-            width: 44px; 
-            height: 44px; 
-            border-radius: 14px; 
-            background: var(--surface); 
-            object-fit: cover; 
-            border: 1.5px solid var(--accent); 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-weight: 900; 
-            font-size: 1.3rem; 
-            color: var(--accent);
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+            width: 42px; height: 42px; border-radius: 12px; 
+            background: var(--surface); display: flex; align-items: center; justify-content: center; 
+            font-weight: 900; color: var(--accent); border: 1px solid var(--border);
         }
-
-        .source-name { 
-            font-weight: 800; 
-            font-size: 1.1rem; 
-            color: #fff; 
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .bite-time { 
-            font-size: 0.75rem; 
-            color: var(--text-dim); 
-            font-weight: 600; 
-            margin-top: 2px;
-            opacity: 0.8;
-        }
+        .source-name { font-weight: 800; font-size: 1.05rem; color: #fff; }
         
-        .bite-caption { 
-            font-size: 1.05rem; 
-            line-height: 1.45; 
-            color: #ffffff; 
-            margin-bottom: 15px;
-            display: -webkit-box;
-            -webkit-line-clamp: 4; /* More text visible */
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.9);
-            font-weight: 500;
-        }
-
+        .bite-caption { font-size: 1rem; line-height: 1.4; color: #f0f0f0; margin-bottom: 10px; font-weight: 500;}
         .bite-tag { 
-            background: rgba(0, 210, 255, 0.1); 
-            color: var(--accent); 
-            padding: 6px 14px; 
-            border-radius: 10px; 
-            font-weight: 800; 
-            display: inline-block; 
-            font-size: 0.7rem; 
-            border: 1px solid rgba(0, 210, 255, 0.2);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            background: rgba(0, 210, 255, 0.1); color: var(--accent); 
+            padding: 5px 12px; border-radius: 12px; font-weight: 700; 
+            display: inline-block; font-size: 0.75rem; border: 1px solid rgba(0, 210, 255, 0.2);
         }
 
-        /* ==========================================================================
-           ACTION BUTTONS
-           ========================================================================== */
-        .bite-actions { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 28px; 
-            align-items: center; 
-            padding-bottom: 10px; 
-        }
+        /* ACTIONS */
+        .bite-actions { display: flex; flex-direction: column; gap: 28px; align-items: center; padding-bottom: 5px; }
+        .action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; cursor: pointer; }
+        .action-btn .material-icons-round { font-size: 38px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); transition: 0.2s; }
+        .action-btn:active .material-icons-round { transform: scale(0.7); }
+        .action-btn.liked .material-icons-round { color: var(--danger); }
+        .action-label { font-size: 0.75rem; font-weight: 700; }
 
-        .action-btn { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            gap: 6px; 
-            color: #fff; 
-            cursor: pointer; 
-            transition: 0.2s;
-        }
-
-        .action-btn .material-icons-round { 
-            font-size: 38px; 
-            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); 
-        }
-
-        .action-btn:active { transform: scale(0.8); }
-        .action-btn.liked .material-icons-round { color: var(--danger); text-shadow: 0 0 15px rgba(255, 68, 68, 0.4); }
-
-        .action-label { 
-            font-size: 0.75rem; 
-            font-weight: 800; 
-            text-shadow: 0 1px 4px rgba(0,0,0,0.8); 
-        }
-
-        /* ==========================================================================
-           SEARCH MODAL (Slide-In)
-           ========================================================================== */
+        /* MODAL */
         #search-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 10001;
-            transform: translateX(100%); 
-            transition: transform 0.45s cubic-bezier(0.19, 1, 0.22, 1);
+            background: var(--surface); z-index: 10001;
+            transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             display: flex; flex-direction: column;
         }
-
         #search-modal.active { transform: translateX(0); }
-        
         .search-header {
             padding: max(15px, env(safe-area-inset-top)) 20px 15px;
-            display: flex; align-items: center; gap: 15px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(10,10,10,0.95); backdrop-filter: blur(20px);
+            display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border);
         }
-
         .search-input {
             flex: 1; background: #111; border: 1px solid var(--border);
-            padding: 14px 20px; border-radius: 14px; color: white; outline: none;
-            font-size: 16px; transition: 0.3s;
+            padding: 14px 18px; border-radius: 16px; color: white; font-size: 16px;
         }
 
-        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 15px rgba(0,210,255,0.1); }
+        .loading-spinner { text-align: center; padding: 40px; color: var(--accent); font-weight: 800; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
-        .search-results { flex: 1; overflow-y: auto; padding: 10px 0; background: var(--bg); }
-
-        /* ==========================================================================
-           LOADING & UTILS
-           ========================================================================== */
-        .skeleton-card { background: #0a0a0a; animation: skelPulse 1.5s infinite; }
-        @keyframes skelPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
-        
-        .loading-spinner {
-            text-align: center; padding: 40px; color: var(--accent); font-weight: 900;
-            text-transform: uppercase; letter-spacing: 4px; animation: skelPulse 1s infinite;
-        }
-
-        main-navbar { position: relative; z-index: 10000; }
+        main-navbar { z-index: 10000; position: relative; }
     </style>
 </head>
 <body>
@@ -308,13 +159,6 @@
 <div id="bites-feed-container">
     <div class="bite-card skeleton-card">
         <div class="bite-overlay"></div>
-        <div class="bite-content" style="opacity: 0.5;">
-            <div class="bite-info">
-                <div class="source-row"><div class="source-pfp" style="background:#222;"></div><div style="width:100px;height:20px;background:#222;border-radius:4px;"></div></div>
-                <div style="width:90%;height:15px;background:#222;margin-bottom:10px;border-radius:4px;"></div>
-                <div style="width:70%;height:15px;background:#222;border-radius:4px;"></div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -323,25 +167,14 @@
 <div id="search-modal">
     <div class="search-header">
         <span class="material-icons-round back-btn" onclick="closeSearch()">arrow_back</span>
-        <input type="text" class="search-input" id="bite-search-box" placeholder="Search Quantum Network..." autocomplete="off">
+        <input type="text" class="search-input" id="bite-search-box" placeholder="Search Tamil News & Videos..." autocomplete="off">
     </div>
-    <div class="search-results" id="search-results-container">
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;opacity:0.3;padding:40px;">
-            <span class="material-icons-round" style="font-size:64px;margin-bottom:20px;">explore</span>
-            <p style="text-align:center;font-weight:800;letter-spacing:1px;">EXPLORE THE UNIVERSE</p>
-            <p style="text-align:center;font-size:0.8rem;">Every search trains your personalized algorithm.</p>
-        </div>
-    </div>
+    <div class="search-results" id="search-results-container"></div>
 </div>
 
 <script>
-    /* --- 1. CORE SETUP --- */
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } else if (!firebase.apps.length) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
-
+    // --- 1. QUANTUM INITIALIZATION ---
+    if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
     
@@ -351,284 +184,219 @@
     let isFetching = false;
     let viewTimers = {}; 
 
-    // Seed Topics
-    const DEFAULT_TOPICS = ["breaking news", "technology", "sports", "quantum physics", "nature"];
+    // Seed Topics specifically for Tamil Content
+    const DEFAULT_TOPICS = ["Tamil Nadu news", "Kollywood", "Chennai", "Tamil Cinema", "Tamil Tech"];
 
-    /* --- 2. AUTHENTICATION & PROFILE --- */
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             myUid = user.uid;
-            await loadMLProfile();
+            await loadProfile();
             initEngine();
-        } else {
-            window.location.href = "login.html";
-        }
+        } else window.location.href = "login.html";
     });
 
-    async function loadMLProfile() {
-        try {
-            const doc = await db.collection("users").doc(myUid).get();
-            if(doc.exists && doc.data().bitesProfile) {
-                userInterests = doc.data().bitesProfile;
-            }
-        } catch(e) { console.error("ML Profile Loading Error", e); }
+    async function loadProfile() {
+        const doc = await db.collection("users").doc(myUid).get();
+        if(doc.exists && doc.data().bitesProfile) userInterests = doc.data().bitesProfile;
     }
 
-    /* --- 3. ML SCORING LOGIC --- */
-    // Logic: Linger = +1, Like = +5, Search = +10
     function trainAlgorithm(topic, points) {
         if (!myUid || !topic) return;
         const tag = topic.toLowerCase().trim();
-        
         userInterests[tag] = (userInterests[tag] || 0) + points;
-        
-        // Update Firebase
         db.collection("users").doc(myUid).update({
             [`bitesProfile.${tag}`]: firebase.firestore.FieldValue.increment(points)
         }).catch(() => {
-            db.collection("users").doc(myUid).set({ 
-                bitesProfile: { [tag]: points } 
-            }, { merge: true });
+            db.collection("users").doc(myUid).set({ bitesProfile: { [tag]: points } }, { merge: true });
         });
-        
-        console.log(`🤖 Quantum Engine Recalibrated: [${tag}] is now weighted +${points}`);
+        console.log(`🤖 Quantum Engine: ${tag} weight increased by ${points}`);
     }
 
-    /* --- 4. INTERNET FETCH ENGINE (RSS-TO-JSON) --- */
-    // Using a reliable bridge to solve CORS and 403 Forbidden issues
-    async function fetchFromInternet(topic, limit = 12) {
+    // --- 2. DUAL-ENGINE FETCHER (NEWS + VIDEOS) ---
+    // Solves CORS using RSS Bridge and Embed workaround
+    async function fetchBiteData(topic, limit = 10) {
         try {
-            const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-IN&gl=IN&ceid=IN:en`;
-            // Free Public API Bridge
-            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&api_key=`;
-
+            // Engine 1: Google News Tamil RSS
+            const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic + " tamil")}&hl=ta-IN&gl=IN&ceid=IN:ta`;
+            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+            
             const response = await fetch(apiUrl);
             const json = await response.json();
-            
             if (json.status !== "ok") return [];
 
             return json.items.map(b => {
-                // Extracting Images from RSS Enclosures or Description
-                let img = b.enclosure && b.enclosure.link ? b.enclosure.link : '';
+                let img = b.enclosure?.link || '';
                 if (!img && b.description) {
                     const match = b.description.match(/src="([^"]+)"/);
                     if (match) img = match[1];
                 }
+                
+                // Detection: Is it a video or article?
+                const isVideo = b.link.includes('youtube.com') || b.link.includes('youtu.be');
+                let embed = "";
+                if (isVideo) {
+                    const vidId = b.link.split('v=')[1] || b.link.split('/').pop();
+                    embed = `https://www.youtube.com/embed/${vidId}?autoplay=1&mute=1&loop=1`;
+                }
 
                 return {
-                    id: b.guid || Math.random().toString(36).substr(2, 9),
+                    id: b.guid || Math.random().toString(36).substr(2,9),
                     category: topic,
-                    source: b.source || "Quantum Feed",
-                    title: b.title.split(' - ')[0], 
-                    imgUrl: img || `https://picsum.photos/seed/${Math.random()}/1080/1920`, 
-                    likes: Math.floor(Math.random() * 900) + 150,
+                    source: b.source || "Tamil Feed",
+                    title: b.title.split(' - ')[0],
+                    imgUrl: img || `https://picsum.photos/seed/${Math.random()}/1080/1920`,
+                    likes: Math.floor(Math.random() * 500) + 100,
                     timestamp: new Date(b.pubDate).getTime(),
-                    link: b.link
+                    link: b.link,
+                    videoUrl: embed
                 };
             });
-        } catch(error) {
-            console.warn(`Sync Error for ${topic}:`, error);
-            return [];
-        }
+        } catch { return []; }
     }
 
-    /* --- 5. THE WEIGHTED BLEND GENERATOR --- */
+    // --- 3. FEED CONTROLLER ---
     async function fetchNextBatch() {
         if (isFetching) return;
         isFetching = true;
         
-        let topicsToFetch = [];
-        // Sort interests by score
-        let sorted = Object.entries(userInterests).sort((a,b) => b[1] - a[1]);
+        let topics = [];
+        let sortedInts = Object.entries(userInterests).sort((a,b) => b[1] - a[1]);
         
-        if (sorted.length === 0) {
-            topicsToFetch = DEFAULT_TOPICS.slice(0, 3);
-        } else {
-            // ML Strategy: Top 2 Interests + 1 Random Exploration Slot
-            topicsToFetch.push(sorted[0][0]);
-            if(sorted[1]) topicsToFetch.push(sorted[1][0]);
-            topicsToFetch.push(DEFAULT_TOPICS[Math.floor(Math.random() * DEFAULT_TOPICS.length)]);
+        if (sortedInts.length === 0) topics = DEFAULT_TOPICS.slice(0, 3);
+        else {
+            topics.push(sortedInts[0][0]); 
+            if(sortedInts[1]) topics.push(sortedInts[1][0]); 
+            topics.push(DEFAULT_TOPICS[Math.floor(Math.random() * DEFAULT_TOPICS.length)]); 
         }
 
-        const promises = topicsToFetch.map(t => fetchFromInternet(t, 6));
-        const resArray = await Promise.all(promises);
+        const promises = topics.map(t => fetchBiteData(t, 5));
+        const results = (await Promise.all(promises)).flat();
         
-        let freshBites = resArray.flat();
-        freshBites = freshBites.filter(b => !seenBites.has(b.id));
-        freshBites.forEach(b => seenBites.add(b.id));
+        const filtered = results.filter(b => !seenBites.has(b.id));
+        filtered.forEach(b => seenBites.add(b.id));
+        filtered.sort(() => Math.random() - 0.5);
         
-        // Shuffle for Discovery feel
-        freshBites.sort(() => Math.random() - 0.5);
-        
-        if(freshBites.length > 0) renderToDOM(freshBites);
+        if(filtered.length > 0) renderBites(filtered);
         isFetching = false;
     }
 
-    /* --- 6. DOM RENDERER --- */
-    function renderToDOM(bites) {
+    function renderBites(bites) {
         const container = document.getElementById('bites-feed-container');
         if(container.querySelector('.skeleton-card')) container.innerHTML = '';
 
-        bites.forEach((bite, index) => {
+        bites.forEach((b, i) => {
             const card = document.createElement('div');
             card.className = 'bite-card';
-            card.style.backgroundImage = `url('${bite.imgUrl}')`;
-            card.dataset.id = bite.id;
-            card.dataset.category = bite.category;
+            card.style.backgroundImage = `url('${b.imgUrl}')`;
+            card.dataset.id = b.id;
+            card.dataset.category = b.category;
             
-            const initial = bite.source.charAt(0).toUpperCase();
+            // If it's a video, add the embed container
+            let videoHtml = b.videoUrl ? `<div class="video-container"><iframe src="${b.videoUrl}" allow="autoplay; encrypted-media"></iframe></div>` : '';
 
             card.innerHTML = `
+                ${videoHtml}
                 <div class="bite-overlay"></div>
                 <div class="bite-content">
                     <div class="bite-info">
                         <div class="source-row">
-                            <div class="source-pfp">${initial}</div>
-                            <div class="source-details">
-                                <span class="source-name">${bite.source}</span>
-                                <span class="bite-time">${formatTime(bite.timestamp)}</span>
-                            </div>
+                            <div class="source-pfp">${b.source.charAt(0)}</div>
+                            <span class="source-name">${b.source}</span>
                         </div>
-                        <div class="bite-caption">${bite.title}</div>
-                        <div class="bite-tag">#${bite.category.replace(/\s+/g, '')}</div>
+                        <div class="bite-caption">${b.title}</div>
+                        <div class="bite-tag">#${b.category.replace(/\s+/g, '')}</div>
                     </div>
                     <div class="bite-actions">
-                        <div class="action-btn" onclick="handleLike(this, '${bite.category}')">
+                        <div class="action-btn" onclick="handleLike(this, '${b.category}')">
                             <span class="material-icons-round">favorite_border</span>
-                            <span class="action-label">${bite.likes}</span>
+                            <span class="action-label">${b.likes}</span>
                         </div>
-                        <div class="action-btn" onclick="window.open('${bite.link}', '_blank')">
+                        <div class="action-btn" onclick="window.open('${b.link}', '_blank')">
                             <span class="material-icons-round">open_in_browser</span>
-                            <span class="action-label">Expand</span>
+                            <span class="action-label">Open</span>
                         </div>
                     </div>
                 </div>
             `;
             container.appendChild(card);
-            
-            // Attach Engagement Watcher
-            mlWatcher.observe(card);
-
-            // Infinite Scroll: Trigger on 2nd to last item
-            if (index === bites.length - 2) scrollTrigger.observe(card);
+            mlObserver.observe(card);
+            if (i === bites.length - 2) scrollTrigger.observe(card);
         });
-
-        /* CACHE REMOVED: Fresh feed on every visit as requested */
     }
 
-    /* --- 7. OBSERVERS (ML & SCROLL) --- */
-    
-    // ML Observer: Tracks 5-second watch time
-    const mlWatcher = new IntersectionObserver((entries) => {
+    // --- 4. QUANTUM OBSERVERS (ML ENGINE) ---
+    // Linger Detection for Interest Auto-Learning
+    const mlObserver = new IntersectionObserver((entries) => {
         entries.forEach(e => {
             const id = e.target.dataset.id;
             const cat = e.target.dataset.category;
 
             if (e.isIntersecting) {
+                // If the card has a video, play it on entry
+                if (e.target.querySelector('.video-container')) {
+                    e.target.classList.add('playing');
+                }
+                
+                // 5-Second Linger Rule
                 viewTimers[id] = setTimeout(() => {
-                    trainAlgorithm(cat, 1); // +1 point for watching
+                    trainAlgorithm(cat, 1);
                 }, 5000); 
             } else {
+                e.target.classList.remove('playing');
                 clearTimeout(viewTimers[id]);
             }
         });
-    }, { threshold: 0.8 }); 
+    }, { threshold: 0.85 });
 
-    // Scroll Trigger: Infinite Loading
     const scrollTrigger = new IntersectionObserver((entries) => {
         entries.forEach(e => {
             if (e.isIntersecting) {
                 scrollTrigger.unobserve(e.target);
-                fetchNextBatch(); 
+                fetchNextBatch();
             }
         });
-    }, { rootMargin: "0px 0px 1000px 0px" });
-
-    function formatTime(ms) {
-        const diff = Date.now() - ms;
-        const sec = Math.floor(diff / 1000);
-        if (sec < 60) return "Just now";
-        if (sec < 3600) return Math.floor(sec/60) + "m ago";
-        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
-        return Math.floor(sec/86400) + "d ago";
-    }
+    }, { rootMargin: "1000px" });
 
     function initEngine() {
         fetchNextBatch();
     }
 
-    /* --- 8. UI ACTIONS --- */
-    function handleLike(el, cat) {
-        const icon = el.querySelector('.material-icons-round');
-        if (el.classList.contains('liked')) {
-            el.classList.remove('liked');
-            icon.innerText = 'favorite_border';
-        } else {
-            el.classList.add('liked');
-            icon.innerText = 'favorite';
-            trainAlgorithm(cat, 5); // Massive +5 boost
-            if(navigator.vibrate) navigator.vibrate([30, 40]);
-        }
+    // --- 5. SEARCH & UI ---
+    function handleLike(btn, cat) {
+        btn.classList.toggle('liked');
+        const icon = btn.querySelector('.material-icons-round');
+        icon.innerText = btn.classList.contains('liked') ? 'favorite' : 'favorite_border';
+        if(btn.classList.contains('liked')) trainAlgorithm(cat, 5); // Likes give +5 weight
     }
 
     function openSearch() {
         document.getElementById('search-modal').classList.add('active');
         document.getElementById('bite-search-box').focus();
-        history.pushState({ search: true }, "", "#search");
     }
 
-    function closeSearch() {
-        document.getElementById('search-modal').classList.remove('active');
-        if (window.location.hash === "#search") history.back();
-    }
+    function closeSearch() { document.getElementById('search-modal').classList.remove('active'); }
 
-    window.addEventListener('popstate', () => {
-        if (document.getElementById('search-modal').classList.contains('active')) {
-            document.getElementById('search-modal').classList.remove('active');
-        }
-    });
-
-    document.getElementById('bite-search-box').addEventListener('keypress', function (e) {
+    document.getElementById('bite-search-box').addEventListener('keypress', async (e) => {
         if (e.key === 'Enter') {
-            const q = this.value.trim();
-            if(q.length > 0) runSearch(q);
+            const q = e.target.value.trim();
+            if(!q) return;
+            trainAlgorithm(q, 10); // Search gives +10 weight
+            const container = document.getElementById('search-results-container');
+            container.innerHTML = '<div class="loading-spinner">Tuning Quantum Frequencies...</div>';
+            
+            const results = await fetchBiteData(q, 15);
+            container.innerHTML = '';
+            results.forEach(item => {
+                const row = document.createElement('div');
+                row.style.cssText = "display:flex; padding:15px 20px; border-bottom:1px solid #1a1a1a; gap:15px; align-items:center; cursor:pointer;";
+                row.onclick = () => { closeSearch(); renderBites([item]); window.scrollTo(0,0); };
+                row.innerHTML = `<img src="${item.imgUrl}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;"><div style="flex:1;"><div style="font-weight:700; color:#fff;">${item.title}</div><div style="font-size:0.8rem; color:var(--accent);">${item.source}</div></div>`;
+                container.appendChild(row);
+            });
         }
     });
 
-    async function runSearch(query) {
-        const resultsBox = document.getElementById('search-results-container');
-        resultsBox.innerHTML = `<div class="loading-spinner">Calibrating Frequency...</div>`;
-        
-        // Search = High intent action: +10 Points
-        trainAlgorithm(query, 10);
-        
-        const results = await fetchFromInternet(query, 15);
-        resultsBox.innerHTML = '';
-        
-        if(results.length === 0) {
-            resultsBox.innerHTML = `<p style="text-align:center;padding:40px;color:grey;">No signal found for "${query}"</p>`;
-            return;
-        }
-
-        results.forEach(res => {
-            const row = document.createElement('div');
-            row.style.cssText = "display:flex;padding:15px 20px;border-bottom:1px solid #1a1a1a;gap:15px;align-items:center;cursor:pointer;";
-            row.onclick = () => {
-                closeSearch();
-                window.scrollTo(0,0);
-                renderToDOM([res]); // Force to top
-            };
-            
-            row.innerHTML = `
-                <img src="${res.imgUrl}" style="width:60px;height:60px;border-radius:10px;object-fit:cover;">
-                <div style="flex:1;">
-                    <div style="font-size:0.95rem;font-weight:700;color:#fff;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${res.title}</div>
-                    <div style="font-size:0.75rem;color:var(--accent);margin-top:4px;font-weight:700;">${res.source}</div>
-                </div>
-            `;
-            resultsBox.appendChild(row);
-        });
-    }
+    window.onload = initEngine;
 </script>
 
 </body>
