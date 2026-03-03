@@ -94,29 +94,35 @@
         /* VIDEO PLAYER STYLING */
         .video-wrapper {
             position: absolute; inset: 0; width: 100%; height: 100%;
-            z-index: 0; display: none; background: #000;
+            /* FIX: Changed background to transparent to stop the black box from covering the thumbnail */
+            z-index: 0; display: none; background: transparent;
         }
         .video-wrapper iframe { 
             /* Changed pointer-events to auto so users can tap to play/unmute if blocked by browser */
             width: 100%; height: 100%; border: none; pointer-events: auto; 
             transform: scale(1.05); /* Slight crop to hide YouTube borders */
         }
-        /* When JS adds the .active-video class, the video reveals itself */
-        .bite-card.active-video .video-wrapper { display: block; animation: fadeIn 0.5s; }
+        /* FIX: Slowed the fade-in down so the thumbnail stays visible while the video buffers */
+        .bite-card.active-video .video-wrapper { display: block; animation: fadeIn 1.2s ease-in; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .bite-overlay {
             position: absolute; inset: 0;
             background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 100%);
-            z-index: 1; pointer-events: none;
+            /* FIX: Changed pointer-events to auto so we can register the "tap to unmute" */
+            z-index: 1; pointer-events: auto;
         }
         
         .bite-content { 
             position: relative; z-index: 2; display: flex; 
             justify-content: space-between; align-items: flex-end; width: 100%; 
+            pointer-events: none; /* Let clicks pass through to the overlay */
         }
         
+        /* Ensure buttons stay clickable */
+        .bite-actions, .bite-info { pointer-events: auto; }
+
         .bite-info { flex: 1; padding-right: 15px; animation: slideUp 0.6s ease-out; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -335,16 +341,17 @@
             let initial = isVideo ? 'Y' : 'N';
             let sourceClass = isVideo ? 'youtube' : 'news';
             
-            // The magic iFrame player logic: Changed mute=1 to mute=0 and added playsinline=1
+            // FIX: Changed mute=0 to mute=1 (guarantees browser allows visual autoplay) and added enablejsapi=1
             let videoLayer = isVideo ? `
                 <div class="video-wrapper">
-                    <iframe data-src="https://www.youtube.com/embed/${bite.videoId}?autoplay=1&mute=0&loop=1&playlist=${bite.videoId}&controls=0&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+                    <iframe data-src="https://www.youtube.com/embed/${bite.videoId}?autoplay=1&mute=1&loop=1&playlist=${bite.videoId}&controls=0&modestbranding=1&playsinline=1&enablejsapi=1" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
                 </div>
             ` : '';
 
+            // FIX: Added onclick="enableAudio(this)" to the bite-overlay
             card.innerHTML = `
                 ${videoLayer}
-                <div class="bite-overlay"></div>
+                <div class="bite-overlay" onclick="enableAudio(this)"></div>
                 <div class="bite-content">
                     <div class="bite-info">
                         <div class="source-row">
@@ -479,6 +486,17 @@
             }
         }
     });
+
+    // --- 10. AUDIO CONTROLLER (NEW FIX) ---
+    // Browsers require user interaction to play audio. 
+    // Tapping the screen uses the YouTube API to unmute the video safely.
+    function enableAudio(overlay) {
+        const iframe = overlay.parentElement.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":[]}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
+        }
+    }
 </script>
 
 </body>
