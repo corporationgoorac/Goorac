@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Bites</title>
     
+    <script src="config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
     <script src="components/navbar.js" defer></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
@@ -25,10 +30,9 @@
             background-color: var(--bg); color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0; padding: 0; 
-            overflow: hidden; /* Lock body for scroll-snapping */
+            overflow: hidden; 
         }
 
-        /* HEADER */
         header {
             position: fixed; top: 0; width: 100%;
             background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
@@ -46,7 +50,6 @@
         }
         .search-icon-btn:active { transform: scale(0.85); color: var(--accent); }
 
-        /* BITES FEED (Scroll Snapping) */
         #bites-feed-container {
             height: 100vh; width: 100vw;
             overflow-y: scroll; scroll-snap-type: y mandatory;
@@ -55,7 +58,6 @@
         }
         #bites-feed-container::-webkit-scrollbar { display: none; }
 
-        /* BITE CARD */
         .bite-card {
             height: 100vh; width: 100vw;
             scroll-snap-align: start; scroll-snap-stop: always;
@@ -81,7 +83,6 @@
             background: #222; object-fit: cover; border: 1px solid var(--border); 
             display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: var(--accent);
         }
-        .source-details { display: flex; flex-direction: column; }
         .source-name { font-weight: 800; font-size: 1.05rem; color: #fff; }
         .bite-time { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-top: 2px;}
         
@@ -94,12 +95,11 @@
 
         .bite-actions { display: flex; flex-direction: column; gap: 22px; align-items: center; padding-bottom: 5px; }
         .action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; cursor: pointer; }
-        .action-btn .material-icons-round { font-size: 34px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .action-btn .material-icons-round { font-size: 34px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); transition: 0.2s; }
         .action-btn:active .material-icons-round { transform: scale(0.7); }
         .action-btn.liked .material-icons-round { color: var(--danger); }
         .action-label { font-size: 0.75rem; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 
-        /* SEARCH MODAL */
         #search-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--surface); z-index: 10001;
@@ -114,38 +114,17 @@
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
         }
         .back-btn { color: #fff; font-size: 28px; cursor: pointer; }
-        .search-input-wrap { flex: 1; position: relative; }
         .search-input {
-            width: 100%; background: #111; border: 1px solid var(--border);
+            flex: 1; background: #111; border: 1px solid var(--border);
             padding: 12px 15px; border-radius: 14px; color: white; outline: none;
-            font-size: 16px; transition: 0.2s;
+            font-size: 16px;
         }
-        .search-input:focus { border-color: var(--accent); background: #151515; box-shadow: 0 0 10px rgba(0,210,255,0.1); }
 
-        .search-results { flex: 1; overflow-y: auto; padding: 0; background: var(--bg); }
-        
-        /* SEARCH RESULT CARD */
-        .search-card {
-            display: flex; padding: 15px 20px; border-bottom: 1px solid var(--border);
-            gap: 15px; align-items: center; cursor: pointer; transition: background 0.2s;
-        }
-        .search-card:active { background: #111; }
-        .search-thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; background: #222; }
-        .search-text { flex: 1; }
-        .search-title { font-size: 0.9rem; font-weight: 700; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .search-meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 5px; font-weight: 600;}
-
-        /* SKELETON LOADER */
         .skeleton-card { background: #080808; animation: pulse 1.5s infinite; }
         .skel-box { background: #222; border-radius: 4px; }
         @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        .loading-spinner { text-align: center; padding: 20px; color: var(--accent); animation: pulse 1s infinite; }
         
-        .loading-spinner {
-            text-align: center; padding: 20px; color: var(--accent); font-weight: 800; font-size: 0.8rem;
-            text-transform: uppercase; letter-spacing: 2px; animation: pulse 1s infinite;
-        }
-
-        /* Prevent navbar from blocking content */
         main-navbar { z-index: 10000; position: relative; }
     </style>
 </head>
@@ -158,30 +137,9 @@
 
 <div id="bites-feed-container">
     <script>
-        // 🚀 INSTANT 0ms LOAD FROM LOCAL STORAGE
         const cachedBites = localStorage.getItem('goorac_bites_cache');
-        if (cachedBites) {
-            document.write(cachedBites);
-        } else {
-            // Skeleton loader if no cache exists
-            document.write(`
-                <div class="bite-card skeleton-card">
-                    <div class="bite-overlay"></div>
-                    <div class="bite-content" style="opacity: 0.7;">
-                        <div class="bite-info">
-                            <div class="source-row"><div class="source-pfp"></div><div class="source-details"><div class="skel-box" style="width:100px; height:15px; margin-bottom:5px;"></div><div class="skel-box" style="width:60px; height:10px;"></div></div></div>
-                            <div class="skel-box" style="width:90%; height:14px; margin-bottom:8px;"></div>
-                            <div class="skel-box" style="width:70%; height:14px; margin-bottom:15px;"></div>
-                            <div class="skel-box" style="width:80px; height:20px; border-radius:12px;"></div>
-                        </div>
-                        <div class="bite-actions">
-                            <div class="skel-box" style="width:34px; height:34px; border-radius:50%;"></div>
-                            <div class="skel-box" style="width:34px; height:34px; border-radius:50%;"></div>
-                        </div>
-                    </div>
-                </div>
-            `);
-        }
+        if (cachedBites) document.write(cachedBites);
+        else document.write('<div class="bite-card skeleton-card"><div class="bite-overlay"></div></div>');
     </script>
 </div>
 
@@ -190,211 +148,203 @@
 <div id="search-modal">
     <div class="search-header">
         <span class="material-icons-round back-btn" onclick="closeSearch()">arrow_back</span>
-        <div class="search-input-wrap">
-            <input type="text" class="search-input" id="bite-search-box" placeholder="Search internet, topics, news..." autocomplete="off">
-        </div>
+        <input type="text" class="search-input" id="bite-search-box" placeholder="Search internet, songs, news..." autocomplete="off">
     </div>
-    <div class="search-results" id="search-results-container">
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; opacity:0.5; padding: 40px;">
-            <span class="material-icons-round" style="font-size: 48px; margin-bottom:15px;">travel_explore</span>
-            <p style="text-align: center; font-size: 0.9rem; font-weight: 600;">Explore the global news feed instantly.</p>
-        </div>
-    </div>
+    <div class="search-results" id="search-results-container"></div>
 </div>
 
 <script>
-    // --- 1. CONFIGURATION ---
+    // --- 1. FIREBASE & ML INIT ---
+    if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    
+    let myUid = null;
+    let userInterests = {}; 
     let seenBites = new Set(); 
     let isFetching = false;
-    const DEFAULT_TOPICS = ["World News", "Tech", "Science", "Space", "Nature"];
+    let viewTimers = {}; 
 
-    // --- 2. THE RSS ENGINE (PURE OPEN ACCESS) ---
+    const DEFAULT_TOPICS = ["World News", "Technology", "Sports", "Nature"];
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            myUid = user.uid;
+            await loadProfile();
+            initEngine();
+        } else window.location.href = "login.html";
+    });
+
+    async function loadProfile() {
+        const doc = await db.collection("users").doc(myUid).get();
+        if(doc.exists && doc.data().bitesProfile) userInterests = doc.data().bitesProfile;
+    }
+
+    function updateScore(topic, points) {
+        if (!myUid || !topic) return;
+        const tag = topic.toLowerCase().trim();
+        userInterests[tag] = (userInterests[tag] || 0) + points;
+        db.collection("users").doc(myUid).update({
+            [`bitesProfile.${tag}`]: firebase.firestore.FieldValue.increment(points)
+        }).catch(() => {
+            db.collection("users").doc(myUid).set({ bitesProfile: { [tag]: points } }, { merge: true });
+        });
+    }
+
+    // --- 2. THE RSS FETCH ENGINE ---
     async function fetchFromInternet(topic, limit = 10) {
         try {
-            // Using Google News RSS through a free RSS-to-JSON bridge
-            const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
+            const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-IN&gl=IN&ceid=IN:en`;
             const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
-
             const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
             const json = await response.json();
-            if (json.status !== "ok") throw new Error("RSS conversion failed");
+            if (json.status !== "ok") return [];
 
             return json.items.map(b => {
-                let imgUrl = b.enclosure && b.enclosure.link ? b.enclosure.link : '';
-                if (!imgUrl && b.description) {
-                    const imgMatch = b.description.match(/src="([^"]+)"/);
-                    if (imgMatch) imgUrl = imgMatch[1];
+                let img = b.enclosure?.link || '';
+                if (!img && b.description) {
+                    const match = b.description.match(/src="([^"]+)"/);
+                    if (match) img = match[1];
                 }
-
                 return {
-                    id: b.guid || Math.random().toString(36).substr(2, 9),
+                    id: b.guid || Math.random().toString(36).substr(2,9),
                     category: topic,
-                    source: b.author || "Global News",
-                    author: "NewsFeed",
-                    title: b.title.split(' - ')[0], 
-                    imgUrl: imgUrl || `https://picsum.photos/seed/${Math.random()}/1080/1920`, 
-                    likes: Math.floor(Math.random() * 800) + 100,
+                    source: b.source || "News",
+                    title: b.title.split(' - ')[0],
+                    imgUrl: img || `https://picsum.photos/seed/${Math.random()}/1080/1920`,
+                    likes: Math.floor(Math.random() * 500) + 50,
                     timestamp: new Date(b.pubDate).getTime(),
                     link: b.link
                 };
             });
-        } catch(error) {
-            console.warn(`Fetch error for: ${topic}`, error);
-            return [];
-        }
+        } catch { return []; }
     }
 
-    // --- 3. FEED CONTROLLER ---
+    // --- 3. THE ML FEED GENERATOR ---
     async function fetchNextBatch() {
         if (isFetching) return;
         isFetching = true;
         
-        // Rotate through default topics for variety
-        const randomTopic = DEFAULT_TOPICS[Math.floor(Math.random() * DEFAULT_TOPICS.length)];
-        const results = await fetchFromInternet(randomTopic, 8);
+        let topics = [];
+        let sortedInts = Object.entries(userInterests).sort((a,b) => b[1] - a[1]);
         
-        let newBites = results.filter(bite => {
-            if (seenBites.has(bite.id)) return false;
-            seenBites.add(bite.id);
-            return true;
-        }).sort(() => Math.random() - 0.5);
-        
-        if(newBites.length > 0) {
-            appendBitesToDOM(newBites);
+        if (sortedInts.length === 0) topics = DEFAULT_TOPICS;
+        else {
+            topics.push(sortedInts[0][0]); // Top interest
+            if(sortedInts[1]) topics.push(sortedInts[1][0]); 
+            topics.push(DEFAULT_TOPICS[Math.floor(Math.random() * DEFAULT_TOPICS.length)]); // Exploration
         }
+
+        const promises = topics.map(t => fetchFromInternet(t, 5));
+        const results = (await Promise.all(promises)).flat();
+        
+        const filtered = results.filter(b => !seenBites.has(b.id));
+        filtered.forEach(b => seenBites.add(b.id));
+        filtered.sort(() => Math.random() - 0.5);
+        
+        if(filtered.length > 0) appendBites(filtered);
         isFetching = false;
     }
 
-    function formatTime(ms) {
-        const sec = Math.floor((Date.now() - ms) / 1000);
-        if (sec < 3600) return Math.floor(sec/60) + "m ago";
-        if (sec < 86400) return Math.floor(sec/3600) + "h ago";
-        return Math.floor(sec/86400) + "d ago";
-    }
-
-    function appendBitesToDOM(bites) {
+    function appendBites(bites) {
         const container = document.getElementById('bites-feed-container');
-        if(container.querySelector('.skeleton-card')) container.innerHTML = ''; 
+        if(container.querySelector('.skeleton-card')) container.innerHTML = '';
 
-        bites.forEach((bite, index) => {
+        bites.forEach((b, i) => {
             const el = document.createElement('div');
             el.className = 'bite-card';
-            el.style.backgroundImage = `url('${bite.imgUrl}')`;
-            el.dataset.id = bite.id;
+            el.style.backgroundImage = `url('${b.imgUrl}')`;
+            el.dataset.id = b.id;
+            el.dataset.category = b.category;
             
-            const firstLetter = bite.source.charAt(0).toUpperCase();
-
             el.innerHTML = `
                 <div class="bite-overlay"></div>
                 <div class="bite-content">
                     <div class="bite-info">
                         <div class="source-row">
-                            <div class="source-pfp">${firstLetter}</div>
-                            <div class="source-details">
-                                <span class="source-name">${bite.source}</span>
-                                <span class="bite-time">@${bite.author} • ${formatTime(bite.timestamp)}</span>
-                            </div>
+                            <div class="source-pfp">${b.source.charAt(0)}</div>
+                            <span class="source-name">${b.source}</span>
                         </div>
-                        <div class="bite-caption">${bite.title}</div>
-                        <div class="bite-tag">#${bite.category.replace(/\s+/g, '')}</div>
+                        <div class="bite-caption">${b.title}</div>
+                        <div class="bite-tag">#${b.category}</div>
                     </div>
                     <div class="bite-actions">
-                        <div class="action-btn" onclick="handleLike(this)">
+                        <div class="action-btn" onclick="handleLike(this, '${b.category}')">
                             <span class="material-icons-round">favorite_border</span>
-                            <span class="action-label">${bite.likes}</span>
+                            <span class="action-label">${b.likes}</span>
                         </div>
-                        <div class="action-btn" onclick="shareBite('${bite.link}')">
+                        <div class="action-btn" onclick="window.open('${b.link}', '_blank')">
                             <span class="material-icons-round">open_in_browser</span>
-                            <span class="action-label">Read</span>
                         </div>
                     </div>
                 </div>
             `;
             container.appendChild(el);
-            if (index === bites.length - 2) infiniteScrollObserver.observe(el);
+            mlObserver.observe(el);
+            if (i === bites.length - 2) infiniteObserver.observe(el);
         });
         localStorage.setItem('goorac_bites_cache', container.innerHTML);
     }
 
-    // --- 4. INFINITE SCROLL ---
-    const infiniteScrollObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                infiniteScrollObserver.unobserve(entry.target);
+    // --- 4. OBSERVERS ---
+    const mlObserver = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                viewTimers[e.target.dataset.id] = setTimeout(() => {
+                    updateScore(e.target.dataset.category, 1);
+                }, 5000); // 5-second watch rule
+            } else clearTimeout(viewTimers[e.target.dataset.id]);
+        });
+    }, { threshold: 0.8 });
+
+    const infiniteObserver = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                infiniteObserver.unobserve(e.target);
                 fetchNextBatch();
             }
         });
-    }, { rootMargin: "0px 0px 800px 0px" });
+    }, { rootMargin: "800px" });
 
     function initEngine() {
-        if (document.getElementById('bites-feed-container').querySelector('.skeleton-card') || !cachedBites) {
-            fetchNextBatch();
-        } else {
-            setTimeout(fetchNextBatch, 500);
+        const hasSkel = document.getElementById('bites-feed-container').querySelector('.skeleton-card');
+        if (hasSkel) fetchNextBatch();
+        else {
+            setTimeout(fetchNextBatch, 1000);
+            document.querySelectorAll('.bite-card').forEach(c => mlObserver.observe(c));
         }
     }
 
-    // --- 5. UI ACTIONS ---
-    function handleLike(btnEl) {
-        const icon = btnEl.querySelector('.material-icons-round');
-        btnEl.classList.toggle('liked');
-        icon.innerText = btnEl.classList.contains('liked') ? 'favorite' : 'favorite_border';
-        if(navigator.vibrate) navigator.vibrate(40);
+    // --- 5. SEARCH & UI ---
+    function handleLike(btn, cat) {
+        btn.classList.toggle('liked');
+        const icon = btn.querySelector('.material-icons-round');
+        icon.innerText = btn.classList.contains('liked') ? 'favorite' : 'favorite_border';
+        if(btn.classList.contains('liked')) updateScore(cat, 5); // Likes give +5 weight
     }
 
-    function shareBite(url) {
-        if (url) window.open(url, '_blank');
-    }
+    function openSearch() { document.getElementById('search-modal').classList.add('active'); }
+    function closeSearch() { document.getElementById('search-modal').classList.remove('active'); }
 
-    function openSearch() {
-        document.getElementById('search-modal').classList.add('active');
-        document.getElementById('bite-search-box').focus();
-    }
-
-    function closeSearch() {
-        document.getElementById('search-modal').classList.remove('active');
-    }
-
-    document.getElementById('bite-search-box').addEventListener('keypress', function (e) {
+    document.getElementById('bite-search-box').addEventListener('keypress', async (e) => {
         if (e.key === 'Enter') {
-            const query = this.value.trim();
-            if(query.length > 0) executeSearch(query);
+            const q = e.target.value.trim();
+            if(!q) return;
+            updateScore(q, 10); // Search gives +10 weight
+            const container = document.getElementById('search-results-container');
+            container.innerHTML = '<div class="loading-spinner">Searching Quantum...</div>';
+            const res = await fetchFromInternet(q, 10);
+            container.innerHTML = '';
+            res.forEach(item => {
+                const card = document.createElement('div');
+                card.style.padding = '15px';
+                card.innerHTML = `<div style="font-weight:700;">${item.title}</div><div style="font-size:0.8rem;color:grey;">${item.source}</div>`;
+                card.onclick = () => { closeSearch(); appendBites([item]); window.scrollTo(0,0); };
+                container.appendChild(card);
+            });
         }
     });
 
-    async function executeSearch(query) {
-        const container = document.getElementById('search-results-container');
-        container.innerHTML = `<div class="loading-spinner">Accessing Global Feed...</div>`;
-        const results = await fetchFromInternet(query, 12);
-        container.innerHTML = '';
-        
-        if(results.length === 0) {
-            container.innerHTML = `<p style="text-align:center; color:var(--text-dim); padding:20px;">No results for "${query}"</p>`;
-            return;
-        }
-
-        results.forEach(res => {
-            const card = document.createElement('div');
-            card.className = 'search-card';
-            card.onclick = () => {
-                closeSearch();
-                window.scrollTo(0,0);
-                appendBitesToDOM([res]);
-            };
-            card.innerHTML = `
-                <img src="${res.imgUrl}" class="search-thumb">
-                <div class="search-text">
-                    <div class="search-title">${res.title}</div>
-                    <div class="search-meta">${res.source} • ${formatTime(res.timestamp)}</div>
-                </div>
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    // Initialize
     window.onload = initEngine;
 </script>
 
