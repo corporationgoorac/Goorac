@@ -3,129 +3,508 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Official Shorts Feed</title>
+    <title>Goorac | Quantum Bites Feed</title>
     
     <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <script src="components/navbar.js" defer></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
     <style>
+        /* ==========================================================================
+           QUANTUM UI TOKENS (ULTRA-PERFORMANCE EDITION)
+           ========================================================================== */
         :root {
             --bg: #000000;
-            --nav-clearance: 140px; /* Space for your Goorac Navbar */
-            --safe-top: env(safe-area-inset-top);
+            --surface: #0a0a0a;
+            --accent: #00d2ff;
+            --danger: #ff2a55;
+            --border: #1a1a1a;
+            --text-main: #ffffff;
+            --nav-clearance: 140px; 
+            --spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --expo: cubic-bezier(0.19, 1, 0.22, 1);
         }
 
-        * { 
-            box-sizing: border-box; 
-            margin: 0; padding: 0; 
-            -webkit-tap-highlight-color: transparent; 
-        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; outline: none; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text-main); font-family: -apple-system, system-ui, sans-serif; overflow: hidden; height: 100vh; width: 100vw; position: fixed; }
 
-        body, html {
-            background-color: var(--bg); 
-            overflow: hidden; 
-            height: 100vh;
-            width: 100vw;
-            position: fixed;
-        }
-
-        /* ==========================================================================
-          THE OFFICIAL YOUTUBE PORTAL 
-          ==========================================================================
-        */
-        #official-youtube-portal {
-            position: absolute;
-            top: 0; 
-            left: 0;
-            width: 100%;
-            /* Cuts the bottom off exactly where your navbar starts */
-            height: calc(100vh - var(--nav-clearance)); 
-            border: none;
-            z-index: 1;
-            background: #000;
-        }
-
-        /* GOORAC HEADER OVERLAY */
+        /* HEADER NAVIGATION */
         header {
-            position: fixed; 
-            top: 0; 
-            width: 100%;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
-            padding: calc(var(--safe-top) + 15px) 20px 30px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            z-index: 5000; 
-            pointer-events: none; /* Lets you touch the video behind the header */
+            position: fixed; top: 0; width: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%);
+            padding: calc(env(safe-area-inset-top) + 15px) 20px 30px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            z-index: 5000; pointer-events: none;
         }
         
-        .header-title { 
-            font-size: 1.7rem; font-weight: 900; letter-spacing: -1.2px;
-            color: #fff; text-shadow: 0 4px 15px rgba(0,0,0,0.8);
-            pointer-events: auto;
-            font-family: -apple-system, sans-serif;
+        .header-title { font-size: 1.8rem; font-weight: 900; letter-spacing: -1.2px; pointer-events: auto; color: #fff; text-shadow: 0 4px 15px rgba(0,0,0,0.9); font-style: italic; }
+        .search-icon-btn { color: #fff; font-size: 34px; cursor: pointer; pointer-events: auto; text-shadow: 0 4px 15px rgba(0,0,0,0.9); transition: transform 0.2s var(--spring); }
+        .search-icon-btn:active { transform: scale(0.85); color: var(--accent); }
+
+        /* VIEWPORT MANAGEMENT (THE VIRTUAL DOM) */
+        #bites-feed-container {
+            height: 100vh; width: 100vw;
+            overflow-y: scroll; scroll-snap-type: y mandatory;
+            scrollbar-width: none; background: var(--bg);
+            will-change: transform;
+        }
+        #bites-feed-container::-webkit-scrollbar { display: none; }
+
+        /* BITE CARD ARCHITECTURE */
+        .bite-card {
+            height: 100vh; width: 100vw;
+            scroll-snap-align: start; scroll-snap-stop: always;
+            position: relative; display: flex; flex-direction: column;
+            justify-content: flex-end; padding: 15px;
+            padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom) + 5px);
+            background-size: cover; background-position: center; background-color: #050505;
+            border-bottom: 1px solid var(--border);
         }
 
-        /* GOORAC NAVBAR LAYER */
-        main-navbar { 
-            position: fixed; 
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            z-index: 6000; 
+        .video-wrapper {
+            position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; background: #000;
+            opacity: 0; transition: opacity 0.4s ease-in;
+        }
+        .video-wrapper iframe { width: 100%; height: 100%; border: none; pointer-events: auto; transform: scale(1.15); }
+        .bite-card.active-video .video-wrapper { opacity: 1; }
+
+        .bite-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 25%, rgba(0,0,0,0) 60%);
+            z-index: 1; pointer-events: auto;
         }
         
-        /* Loading Screen while YouTube connects */
-        #portal-loader {
-            position: absolute;
-            inset: 0;
-            background: #000;
-            z-index: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            font-family: sans-serif;
-            font-weight: 800;
-            letter-spacing: 2px;
+        .bite-content { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; pointer-events: none; }
+        .bite-actions, .bite-info { pointer-events: auto; }
+
+        /* INFORMATION ARCHITECTURE */
+        .bite-info { flex: 1; padding-right: 20px; animation: slideUpFade 0.5s var(--expo); }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .source-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .source-pfp { 
+            width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(45deg, #222, #000); 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: 800; font-size: 0.9rem; border: 1.5px solid rgba(255,255,255,0.2);
+            color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
+        .source-name { font-weight: 800; font-size: 0.95rem; color: #fff; text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
+        
+        /* EXPANDABLE CAPTION (1-LINE STRICT) */
+        .bite-caption { 
+            font-size: 0.9rem; line-height: 1.4; color: #f8f8f8; 
+            margin-bottom: 8px; font-weight: 400; cursor: pointer;
+            text-shadow: 0 1px 6px rgba(0,0,0,1);
+            display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; 
+            overflow: hidden; text-overflow: ellipsis; transition: all 0.3s ease;
+        }
+        .bite-caption.expanded {
+            display: block; -webkit-line-clamp: unset;
+            background: rgba(0,0,0,0.6); border-radius: 10px; padding: 10px;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .bite-tag-row { display: flex; flex-wrap: wrap; gap: 5px; }
+        .bite-tag { 
+            background: rgba(255, 255, 255, 0.15); color: #fff; padding: 4px 10px; 
+            border-radius: 6px; font-weight: 800; font-size: 0.65rem; 
+            border: 0.5px solid rgba(255, 255, 255, 0.1); text-transform: lowercase; backdrop-filter: blur(8px);
+        }
+
+        /* INTERACTIVE BUTTONS */
+        .bite-actions { display: flex; flex-direction: column; gap: 28px; align-items: center; margin-bottom: 5px; }
+        .action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; cursor: pointer; }
+        .action-btn .material-icons-round { font-size: 38px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.9)); transition: 0.2s; }
+        .action-btn:active { transform: scale(0.7); }
+        .action-btn.liked .material-icons-round { color: var(--danger); animation: pop 0.4s var(--spring); }
+        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+        .action-label { font-size: 0.75rem; font-weight: 900; text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
+
+        /* SEARCH MODAL */
+        #search-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--surface); z-index: 10001;
+            transform: translateX(100%); transition: transform 0.4s var(--expo);
+            display: flex; flex-direction: column;
+        }
+        #search-modal.active { transform: translateX(0); }
+        
+        .search-header {
+            padding: max(15px, env(safe-area-inset-top)) 20px 15px;
+            display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border);
+            background: rgba(10,10,10,0.98);
+        }
+        .search-input {
+            flex: 1; background: #151515; border: 1px solid #222;
+            padding: 16px 20px; border-radius: 16px; color: white; outline: none; font-size: 16px; font-weight: 500;
+        }
+        .search-input:focus { border-color: var(--accent); }
+        .search-results { flex: 1; overflow-y: auto; padding: 10px 0; background: var(--bg); }
+
+        .skeleton-card { background: linear-gradient(110deg, #050505 8%, #111 18%, #050505 33%); background-size: 200% 100%; animation: shimmer 1.5s infinite linear; }
+        @keyframes shimmer { to { background-position-x: -200%; } }
+        .loading-spinner { text-align: center; padding: 60px; color: var(--accent); font-weight: 900; letter-spacing: 3px; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+        main-navbar { position: relative; z-index: 10000; }
     </style>
 </head>
 <body>
 
 <header>
     <div class="header-title">Goorac Bites</div>
+    <span class="material-icons-round search-icon-btn" onclick="QuantumInterface.openSearch()">search</span>
 </header>
 
-<div id="portal-loader">CONNECTING TO YOUTUBE...</div>
-
-<iframe 
-    id="official-youtube-portal" 
-    src="https://www.youtube.com/shorts" 
-    allow="autoplay; encrypted-media; fullscreen"
-    sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
-    onload="document.getElementById('portal-loader').style.display='none';">
-</iframe>
+<div id="bites-feed-container">
+    <div class="bite-card skeleton-card"><div class="bite-overlay"></div></div>
+</div>
 
 <main-navbar></main-navbar>
 
-<script>
-    // Keep your Firebase Auth intact as requested
-    if (typeof window.initFirebaseCore === 'function') {
-        window.initFirebaseCore();
-    } else if (!firebase.apps.length && window.firebaseConfig) {
-        firebase.initializeApp(window.firebaseConfig);
-    }
-    const auth = firebase.auth();
+<div id="search-modal">
+    <div class="search-header">
+        <span class="material-icons-round" style="color:#fff; cursor:pointer; font-size:36px;" onclick="QuantumInterface.closeSearch()">chevron_left</span>
+        <input type="text" class="search-input" id="quantum-search-box" placeholder="Search specific topics..." autocomplete="off">
+    </div>
+    <div class="search-results" id="search-results-list">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:70vh;opacity:0.2;">
+            <span class="material-icons-round" style="font-size:80px;margin-bottom:20px;">manage_search</span>
+            <p style="text-align:center;font-weight:900;letter-spacing:2px;">SEARCH ENGINE READY</p>
+        </div>
+    </div>
+</div>
 
-    // Ensure the user is logged into your app before showing the portal
-    auth.onAuthStateChanged((user) => {
-        if (!user) {
+<script>
+    // --- 1. CORE INITIALIZATION ---
+    if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
+    else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
+    const auth = firebase.auth();
+    
+    const CONFIG = {
+        BACKEND: "https://pishaa.onrender.com/api/feed",
+        SYNC_API: "https://pishaa.onrender.com/api/neural-sync",
+        DEFAULT_QUERY: "trending shorts"
+    };
+
+    const State = {
+        uid: null,
+        seenIds: new Set(JSON.parse(localStorage.getItem('gq_master_seen') || '[]')),
+        feedCache: JSON.parse(localStorage.getItem('gq_master_cache') || '[]'),
+        isFetching: false,
+        audioActive: false,
+        timers: {},
+        scrollRef: 0
+    };
+
+    // --- 2. OFFLOADED NEURAL ENGINE (Runs fast, syncs to server) ---
+    const NeuralEngine = {
+        weights: JSON.parse(localStorage.getItem('gq_local_weights') || '{}'),
+
+        signal: function(tagsStr, action) {
+            if (!tagsStr) return;
+            // Parse main category and hashtags into one array
+            const tags = tagsStr.split(',').map(t => t.toLowerCase().replace(/#/g, '').trim()).filter(t => t);
+            if (tags.length === 0) return;
+
+            let points = (action === 'like') ? 40 : (action === 'search') ? 60 : (action === 'deep_view') ? 20 : -8;
+
+            // Instant UI Local Cache update
+            tags.forEach(t => {
+                if (!this.weights[t]) this.weights[t] = { score: 10, ts: Date.now() };
+                this.weights[t].score += points;
+                this.weights[t].ts = Date.now(); 
+                if (this.weights[t].score < 1) this.weights[t].score = 1;
+            });
+            localStorage.setItem('gq_local_weights', JSON.stringify(this.weights));
+
+            // FIRE & FORGET: Offload DB writes to Render Server
+            if (State.uid && points > 0) {
+                fetch(CONFIG.SYNC_API, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ uid: State.uid, tags: tags, points: points })
+                }).catch(err => console.log("Silent Sync")); // Doesn't crash UI if offline
+            }
+        },
+
+        getLocalFallbackQuery: function() {
+            const data = Object.entries(this.weights);
+            if (data.length === 0) return CONFIG.DEFAULT_QUERY;
+            
+            let candidates = data.map(([tag, val]) => {
+                const ageHrs = (Date.now() - val.ts) / 3600000;
+                return { tag, weight: val.score * Math.pow(0.85, ageHrs) };
+            }).sort((a, b) => b.weight - a.weight);
+
+            return candidates.slice(0, 2).map(c => c.tag).join(',');
+        }
+    };
+
+    // --- 3. DATA MANAGER (Communicates with Server-Side Brain) ---
+    const DataManager = {
+        sync: async function(query, isStrictSearch = false) {
+            try {
+                // Passes UID so the Server can check language & personality preferences
+                const url = `${CONFIG.BACKEND}?topics=${encodeURIComponent(query)}&mode=${isStrictSearch ? 'strict' : 'algo'}&uid=${State.uid || ''}&cb=${Date.now()}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                return (json.success && json.bites) ? json.bites : [];
+            } catch (err) { return []; }
+        },
+
+        hydrate: async function(forcedData = null) {
+            if (State.isFetching) return;
+            State.isFetching = true;
+
+            let incoming = [];
+            if (forcedData) {
+                incoming = forcedData;
+            } else {
+                const localQuery = NeuralEngine.getLocalFallbackQuery();
+                incoming = await this.sync(localQuery, false);
+            }
+
+            // Anti-Loop Blocklist execution
+            const unique = incoming.filter(b => !State.seenIds.has(b.id));
+
+            if (unique.length > 0) {
+                if (forcedData) State.feedCache = unique;
+                else State.feedCache = [...State.feedCache, ...unique].slice(-25);
+
+                localStorage.setItem('gq_master_cache', JSON.stringify(State.feedCache));
+                RenderEngine.draw(unique, !!forcedData);
+            } else if (!forcedData) {
+                // Rescue recursion if server returns all seen videos
+                State.isFetching = false;
+                setTimeout(() => this.hydrate(), 600);
+                return;
+            }
+            State.isFetching = false;
+        }
+    };
+
+    // --- 4. RENDER ENGINE & VIRTUAL DOM (Lag Killer) ---
+    const RenderEngine = {
+        container: document.getElementById('bites-feed-container'),
+
+        draw: function(batch, wipeFirst = false) {
+            if (wipeFirst || this.container.querySelector('.skeleton-card')) this.container.innerHTML = '';
+
+            batch.forEach((bite, i) => {
+                const card = document.createElement('div');
+                card.className = 'bite-card';
+                card.style.backgroundImage = `url('${bite.imgUrl}')`;
+                card.dataset.id = bite.id;
+                card.dataset.cat = bite.category;
+                
+                const creator = bite.author || "Creator";
+                const initial = creator.charAt(0).toUpperCase();
+
+                const tagsArr = (bite.title.match(/#[\w\u0590-\u05ff]+/g) || []).map(t => t.toLowerCase());
+                // Combine category and tags into one dataset string for the Neural Engine
+                const fullTagsStr = [bite.category, ...tagsArr].join(',');
+                card.dataset.tags = fullTagsStr;
+
+                const tagHtml = tagsArr.slice(0, 3).map(t => `<span class="bite-tag">${t}</span>`).join('');
+
+                const playerHtml = `
+                    <div class="video-wrapper">
+                        <iframe data-src="https://www.youtube.com/embed/${bite.videoId}?autoplay=1&mute=1&loop=1&playlist=${bite.videoId}&controls=0&modestbranding=1&playsinline=1&enablejsapi=1&vq=small" allow="autoplay; encrypted-media; fullscreen;"></iframe>
+                    </div>
+                `;
+
+                card.innerHTML = `
+                    ${playerHtml}
+                    <div class="bite-overlay" onclick="QuantumInterface.toggleMedia(this)"></div>
+                    <div class="bite-content">
+                        <div class="bite-info">
+                            <div class="source-row">
+                                <div class="source-pfp">${initial}</div>
+                                <span class="source-name">${creator}</span>
+                            </div>
+                            <div class="bite-caption" onclick="QuantumInterface.expandCaption(this)">${bite.title}</div>
+                            <div class="bite-tag-row">${tagHtml}</div>
+                        </div>
+                        
+                        <div class="bite-actions">
+                            <div class="action-btn" onclick="QuantumInterface.like(this)">
+                                <span class="material-icons-round">favorite_border</span>
+                                <span class="action-label">${this.format(bite.likes)}</span>
+                            </div>
+                            <div class="action-btn" onclick="window.open('${bite.link}', '_blank')">
+                                <span class="material-icons-round">open_in_new</span>
+                                <span class="action-label">Open</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                this.container.appendChild(card);
+                ObserverSystem.preload.observe(card);
+                ObserverSystem.neural.observe(card);
+
+                if (i === batch.length - 4) ObserverSystem.scroll.observe(card);
+            });
+        },
+        format: n => n > 1000 ? (n/1000).toFixed(1) + 'k' : n
+    };
+
+    // --- 5. OBSERVER SYSTEM (Controls Memory & Playback) ---
+    const ObserverSystem = {
+        preload: new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    const frame = e.target.querySelector('iframe');
+                    if (frame && !frame.src) frame.src = frame.dataset.src;
+                }
+            });
+        }, { rootMargin: "1500px 0px" }),
+
+        neural: new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                const id = e.target.dataset.id;
+                const tagsStr = e.target.dataset.tags;
+                const frame = e.target.querySelector('iframe');
+
+                if (e.isIntersecting) {
+                    State.scrollRef = Date.now();
+                    
+                    // Permanent ID Blocklist updates
+                    if (!State.seenIds.has(id)) {
+                        State.seenIds.add(id);
+                        if (State.seenIds.size > 2000) {
+                            const arr = Array.from(State.seenIds);
+                            State.seenIds = new Set(arr.slice(-2000));
+                        }
+                        localStorage.setItem('gq_master_seen', JSON.stringify(Array.from(State.seenIds)));
+                    }
+                    
+                    if (frame && !frame.src) frame.src = frame.dataset.src;
+                    e.target.classList.add('active-video');
+                    
+                    if (frame && frame.contentWindow) {
+                        frame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
+                        if (State.audioActive) frame.contentWindow.postMessage('{"event":"command","func":"unMute","args":[]}', '*');
+                    }
+
+                    // 15-second deep view trigger
+                    State.timers[id] = setTimeout(() => {
+                        NeuralEngine.signal(tagsStr, 'deep_view'); 
+                    }, 15000); 
+
+                } else {
+                    e.target.classList.remove('active-video');
+                    const duration = Date.now() - State.scrollRef;
+                    if (duration > 0 && duration < 2000) NeuralEngine.signal(tagsStr, 'skip');
+
+                    if (frame && frame.contentWindow) {
+                        frame.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":[]}', '*');
+                    }
+                    clearTimeout(State.timers[id]);
+                }
+            });
+        }, { threshold: 0.75 }),
+
+        scroll: new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) DataManager.hydrate();
+        }, { rootMargin: "300px" })
+    };
+
+    // --- 6. UI INTERFACE CONTROLS ---
+    const QuantumInterface = {
+        toggleMedia: function(overlay) {
+            State.audioActive = !State.audioActive; 
+            const frame = overlay.parentElement.querySelector('iframe');
+            if (frame && frame.contentWindow) {
+                frame.contentWindow.postMessage(`{"event":"command","func":"${State.audioActive?'unMute':'mute'}","args":[]}`, '*');
+                frame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
+                if (navigator.vibrate) navigator.vibrate(25);
+            }
+        },
+        expandCaption: el => el.classList.toggle('expanded'),
+        like: function(btn) {
+            const card = btn.closest('.bite-card');
+            const tagsStr = card.dataset.tags;
+            
+            if (btn.classList.toggle('liked')) {
+                btn.querySelector('.material-icons-round').innerText = 'favorite';
+                NeuralEngine.signal(tagsStr, 'like');
+                if (navigator.vibrate) navigator.vibrate([40, 60]);
+            } else {
+                btn.querySelector('.material-icons-round').innerText = 'favorite_border';
+            }
+        },
+        openSearch: () => {
+            document.getElementById('search-modal').classList.add('active');
+            document.getElementById('quantum-search-box').focus();
+            history.pushState({modal: 'search'}, '', '#search');
+        },
+        closeSearch: () => {
+            if (history.state && history.state.modal === 'search') history.back();
+            else document.getElementById('search-modal').classList.remove('active');
+        }
+    };
+
+    // Mobile Hardware Back Button Support
+    window.addEventListener('popstate', () => document.getElementById('search-modal').classList.remove('active'));
+
+    // EXACT MATCH SEARCH LOGIC
+    document.getElementById('quantum-search-box').addEventListener('keypress', async function (e) {
+        if (e.key === 'Enter') {
+            const query = this.value.trim(); 
+            if (!query) return;
+            
+            NeuralEngine.signal(query, 'search'); 
+            
+            const container = document.getElementById('search-results-list');
+            container.innerHTML = `<div class="loading-spinner">MAPPING RESULTS...</div>`;
+            
+            // Forces strict mode on the server
+            const results = await DataManager.sync(query, true); 
+            container.innerHTML = '';
+            
+            if (results.length === 0) return container.innerHTML = `<p style="text-align:center; padding:50px; color:grey; font-weight:800; letter-spacing:1px;">NO EXACT MATCHES FOUND</p>`;
+
+            results.forEach(res => {
+                const row = document.createElement('div');
+                row.style.cssText = "display:flex; padding:18px; border-bottom:1px solid #1a1a1a; gap:16px; align-items:center; cursor:pointer;";
+                row.onclick = () => {
+                    QuantumInterface.closeSearch();
+                    // Inject the search array into the feed logic, putting clicked item at [0]
+                    const injection = [...results];
+                    injection.splice(injection.indexOf(res), 1);
+                    injection.unshift(res);
+                    DataManager.hydrate(injection);
+                    setTimeout(() => document.getElementById('bites-feed-container').scrollTo(0,0), 100);
+                };
+                row.innerHTML = `
+                    <img src="${res.imgUrl}" style="width:68px;height:68px;border-radius:12px;object-fit:cover; border: 1px solid #222;">
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-size:0.95rem;font-weight:700;color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${res.title}</div>
+                        <div style="font-size:0.75rem;color:var(--accent);margin-top:5px; font-weight: 600;">${res.author||"Creator"}</div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+    });
+
+    // --- 7. IGNITION SEQUENCE ---
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            State.uid = user.uid;
+            if (State.feedCache.length > 0) {
+                RenderEngine.draw(State.feedCache, true); 
+                // Fetch new batch silently in background after cache loads
+                setTimeout(() => DataManager.hydrate(), 2000); 
+            } else {
+                DataManager.hydrate();
+            }
+        } else {
             window.location.href = "login.html";
         }
     });
