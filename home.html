@@ -21,7 +21,7 @@
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Round" rel="stylesheet">
     
-    <script src="components/navbar.js" defer></script>
+    <script src="components/navbar.js"></script>
     
     <script src="components/call-notifier.js" defer></script>
     <script src="components/viewNotes.js" defer></script>
@@ -234,6 +234,9 @@
 
         .pulse-icon {
             color: var(--accent) !important;
+            fill: var(--accent) !important;
+            width: 26px;
+            height: 26px;
             font-size: 26px;
             animation: pulse-skel 2.5s infinite ease-in-out;
             filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.4));
@@ -776,21 +779,21 @@
         body.fonts-ready .pulse-icon { color: var(--accent) !important; }
 
         /* INSTEAD: Added max-width and overflow hidden so fallback text doesn't stretch the layout */
-        /* --- [GLITCH FIX]: DISABLED SQUISH CSS TO FIX NAVBAR FLICKER --- */
+        /* --- [GLITCH FIX]: RESTORED SQUISH CSS TO FIX FOUT TEXT SPAM GLOBALLY --- */
         .material-icons-round {
             /* color: inherit; */ /* Fixed: Removed !important so verification badges keep their own color */
-            /* max-width: 1em; */
-            /* overflow: hidden; */
-            /* display: inline-flex; */
-            /* justify-content: center; */
-            /* align-items: center; */
-            /* white-space: nowrap; */
+            max-width: 1em;
+            overflow: hidden;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            white-space: nowrap;
         }
         /* Fix for Emoji/Verification Badges so they don't turn black/white */
         .material-icons-round[class*="verif"], .verified, .verification-badge { color: var(--accent) !important; }
         .msg-icon { color: #fff !important; }
         .moments-fab .material-icons-round { color: var(--accent) !important; }
-        .pulse-icon { color: var(--accent) !important; }
+        .pulse-icon { color: var(--accent) !important; fill: var(--accent) !important; }
 
         /* ==========================================================================
            CUSTOM NOTIFICATION BOTTOM SHEET
@@ -939,7 +942,23 @@
         </div>
         
         <div class="pulse-btn" id="header-pulse-btn" onclick="window.location.href='pulseLobby.html'">
-            <span class="material-icons-round pulse-icon">graphic_eq</span>
+            <svg class="pulse-icon" viewBox="0 0 24 24" id="pulse-svg-icon" style="display:none;">
+                <path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z" fill="currentColor"/>
+            </svg>
+            <script>
+                // Make it store to local storage like notification icon logic
+                const cachedPulseSvg = localStorage.getItem('goorac_pulse_svg_cache');
+                const pulseSvgEl = document.getElementById('pulse-svg-icon');
+                if (cachedPulseSvg) {
+                    pulseSvgEl.innerHTML = cachedPulseSvg;
+                    pulseSvgEl.style.display = 'block';
+                } else {
+                    const defaultPulse = '<path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z" fill="currentColor"/>';
+                    localStorage.setItem('goorac_pulse_svg_cache', defaultPulse);
+                    pulseSvgEl.innerHTML = defaultPulse;
+                    pulseSvgEl.style.display = 'block';
+                }
+            </script>
         </div>
         
         <div class="notif-btn" id="notif-btn" onclick="window.location.href='notifications.html'">
@@ -960,6 +979,16 @@
         </script>
     </div>
 </header>
+
+<main-navbar id="main-nav"></main-navbar>
+<script>
+    // 🚀 INSTANT 0ms NAVBAR CACHE INJECTION
+    const cachedNavbarHtmlData = localStorage.getItem('goorac_navbar_html_cache');
+    if (cachedNavbarHtmlData) {
+        // [GLITCH FIX]: Disabled forcing raw HTML into the element, allowing the component to load its own 0ms SVGs cleanly
+        // document.getElementById('main-nav').innerHTML = cachedNavbarHtmlData;
+    }
+</script>
 
 <div id="notes-container">
     <div class="note-item" id="my-note-btn">
@@ -1047,16 +1076,6 @@
                 fabEl.innerHTML = `<img src="${parsedMyMoment.photoURL}">`;
             }
         } catch(e) {}
-    }
-</script>
-
-<main-navbar id="main-nav"></main-navbar>
-<script>
-    // 🚀 INSTANT 0ms NAVBAR CACHE INJECTION
-    const cachedNavbarHtmlData = localStorage.getItem('goorac_navbar_html_cache');
-    if (cachedNavbarHtmlData) {
-        // [GLITCH FIX]: Disabled forcing raw HTML into the element, allowing the component to load its own 0ms SVGs cleanly
-        // document.getElementById('main-nav').innerHTML = cachedNavbarHtmlData;
     }
 </script>
 
