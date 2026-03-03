@@ -91,19 +91,20 @@
             background-color: #050505; border-bottom: 1px solid var(--border);
         }
 
-        /* VIDEO PLAYER STYLING */
+        /* VIDEO PLAYER STYLING (FIXED FOR BLACK SCREEN ISSUE) */
         .video-wrapper {
             position: absolute; inset: 0; width: 100%; height: 100%;
-            z-index: 0; display: none; background: transparent;
+            z-index: 0; background: transparent;
+            /* Use opacity instead of display:none so browser preloads it properly */
+            opacity: 0; transition: opacity 0.8s ease-in-out;
         }
         .video-wrapper iframe { 
-            width: 100%; height: 100%; border: none; pointer-events: auto; 
+            width: 100%; height: 100%; border: none; pointer-events: none; 
             transform: scale(1.05); /* Slight crop to hide YouTube borders */
         }
-        /* FIX: Smoother, faster fade-in to prevent the screen from hanging black */
-        .bite-card.active-video .video-wrapper { display: block; animation: fadeIn 0.5s ease-in forwards; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* When active, smoothly fade in the preloaded video */
+        .bite-card.active-video .video-wrapper { opacity: 1; }
+        .bite-card.active-video .video-wrapper iframe { pointer-events: auto; }
 
         .bite-overlay {
             position: absolute; inset: 0;
@@ -237,7 +238,7 @@
     let isFetching = false;
     let viewTimers = {}; 
     
-    // NEW FIX: Global Audio State (Remembers if user unmuted a video)
+    // Global Audio State (Remembers if user unmuted a video)
     let globalAudioEnabled = false;
 
     // YOUR RENDER BACKEND
@@ -373,6 +374,9 @@
             `;
             
             container.appendChild(card);
+            
+            // Register observers
+            preloadObserver.observe(card);
             mlWatcher.observe(card);
 
             if (index === bites.length - 2) scrollTrigger.observe(card);
@@ -384,7 +388,18 @@
         return num > 1000 ? (num/1000).toFixed(1) + 'k' : num;
     }
 
-    // --- 8. SMART OBSERVERS (THE CRITICAL FIX IS HERE) ---
+    // --- 8. SMART OBSERVERS (THE FIX IS HERE) ---
+    
+    // NEW: Secretly load the video before you scroll to it
+    const preloadObserver = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                const iframe = e.target.querySelector('iframe');
+                if (iframe && !iframe.src) iframe.src = iframe.dataset.src;
+            }
+        });
+    }, { rootMargin: "1200px 0px" }); // Loads 1 or 2 cards ahead of your current scroll position
+
     const mlWatcher = new IntersectionObserver((entries) => {
         entries.forEach(e => {
             const id = e.target.dataset.id;
@@ -392,28 +407,25 @@
             const iframe = e.target.querySelector('iframe');
 
             if (e.isIntersecting) {
-                // 1. If it doesn't have a source yet, load the video into memory
-                if (iframe && !iframe.src) {
-                    iframe.src = iframe.dataset.src; 
-                } else if (iframe && iframe.contentWindow) {
-                    // If it already loaded previously, just hit PLAY!
-                    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
-                }
+                // Safety net: if preloader missed it, load it now
+                if (iframe && !iframe.src) iframe.src = iframe.dataset.src; 
                 
                 e.target.classList.add('active-video');
 
-                // 2. Automatically sync the audio state!
+                // Add a small delay so the CSS transition starts before forcing play commands
                 setTimeout(() => {
                     if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
+                        
                         if (globalAudioEnabled) {
                             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":[]}', '*');
                         } else {
                             iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":[]}', '*');
                         }
                     }
-                }, 1000); // Wait 1 second for the player to initialize before sending the command
+                }, 500);
 
-                // 3. Start 5-SECOND DEEP LEARNING WATCH TIMER
+                // 5-SECOND DEEP LEARNING WATCH TIMER
                 viewTimers[id] = setTimeout(() => {
                     trainAlgorithm(cat, 1); 
                 }, 5000); 
@@ -421,8 +433,7 @@
             } else {
                 e.target.classList.remove('active-video');
                 
-                // THE FIX: Do NOT destroy the iframe! Just PAUSE and MUTE it.
-                // This stops the black screen crashes and saves huge amounts of data/RAM.
+                // Do NOT destroy the iframe! Just PAUSE and MUTE it.
                 if (iframe && iframe.contentWindow) {
                     iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":[]}', '*');
                     iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":[]}', '*');
@@ -506,9 +517,8 @@
     });
 
     // --- 10. SMART AUDIO CONTROLLER ---
-    // User taps the screen -> Unmutes the current video AND remembers the choice for the next videos!
     function enableAudio(overlay) {
-        globalAudioEnabled = !globalAudioEnabled; // Toggle global state
+        globalAudioEnabled = !globalAudioEnabled; 
         const iframe = overlay.parentElement.querySelector('iframe');
         
         if (iframe && iframe.contentWindow) {
@@ -516,7 +526,6 @@
                 iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":[]}', '*');
                 iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
                 
-                // Optional: Vibrate slightly to confirm unmute
                 if (navigator.vibrate) navigator.vibrate(20); 
             } else {
                 iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":[]}', '*');
