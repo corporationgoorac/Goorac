@@ -17,14 +17,13 @@
 
     <script src="components/presence.js"></script>
     <script src="components/call-notifier.js"></script>
-    <script src="components/chatLoader.js"></script>
-
+    
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
 
     <style>
         /* ==========================================================================
-           1. CORE VARIABLES & MASTER RESET
+           1. CORE VARIABLES & RESET (VISION THEME: CYAN/BLACK)
            ========================================================================== */
         :root {
             --bg: #000000;
@@ -32,866 +31,998 @@
             --surface-glass: rgba(15, 15, 15, 0.85);
             --border: rgba(255, 255, 255, 0.08);
             --accent: #00d2ff; /* Vision Cyan */
-            --accent-dark: #0088aa;
+            --accent-dark: #0099cc;
+            --accent-glow: rgba(0, 210, 255, 0.4);
             --text: #ffffff;
-            --text-dim: #888888;
+            --text-secondary: #888888;
             --safe-top: env(safe-area-inset-top, 20px);
             --safe-bottom: env(safe-area-inset-bottom, 20px);
-            --verified: #0095f6;
-            --spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            --smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --verified-color: #0095f6;
+            --ease-out-back: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Chat Specific Vars */
+            --sent-bg: linear-gradient(135deg, #00d2ff 0%, #0088ff 100%);
+            --sent-text: #ffffff;
+            --received-bg: #1c1c1c; 
+            --received-text: #F0F0F0;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
         body {
             background: var(--bg); color: var(--text);
-            font-family: 'Inter', -apple-system, sans-serif;
-            height: 100vh; height: 100dvh; width: 100vw; overflow: hidden;
-            display: flex; flex-direction: column;
-            overscroll-behavior: none;
+            font-family: 'Inter', 'Noto Color Emoji', -apple-system, sans-serif;
+            height: 100dvh; width: 100vw; overflow: hidden;
+            display: flex; flex-direction: column; position: fixed;
         }
 
-        /* HARDWARE ACCELERATION CLASSES */
-        .hw-accel { transform: translateZ(0); will-change: transform; }
+        /* Prevent Text Selection universally except inputs */
+        div, span, p, h1, h2, h3, img { user-select: none; -webkit-user-select: none; }
+        input, textarea { user-select: text !important; -webkit-user-select: text !important; }
 
         /* ==========================================================================
-           2. GLOBAL NAVIGATION & HEADERS
+           2. PARTICLE ENGINE CANVAS
            ========================================================================== */
-        .top-nav {
-            position: absolute; top: 0; left: 0; width: 100%;
-            padding: calc(10px + var(--safe-top)) 20px 10px;
-            display: flex; align-items: center; justify-content: space-between;
-            z-index: 500;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+        #particle-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999;
         }
-        
-        .back-btn {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-            width: 40px; height: 40px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; cursor: pointer; 
-            backdrop-filter: blur(10px); transition: transform 0.2s;
-        }
-        .back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
-
-        .room-badge {
-            background: rgba(0, 210, 255, 0.15); border: 1px solid var(--accent);
-            padding: 4px 12px; border-radius: 20px; color: var(--accent);
-            font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 700;
-            letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
-        }
-        .live-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: blink 1.5s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
         /* ==========================================================================
-           3. SCREEN MANAGER (WAITING VS ACTIVE)
+           3. SCREEN MANAGER & TOP NAV
            ========================================================================== */
         #session-view { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
-        
+
         .screen {
-            position: absolute; inset: 0; display: flex; flex-direction: column;
-            opacity: 0; pointer-events: none; transition: 0.4s var(--smooth);
-            transform: scale(0.98); z-index: 10;
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            transform: scale(0.98); z-index: 10; background: var(--bg);
         }
         .screen.active { opacity: 1; pointer-events: auto; transform: scale(1); }
 
-        /* --- ERROR SCREEN --- */
+        .top-nav {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: calc(10px + var(--safe-top)) 24px 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            z-index: 100; pointer-events: none;
+        }
+        
+        .nav-btn {
+            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
+            width: 44px; height: 44px; border-radius: 50%; pointer-events: auto;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; cursor: pointer; backdrop-filter: blur(15px);
+            transition: transform 0.2s, background 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .nav-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.15); }
+        .nav-btn.exit { color: #ff453a; border-color: rgba(255, 69, 58, 0.3); }
+
+        .status-pill {
+            pointer-events: auto;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(10px);
+            padding: 6px 16px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.05);
+            font-family: 'Orbitron', sans-serif; font-size: 10px; color: var(--accent);
+            display: flex; align-items: center; gap: 8px; letter-spacing: 2px; font-weight: 700;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5); transition: 0.3s;
+        }
+        .status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 8px currentColor; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* ==========================================================================
+           4. ERROR & WAITING SCREENS (From Pulse)
+           ========================================================================== */
+        #screen-error { align-items: center; justify-content: center; }
         .err-box {
             background: var(--surface-glass); border: 1px solid var(--border);
-            padding: 40px 30px; border-radius: 30px; text-align: center;
-            margin: auto; max-width: 320px; backdrop-filter: blur(20px);
+            padding: 40px 32px; border-radius: 32px; text-align: center; max-width: 320px;
+            backdrop-filter: blur(30px); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            animation: shake 0.5s var(--ease-out-back);
         }
-        .err-box h2 { color: #ff453a; margin: 15px 0 10px; font-weight: 800; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
-        /* --- WAITING SCREEN --- */
-        #screen-waiting { justify-content: center; align-items: center; background: radial-gradient(circle at center, #001a22 0%, #000 70%); }
-        
-        .avatar-link-container { display: flex; align-items: center; gap: 30px; margin-bottom: 40px; position: relative; }
-        
-        .w-avatar-wrapper { display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 2; transition: 0.4s; }
-        .w-avatar {
-            width: 90px; height: 90px; border-radius: 50%; border: 2px solid #333;
-            background: #111; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: 0.4s;
+        #screen-waiting { align-items: center; justify-content: center; background: radial-gradient(circle at center, #001a22 0%, #000 100%); }
+        .session-avatars { display: flex; align-items: center; justify-content: center; gap: 40px; width: 100%; position: relative; margin-bottom: 40px; }
+        .avatar-group { display: flex; flex-direction: column; align-items: center; gap: 12px; position: relative; z-index: 2; transition: 0.5s var(--ease-out-back); }
+        .s-bubble {
+            width: 100px; height: 100px; border-radius: 50%; position: relative; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6); background: #111; border: 2px solid #333;
+            transition: border-color 0.3s, transform 0.3s; display: flex; align-items: center; justify-content: center;
         }
-        .w-name { font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 12px; }
+        .s-bubble img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; opacity: 0; transition: opacity 0.5s; }
+        .s-bubble img.loaded { opacity: 1; }
+        .avatar-group.them { opacity: 0.5; filter: grayscale(100%); transform: scale(0.9); }
+        .avatar-group.them.active { opacity: 1; filter: grayscale(0%); transform: scale(1); }
+        .avatar-group.them.active .s-bubble { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-glow); }
+        .u-name { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.5); padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
         
-        .w-avatar-wrapper.target { opacity: 0.5; filter: grayscale(100%); transform: scale(0.9); }
-        .w-avatar-wrapper.target.connected { opacity: 1; filter: grayscale(0%); transform: scale(1); }
-        .w-avatar-wrapper.target.connected .w-avatar { border-color: var(--accent); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4); }
-
-        .w-line { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); width: 80px; height: 2px; background: #222; z-index: 1; overflow: hidden; }
-        .w-line::after {
-            content:''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            animation: flow 1.5s infinite linear; opacity: 0; transition: 0.3s;
+        .s-line {
+            position: absolute; height: 2px; width: 60px; background: #222;
+            top: 50px; left: 50%; transform: translateX(-50%); z-index: 1; overflow: hidden;
         }
-        .w-avatar-wrapper.target.connected ~ .w-line::after { opacity: 1; }
-        @keyframes flow { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        .s-line::after {
+            content:''; position: absolute; top:0; left:-100%; width:100%; height:100%;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: flowLine 1.5s infinite linear; opacity: 0;
+        }
+        .s-line.connected { background: #333; }
+        .s-line.connected::after { opacity: 1; }
+        @keyframes flowLine { 0% { left: -100%; } 100% { left: 100%; } }
 
         /* ==========================================================================
-           4. ACTIVE SCREEN: VIDEO PLAYER (TOP HALF)
+           5. ACTIVE SCREEN (TOP: VIDEO, MIDDLE: INFO, BOTTOM: CHAT)
            ========================================================================== */
-        .video-section {
-            width: 100%; height: 40vh; min-height: 250px; background: #000;
-            position: relative; flex-shrink: 0; z-index: 50;
-            border-bottom: 1px solid var(--border);
-            padding-top: calc(var(--safe-top) + 50px); /* Push down below header */
+        #screen-active {
+            display: flex; flex-direction: column; justify-content: flex-start;
         }
 
-        /* THE MAGIC OVERLAY: 
-           This transparent div sits ON TOP of the YouTube iframe.
-           It blocks the user from touching the progress bar, forcing them to use our play/pause logic. 
-        */
-        .custom-player-overlay {
-            position: absolute; top: calc(var(--safe-top) + 50px); left: 0; width: 100%; bottom: 0;
-            z-index: 60; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            background: rgba(0,0,0,0); transition: background 0.3s;
+        /* --- THE VIDEO PLAYER --- */
+        .video-zone {
+            width: 100%; height: 35vh; min-height: 250px; background: #050505;
+            position: relative; z-index: 20; border-bottom: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            /* Padding for Top Nav */
+            padding-top: calc(var(--safe-top));
+            display: flex; align-items: center; justify-content: center;
         }
-        .custom-player-overlay:active { background: rgba(255,255,255,0.05); }
-
-        .playback-anim-icon {
+        #youtube-player { width: 100%; height: 100%; pointer-events: none; } /* NO NATIVE CONTROLS */
+        
+        /* The custom touch layer to prevent scrubbing and handle play/pause */
+        .video-touch-overlay {
+            position: absolute; inset: 0; z-index: 25; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.3); transition: background 0.3s;
+        }
+        .video-touch-overlay:active { background: rgba(0,0,0,0.5); }
+        
+        /* Big glowing center icon for Play/Pause feedback */
+        .v-state-icon {
             width: 70px; height: 70px; background: rgba(0,0,0,0.6); border-radius: 50%;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
             display: flex; align-items: center; justify-content: center;
-            color: #fff; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(10px);
-            transform: scale(0); opacity: 0; pointer-events: none;
+            color: #fff; transform: scale(0); opacity: 0; transition: 0.3s var(--ease-out-back);
         }
-        .playback-anim-icon span { font-size: 36px; margin-left: 4px; }
-        .playback-anim-icon.ping { animation: playPing 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes playPing { 
-            0% { transform: scale(0); opacity: 1; } 
-            50% { transform: scale(1.2); opacity: 1; } 
-            100% { transform: scale(1.5); opacity: 0; } 
-        }
+        .v-state-icon span { font-size: 36px; }
+        .v-state-icon.show { transform: scale(1); opacity: 1; }
+        .v-state-icon.paused { box-shadow: 0 0 30px rgba(255, 69, 58, 0.4); color: #ff453a; }
+        .v-state-icon.playing { box-shadow: 0 0 30px var(--accent-glow); color: var(--accent); }
 
-        #yt-player-container { width: 100%; height: 100%; pointer-events: none; /* Prevent direct iframe clicks */ }
-        
-        .video-meta-bar {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            padding: 15px 15px 10px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-            z-index: 65; pointer-events: none; display: flex; justify-content: space-between; align-items: flex-end;
+        /* Buffer Spinner */
+        .v-spinner {
+            position: absolute; width: 50px; height: 50px; border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent);
+            animation: spin 1s linear infinite; display: none; z-index: 30;
         }
-        .v-title { font-size: 14px; font-weight: 700; text-shadow: 0 2px 4px #000; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; margin-right: 15px; }
-        
-        .turn-indicator {
-            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
-            padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 800;
-            letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- THE INFO BAR (Who's picking / Video Title) --- */
+        .info-bar {
+            width: 100%; padding: 12px 20px; background: #111;
+            border-bottom: 1px solid var(--border); display: flex;
+            align-items: center; justify-content: space-between; z-index: 15;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .turn-indicator.mine { background: var(--accent); color: #000; border-color: var(--accent); }
+        .info-text { flex: 1; overflow: hidden; }
+        .info-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; margin-bottom: 2px; }
+        .info-sub { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; text-transform: uppercase; }
 
-        /* ==========================================================================
-           5. ACTIVE SCREEN: LIVE CHAT AREA (BOTTOM HALF)
-           ========================================================================== */
-        .chat-section {
-            flex: 1; display: flex; flex-direction: column; position: relative;
-            background: var(--surface); overflow: hidden;
+        .dj-btn {
+            background: #fff; color: #000; border: none; padding: 8px 16px; border-radius: 20px;
+            font-weight: 800; font-size: 11px; letter-spacing: 0.5px; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255,255,255,0.2); transition: 0.2s;
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
         }
-
-        /* Top gradient fade for messages scrolling up */
-        .chat-fade-top {
-            position: absolute; top: 0; left: 0; width: 100%; height: 40px;
-            background: linear-gradient(to bottom, var(--surface), transparent); z-index: 10; pointer-events: none;
-        }
-
-        #chat-scroll-area {
-            flex: 1; overflow-y: auto; padding: 15px 15px 0;
-            display: flex; flex-direction: column; scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch; padding-bottom: 10px;
-        }
-        #chat-scroll-area::-webkit-scrollbar { display: none; }
-
-        /* LIVE CHAT BUBBLE DESIGN (Twitch / IG Live Style) */
-        .chat-msg {
-            display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start;
-            animation: slideInLeft 0.3s var(--smooth); width: 100%;
-        }
-        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        
-        .c-pfp { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #222; flex-shrink: 0; margin-top: 2px; }
-        .c-content { display: flex; flex-direction: column; background: rgba(255,255,255,0.05); padding: 8px 14px; border-radius: 16px; border-top-left-radius: 4px; max-width: 85%; }
-        
-        /* Differentiate my messages */
-        .chat-msg.me { flex-direction: row-reverse; animation: slideInRight 0.3s var(--smooth); }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
-        .chat-msg.me .c-content { background: var(--accent); color: #000; border-top-left-radius: 16px; border-top-right-radius: 4px; }
-        .chat-msg.me .c-name { color: rgba(0,0,0,0.6); text-align: right; }
-
-        .c-name { font-size: 11px; font-weight: 800; color: var(--accent); margin-bottom: 2px; letter-spacing: 0.5px; }
-        .c-text { font-size: 14px; line-height: 1.4; word-wrap: break-word; font-weight: 500; }
-
-        /* TYPING INDICATOR */
-        .typing-row { display: none; align-items: center; gap: 10px; padding: 0 15px 10px; opacity: 0.7; }
-        .t-text { font-size: 12px; font-style: italic; color: var(--text-dim); }
-        .t-dots { display: flex; gap: 3px; margin-top: 4px; }
-        .t-dot { width: 4px; height: 4px; background: var(--text-dim); border-radius: 50%; animation: tBounce 1.4s infinite ease-in-out both; }
-        .t-dot:nth-child(1) { animation-delay: -0.32s; } .t-dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes tBounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .dj-btn:active { transform: scale(0.95); }
+        .dj-btn.disabled { background: #333; color: #888; box-shadow: none; pointer-events: none; }
 
         /* ==========================================================================
-           6. INPUT CAPSULE
+           6. LIVE CHAT ENGINE (BOTTOM HALF)
            ========================================================================== */
-        .input-container {
-            padding: 10px 15px calc(15px + var(--safe-bottom));
+        #chat-container {
+            flex: 1; display: flex; flex-direction: column; background: var(--bg);
+            overflow: hidden; position: relative;
+        }
+
+        #chat-flow {
+            flex: 1; overflow-y: auto; padding: 15px 15px 5px;
+            display: flex; flex-direction: column;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            overscroll-behavior-y: contain;
+        }
+        #chat-flow::-webkit-scrollbar { display: none; }
+
+        /* Chat Bubbles (From Chat.html) */
+        .msg-row { display: flex; width: 100%; margin-bottom: 8px; flex-direction: column; }
+        .msg-row.sent { align-items: flex-end; }
+        .msg-row.received { align-items: flex-start; }
+        
+        .received-inner-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; }
+        
+        .msg-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; border: 1px solid rgba(255,255,255,0.1); }
+        
+        .msg-bubble-box { max-width: 75vw; display: flex; flex-direction: column; }
+        .sent .msg-bubble-box { align-items: flex-end; }
+        .received .msg-bubble-box { align-items: flex-start; }
+
+        .bubble { 
+            padding: 10px 14px; border-radius: 18px; font-size: 0.95rem; line-height: 1.4; 
+            word-wrap: break-word; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .sent .bubble { background: var(--sent-bg); color: var(--sent-text); border-bottom-right-radius: 4px; }
+        .received .bubble { background: var(--received-bg); color: var(--received-text); border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.05); }
+
+        .system-msg {
+            align-self: center; font-size: 11px; font-weight: 700; color: #666;
+            background: #111; padding: 4px 12px; border-radius: 12px; margin: 10px 0;
+            border: 1px solid #222; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        /* Typing Indicator */
+        .typing-row { display: none; align-items: flex-end; margin-bottom: 8px; gap: 8px; }
+        .typing-bubble { 
+            background: var(--received-bg); padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 4px; 
+            display: flex; gap: 4px; align-items: center; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .typing-dot { width: 5px; height: 5px; background: #888; border-radius: 50%; animation: typingWave 1.4s ease-in-out infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingWave { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-4px); opacity: 1; } }
+
+        /* Chat Input Area */
+        .input-area-container { 
+            padding: 10px 15px calc(10px + var(--safe-bottom)); 
             background: var(--surface); border-top: 1px solid var(--border);
-            display: flex; gap: 10px; align-items: center; z-index: 20;
+            z-index: 50; flex-shrink: 0;
         }
-        
-        .dj-control-btn {
-            width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            background: #222; border: 1px solid #333; color: #fff; cursor: pointer; transition: 0.2s;
+        .input-capsule {
+            display: flex; align-items: flex-end; gap: 8px;
+            background: #1a1a1a; border-radius: 24px; padding: 4px 6px;
+            border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;
         }
-        .dj-control-btn.active { background: var(--accent); color: #000; border-color: var(--accent); animation: pulse 2s infinite; }
-        .dj-control-btn:active { transform: scale(0.9); }
+        .input-capsule:focus-within { border-color: var(--accent); background: #222; }
 
-        .chat-input-wrapper {
-            flex: 1; background: #1a1a1a; border-radius: 24px; border: 1px solid #333;
-            display: flex; align-items: center; padding: 4px 4px 4px 16px; transition: 0.3s;
-        }
-        .chat-input-wrapper:focus-within { border-color: var(--accent); background: #222; }
-        
-        .chat-input {
+        .msg-input {
             flex: 1; background: transparent; border: none; color: #fff;
-            font-size: 14px; outline: none; padding: 8px 0;
+            padding: 10px 8px; font-size: 15px; resize: none; max-height: 100px;
+            font-family: inherit; line-height: 1.4;
         }
-        .chat-input::placeholder { color: #666; }
+        .msg-input::placeholder { color: #666; }
         
         .send-btn {
-            width: 36px; height: 36px; border-radius: 50%; background: var(--accent);
-            border: none; display: flex; align-items: center; justify-content: center;
-            color: #000; cursor: pointer; opacity: 0.5; pointer-events: none; transition: 0.2s;
+            background: var(--accent); border: none; border-radius: 50%;
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            color: #fff; cursor: pointer; flex-shrink: 0; align-self: flex-end; margin-bottom: 2px;
+            transform: scale(0); opacity: 0; transition: 0.2s var(--ease-out-back);
         }
-        .send-btn.ready { opacity: 1; pointer-events: auto; }
+        .send-btn.show { transform: scale(1); opacity: 1; }
         .send-btn span { font-size: 18px; margin-left: 2px; }
 
         /* ==========================================================================
-           7. TURN-BASED VIDEO PICKER MODAL (FULL SCREEN BOTTOM SHEET)
+           7. VIDEO PICKER MODAL (FULL SCREEN SHEET)
            ========================================================================== */
         #picker-modal {
-            position: fixed; inset: 0; z-index: 2000; background: var(--bg);
-            display: flex; flex-direction: column;
-            transform: translateY(100%); transition: transform 0.4s var(--spring);
+            position: fixed; inset: 0; z-index: 5000;
+            background: var(--bg); display: flex; flex-direction: column;
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         #picker-modal.active { transform: translateY(0); }
 
         .picker-header {
-            padding: calc(var(--safe-top) + 15px) 20px 15px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; gap: 15px; background: #111;
+            padding: calc(var(--safe-top) + 15px) 20px 15px; background: #111;
+            display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border);
         }
-        .search-box-huge {
-            flex: 1; background: #000; border: 1px solid #333; border-radius: 16px;
-            padding: 12px 16px; color: #fff; font-size: 15px; outline: none; transition: 0.3s;
+        .search-box {
+            flex: 1; background: #222; border-radius: 12px; padding: 12px 16px;
+            border: 1px solid #333; color: #fff; font-size: 15px; outline: none;
         }
-        .search-box-huge:focus { border-color: var(--accent); }
+        .search-box:focus { border-color: var(--accent); }
 
         #picker-results {
             flex: 1; overflow-y: auto; padding: 15px; -webkit-overflow-scrolling: touch;
         }
-        
-        .yt-card {
-            display: flex; gap: 15px; padding: 10px; background: #111; border-radius: 16px;
+
+        .vid-card {
+            display: flex; gap: 12px; padding: 12px; background: #111; border-radius: 16px;
             margin-bottom: 12px; border: 1px solid var(--border); cursor: pointer; transition: 0.2s;
         }
-        .yt-card:active { transform: scale(0.97); background: #1a1a1a; }
-        .yt-thumb { width: 120px; height: 68px; border-radius: 8px; object-fit: cover; background: #222; flex-shrink: 0; }
-        .yt-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-        .yt-title { font-size: 13px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
-        .yt-chan { font-size: 11px; color: #888; }
+        .vid-card:active { transform: scale(0.97); background: #1a1a1a; }
+        .vid-thumb { width: 120px; height: 68px; border-radius: 8px; object-fit: cover; background: #222; flex-shrink: 0; }
+        .vid-details { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .vid-title-text { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .vid-channel { font-size: 11px; color: #888; }
 
-        .skeleton-item { display: flex; gap: 15px; margin-bottom: 12px; opacity: 0.5; animation: skelPulse 1.5s infinite; }
-        .skel-img { width: 120px; height: 68px; background: #222; border-radius: 8px; }
-        .skel-lines { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
-        .skel-line { height: 12px; background: #222; border-radius: 4px; }
-        @keyframes skelPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+        /* Loading Skeleton */
+        .skel-card { display: flex; gap: 12px; padding: 12px; margin-bottom: 12px; }
+        .skel-thumb { width: 120px; height: 68px; border-radius: 8px; background: #222; animation: skelPulse 1.5s infinite; }
+        .skel-line { height: 12px; background: #222; border-radius: 6px; margin-bottom: 8px; animation: skelPulse 1.5s infinite; }
+        @keyframes skelPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
     </style>
 </head>
 <body>
 
-    <div id="picker-modal">
-        <div class="picker-header">
-            <span class="material-icons-round" style="font-size:32px; cursor:pointer;" onclick="history.back()">expand_more</span>
-            <input type="text" id="picker-search-input" class="search-box-huge" placeholder="Search YouTube or paste URL...">
-        </div>
-        <div id="picker-results">
-            <div style="text-align:center; padding: 60px 20px; color: #555;">
-                <span class="material-icons-round" style="font-size:60px; margin-bottom:10px;">smart_display</span>
-                <h3>It's your turn.</h3>
-                <p style="font-size:13px; margin-top:5px;">Search for any video to play it instantly for both of you.</p>
-            </div>
-        </div>
-    </div>
+    <canvas id="particle-canvas"></canvas>
 
     <div id="session-view">
-        
         <div class="screen" id="screen-error">
             <div class="err-box">
-                <span class="material-icons-round" style="font-size:50px; color:#ff453a;">gpp_bad</span>
-                <h2>Access Denied</h2>
-                <p id="error-msg">Connection failure or blocked user.</p>
-                <button onclick="handleExit()" style="margin-top:20px; padding:12px 30px; background:#fff; color:#000; border:none; border-radius:30px; font-weight:800; cursor:pointer;">Exit Room</button>
+                <span class="material-icons-round" style="font-size:40px; color:#ff453a; margin-bottom:10px;">error_outline</span>
+                <h2 style="font-family:'Orbitron'; color:#ff453a; margin-bottom:10px;">Connection Failed</h2>
+                <p id="error-msg" style="font-size:13px; color:#888; line-height:1.5;">Room inaccessible.</p>
+                <button onclick="exitSession()" style="margin-top:25px; padding:12px 30px; background:#fff; color:#000; border:none; border-radius:50px; font-weight:700; font-size:13px; cursor:pointer;">Return to Lobby</button>
             </div>
         </div>
 
         <div class="screen active" id="screen-waiting">
-            <div class="top-nav" style="background:transparent;">
-                <div class="back-btn" onclick="handleExit()"><span class="material-icons-round">close</span></div>
+            <div class="top-nav">
+                <div class="nav-btn" onclick="exitSession()"><span class="material-icons-round">west</span></div>
             </div>
 
-            <div class="avatar-link-container">
-                <div class="w-avatar-wrapper me">
-                    <img id="wait-my-pfp" src="https://via.placeholder.com/90" class="w-avatar">
-                    <div class="w-name">YOU</div>
+            <div class="session-avatars">
+                <div class="s-line" id="connect-line"></div>
+                
+                <div class="avatar-group me">
+                    <div class="s-bubble"><img id="my-avatar-img" src="" class="loaded"></div>
+                    <div class="u-name">You</div>
                 </div>
-                <div class="w-line"></div>
-                <div class="w-avatar-wrapper target" id="wait-target-group">
-                    <img id="wait-target-pfp" src="https://via.placeholder.com/90" class="w-avatar">
-                    <div class="w-name" id="wait-target-name">THEM</div>
+
+                <div class="avatar-group them" id="target-group">
+                    <div class="s-bubble"><img id="target-avatar" src=""></div>
+                    <div class="u-name" id="target-name-display">...</div>
                 </div>
             </div>
 
-            <h2 style="font-family:'Orbitron'; letter-spacing:1px; margin-bottom:8px;">CONNECTING</h2>
-            <p style="color:#888; font-size:13px;">Waiting for partner to join...</p>
+            <h1 id="status-text" style="font-size:22px; font-family:'Orbitron'; font-weight:900; letter-spacing:1px; margin-bottom:5px;">CONNECTING</h1>
+            <p style="font-size:13px; color:#666;">Establishing Vision link...</p>
         </div>
 
         <div class="screen" id="screen-active">
             
-            <div class="video-section">
-                <div class="top-nav">
-                    <div class="back-btn" onclick="handleExit()" style="background:rgba(255, 69, 58, 0.1); border-color:#ff453a; color:#ff453a;">
-                        <span class="material-icons-round">power_settings_new</span>
-                    </div>
-                    <div class="room-badge"><div class="live-dot"></div> VISION SYNC</div>
-                </div>
+            <div class="top-nav">
+                <div class="nav-btn" onclick="exitSession()"><span class="material-icons-round">west</span></div>
+                <div class="status-pill"><div class="status-dot"></div> VISION SYNC</div>
+                <div class="nav-btn exit" onclick="exitSession()"><span class="material-icons-round">power_settings_new</span></div>
+            </div>
 
-                <div id="yt-player-container"></div>
-                
-                <div class="custom-player-overlay" id="video-tap-zone">
-                    <div class="playback-anim-icon" id="play-anim"><span class="material-icons-round">play_arrow</span></div>
-                    <div class="playback-anim-icon" id="pause-anim" style="display:none;"><span class="material-icons-round">pause</span></div>
-                </div>
-
-                <div class="video-meta-bar">
-                    <div class="v-title" id="active-v-title">Waiting for video...</div>
-                    <div class="turn-indicator" id="turn-badge">WAITING</div>
+            <div class="video-zone" id="video-zone">
+                <div id="youtube-player"></div>
+                <div class="video-touch-overlay" id="video-touch-overlay" onclick="handleVideoTap()">
+                    <div class="v-spinner" id="v-spinner"></div>
+                    <div class="v-state-icon" id="v-state-icon"><span class="material-icons-round">play_arrow</span></div>
                 </div>
             </div>
 
-            <div class="chat-section">
-                <div class="chat-fade-top"></div>
-                
-                <div id="chat-scroll-area">
-                    <div style="text-align:center; padding:20px; font-size:11px; color:#555; font-weight:700; letter-spacing:1px; margin-bottom:10px;">
-                        SECURE CONNECTION ESTABLISHED
-                    </div>
-                    </div>
+            <div class="info-bar">
+                <div class="info-text">
+                    <div class="info-title" id="info-title">Waiting for selection...</div>
+                    <div class="info-sub" id="info-sub">Room Active</div>
+                </div>
+                <button class="dj-btn" id="action-btn" onclick="openPicker()">
+                    <span class="material-icons-round">search</span> PICK VIDEO
+                </button>
+            </div>
 
-                <div class="typing-row" id="typing-indicator">
-                    <div class="c-pfp"><img id="typing-pfp" src="" style="width:100%;height:100%;border-radius:50%;"></div>
-                    <div class="c-content" style="background:transparent; padding:0; flex-direction:row; align-items:center; gap:8px;">
-                        <div class="t-text" id="typing-name">Name is typing</div>
-                        <div class="t-dots"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div>
+            <div id="chat-container">
+                <div id="chat-flow">
+                    <div id="messages-container"></div>
+                    
+                    <div class="typing-row" id="typing-row">
+                        <img src="" class="msg-avatar" id="typing-pfp">
+                        <div class="typing-bubble">
+                           <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+                        </div>
+                   </div>
+                </div>
+
+                <div class="input-area-container">
+                    <div class="input-capsule">
+                        <textarea id="chat-input" class="msg-input" placeholder="Type to chat or react..." rows="1"></textarea>
+                        <button class="send-btn" id="send-btn" onclick="sendChat()">
+                            <span class="material-icons-round">send</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div class="input-container">
-                <div class="dj-control-btn" id="dj-btn" onclick="openPickerModal()">
-                    <span class="material-icons-round">search</span>
-                </div>
-                
-                <div class="chat-input-wrapper">
-                    <input type="text" id="chat-input" class="chat-input" placeholder="Send a message..." autocomplete="off">
-                    <button class="send-btn" id="send-btn" onclick="sendChatMessage()">
-                        <span class="material-icons-round">send</span>
-                    </button>
-                </div>
-            </div>
+        </div>
+    </div>
 
+    <div id="picker-modal">
+        <div class="picker-header">
+            <span class="material-icons-round" style="font-size:32px; color:#fff; cursor:pointer;" onclick="closePicker()">expand_more</span>
+            <input type="text" id="vid-search-input" class="search-box" placeholder="Search or paste YouTube link...">
+        </div>
+        <div id="picker-results">
+            <div style="text-align:center; padding: 50px; color:#666;">
+                <span class="material-icons-round" style="font-size:60px; opacity:0.5; margin-bottom:10px;">smart_display</span>
+                <p>Search any topic to watch together.</p>
+            </div>
         </div>
     </div>
 
     <script>
         // ==========================================================================
-        // 1. SYSTEM INITIALIZATION & STATE
+        // 1. SYSTEM INITIALIZATION & VARIABLES
         // ==========================================================================
         if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
         else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
 
-        const vFirestore = firebase.firestore();
-        const vRTDB = firebase.database();
-        const vAuth = firebase.auth();
-
+        const db = firebase.firestore();
+        const rdb = firebase.database();
+        const auth = firebase.auth();
         const params = new URLSearchParams(window.location.search);
         const targetUsername = params.get('user');
 
-        const State = {
-            myUid: null, myData: null,
-            targetUid: null, targetData: null,
-            roomId: null,
-            isMyTurn: false,
-            playerReady: false,
-            ytPlayer: null,
-            ignoreSyncEvent: false, // Prevents echo loop on pause/play
-            lastSyncTime: 0,
-            chatUnsubscribe: null,
-            roomUnsubscribe: null
-        };
+        let myUid = null, targetUid = null, roomId = null;
+        let myProfile = null, targetProfile = null;
+        let roomUnsub = null, chatUnsub = null;
+        let wakeLock = null;
 
-        // Cache prep for speed
-        if (targetUsername) {
-            const cache = localStorage.getItem(`vision_user_${targetUsername}`);
-            if (cache) updateWaitingUI(JSON.parse(cache));
-        }
+        // Player & Sync State
+        let player = null;
+        let isPlayerReady = false;
+        let currentVideoId = null;
+        let isMyTurn = false;
+        let ignoreSyncEvent = false; // Lock flag to prevent echo loops
+        let lastKnownState = -1; // Unstarted
 
-        vAuth.onAuthStateChanged(async user => {
+        // Chat State
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatFlow = document.getElementById('chat-flow');
+        const msgContainer = document.getElementById('messages-container');
+
+        // Sounds
+        const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
+
+        // ==========================================================================
+        // 2. AUTHENTICATION & CACHE
+        // ==========================================================================
+        auth.onAuthStateChanged(async (user) => {
             if (user) {
-                State.myUid = user.uid;
+                myUid = user.uid;
                 
-                // Get My Data
-                const mDoc = await vFirestore.collection('users').doc(user.uid).get();
-                if(mDoc.exists) {
-                    State.myData = mDoc.data();
-                    document.getElementById('wait-my-pfp').src = State.myData.photoURL || 'https://via.placeholder.com/90';
-                }
+                // Load My PFP
+                db.collection('users').doc(user.uid).get().then(doc => {
+                    if(doc.exists) {
+                        myProfile = doc.data();
+                        document.getElementById('my-avatar-img').src = myProfile.photoURL || 'https://via.placeholder.com/150';
+                    }
+                });
 
-                // Get Target Data
-                if(targetUsername) {
+                // Load Target User
+                if (targetUsername) {
                     try {
-                        const snap = await vFirestore.collection('users').where('username', '==', targetUsername).limit(1).get();
-                        if(!snap.empty) {
-                            State.targetUid = snap.docs[0].id;
-                            State.targetData = snap.docs[0].data();
-                            State.targetData.uid = State.targetUid;
-                            localStorage.setItem(`vision_user_${targetUsername}`, JSON.stringify(State.targetData));
-                            updateWaitingUI(State.targetData);
-                            
+                        const cached = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
+                        if (cached) updateTargetUI(JSON.parse(cached));
+
+                        const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
+                        if (!snap.empty) {
+                            targetProfile = snap.docs[0].data();
+                            targetUid = snap.docs[0].id;
+                            updateTargetUI(targetProfile);
                             initRoom();
-                        } else showError("User not found.");
-                    } catch(e) { showError("Network Error."); }
-                } else window.location.replace('visionLobby.html');
-            } else window.location.href = 'login.html';
+                        } else { showError("User not found."); }
+                    } catch (e) { showError("Network error."); }
+                } else { exitSession(); }
+            } else { window.location.href = 'login.html'; }
         });
 
-        function updateWaitingUI(data) {
-            const pfp = data.photoURL || 'https://via.placeholder.com/90';
-            const name = (data.name || data.username).split(' ')[0].toUpperCase();
-            document.getElementById('wait-target-pfp').src = pfp;
-            document.getElementById('wait-target-name').innerText = name;
+        function updateTargetUI(data) {
+            const pfp = data.photoURL || 'https://via.placeholder.com/150';
+            const name = data.name.split(' ')[0].toUpperCase();
+            document.getElementById('target-avatar').src = pfp;
+            document.getElementById('target-avatar').classList.add('loaded');
+            document.getElementById('status-text').innerText = `WAITING FOR ${name}`;
+            document.getElementById('target-name-display').innerText = name;
             document.getElementById('typing-pfp').src = pfp;
-            document.getElementById('typing-name').innerText = `${name} is typing`;
-        }
-
-        function showError(msg) {
-            document.getElementById('error-msg').innerText = msg;
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById('screen-error').classList.add('active');
         }
 
         // ==========================================================================
-        // 2. ROOM CONNECTION & PRESENCE LOGIC
+        // 3. ROOM STATE MACHINE (FIRESTORE)
         // ==========================================================================
-        async function initRoom() {
-            // Generate deterministic room ID
-            State.roomId = State.myUid < State.targetUid ? `${State.myUid}_${State.targetUid}` : `${State.targetUid}_${State.myUid}`;
-            const roomRef = vFirestore.collection('vision_rooms').doc(State.roomId);
+        function initRoom() {
+            roomId = [myUid, targetUid].sort().join('_');
+            const roomRef = db.collection('vision_rooms').doc(roomId);
 
-            const myField = (State.myUid < State.targetUid) ? 'userA' : 'userB';
-            const otherField = (State.myUid < State.targetUid) ? 'userB' : 'userA';
+            const myField = (myUid < targetUid) ? 'userA' : 'userB';
+            const otherField = (myUid < targetUid) ? 'userB' : 'userA';
 
-            // Set my presence to online
-            await roomRef.set({
+            roomRef.set({ 
                 [myField]: 'online',
+                sessionStatus: 'active', 
                 lastActive: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-
-            // Initialize defaults if room is fresh
-            const rDoc = await roomRef.get();
-            if(!rDoc.exists || !rDoc.data().turn) {
-                roomRef.set({
-                    turn: State.myUid, // Creator gets first turn
-                    currentVideo: null
-                }, { merge: true });
-            }
-
-            // Realtime Room Listener
-            State.roomUnsubscribe = roomRef.onSnapshot(snap => {
-                if(!snap.exists) return;
-                const data = snap.data();
-
-                if (data[otherField] === 'online') {
-                    // THEY ARE HERE
-                    document.getElementById('wait-target-group').classList.add('connected');
-                    
-                    if(!document.getElementById('screen-active').classList.contains('active')) {
-                        setTimeout(() => {
-                            document.getElementById('screen-waiting').classList.remove('active');
-                            document.getElementById('screen-active').classList.add('active');
-                            initYouTubeEngine();
-                            initLiveChat();
-                        }, 800); // Small delay for nice animation
+            }, { merge: true }).then(() => {
+                roomRef.get().then(doc => {
+                    if (!doc.exists || !doc.data().status) {
+                        // Init clean state
+                        roomRef.set({ 
+                            turn: myUid, 
+                            status: 'picking', 
+                            videoData: null,
+                            playbackState: 'paused',
+                            time: 0,
+                            updatedBy: 'system',
+                            ts: Date.now()
+                        }, { merge: true });
                     }
-
-                    // Process Turn & Video Data
-                    processRoomData(data);
-                } else {
-                    // THEY LEFT
-                    document.getElementById('wait-target-group').classList.remove('connected');
-                    document.getElementById('screen-active').classList.remove('active');
-                    document.getElementById('screen-waiting').classList.add('active');
-                    if(State.ytPlayer && typeof State.ytPlayer.pauseVideo === 'function') State.ytPlayer.pauseVideo();
-                }
+                });
             });
 
-            // Cleanup Hooks
-            window.addEventListener('beforeunload', leaveRoom);
-            document.addEventListener('visibilitychange', () => { if (document.hidden) leaveRoom(); });
-        }
-
-        function processRoomData(data) {
-            // 1. Turn Logic
-            State.isMyTurn = (data.turn === State.myUid);
-            const badge = document.getElementById('turn-badge');
-            const djBtn = document.getElementById('dj-btn');
-
-            if (State.isMyTurn) {
-                badge.innerText = "YOUR TURN";
-                badge.className = "turn-indicator mine";
-                djBtn.classList.add('active');
-            } else {
-                const tName = State.targetData ? State.targetData.name.split(' ')[0].toUpperCase() : 'THEIR';
-                badge.innerText = `${tName}'S TURN`;
-                badge.className = "turn-indicator";
-                djBtn.classList.remove('active');
-            }
-
-            // 2. Video Loading Logic (Triggered by Firestore)
-            if (data.currentVideo && State.playerReady) {
-                // If it's a new video we haven't loaded yet
-                const curUrl = State.ytPlayer.getVideoUrl();
-                const vidId = data.currentVideo.videoId;
-                
-                if (!curUrl || !curUrl.includes(vidId)) {
-                    document.getElementById('active-v-title').innerText = data.currentVideo.title;
-                    State.ignoreSyncEvent = true;
-                    State.ytPlayer.loadVideoById(vidId);
-                    
-                    setTimeout(() => { State.ignoreSyncEvent = false; }, 1000);
-                }
-            }
-        }
-
-        // ==========================================================================
-        // 3. CUSTOM YOUTUBE SYNC ENGINE (RTDB FOR 40ms LATENCY)
-        // ==========================================================================
-        function initYouTubeEngine() {
-            if (State.ytPlayer) return; // Already built
+            // Prevent Sleep
+            requestWakeLock();
             
-            State.ytPlayer = new YT.Player('yt-player-container', {
-                height: '100%', width: '100%',
-                videoId: '', 
-                playerVars: {
-                    'autoplay': 0, 
-                    'controls': 0, // HIDE NATIVE CONTROLS (CRITICAL)
-                    'disablekb': 1, // Disable keyboard skipping
+            // Listeners
+            window.addEventListener('beforeunload', () => roomRef.update({ [myField]: 'offline' }));
+            document.addEventListener('visibilitychange', () => { if (document.hidden) roomRef.update({ [myField]: 'offline' }); });
+
+            // START ENGINE
+            roomUnsub = roomRef.onSnapshot(snap => {
+                if (!snap.exists) return;
+                const data = snap.data();
+                
+                if (data.sessionStatus === 'ended') { exitSession(); return; }
+
+                // Check Connection
+                if (data[otherField] === 'online') {
+                    document.getElementById('target-group').classList.add('active');
+                    document.getElementById('connect-line').classList.add('connected');
+                    if (!document.getElementById('screen-active').classList.contains('active')) {
+                        showScreen('screen-active');
+                        initChatListener(); // Start chat only when both inside
+                    }
+                    syncVisionEngine(data);
+                } else {
+                    document.getElementById('target-group').classList.remove('active');
+                    document.getElementById('connect-line').classList.remove('connected');
+                    showScreen('screen-waiting');
+                    if(player) player.pauseVideo();
+                }
+            });
+        }
+
+        // ==========================================================================
+        // 4. VISION ENGINE (YOUTUBE SYNC LOGIC)
+        // ==========================================================================
+        function onYouTubeIframeAPIReady() {
+            // API Loaded, player initialized dynamically when first video is picked
+        }
+
+        function createPlayer(vidId) {
+            if (player) {
+                player.loadVideoById(vidId);
+                return;
+            }
+            player = new YT.Player('youtube-player', {
+                videoId: vidId,
+                playerVars: { 
+                    'autoplay': 1, 
+                    'controls': 0, // NO NATIVE CONTROLS
+                    'disablekb': 1, // NO KEYBOARD FORWARDING
+                    'fs': 0, 
                     'rel': 0, 
                     'modestbranding': 1,
-                    'playsinline': 1
+                    'playsinline': 1 
                 },
                 events: {
-                    'onReady': () => {
-                        State.playerReady = true;
-                        listenToSyncNode();
-                    },
+                    'onReady': () => { isPlayerReady = true; player.playVideo(); },
                     'onStateChange': onPlayerStateChange
                 }
             });
+        }
 
-            // CUSTOM TAP ZONE LOGIC (Play/Pause Toggle Only)
-            const tapZone = document.getElementById('video-tap-zone');
-            tapZone.addEventListener('click', () => {
-                if(!State.playerReady || !State.ytPlayer.getVideoUrl()) return;
-                
-                const state = State.ytPlayer.getPlayerState();
-                if (state === YT.PlayerState.PLAYING) {
-                    State.ytPlayer.pauseVideo();
-                    animatePlaybackIcon('pause');
-                    broadcastSyncState(2); // 2 = Paused
-                } else {
-                    State.ytPlayer.playVideo();
-                    animatePlaybackIcon('play');
-                    broadcastSyncState(1); // 1 = Playing
+        function syncVisionEngine(data) {
+            isMyTurn = (data.turn === myUid);
+            const btn = document.getElementById('action-btn');
+            
+            // UI Updates based on turn
+            if (isMyTurn) {
+                btn.className = "dj-btn";
+                btn.innerHTML = `<span class="material-icons-round">search</span> PICK VIDEO`;
+                document.getElementById('info-sub').innerText = "YOUR TURN";
+            } else {
+                btn.className = "dj-btn disabled";
+                btn.innerHTML = `WAITING...`;
+                const name = targetProfile ? targetProfile.name.split(' ')[0].toUpperCase() : 'THEM';
+                document.getElementById('info-sub').innerText = `${name}'S TURN`;
+            }
+
+            // Phase: Picking
+            if (data.status === 'picking') {
+                document.getElementById('info-title').innerText = "Waiting for selection...";
+                if (player) player.pauseVideo();
+                document.getElementById('video-touch-overlay').style.background = 'rgba(0,0,0,0.8)';
+                document.getElementById('v-state-icon').classList.remove('show');
+            }
+
+            // Phase: Playing/Syncing
+            if (data.videoData && data.videoData.id) {
+                const vid = data.videoData;
+                document.getElementById('info-title').innerText = vid.title;
+
+                if (currentVideoId !== vid.id) {
+                    currentVideoId = vid.id;
+                    createPlayer(vid.id);
                 }
-                if(navigator.vibrate) navigator.vibrate(15);
-            });
+
+                // --- THE QUANTUM SYNC EXECUTION ---
+                if (isPlayerReady) {
+                    // Prevent ECHO LOOP: Don't process if *I* was the one who sent this update
+                    if (data.updatedBy === myUid) return;
+
+                    ignoreSyncEvent = true; // Lock local listener
+
+                    // 1. Time Drift Correction (Strict Sync)
+                    const diff = Math.abs(player.getCurrentTime() - data.time);
+                    if (diff > 2.0) { // If out of sync by 2 seconds, force jump
+                        player.seekTo(data.time, true);
+                    }
+
+                    // 2. Playback State Enforcement
+                    if (data.playbackState === 'playing') {
+                        player.playVideo();
+                        updateOverlayUI('playing');
+                    } else {
+                        player.pauseVideo();
+                        updateOverlayUI('paused');
+                    }
+
+                    setTimeout(() => { ignoreSyncEvent = false; }, 500); // Unlock
+                }
+            }
         }
 
-        function animatePlaybackIcon(type) {
-            const playEl = document.getElementById('play-anim');
-            const pauseEl = document.getElementById('pause-anim');
+        // Local Player Event Catching
+        function onPlayerStateChange(event) {
+            if (ignoreSyncEvent) return;
+
+            // 1 = Playing, 2 = Paused, 3 = Buffering
+            const newState = event.data;
             
-            playEl.style.display = 'none'; playEl.classList.remove('ping');
-            pauseEl.style.display = 'none'; pauseEl.classList.remove('ping');
-            
-            const target = type === 'play' ? playEl : pauseEl;
-            target.style.display = 'flex';
-            void target.offsetWidth; // reflow
-            target.classList.add('ping');
+            if (newState === YT.PlayerState.BUFFERING) {
+                document.getElementById('v-spinner').style.display = 'block';
+                return;
+            } else {
+                document.getElementById('v-spinner').style.display = 'none';
+            }
+
+            // Only broadcast genuine Play/Pause clicks
+            if (newState === YT.PlayerState.PLAYING && lastKnownState !== YT.PlayerState.PLAYING) {
+                lastKnownState = YT.PlayerState.PLAYING;
+                broadcastState('playing');
+                updateOverlayUI('playing');
+            } 
+            else if (newState === YT.PlayerState.PAUSED && lastKnownState !== YT.PlayerState.PAUSED) {
+                lastKnownState = YT.PlayerState.PAUSED;
+                broadcastState('paused');
+                updateOverlayUI('paused');
+                
+                // End of video auto-swap logic (If paused at the very end)
+                if (player.getDuration() - player.getCurrentTime() < 2) {
+                    if (isMyTurn) swapTurn();
+                }
+            }
         }
 
-        // RTDB Publisher
-        function broadcastSyncState(stateCode) {
-            if (!State.roomId) return;
-            vRTDB.ref(`vision_sync/${State.roomId}/playback`).set({
-                state: stateCode,
-                time: State.ytPlayer.getCurrentTime(),
-                updatedBy: State.myUid,
+        // The Custom Invisible Glass Overlay Click Handler
+        function handleVideoTap() {
+            if (!isPlayerReady || !currentVideoId) return;
+            
+            // This is the ONLY way users can control the video. Scrubbing is impossible.
+            const state = player.getPlayerState();
+            if (state === 1) { // Playing
+                player.pauseVideo(); // Will trigger onPlayerStateChange
+            } else {
+                player.playVideo();
+            }
+        }
+
+        function updateOverlayUI(state) {
+            const overlay = document.getElementById('video-touch-overlay');
+            const icon = document.getElementById('v-state-icon');
+            
+            icon.className = "v-state-icon show";
+            if (state === 'playing') {
+                overlay.style.background = 'transparent';
+                icon.classList.add('playing');
+                icon.innerHTML = '<span class="material-icons-round">play_arrow</span>';
+                // Fade out play icon after 1 second
+                setTimeout(() => icon.classList.remove('show', 'playing'), 1000);
+            } else {
+                overlay.style.background = 'rgba(0,0,0,0.5)';
+                icon.classList.add('paused');
+                icon.innerHTML = '<span class="material-icons-round">pause</span>';
+                // Keep pause icon visible
+            }
+        }
+
+        function broadcastState(stateStr) {
+            db.collection('vision_rooms').doc(roomId).update({
+                playbackState: stateStr,
+                time: player.getCurrentTime(),
+                updatedBy: myUid,
                 ts: Date.now()
             });
         }
 
-        // Internal Player Observer
-        function onPlayerStateChange(event) {
-            // Video Ended -> Swap Turn
-            if (event.data === YT.PlayerState.ENDED && State.isMyTurn) {
-                vFirestore.collection('vision_rooms').doc(State.roomId).update({
-                    turn: State.targetUid,
-                    currentVideo: null
-                });
-            }
-        }
-
-        // RTDB Listener (Fast Sync)
-        function listenToSyncNode() {
-            vRTDB.ref(`vision_sync/${State.roomId}/playback`).on('value', snap => {
-                const data = snap.val();
-                if (!data) return;
-
-                // Protect against echo loop: Don't process our own commands immediately
-                if (data.updatedBy === State.myUid) return;
-
-                State.ignoreSyncEvent = true;
-
-                // Drift check (If time is off by more than 1.5s, force snap)
-                const localTime = State.ytPlayer.getCurrentTime();
-                if (Math.abs(localTime - data.time) > 1.5) {
-                    State.ytPlayer.seekTo(data.time, true);
-                }
-
-                // State Enforcement
-                if (data.state === 1 && State.ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                    State.ytPlayer.playVideo();
-                    animatePlaybackIcon('play');
-                } else if (data.state === 2 && State.ytPlayer.getPlayerState() !== YT.PlayerState.PAUSED) {
-                    State.ytPlayer.pauseVideo();
-                    animatePlaybackIcon('pause');
-                }
-
-                setTimeout(() => { State.ignoreSyncEvent = false; }, 500);
+        function swapTurn() {
+            db.collection('vision_rooms').doc(roomId).update({
+                turn: targetUid,
+                status: 'picking',
+                videoData: null
             });
         }
 
         // ==========================================================================
-        // 4. VIDEO PICKER MODAL & SEARCH API
+        // 5. VIDEO PICKER MODAL (YOUTUBE SEARCH)
         // ==========================================================================
-        function openPickerModal() {
-            if(!State.isMyTurn) {
-                const name = State.targetData ? State.targetData.name.split(' ')[0] : 'Partner';
-                alert(`It's ${name}'s turn to pick a video!`);
-                return;
-            }
+        function openPicker() {
+            if (!isMyTurn) return;
             document.getElementById('picker-modal').classList.add('active');
             history.pushState({modal: 'picker'}, "");
-            setTimeout(() => document.getElementById('picker-search-input').focus(), 300);
         }
-
-        function closePickerModal() {
+        
+        function closePicker() {
             document.getElementById('picker-modal').classList.remove('active');
             if (history.state && history.state.modal === 'picker') history.back();
         }
 
-        // Search Logic
-        document.getElementById('picker-search-input').addEventListener('keypress', async function(e) {
-            if(e.key === 'Enter') {
-                const query = this.value.trim();
-                if(!query) return;
-                this.blur(); // dismiss keyboard
-
-                const resContainer = document.getElementById('picker-results');
+        document.getElementById('vid-search-input').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value.trim();
+                if (!query) return;
                 
-                // 1. Direct URL Parsing
+                const container = document.getElementById('picker-results');
+                
+                // URL Interceptor
                 const urlRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
                 const match = query.match(urlRegex);
+                
                 if (match && match[1]) {
-                    // Send to Firebase immediately
-                    selectVideo({ videoId: match[1], title: "Custom YouTube Link", author: "Direct URL" });
+                    selectVideo({ id: match[1], title: "Custom Video", author: "YouTube Link" });
                     return;
                 }
 
-                // 2. Render Skeleton Loader
-                resContainer.innerHTML = `
-                    <div class="skeleton-item"><div class="skel-img"></div><div class="skel-lines"><div class="skel-line" style="width:90%"></div><div class="skel-line" style="width:60%"></div></div></div>
-                    <div class="skeleton-item"><div class="skel-img"></div><div class="skel-lines"><div class="skel-line" style="width:85%"></div><div class="skel-line" style="width:50%"></div></div></div>
-                    <div class="skeleton-item"><div class="skel-img"></div><div class="skel-lines"><div class="skel-line" style="width:95%"></div><div class="skel-line" style="width:70%"></div></div></div>
+                // Search Loader
+                container.innerHTML = `
+                    <div class="skel-card"><div class="skel-thumb"></div><div style="flex:1"><div class="skel-line" style="width:90%"></div><div class="skel-line" style="width:60%"></div></div></div>
+                    <div class="skel-card"><div class="skel-thumb"></div><div style="flex:1"><div class="skel-line" style="width:80%"></div><div class="skel-line" style="width:40%"></div></div></div>
                 `;
 
-                // 3. Fetch from Server
                 try {
+                    // Hits Render Server. Assumes you fixed server.js to allow long videos!
                     const res = await fetch(`https://pishaa.onrender.com/api/feed?topics=${encodeURIComponent(query)}&mode=strict`);
                     const data = await res.json();
                     
-                    resContainer.innerHTML = '';
+                    container.innerHTML = '';
                     if (data.bites && data.bites.length > 0) {
                         data.bites.forEach(vid => {
                             const card = document.createElement('div');
-                            card.className = 'yt-card';
-                            card.onclick = () => selectVideo(vid);
+                            card.className = 'vid-card';
+                            card.onclick = () => selectVideo({ id: vid.videoId, title: vid.title, author: vid.author });
                             card.innerHTML = `
-                                <img src="${vid.imgUrl}" class="yt-thumb">
-                                <div class="yt-info">
-                                    <div class="yt-title">${vid.title}</div>
-                                    <div class="yt-chan">${vid.author || "YouTube"}</div>
+                                <img src="${vid.imgUrl}" class="vid-thumb">
+                                <div class="vid-details">
+                                    <div class="vid-title-text">${vid.title}</div>
+                                    <div class="vid-channel">${vid.author || "YouTube"}</div>
                                 </div>
                             `;
-                            resContainer.appendChild(card);
+                            container.appendChild(card);
                         });
                     } else {
-                        resContainer.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found.</p>';
+                        container.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found.</p>';
                     }
-                } catch(err) {
-                    resContainer.innerHTML = '<p style="text-align:center; padding:40px; color:#ff453a;">Network error searching YouTube.</p>';
+                } catch (err) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:#ff453a;">Network error.</p>';
                 }
             }
         });
 
-        function selectVideo(vid) {
-            closePickerModal();
-            // Update Firestore so partner sees it
-            vFirestore.collection('vision_rooms').doc(State.roomId).update({
-                currentVideo: {
-                    videoId: vid.videoId,
-                    title: vid.title,
-                    channel: vid.author || "YouTube",
-                    thumb: vid.imgUrl || ""
-                }
+        function selectVideo(vidObj) {
+            closePicker();
+            // Start the room with the new video
+            db.collection('vision_rooms').doc(roomId).update({
+                status: 'playing',
+                videoData: vidObj,
+                playbackState: 'playing',
+                time: 0,
+                updatedBy: 'system',
+                ts: Date.now()
             });
-            // Auto Play for Host
-            setTimeout(() => { broadcastSyncState(1); }, 1500); 
+            // System message to chat
+            sendSystemMessage(`${myProfile ? myProfile.name.split(' ')[0] : 'Host'} selected a video.`);
         }
 
         // ==========================================================================
-        // 5. LIVE CHAT ENGINE (RTDB)
+        // 6. LIVE CHAT ENGINE (Ephemeral RTDB)
         // ==========================================================================
-        const chatInput = document.getElementById('chat-input');
-        const sendBtn = document.getElementById('send-btn');
-        const scrollArea = document.getElementById('chat-scroll-area');
-        let typingTimeout = null;
+        const particleEngine = new ParticleEngine();
 
-        function initLiveChat() {
-            if (State.chatUnsubscribe) return;
-            State.chatUnsubscribe = true; // Lock
+        function initChatListener() {
+            if (chatUnsub) rdb.ref(`vision_chat/${roomId}`).off('child_added', chatUnsub);
+            msgContainer.innerHTML = ''; // Clear old
 
-            // 1. Message Listener
-            vRTDB.ref(`vision_chats/${State.roomId}/messages`).limitToLast(50).on('child_added', snap => {
+            // 1. Listen for new messages
+            chatUnsub = rdb.ref(`vision_chat/${roomId}`).limitToLast(30).on('child_added', snap => {
                 const msg = snap.val();
-                renderChatBubble(msg);
+                renderChatMessage(msg);
             });
 
-            // 2. Typing Listener
-            vRTDB.ref(`vision_chats/${State.roomId}/typing/${State.targetUid}`).on('value', snap => {
-                const isTyping = snap.val();
-                const indicator = document.getElementById('typing-indicator');
-                if (isTyping) {
-                    indicator.style.display = 'flex';
-                    scrollToBottom();
-                } else {
-                    indicator.style.display = 'none';
-                }
+            // 2. Listen for Typing Indicator
+            rdb.ref(`typing/vision_${roomId}/${targetUid}`).on('value', snap => {
+                document.getElementById('typing-row').style.display = snap.val() ? 'flex' : 'none';
+                scrollToBottom();
             });
         }
 
-        function renderChatBubble(msg) {
-            const isMe = (msg.senderId === State.myUid);
-            const div = document.createElement('div');
-            div.className = `chat-msg ${isMe ? 'me' : 'them'}`;
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto'; 
+            this.style.height = (this.scrollHeight) + 'px';
             
-            const pfp = isMe ? (State.myData?.photoURL || '') : (State.targetData?.photoURL || '');
-            const name = isMe ? 'You' : (State.targetData?.name || 'User');
+            const val = this.value.trim();
+            if (val.length > 0) {
+                sendBtn.classList.add('show');
+                rdb.ref(`typing/vision_${roomId}/${myUid}`).set(true);
+            } else {
+                sendBtn.classList.remove('show');
+                rdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
+            }
+        });
 
-            div.innerHTML = `
-                <img src="${pfp}" class="c-pfp">
-                <div class="c-content">
-                    <div class="c-name">${name}</div>
-                    <div class="c-text">${msg.text}</div>
-                </div>
-            `;
-            scrollArea.appendChild(div);
+        function sendChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            // Trigger visual physics
+            checkKeywords(text);
+            popSound.play().catch(()=>{});
+
+            // Reset UI
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            sendBtn.classList.remove('show');
+            rdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
+
+            // Push to DB
+            rdb.ref(`vision_chat/${roomId}`).push({
+                text: text,
+                sender: myUid,
+                ts: firebase.database.ServerValue.TIMESTAMP,
+                type: 'msg'
+            });
+            chatInput.focus();
+        }
+
+        function sendSystemMessage(text) {
+            rdb.ref(`vision_chat/${roomId}`).push({
+                text: text,
+                type: 'sys',
+                ts: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+
+        function renderChatMessage(msg) {
+            if (msg.type === 'sys') {
+                const div = document.createElement('div');
+                div.className = "system-msg";
+                div.innerText = msg.text;
+                msgContainer.appendChild(div);
+                scrollToBottom();
+                return;
+            }
+
+            const isMine = (msg.sender === myUid);
+            const rowClass = isMine ? 'sent' : 'received';
+            
+            // Check for giant emoji logic
+            const textNoSpaces = msg.text.replace(/\s/g, '');
+            const emojiRegex = /^[\p{Extended_Pictographic}]+$/u;
+            const isJumbo = textNoSpaces.length > 0 && Array.from(textNoSpaces).length <= 4 && emojiRegex.test(textNoSpaces);
+            
+            let bubbleStyle = isJumbo ? 'background:transparent; border:none; box-shadow:none; font-size:3rem; padding:0;' : '';
+
+            const div = document.createElement('div');
+            div.className = `msg-row ${rowClass}`;
+            
+            if (!isMine) {
+                // Parse opponent text for physics triggers on my screen
+                checkKeywords(msg.text);
+                
+                div.innerHTML = `
+                    <div class="received-inner-row">
+                        <img src="${targetProfile ? targetProfile.photoURL : ''}" class="msg-avatar">
+                        <div class="msg-bubble-box">
+                            <div class="bubble" style="${bubbleStyle}">${msg.text}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                div.innerHTML = `
+                    <div class="msg-bubble-box">
+                        <div class="bubble" style="${bubbleStyle}">${msg.text}</div>
+                    </div>
+                `;
+            }
+
+            msgContainer.appendChild(div);
             scrollToBottom();
         }
 
         function scrollToBottom() {
-            scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: 'smooth' });
+            chatFlow.scrollTop = chatFlow.scrollHeight;
         }
 
-        // Input Logic
-        chatInput.addEventListener('input', function() {
-            if (this.value.trim().length > 0) {
-                sendBtn.classList.add('ready');
-                vRTDB.ref(`vision_chats/${State.roomId}/typing/${State.myUid}`).set(true);
-                
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    vRTDB.ref(`vision_chats/${State.roomId}/typing/${State.myUid}`).set(false);
-                }, 1500);
-            } else {
-                sendBtn.classList.remove('ready');
-                vRTDB.ref(`vision_chats/${State.roomId}/typing/${State.myUid}`).set(false);
+        // ==========================================================================
+        // 7. PHYSICS KEYWORD ENGINE (From Chat)
+        // ==========================================================================
+        function checkKeywords(text) {
+            // First check if text is purely one of the trigger emojis
+            const pureEmoji = text.replace(/\s/g, '');
+            if (['❤️','🔥','😂','💀','✨','👍'].includes(pureEmoji)) {
+                particleEngine.spawn(pureEmoji);
+                return;
             }
-        });
 
-        chatInput.addEventListener('keypress', e => { if(e.key === 'Enter') sendChatMessage(); });
-
-        function sendChatMessage() {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            
-            chatInput.value = '';
-            sendBtn.classList.remove('ready');
-            vRTDB.ref(`vision_chats/${State.roomId}/typing/${State.myUid}`).set(false);
-            chatInput.focus();
-
-            vRTDB.ref(`vision_chats/${State.roomId}/messages`).push({
-                senderId: State.myUid,
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-            });
+            // Word matching
+            const lower = text.toLowerCase();
+            if (lower.includes('love') || lower.includes('❤️')) particleEngine.spawn('❤️');
+            else if (lower.includes('fire') || lower.includes('lit') || lower.includes('🔥')) particleEngine.spawn('🔥');
+            else if (lower.includes('haha') || lower.includes('lmao') || lower.includes('😂')) particleEngine.spawn('😂');
+            else if (lower.includes('dead') || lower.includes('💀')) particleEngine.spawn('💀');
         }
 
         // ==========================================================================
-        // 6. HARDWARE BACK BUTTON & CLEANUP
+        // 8. SYSTEM HARDWARE & EXIT LOGIC
         // ==========================================================================
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try { wakeLock = await navigator.wakeLock.request('screen'); } 
+                catch (err) {}
+            }
+        }
+
         window.addEventListener('popstate', (e) => {
-            if (document.getElementById('picker-modal').classList.contains('active')) {
-                closePickerModal();
-            }
+            const modals = [ { id: 'picker-modal', activeClass: 'active' } ];
+            let closed = false;
+            modals.forEach(m => {
+                const el = document.getElementById(m.id);
+                if(el && el.classList.contains(m.activeClass)) {
+                    el.classList.remove(m.activeClass);
+                    closed = true;
+                }
+            });
+            if(!closed && !e.state) exitSession();
         });
 
-        function leaveRoom() {
-            if (State.roomId) {
-                const myField = (State.myUid < State.targetUid) ? 'userA' : 'userB';
-                vFirestore.collection('vision_rooms').doc(State.roomId).update({ [myField]: 'offline' }).catch(()=>{});
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            showScreen('screen-error');
+        }
+
+        function exitSession() {
+            if (roomId) {
+                const myField = (myUid < targetUid) ? 'userA' : 'userB';
+                db.collection('vision_rooms').doc(roomId).update({
+                    [myField]: 'offline',
+                    sessionStatus: 'ended'
+                }).catch(()=>{});
             }
-            if (State.ytPlayer && typeof State.ytPlayer.destroy === 'function') {
-                State.ytPlayer.destroy();
-            }
+            if (player) player.destroy();
+            if (wakeLock) wakeLock.release();
             window.location.replace('visionLobby.html');
         }
 
-        function handleExit() {
-            leaveRoom();
-        }
     </script>
 </body>
 </html>
