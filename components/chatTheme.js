@@ -2,30 +2,30 @@
 (function() {
     window.chatTheme = {
         // App Core Backgrounds
-        bg: "#030A14", // The absolute base background color of the entire app behind everything. (Matches Header/Toolbar)
-        bgGradient: "radial-gradient(circle at 50% 30%, #0A192F 0%, #030A14 70%)", // The immersive gradient overlay for depth.
+        bg: "#050709", // The absolute base background color of the entire app behind everything.
+        bgGradient: "radial-gradient(circle at 50% 30%, #0B1014 0%, #050709 70%)", // The immersive gradient overlay for depth.
         
         // Header
-        headerBg: "#030A14", // Background color of the top sticky navigation bar.
+        headerBg: "#0B1014", // Background color of the top sticky navigation bar.
         headerBlur: "blur(25px)", // The intensity of the glassmorphism blur effect on the header.
         
         // Primary Brand Colors (Buttons, Highlights, Icons)
-        accent: "#FF1E8F", // Primary brand color. Bioluminescent pink from the glowing waves.
-        accentDark: "#B31564", // Darker variant of the accent color, used for gradients or pressed states.
-        accentDim: "rgba(255, 30, 143, 0.2)", // Transparent variant of the accent color. Used for glows, reply previews, and soft backgrounds.
+        accent: "#2A3F4C", // Primary brand color. Controls send button, mic button, active states, and highlights.
+        accentDark: "#1D2C36", // Darker variant of the accent color, used for gradients or pressed states.
+        accentDim: "rgba(42, 63, 76, 0.2)", // Transparent variant of the accent color. Used for glows, reply previews, and soft backgrounds.
         
         // Borders and Dividers
-        glassBorder: "rgba(255, 255, 255, 0.08)", // Extremely subtle transparent white. Used for the edges of the input capsule, popups, and bubbles to give a glass look.
-        border: "#0D1B2A", // Solid border color used for distinct separation lines (like in menus or dividers).
+        glassBorder: "rgba(255, 255, 255, 0.05)", // Extremely subtle transparent white. Used for the edges of the input capsule, popups, and bubbles to give a glass look.
+        border: "#151D24", // Solid border color used for distinct separation lines (like in menus or dividers).
         borderLight: "rgba(255, 255, 255, 0.06)", // Slightly brighter solid border for inner elements.
         
         // Outgoing (Sent) Message Bubbles
-        sentBg: "linear-gradient(135deg, #0E3661 0%, #061B36 100%)", // The background gradient of the messages you send (Deep ocean blue).
+        sentBg: "linear-gradient(135deg, #1D2C36 0%, #2A3F4C 100%)", // The background gradient of the messages you send.
         sentText: "#F0F4F8", // The text color of the messages you send.
-        sentShadow: "0 4px 15px rgba(0, 0, 0, 0.5)", // The drop shadow beneath your sent bubbles.
+        sentShadow: "0 4px 15px rgba(0, 0, 0, 0.4)", // The drop shadow beneath your sent bubbles.
         
         // Incoming (Received) Message Bubbles & Media Pills
-        receivedBg: "#091424", // The background color of messages others send you, slightly lighter than base bg.
+        receivedBg: "#121A21", // The background color of messages others send you, as well as audio and file pills.
         receivedText: "#E2E8F0", // The text color of incoming messages.
         receivedShadow: "0 2px 5px rgba(0,0,0,0.5)", // The drop shadow beneath incoming bubbles.
         
@@ -35,15 +35,15 @@
         textMuted: "#475569", // Highly muted text color used for placeholders (e.g., "Message...").
         
         // Modals & Bottom Areas
-        mobileToolbarBg: "#030A14", // The background color of the input text capsule, the attachment menu, emoji tray, and long-press popups. (Matches Base/Header)
+        mobileToolbarBg: "#0B1014", // The background color of the input text capsule, the attachment menu, emoji tray, and long-press popups.
         
         // Text Capsule Aura Glow (Dynamically linked to your accent color)
-        capsuleGlowUnfocused: "0 -2px 15px color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 25px rgba(0,0,0,0.4)", // The subtle aura glow around the text input when not typing. Change 15% to adjust brightness.
-        capsuleGlowFocused: "0 -4px 25px color-mix(in srgb, var(--accent) 35%, transparent), 0 8px 25px color-mix(in srgb, var(--accent) 20%, transparent)", // The brighter, larger aura glow when typing. Change 35% to adjust brightness.
+        capsuleGlowUnfocused: "0 -2px 18px color-mix(in srgb, var(--accent) 25%, transparent), 0 8px 25px rgba(0,0,0,0.4)", // Brightened from 15% to 25%
+        capsuleGlowFocused: "0 -4px 30px color-mix(in srgb, var(--accent) 55%, transparent), 0 8px 25px color-mix(in srgb, var(--accent) 30%, transparent)", // Brightened from 35% to 55%
         
         // System UI
         // SOLID HEX for Android Status Bar to remove the top border line
-        statusBarColor: "#030A14" // Changes the color of the physical phone's top notification bar. (Matches Base/Header)
+        statusBarColor: "#0B1014" // Changes the color of the physical phone's top notification bar (battery, wifi, time).
     };
 
     // Apply the theme directly to the root CSS variables
@@ -137,6 +137,22 @@
                     100% { background-color: transparent !important; transform: scale(1); box-shadow: none !important; } 
                 }
                 .flash-active { animation: flashMessageTheme 1.5s ease-out !important; }
+
+                /* Time Divider - Increased visibility */
+                .time-divider {
+                    color: var(--text) !important;
+                    font-size: 0.75rem !important;
+                    font-weight: 700 !important;
+                    opacity: 0.8 !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+
+                /* Unsend Button - Forced Red Color */
+                #unsend-btn {
+                    color: #FF3B30 !important;
+                    font-weight: 700 !important;
+                }
             `;
             document.head.appendChild(style);
         }
