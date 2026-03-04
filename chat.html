@@ -428,27 +428,6 @@
             border-radius: 20px; font-size: 0.75rem; cursor: pointer; 
         }
 
-        /* --- VISION INVITE BANNER --- */
-        #vision-invite-banner {
-            position: absolute;
-            top: calc(62px + env(safe-area-inset-top));
-            left: 0; right: 0;
-            background: linear-gradient(135deg, rgba(0, 210, 255, 0.15), rgba(0, 0, 0, 0.8));
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #00d2ff;
-            padding: 10px 16px;
-            display: none; 
-            align-items: center;
-            justify-content: space-between;
-            z-index: 1499; 
-            animation: slideDown 0.3s ease-out;
-        }
-        .vision-pulse-icon { color: #00d2ff; font-size: 20px; animation: pulseGreen 1.5s infinite; }
-        .btn-join-vision { 
-            background: #00d2ff; color: #000; border: none; padding: 6px 12px; 
-            border-radius: 20px; font-weight: 700; font-size: 0.75rem; cursor: pointer; 
-        }
-
         /* =========================================
            6. CHAT AREA (SCROLLABLE)
            ========================================= */
@@ -1480,14 +1459,14 @@ box-shadow: var(--received-shadow);
     </div>
 </div>
 
-<div id="vision-invite-banner">
-    <div class="invite-content">
-        <span class="material-icons-round vision-pulse-icon">live_tv</span>
+<div id="vision-invite-banner" style="display:none; position:absolute; top:calc(110px + env(safe-area-inset-top)); left:0; right:0; background:linear-gradient(135deg, rgba(0, 210, 255, 0.15), rgba(0, 0, 0, 0.8)); backdrop-filter:blur(10px); border-bottom:1px solid #00d2ff; padding:10px 16px; align-items:center; justify-content:space-between; z-index:1499; animation:slideDown 0.3s ease-out;">
+    <div class="invite-content" style="display:flex; align-items:center; gap:10px; font-size:0.85rem; color:#fff; font-weight:600;">
+        <span class="material-icons-round" style="color:#00d2ff; font-size:20px; animation:pulseGreen 1.5s infinite;">live_tv</span>
         <span>Invited you to a Vision Session</span>
     </div>
-    <div class="invite-actions">
-        <button class="btn-dismiss" onclick="dismissVisionInvite()">✕</button>
-        <button class="btn-join-vision" onclick="joinVisionSession()">JOIN</button>
+    <div class="invite-actions" style="display:flex; gap:10px;">
+        <button class="btn-dismiss" style="background:rgba(255,255,255,0.1); color:#ccc; border:none; padding:6px 12px; border-radius:20px; font-size:0.75rem; cursor:pointer;" onclick="dismissVisionInvite()">✕</button>
+        <button class="btn-join" style="background:#00d2ff; color:#000; border:none; padding:6px 12px; border-radius:20px; font-weight:700; font-size:0.75rem; cursor:pointer;" onclick="joinVisionSession()">JOIN</button>
     </div>
 </div>
 
@@ -1818,6 +1797,7 @@ box-shadow: var(--received-shadow);
     let isFirstLoad = true;
     let statusTimeout = null;
     let pulseListener = null;
+    let visionListener = null;
     
     // Status Logic State
     let lastStatusData = null;
@@ -1973,33 +1953,6 @@ box-shadow: var(--received-shadow);
             vibrate(30);
         }
     });
-
-    // SMART GESTURE: Double tap header to quick scroll
-    let headerLastTap = 0;
-    document.getElementById('chat-header').addEventListener('touchend', (e) => {
-        if (e.target.closest('.header-icon') || e.target.closest('.back-btn')) return;
-        const now = new Date().getTime();
-        if (now - headerLastTap < 300) {
-            if (chatFlow.scrollTop > 500) {
-                chatFlow.scrollTo({top: 0, behavior: 'smooth'}); 
-            } else {
-                window.scrollToBottom(true); 
-            }
-            vibrate(30);
-        }
-        headerLastTap = now;
-    });
-
-    // SMART GESTURE: Swipe down to dismiss keyboard
-    let chatTouchStartY = 0;
-    chatFlow.addEventListener('touchstart', (e) => {
-        chatTouchStartY = e.touches[0].clientY;
-    }, {passive: true});
-    chatFlow.addEventListener('touchmove', (e) => {
-        if (chatTouchStartY < e.touches[0].clientY - 50 && document.activeElement === mInput) {
-            mInput.blur(); 
-        }
-    }, {passive: true});
     
     // Ripple Effect Logic
     document.addEventListener('click', function(e) {
@@ -2387,6 +2340,10 @@ box-shadow: var(--received-shadow);
                  return;
             }
             
+            // Auto scroll fix
+            const cf = document.getElementById('chat-flow');
+            const isNearBottom = cf.scrollHeight - cf.scrollTop - cf.clientHeight < 150;
+
             if (val === 'recording') {
                 typingRow.style.display = 'flex';
                 bubble.className = "rec-ind-bubble";
@@ -2395,17 +2352,13 @@ box-shadow: var(--received-shadow);
                     Recording...
                 `;
                 inputBox.style.boxShadow = "0 0 15px rgba(255, 69, 58, 0.3)"; // NEW FEATURE: Glow red when recording
-                if (chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 150) {
-                    window.scrollToBottom(true);
-                }
+                if (isNearBottom) window.scrollToBottom(true);
             } else if (val === true) {
                 typingRow.style.display = 'flex';
                 bubble.className = "typing-bubble";
                 bubble.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
                 inputBox.style.boxShadow = "0 0 15px var(--accent-dim)"; // NEW FEATURE: Glow orange when typing
-                if (chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 150) {
-                    window.scrollToBottom(true);
-                }
+                if (isNearBottom) window.scrollToBottom(true); 
             } else {
                 typingRow.style.display = 'none';
                 inputBox.style.boxShadow = "none"; // NEW FEATURE: Remove glow
@@ -2486,7 +2439,6 @@ box-shadow: var(--received-shadow);
     }
 
     // NEW: Vision Invitation Logic
-    let visionListener = null;
     function checkVisionInvitation() {
         const roomRef = db.collection('vision_rooms').doc(chatId);
         visionListener = roomRef.onSnapshot(doc => {
@@ -2497,12 +2449,12 @@ box-shadow: var(--received-shadow);
                 const myField = isUserA ? 'userA' : 'userB';
                 
                 if ((data[otherField] === 'online' || data[otherField] === 'waiting') && 
-                    (!data[myField] || data[myField] === 'offline')) {
+                    (!data[myField] || data[myField] === 'offline') &&
+                    data.sessionStatus !== 'ended') {
                     
                     const dismissedAt = localStorage.getItem('vision_dismiss_' + targetUid);
-                    if (dismissedAt) {
-                        if (Date.now() - parseInt(dismissedAt) < 3600000) return; 
-                    }
+                    if (dismissedAt && (Date.now() - parseInt(dismissedAt) < 3600000)) return; 
+                    
                     document.getElementById('vision-invite-banner').style.display = 'flex';
                 } else {
                     document.getElementById('vision-invite-banner').style.display = 'none';
@@ -2530,7 +2482,7 @@ box-shadow: var(--received-shadow);
         
         unsubscribe = db.collection("chats").doc(chatId).collection("messages")
             .orderBy("timestamp", "desc")
-            .limit(20)
+            .limit(50) // Increased limit to protect from missing drops
             .onSnapshot(snapshot => {
                 if (snapshot.empty) return;
                 
@@ -2602,13 +2554,24 @@ box-shadow: var(--received-shadow);
                         }
                     } 
                     else if (change.type === "removed") {
-                        messagesMap.delete(msgId);
-                        // Fix for immediate removal from UI
-                        const el = document.getElementById(msgId);
-                        if(el) el.remove();
-                        // Also force re-render to fix group styling if needed, but simple removal works for speed
-                        hasVisualChanges = true; 
-                        didRemoveMessage = true; // NEW
+                        // Disappearing messages FIX: Protect older loaded messages from snapshot limit drop
+                        const removedTime = msgData.timestamp?.toMillis ? msgData.timestamp.toMillis() : new Date(msgData.timestampIso || 0).getTime();
+                        let olderCount = 0;
+                        messagesMap.forEach(m => {
+                            const mTime = m.timestamp?.toDate ? m.timestamp.toDate().getTime() : new Date(m.timestampIso || 0).getTime();
+                            if (mTime < removedTime) olderCount++;
+                        });
+
+                        // If it's truly deleted (no older messages, or less than limit), remove it
+                        if (olderCount > 0 || messagesMap.size < 50) {
+                            messagesMap.delete(msgId);
+                            // Fix for immediate removal from UI
+                            const el = document.getElementById(msgId);
+                            if(el) el.remove();
+                            // Also force re-render to fix group styling if needed, but simple removal works for speed
+                            hasVisualChanges = true; 
+                            didRemoveMessage = true; // NEW
+                        }
                     }
                     
                     // Mark read logic
@@ -2905,10 +2868,23 @@ box-shadow: var(--received-shadow);
         } else {
             let newChildren = Array.from(tempContainer.children);
             let oldChildren = Array.from(container.children);
+            
+            let newIds = newChildren.map(c => c.id);
 
+            // 1. Remove deleted to prevent scroll jumps and mutations
+            for (let i = oldChildren.length - 1; i >= 0; i--) {
+                if (oldChildren[i].id && !newIds.includes(oldChildren[i].id)) {
+                    container.removeChild(oldChildren[i]);
+                }
+            }
+            
+            // Re-fetch remaining old children
+            oldChildren = Array.from(container.children);
+
+            // 2. Add or Update
             for (let i = 0; i < newChildren.length; i++) {
                 let newChild = newChildren[i];
-                let oldChild = oldChildren[i];
+                let oldChild = container.children[i];
 
                 if (!oldChild) {
                     // It's a brand new appended message
@@ -2938,12 +2914,8 @@ box-shadow: var(--received-shadow);
                     }
                 } else {
                     // Fallback for mismatch (e.g. dividers adjusting)
-                    container.replaceChild(newChild, oldChild);
+                    container.insertBefore(newChild, oldChild);
                 }
-            }
-            // Remove any trailing messages that got deleted from DB
-            while (container.children.length > newChildren.length) {
-                container.removeChild(container.lastChild);
             }
         }
         // ========================================================================================
@@ -3685,10 +3657,10 @@ box-shadow: var(--received-shadow);
     }
 
     // =========================================
-    //  19. MESSAGING CORE ACTIONS
+    //  19. MESSAGING CORE ACTIONS (BATCH SYSTEM ENABLED)
     // =========================================
 
-        const sendPushNotification = async (messageText) => {
+    const sendPushNotification = async (messageText) => {
         // Only run if we have a person to send it to
         if (!targetUid) return;
         
@@ -3724,8 +3696,6 @@ box-shadow: var(--received-shadow);
     };
     
 
-    
-    
     async function sendImageMessage(imageUrl) {
         popSound.play().catch(e => {});
         window.scrollToBottom(true);
@@ -3740,8 +3710,22 @@ box-shadow: var(--received-shadow);
             imageUrl: imageUrl
         };
         cancelInteraction();
-        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-        updateLastMsg("📷 Image");
+        
+        const batch = db.batch();
+        const newMsgRef = db.collection("chats").doc(chatId).collection("messages").doc();
+        batch.set(newMsgRef, msgData);
+        
+        const chatRef = db.collection("chats").doc(chatId);
+        batch.set(chatRef, {
+            lastMessage: "📷 Image", 
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            participants: [myUid, targetUid], seen: false,
+            [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
+        
+        await batch.commit();
+
         updateInboxCacheLocal(chatId, "📷 Image", myUid, false); // INBOX SYNC
         sendPushNotification("📷 Sent you an image");
         window.scrollToBottom(true);
@@ -3763,13 +3747,29 @@ box-shadow: var(--received-shadow);
             fileMeta: metadata
         };
         cancelInteraction();
-        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
         let label = "📄 File";
         if(metadata.type && metadata.type.indexOf('video') !== -1) label = "🎥 Video Message";
         else if(metadata.type && metadata.type.indexOf('audio') !== -1) label = "🎤 Voice Message";
-        updateLastMsg(caption ? label + " " + caption : label);
-        updateInboxCacheLocal(chatId, caption ? label + " " + caption : label, myUid, false); // INBOX SYNC
-        sendPushNotification(caption ? label + " " + caption : label);
+        const msgText = caption ? label + " " + caption : label;
+
+        const batch = db.batch();
+        const newMsgRef = db.collection("chats").doc(chatId).collection("messages").doc();
+        batch.set(newMsgRef, msgData);
+        
+        const chatRef = db.collection("chats").doc(chatId);
+        batch.set(chatRef, {
+            lastMessage: msgText, 
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            participants: [myUid, targetUid], seen: false,
+            [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
+        
+        await batch.commit();
+
+        updateInboxCacheLocal(chatId, msgText, myUid, false); // INBOX SYNC
+        sendPushNotification(msgText);
         window.scrollToBottom(true);
     }
 
@@ -3812,8 +3812,22 @@ box-shadow: var(--received-shadow);
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
             };
-            await db.collection("chats").doc(chatId).collection("messages").add(msgData);
-            updateLastMsg(text);
+            
+            const batch = db.batch();
+            const newMsgRef = db.collection("chats").doc(chatId).collection("messages").doc();
+            batch.set(newMsgRef, msgData);
+            
+            const chatRef = db.collection("chats").doc(chatId);
+            batch.set(chatRef, {
+                lastMessage: text, 
+                lastSender: myUid,
+                lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                participants: [myUid, targetUid], seen: false,
+                [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
+            }, { merge: true });
+            
+            await batch.commit();
+
             updateInboxCacheLocal(chatId, text, myUid, false); // INBOX SYNC
             sendPushNotification(text);
         }
@@ -3821,6 +3835,7 @@ box-shadow: var(--received-shadow);
     }
 
     async function updateLastMsg(msgText) {
+        // Redundant fallback, moved main logic inside batch system functions
         await db.collection("chats").doc(chatId).set({
             lastMessage: msgText, 
             lastSender: myUid,
@@ -3879,28 +3894,37 @@ box-shadow: var(--received-shadow);
             renderAll(); 
         }
         
-        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-        const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
-        if (!snapshot.empty) {
-            const lastMsg = snapshot.docs[0].data();
-            let txt = lastMsg.text || "";
-            
-            // Logic to determine type of the NEW last message
-            if (lastMsg.imageUrl) {
-                txt = txt ? "📷 " + txt : "📷 Image";
-            } else if (lastMsg.fileUrl) {
-                const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
-                let icon = "📄";
-                let label = "File";
+        // Fetch new last message before deleting to ensure we have the next best string
+        const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(2).get();
+        
+        const batch = db.batch();
+        batch.delete(db.collection("chats").doc(chatId).collection("messages").doc(idToDelete));
+
+        let newLastMsg = null;
+        snapshot.forEach(doc => {
+            if (doc.id !== idToDelete && !newLastMsg) {
+                newLastMsg = doc.data();
+            }
+        });
+
+        if (newLastMsg) {
+            let txt = newLastMsg.text || "";
+            if (newLastMsg.imageUrl) txt = txt ? "📷 " + txt : "📷 Image";
+            else if (newLastMsg.fileUrl) {
+                const type = newLastMsg.fileMeta ? newLastMsg.fileMeta.type : 'file';
+                let icon = "📄", label = "File";
                 if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
                 else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
-                
                 txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
             }
-            
-            await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
-            updateInboxCacheLocal(chatId, txt, lastMsg.sender, false); // INBOX SYNC
+            batch.update(db.collection("chats").doc(chatId), { lastMessage: txt, lastSender: newLastMsg.sender, lastTimestamp: newLastMsg.timestamp });
+            updateInboxCacheLocal(chatId, txt, newLastMsg.sender, false); // INBOX SYNC
+        } else {
+             batch.update(db.collection("chats").doc(chatId), { lastMessage: "Chat started", lastSender: myUid });
+             updateInboxCacheLocal(chatId, "Chat started", myUid, false); 
         }
+        
+        await batch.commit();
     }
 
     // =======================================================================
@@ -4246,7 +4270,7 @@ box-shadow: var(--received-shadow);
                 // Fix format for iOS Support
                 const mime = mediaRecorder.mimeType || 'audio/webm';
                 // iOS Safari sometimes produces empty mimeType but it's mp4/m4a
-                const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'webm');
+                const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'ogg' : 'webm');
                 const blob = new Blob(audioChunks, { type: mime || 'audio/mp4' });
                 
                 const duration = Math.ceil((Date.now() - recStartTime) / 1000);
