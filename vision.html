@@ -54,11 +54,12 @@
             outline: none;
         }
 
+        /* STRICT PWA LOCK: Prevents entire body from scrolling/bouncing */
         body {
             background: var(--bg); color: var(--text);
             font-family: 'Inter', 'Noto Color Emoji', -apple-system, sans-serif;
-            height: 100dvh; width: 100vw; overflow: hidden;
-            display: flex; flex-direction: column; position: fixed;
+            position: fixed; inset: 0; width: 100vw; height: 100dvh; 
+            overflow: hidden; display: flex; flex-direction: column;
         }
 
         /* Prevent Text Selection universally except inputs */
@@ -79,7 +80,7 @@
         #session-view { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
 
         .screen {
-            position: absolute; inset: 0;
+            position: absolute; inset: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column;
             opacity: 0; pointer-events: none;
             transition: opacity 0.4s ease, transform 0.4s ease;
@@ -116,7 +117,7 @@
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
         /* ==========================================================================
-           4. ERROR & WAITING SCREENS (From Pulse)
+           4. ERROR & WAITING SCREENS
            ========================================================================== */
         #screen-error { align-items: center; justify-content: center; }
         .err-box {
@@ -156,22 +157,29 @@
         @keyframes flowLine { 0% { left: -100%; } 100% { left: 100%; } }
 
         /* ==========================================================================
-           5. ACTIVE SCREEN (TOP: VIDEO, MIDDLE: INFO, BOTTOM: CHAT)
+           5. STRICT LAYOUT ZONES (VIDEO, INFO, CHAT)
            ========================================================================== */
-        #screen-active {
-            display: flex; flex-direction: column; justify-content: flex-start;
-        }
-
-        /* --- THE VIDEO PLAYER --- */
+        
+        /* --- 1. THE VIDEO PLAYER ZONE --- */
         .video-zone {
-            width: 100%; height: 35vh; min-height: 250px; background: #050505;
-            position: relative; z-index: 20; border-bottom: 1px solid var(--border);
+            flex: 0 0 35vh; /* STRICTLY LOCKS THE HEIGHT */
+            min-height: 250px; 
+            max-height: 400px;
+            width: 100%; 
+            background: #050505;
+            position: relative; z-index: 20; 
+            border-bottom: 1px solid var(--border);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            /* Padding for Top Nav */
             padding-top: calc(var(--safe-top));
             display: flex; align-items: center; justify-content: center;
         }
-        #youtube-player { width: 100%; height: 100%; pointer-events: none; } /* NO NATIVE CONTROLS */
+
+        #video-placeholder {
+            position: absolute; inset: 0; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; background: #050505; z-index: 5;
+        }
+
+        #youtube-player { width: 100%; height: 100%; pointer-events: none; z-index: 10; } 
         
         /* The custom touch layer to prevent scrubbing and handle play/pause */
         .video-touch-overlay {
@@ -181,7 +189,6 @@
         }
         .video-touch-overlay:active { background: rgba(0,0,0,0.5); }
         
-        /* Big glowing center icon for Play/Pause feedback */
         .v-state-icon {
             width: 70px; height: 70px; background: rgba(0,0,0,0.6); border-radius: 50%;
             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
@@ -193,7 +200,6 @@
         .v-state-icon.paused { box-shadow: 0 0 30px rgba(255, 69, 58, 0.4); color: #ff453a; }
         .v-state-icon.playing { box-shadow: 0 0 30px var(--accent-glow); color: var(--accent); }
 
-        /* Buffer Spinner */
         .v-spinner {
             position: absolute; width: 50px; height: 50px; border-radius: 50%;
             border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent);
@@ -201,8 +207,9 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* --- THE INFO BAR (Who's picking / Video Title) --- */
+        /* --- 2. THE INFO BAR --- */
         .info-bar {
+            flex: 0 0 auto; /* Lock height */
             width: 100%; padding: 12px 20px; background: #111;
             border-bottom: 1px solid var(--border); display: flex;
             align-items: center; justify-content: space-between; z-index: 15;
@@ -221,11 +228,10 @@
         .dj-btn:active { transform: scale(0.95); }
         .dj-btn.disabled { background: #333; color: #888; box-shadow: none; pointer-events: none; }
 
-        /* ==========================================================================
-           6. LIVE CHAT ENGINE (BOTTOM HALF)
-           ========================================================================== */
+        /* --- 3. LIVE CHAT ENGINE --- */
         #chat-container {
-            flex: 1; display: flex; flex-direction: column; background: var(--bg);
+            flex: 1; /* Takes all remaining space below info bar */
+            display: flex; flex-direction: column; background: var(--bg);
             overflow: hidden; position: relative;
         }
 
@@ -237,15 +243,11 @@
         }
         #chat-flow::-webkit-scrollbar { display: none; }
 
-        /* Chat Bubbles (From Chat.html) */
         .msg-row { display: flex; width: 100%; margin-bottom: 8px; flex-direction: column; }
         .msg-row.sent { align-items: flex-end; }
         .msg-row.received { align-items: flex-start; }
-        
         .received-inner-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; }
-        
         .msg-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; border: 1px solid rgba(255,255,255,0.1); }
-        
         .msg-bubble-box { max-width: 75vw; display: flex; flex-direction: column; }
         .sent .msg-bubble-box { align-items: flex-end; }
         .received .msg-bubble-box { align-items: flex-start; }
@@ -263,7 +265,6 @@
             border: 1px solid #222; text-transform: uppercase; letter-spacing: 1px;
         }
 
-        /* Typing Indicator */
         .typing-row { display: none; align-items: flex-end; margin-bottom: 8px; gap: 8px; }
         .typing-bubble { 
             background: var(--received-bg); padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 4px; 
@@ -274,9 +275,9 @@
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes typingWave { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-4px); opacity: 1; } }
 
-        /* Chat Input Area */
+        /* THE PWA TEXT BOX FIX: Added 24px extra padding + safe area calculation */
         .input-area-container { 
-            padding: 10px 15px calc(10px + var(--safe-bottom)); 
+            padding: 10px 15px calc(24px + var(--safe-bottom)); 
             background: var(--surface); border-top: 1px solid var(--border);
             z-index: 50; flex-shrink: 0;
         }
@@ -391,8 +392,15 @@
             </div>
 
             <div class="video-zone" id="video-zone">
+                
+                <div id="video-placeholder">
+                    <span class="material-icons-round" style="font-size:48px; color:#333;">live_tv</span>
+                    <div style="color:#555; margin-top:10px; font-size:12px; font-weight:700; letter-spacing:1px;">NO VIDEO SELECTED</div>
+                </div>
+
                 <div id="youtube-player"></div>
-                <div class="video-touch-overlay" id="video-touch-overlay" onclick="handleVideoTap()">
+                
+                <div class="video-touch-overlay" id="video-touch-overlay" onclick="handleVideoTap()" style="display:none;">
                     <div class="v-spinner" id="v-spinner"></div>
                     <div class="v-state-icon" id="v-state-icon"><span class="material-icons-round">play_arrow</span></div>
                 </div>
@@ -453,9 +461,11 @@
         if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
         else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
 
-        const db = firebase.firestore();
-        const rdb = firebase.database();
-        const auth = firebase.auth();
+        // 🔥 FIX: RENAME VARIABLES TO PREVENT CONFIG.JS COLLISION
+        const visionDb = firebase.firestore();
+        const visionRdb = firebase.database();
+        const visionAuth = firebase.auth();
+        
         const params = new URLSearchParams(window.location.search);
         const targetUsername = params.get('user');
 
@@ -469,8 +479,8 @@
         let isPlayerReady = false;
         let currentVideoId = null;
         let isMyTurn = false;
-        let ignoreSyncEvent = false; // Lock flag to prevent echo loops
-        let lastKnownState = -1; // Unstarted
+        let ignoreSyncEvent = false; 
+        let lastKnownState = -1; 
 
         // Chat State
         const chatInput = document.getElementById('chat-input');
@@ -478,18 +488,22 @@
         const chatFlow = document.getElementById('chat-flow');
         const msgContainer = document.getElementById('messages-container');
 
+        // Safe particle engine load
+        let particleEngine = null;
+        try { if(typeof ParticleEngine !== 'undefined') particleEngine = new ParticleEngine(); } catch(e){}
+
         // Sounds
         const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
 
         // ==========================================================================
         // 2. AUTHENTICATION & CACHE
         // ==========================================================================
-        auth.onAuthStateChanged(async (user) => {
+        visionAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 myUid = user.uid;
                 
                 // Load My PFP
-                db.collection('users').doc(user.uid).get().then(doc => {
+                visionDb.collection('users').doc(user.uid).get().then(doc => {
                     if(doc.exists) {
                         myProfile = doc.data();
                         document.getElementById('my-avatar-img').src = myProfile.photoURL || 'https://via.placeholder.com/150';
@@ -502,7 +516,7 @@
                         const cached = localStorage.getItem(`pulse_cache_user_${targetUsername}`);
                         if (cached) updateTargetUI(JSON.parse(cached));
 
-                        const snap = await db.collection('users').where('username', '==', targetUsername).limit(1).get();
+                        const snap = await visionDb.collection('users').where('username', '==', targetUsername).limit(1).get();
                         if (!snap.empty) {
                             targetProfile = snap.docs[0].data();
                             targetUid = snap.docs[0].id;
@@ -529,7 +543,7 @@
         // ==========================================================================
         function initRoom() {
             roomId = [myUid, targetUid].sort().join('_');
-            const roomRef = db.collection('vision_rooms').doc(roomId);
+            const roomRef = visionDb.collection('vision_rooms').doc(roomId);
 
             const myField = (myUid < targetUid) ? 'userA' : 'userB';
             const otherField = (myUid < targetUid) ? 'userB' : 'userA';
@@ -590,11 +604,13 @@
         // ==========================================================================
         // 4. VISION ENGINE (YOUTUBE SYNC LOGIC)
         // ==========================================================================
-        function onYouTubeIframeAPIReady() {
-            // API Loaded, player initialized dynamically when first video is picked
-        }
+        function onYouTubeIframeAPIReady() {} // Standard requirement
 
         function createPlayer(vidId) {
+            // Remove Placeholder, Reveal Player & Touch Overlay
+            document.getElementById('video-placeholder').style.display = 'none';
+            document.getElementById('video-touch-overlay').style.display = 'flex';
+
             if (player) {
                 player.loadVideoById(vidId);
                 return;
@@ -636,9 +652,17 @@
             // Phase: Picking
             if (data.status === 'picking') {
                 document.getElementById('info-title').innerText = "Waiting for selection...";
+                
+                // Show placeholder again if picking completely new video
+                if(!data.videoData) {
+                    document.getElementById('video-placeholder').style.display = 'flex';
+                    document.getElementById('video-touch-overlay').style.display = 'none';
+                } else {
+                    document.getElementById('video-touch-overlay').style.background = 'rgba(0,0,0,0.8)';
+                    document.getElementById('v-state-icon').classList.remove('show');
+                }
+                
                 if (player) player.pauseVideo();
-                document.getElementById('video-touch-overlay').style.background = 'rgba(0,0,0,0.8)';
-                document.getElementById('v-state-icon').classList.remove('show');
             }
 
             // Phase: Playing/Syncing
@@ -653,7 +677,7 @@
 
                 // --- THE QUANTUM SYNC EXECUTION ---
                 if (isPlayerReady) {
-                    // Prevent ECHO LOOP: Don't process if *I* was the one who sent this update
+                    // Prevent ECHO LOOP
                     if (data.updatedBy === myUid) return;
 
                     ignoreSyncEvent = true; // Lock local listener
@@ -682,7 +706,6 @@
         function onPlayerStateChange(event) {
             if (ignoreSyncEvent) return;
 
-            // 1 = Playing, 2 = Paused, 3 = Buffering
             const newState = event.data;
             
             if (newState === YT.PlayerState.BUFFERING) {
@@ -732,18 +755,16 @@
                 overlay.style.background = 'transparent';
                 icon.classList.add('playing');
                 icon.innerHTML = '<span class="material-icons-round">play_arrow</span>';
-                // Fade out play icon after 1 second
                 setTimeout(() => icon.classList.remove('show', 'playing'), 1000);
             } else {
                 overlay.style.background = 'rgba(0,0,0,0.5)';
                 icon.classList.add('paused');
                 icon.innerHTML = '<span class="material-icons-round">pause</span>';
-                // Keep pause icon visible
             }
         }
 
         function broadcastState(stateStr) {
-            db.collection('vision_rooms').doc(roomId).update({
+            visionDb.collection('vision_rooms').doc(roomId).update({
                 playbackState: stateStr,
                 time: player.getCurrentTime(),
                 updatedBy: myUid,
@@ -752,7 +773,7 @@
         }
 
         function swapTurn() {
-            db.collection('vision_rooms').doc(roomId).update({
+            visionDb.collection('vision_rooms').doc(roomId).update({
                 turn: targetUid,
                 status: 'picking',
                 videoData: null
@@ -796,7 +817,6 @@
                 `;
 
                 try {
-                    // Hits Render Server. Assumes you fixed server.js to allow long videos!
                     const res = await fetch(`https://pishaa.onrender.com/api/feed?topics=${encodeURIComponent(query)}&mode=strict`);
                     const data = await res.json();
                     
@@ -826,8 +846,7 @@
 
         function selectVideo(vidObj) {
             closePicker();
-            // Start the room with the new video
-            db.collection('vision_rooms').doc(roomId).update({
+            visionDb.collection('vision_rooms').doc(roomId).update({
                 status: 'playing',
                 videoData: vidObj,
                 playbackState: 'playing',
@@ -835,27 +854,24 @@
                 updatedBy: 'system',
                 ts: Date.now()
             });
-            // System message to chat
             sendSystemMessage(`${myProfile ? myProfile.name.split(' ')[0] : 'Host'} selected a video.`);
         }
 
         // ==========================================================================
         // 6. LIVE CHAT ENGINE (Ephemeral RTDB)
         // ==========================================================================
-        const particleEngine = new ParticleEngine();
-
         function initChatListener() {
-            if (chatUnsub) rdb.ref(`vision_chat/${roomId}`).off('child_added', chatUnsub);
+            if (chatUnsub) visionRdb.ref(`vision_chat/${roomId}`).off('child_added', chatUnsub);
             msgContainer.innerHTML = ''; // Clear old
 
-            // 1. Listen for new messages
-            chatUnsub = rdb.ref(`vision_chat/${roomId}`).limitToLast(30).on('child_added', snap => {
+            // Listen for new messages
+            chatUnsub = visionRdb.ref(`vision_chat/${roomId}`).limitToLast(30).on('child_added', snap => {
                 const msg = snap.val();
                 renderChatMessage(msg);
             });
 
-            // 2. Listen for Typing Indicator
-            rdb.ref(`typing/vision_${roomId}/${targetUid}`).on('value', snap => {
+            // Listen for Typing Indicator
+            visionRdb.ref(`typing/vision_${roomId}/${targetUid}`).on('value', snap => {
                 document.getElementById('typing-row').style.display = snap.val() ? 'flex' : 'none';
                 scrollToBottom();
             });
@@ -868,10 +884,10 @@
             const val = this.value.trim();
             if (val.length > 0) {
                 sendBtn.classList.add('show');
-                rdb.ref(`typing/vision_${roomId}/${myUid}`).set(true);
+                visionRdb.ref(`typing/vision_${roomId}/${myUid}`).set(true);
             } else {
                 sendBtn.classList.remove('show');
-                rdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
+                visionRdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
             }
         });
 
@@ -879,18 +895,15 @@
             const text = chatInput.value.trim();
             if (!text) return;
 
-            // Trigger visual physics
             checkKeywords(text);
             popSound.play().catch(()=>{});
 
-            // Reset UI
             chatInput.value = '';
             chatInput.style.height = 'auto';
             sendBtn.classList.remove('show');
-            rdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
+            visionRdb.ref(`typing/vision_${roomId}/${myUid}`).set(false);
 
-            // Push to DB
-            rdb.ref(`vision_chat/${roomId}`).push({
+            visionRdb.ref(`vision_chat/${roomId}`).push({
                 text: text,
                 sender: myUid,
                 ts: firebase.database.ServerValue.TIMESTAMP,
@@ -900,7 +913,7 @@
         }
 
         function sendSystemMessage(text) {
-            rdb.ref(`vision_chat/${roomId}`).push({
+            visionRdb.ref(`vision_chat/${roomId}`).push({
                 text: text,
                 type: 'sys',
                 ts: firebase.database.ServerValue.TIMESTAMP
@@ -920,7 +933,6 @@
             const isMine = (msg.sender === myUid);
             const rowClass = isMine ? 'sent' : 'received';
             
-            // Check for giant emoji logic
             const textNoSpaces = msg.text.replace(/\s/g, '');
             const emojiRegex = /^[\p{Extended_Pictographic}]+$/u;
             const isJumbo = textNoSpaces.length > 0 && Array.from(textNoSpaces).length <= 4 && emojiRegex.test(textNoSpaces);
@@ -931,7 +943,6 @@
             div.className = `msg-row ${rowClass}`;
             
             if (!isMine) {
-                // Parse opponent text for physics triggers on my screen
                 checkKeywords(msg.text);
                 
                 div.innerHTML = `
@@ -959,17 +970,15 @@
         }
 
         // ==========================================================================
-        // 7. PHYSICS KEYWORD ENGINE (From Chat)
+        // 7. PHYSICS KEYWORD ENGINE
         // ==========================================================================
         function checkKeywords(text) {
-            // First check if text is purely one of the trigger emojis
+            if(!particleEngine) return;
             const pureEmoji = text.replace(/\s/g, '');
             if (['❤️','🔥','😂','💀','✨','👍'].includes(pureEmoji)) {
                 particleEngine.spawn(pureEmoji);
                 return;
             }
-
-            // Word matching
             const lower = text.toLowerCase();
             if (lower.includes('love') || lower.includes('❤️')) particleEngine.spawn('❤️');
             else if (lower.includes('fire') || lower.includes('lit') || lower.includes('🔥')) particleEngine.spawn('🔥');
@@ -997,6 +1006,7 @@
                     closed = true;
                 }
             });
+            // If the back button is pressed and no modal is open, properly exit room
             if(!closed && !e.state) exitSession();
         });
 
@@ -1013,14 +1023,14 @@
         function exitSession() {
             if (roomId) {
                 const myField = (myUid < targetUid) ? 'userA' : 'userB';
-                db.collection('vision_rooms').doc(roomId).update({
+                visionDb.collection('vision_rooms').doc(roomId).update({
                     [myField]: 'offline',
                     sessionStatus: 'ended'
                 }).catch(()=>{});
             }
             if (player) player.destroy();
             if (wakeLock) wakeLock.release();
-            window.location.replace('visionLobby.html');
+            window.location.replace('visionLobby.html'); // Safely navigates backward via JS
         }
 
     </script>
