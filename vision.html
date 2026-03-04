@@ -55,10 +55,10 @@
         }
 
         /* STRICT PWA LOCK: Prevents entire body from scrolling/bouncing */
-        body {
+        html, body {
             background: var(--bg); color: var(--text);
             font-family: 'Inter', 'Noto Color Emoji', -apple-system, sans-serif;
-            position: fixed; inset: 0; width: 100vw; height: 100dvh; 
+            position: fixed; inset: 0; width: 100vw; height: 100%; 
             overflow: hidden; display: flex; flex-direction: column;
         }
 
@@ -160,11 +160,10 @@
            5. STRICT LAYOUT ZONES (VIDEO, INFO, CHAT)
            ========================================================================== */
         
-        /* --- 1. THE VIDEO PLAYER ZONE --- */
+        /* --- 1. THE VIDEO PLAYER ZONE (Fixed Size) --- */
         .video-zone {
-            flex: 0 0 35vh; /* STRICTLY LOCKS THE HEIGHT */
+            flex: 0 0 35%; /* STRICTLY LOCKS THE HEIGHT to 35% of the screen */
             min-height: 250px; 
-            max-height: 400px;
             width: 100%; 
             background: #050505;
             position: relative; z-index: 20; 
@@ -207,7 +206,7 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* --- 2. THE INFO BAR --- */
+        /* --- 2. THE INFO BAR (Fixed Size) --- */
         .info-bar {
             flex: 0 0 auto; /* Lock height */
             width: 100%; padding: 12px 20px; background: #111;
@@ -215,7 +214,7 @@
             align-items: center; justify-content: space-between; z-index: 15;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .info-text { flex: 1; overflow: hidden; }
+        .info-text { flex: 1; overflow: hidden; padding-right: 15px; }
         .info-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; margin-bottom: 2px; }
         .info-sub { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; text-transform: uppercase; }
 
@@ -228,9 +227,9 @@
         .dj-btn:active { transform: scale(0.95); }
         .dj-btn.disabled { background: #333; color: #888; box-shadow: none; pointer-events: none; }
 
-        /* --- 3. LIVE CHAT ENGINE --- */
+        /* --- 3. LIVE CHAT ENGINE (Fills bottom) --- */
         #chat-container {
-            flex: 1; /* Takes all remaining space below info bar */
+            flex: 1; /* Takes all remaining space strictly below info bar */
             display: flex; flex-direction: column; background: var(--bg);
             overflow: hidden; position: relative;
         }
@@ -262,7 +261,7 @@
         .system-msg {
             align-self: center; font-size: 11px; font-weight: 700; color: #666;
             background: #111; padding: 4px 12px; border-radius: 12px; margin: 10px 0;
-            border: 1px solid #222; text-transform: uppercase; letter-spacing: 1px;
+            border: 1px solid #222; text-transform: uppercase; letter-spacing: 1px; text-align: center;
         }
 
         .typing-row { display: none; align-items: flex-end; margin-bottom: 8px; gap: 8px; }
@@ -275,11 +274,12 @@
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes typingWave { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-4px); opacity: 1; } }
 
-        /* THE PWA TEXT BOX FIX: Added 24px extra padding + safe area calculation */
+        /* THE PWA TEXT BOX FIX: Massively increased bottom padding to clear the iPhone Home Bar */
         .input-area-container { 
-            padding: 10px 15px calc(24px + var(--safe-bottom)); 
+            flex: 0 0 auto;
+            padding: 12px 15px calc(35px + var(--safe-bottom)); 
             background: var(--surface); border-top: 1px solid var(--border);
-            z-index: 50; flex-shrink: 0;
+            z-index: 50; width: 100%;
         }
         .input-capsule {
             display: flex; align-items: flex-end; gap: 8px;
@@ -456,12 +456,11 @@
 
     <script>
         // ==========================================================================
-        // 1. SYSTEM INITIALIZATION & VARIABLES
+        // 1. SYSTEM INITIALIZATION & VARIABLES (Fixed Variable Naming)
         // ==========================================================================
         if (typeof window.initFirebaseCore === 'function') window.initFirebaseCore();
         else if (!firebase.apps.length && window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
 
-        // 🔥 FIX: RENAME VARIABLES TO PREVENT CONFIG.JS COLLISION
         const visionDb = firebase.firestore();
         const visionRdb = firebase.database();
         const visionAuth = firebase.auth();
@@ -494,6 +493,14 @@
 
         // Sounds
         const popSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"); 
+
+        // --- iOS PWA KEYBOARD RESIZE FIX ---
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                document.body.style.height = window.visualViewport.height + 'px';
+                window.scrollTo(0, 0);
+            });
+        }
 
         // ==========================================================================
         // 2. AUTHENTICATION & CACHE
@@ -781,7 +788,7 @@
         }
 
         // ==========================================================================
-        // 5. VIDEO PICKER MODAL (YOUTUBE SEARCH)
+        // 5. VIDEO PICKER MODAL (WITH FAILSAFE SEARCH PIPELINE)
         // ==========================================================================
         function openPicker() {
             if (!isMyTurn) return;
@@ -816,30 +823,53 @@
                     <div class="skel-card"><div class="skel-thumb"></div><div style="flex:1"><div class="skel-line" style="width:80%"></div><div class="skel-line" style="width:40%"></div></div></div>
                 `;
 
+                let results = [];
+
                 try {
+                    // Attempt 1: Render Server
                     const res = await fetch(`https://pishaa.onrender.com/api/feed?topics=${encodeURIComponent(query)}&mode=strict`);
                     const data = await res.json();
-                    
-                    container.innerHTML = '';
-                    if (data.bites && data.bites.length > 0) {
-                        data.bites.forEach(vid => {
-                            const card = document.createElement('div');
-                            card.className = 'vid-card';
-                            card.onclick = () => selectVideo({ id: vid.videoId, title: vid.title, author: vid.author });
-                            card.innerHTML = `
-                                <img src="${vid.imgUrl}" class="vid-thumb">
-                                <div class="vid-details">
-                                    <div class="vid-title-text">${vid.title}</div>
-                                    <div class="vid-channel">${vid.author || "YouTube"}</div>
-                                </div>
-                            `;
-                            container.appendChild(card);
-                        });
-                    } else {
-                        container.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found.</p>';
-                    }
+                    if (data.bites && data.bites.length > 0) results = data.bites;
                 } catch (err) {
-                    container.innerHTML = '<p style="text-align:center; padding:40px; color:#ff453a;">Network error.</p>';
+                    console.warn("Render Proxy Failed, trying Public API fallback...");
+                }
+
+                if (results.length === 0) {
+                    // Attempt 2: Direct Public Invidious API (Failsafe)
+                    try {
+                        const fallback = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=all`);
+                        const fbData = await fallback.json();
+                        if (fbData.items && fbData.items.length > 0) {
+                            results = fbData.items.filter(i => i.type === 'stream').map(v => ({
+                                videoId: v.url.replace('/watch?v=', ''),
+                                title: v.title,
+                                author: v.uploaderName,
+                                imgUrl: v.thumbnail
+                            }));
+                        }
+                    } catch (err) {
+                        console.error("All Search APIs Failed.");
+                    }
+                }
+
+                // Render Final Results
+                container.innerHTML = '';
+                if (results.length > 0) {
+                    results.forEach(vid => {
+                        const card = document.createElement('div');
+                        card.className = 'vid-card';
+                        card.onclick = () => selectVideo({ id: vid.videoId, title: vid.title, author: vid.author });
+                        card.innerHTML = `
+                            <img src="${vid.imgUrl}" class="vid-thumb">
+                            <div class="vid-details">
+                                <div class="vid-title-text">${vid.title}</div>
+                                <div class="vid-channel">${vid.author || "YouTube"}</div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                } else {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found. Please try a different search or paste a URL.</p>';
                 }
             }
         });
@@ -921,6 +951,9 @@
         }
 
         function renderChatMessage(msg) {
+            // FIX: ABSOLUTE PROTECTION AGAINST CORRUPT DATABASE ENTRIES
+            if (!msg || typeof msg.text !== 'string') return; 
+
             if (msg.type === 'sys') {
                 const div = document.createElement('div');
                 div.className = "system-msg";
@@ -973,7 +1006,7 @@
         // 7. PHYSICS KEYWORD ENGINE
         // ==========================================================================
         function checkKeywords(text) {
-            if(!particleEngine) return;
+            if(!particleEngine || typeof text !== 'string') return;
             const pureEmoji = text.replace(/\s/g, '');
             if (['❤️','🔥','😂','💀','✨','👍'].includes(pureEmoji)) {
                 particleEngine.spawn(pureEmoji);
