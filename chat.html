@@ -428,6 +428,27 @@
             border-radius: 20px; font-size: 0.75rem; cursor: pointer; 
         }
 
+        /* --- VISION INVITE BANNER --- */
+        #vision-invite-banner {
+            position: absolute;
+            top: calc(62px + env(safe-area-inset-top));
+            left: 0; right: 0;
+            background: linear-gradient(135deg, rgba(0, 210, 255, 0.15), rgba(0, 0, 0, 0.8));
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #00d2ff;
+            padding: 10px 16px;
+            display: none; 
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1499; 
+            animation: slideDown 0.3s ease-out;
+        }
+        .vision-pulse-icon { color: #00d2ff; font-size: 20px; animation: pulseGreen 1.5s infinite; }
+        .btn-join-vision { 
+            background: #00d2ff; color: #000; border: none; padding: 6px 12px; 
+            border-radius: 20px; font-weight: 700; font-size: 0.75rem; cursor: pointer; 
+        }
+
         /* =========================================
            6. CHAT AREA (SCROLLABLE)
            ========================================= */
@@ -1459,6 +1480,17 @@ box-shadow: var(--received-shadow);
     </div>
 </div>
 
+<div id="vision-invite-banner">
+    <div class="invite-content">
+        <span class="material-icons-round vision-pulse-icon">live_tv</span>
+        <span>Invited you to a Vision Session</span>
+    </div>
+    <div class="invite-actions">
+        <button class="btn-dismiss" onclick="dismissVisionInvite()">✕</button>
+        <button class="btn-join-vision" onclick="joinVisionSession()">JOIN</button>
+    </div>
+</div>
+
 <div id="heart-overlay">❤️</div>
 <canvas id="effect-canvas"></canvas>
 
@@ -1941,6 +1973,33 @@ box-shadow: var(--received-shadow);
             vibrate(30);
         }
     });
+
+    // SMART GESTURE: Double tap header to quick scroll
+    let headerLastTap = 0;
+    document.getElementById('chat-header').addEventListener('touchend', (e) => {
+        if (e.target.closest('.header-icon') || e.target.closest('.back-btn')) return;
+        const now = new Date().getTime();
+        if (now - headerLastTap < 300) {
+            if (chatFlow.scrollTop > 500) {
+                chatFlow.scrollTo({top: 0, behavior: 'smooth'}); 
+            } else {
+                window.scrollToBottom(true); 
+            }
+            vibrate(30);
+        }
+        headerLastTap = now;
+    });
+
+    // SMART GESTURE: Swipe down to dismiss keyboard
+    let chatTouchStartY = 0;
+    chatFlow.addEventListener('touchstart', (e) => {
+        chatTouchStartY = e.touches[0].clientY;
+    }, {passive: true});
+    chatFlow.addEventListener('touchmove', (e) => {
+        if (chatTouchStartY < e.touches[0].clientY - 50 && document.activeElement === mInput) {
+            mInput.blur(); 
+        }
+    }, {passive: true});
     
     // Ripple Effect Logic
     document.addEventListener('click', function(e) {
@@ -2305,6 +2364,9 @@ box-shadow: var(--received-shadow);
         // Start Pulse Check
         checkPulseInvitation();
 
+        // Start Vision Check
+        checkVisionInvitation();
+
         // Mark as Seen
         db.collection("chats").doc(chatId).update({ 
             [`unreadCount.${myUid}`]: 0, 
@@ -2333,13 +2395,17 @@ box-shadow: var(--received-shadow);
                     Recording...
                 `;
                 inputBox.style.boxShadow = "0 0 15px rgba(255, 69, 58, 0.3)"; // NEW FEATURE: Glow red when recording
-                window.scrollToBottom(true); /* MODIFIED: Glide when typing block shows */
+                if (chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 150) {
+                    window.scrollToBottom(true);
+                }
             } else if (val === true) {
                 typingRow.style.display = 'flex';
                 bubble.className = "typing-bubble";
                 bubble.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
                 inputBox.style.boxShadow = "0 0 15px var(--accent-dim)"; // NEW FEATURE: Glow orange when typing
-                window.scrollToBottom(true); /* MODIFIED: Glide when typing block shows */
+                if (chatFlow.scrollHeight - chatFlow.scrollTop - chatFlow.clientHeight < 150) {
+                    window.scrollToBottom(true);
+                }
             } else {
                 typingRow.style.display = 'none';
                 inputBox.style.boxShadow = "none"; // NEW FEATURE: Remove glow
@@ -2417,6 +2483,43 @@ box-shadow: var(--received-shadow);
 
     window.joinPulseSession = function() {
         window.location.href = `pulse.html?user=${targetUsername}`;
+    }
+
+    // NEW: Vision Invitation Logic
+    let visionListener = null;
+    function checkVisionInvitation() {
+        const roomRef = db.collection('vision_rooms').doc(chatId);
+        visionListener = roomRef.onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                const isUserA = myUid < targetUid;
+                const otherField = isUserA ? 'userB' : 'userA';
+                const myField = isUserA ? 'userA' : 'userB';
+                
+                if ((data[otherField] === 'online' || data[otherField] === 'waiting') && 
+                    (!data[myField] || data[myField] === 'offline')) {
+                    
+                    const dismissedAt = localStorage.getItem('vision_dismiss_' + targetUid);
+                    if (dismissedAt) {
+                        if (Date.now() - parseInt(dismissedAt) < 3600000) return; 
+                    }
+                    document.getElementById('vision-invite-banner').style.display = 'flex';
+                } else {
+                    document.getElementById('vision-invite-banner').style.display = 'none';
+                }
+            } else {
+                document.getElementById('vision-invite-banner').style.display = 'none';
+            }
+        });
+    }
+
+    window.dismissVisionInvite = function() {
+        document.getElementById('vision-invite-banner').style.display = 'none';
+        localStorage.setItem('vision_dismiss_' + targetUid, Date.now().toString());
+    }
+
+    window.joinVisionSession = function() {
+        window.location.href = `vision.html?user=${targetUsername}`;
     }
 
     // =========================================
@@ -4143,7 +4246,7 @@ box-shadow: var(--received-shadow);
                 // Fix format for iOS Support
                 const mime = mediaRecorder.mimeType || 'audio/webm';
                 // iOS Safari sometimes produces empty mimeType but it's mp4/m4a
-                const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'ogg' : 'webm');
+                const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('ogg') ? 'webm');
                 const blob = new Blob(audioChunks, { type: mime || 'audio/mp4' });
                 
                 const duration = Math.ceil((Date.now() - recStartTime) / 1000);
