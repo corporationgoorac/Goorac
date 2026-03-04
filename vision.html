@@ -162,7 +162,7 @@
         
         /* --- 1. THE VIDEO PLAYER ZONE (Fixed Size) --- */
         .video-zone {
-            flex: 0 0 35%; /* STRICTLY LOCKS THE HEIGHT to 35% of the screen */
+            flex: 0 0 35vh; /* STRICTLY LOCKS THE HEIGHT to 35% of the screen */
             min-height: 250px; 
             width: 100%; 
             background: #050505;
@@ -277,7 +277,8 @@
         /* THE PWA TEXT BOX FIX: Massively increased bottom padding to clear the iPhone Home Bar */
         .input-area-container { 
             flex: 0 0 auto;
-            padding: 12px 15px calc(35px + var(--safe-bottom)); 
+            /* LIFTED 40px higher to prevent Home Bar overlap */
+            padding: 12px 15px calc(40px + var(--safe-bottom)); 
             background: var(--surface); border-top: 1px solid var(--border);
             z-index: 50; width: 100%;
         }
@@ -788,7 +789,7 @@
         }
 
         // ==========================================================================
-        // 5. VIDEO PICKER MODAL (WITH FAILSAFE SEARCH PIPELINE)
+        // 5. VIDEO PICKER MODAL (REMOVED BROKEN FALLBACK)
         // ==========================================================================
         function openPicker() {
             if (!isMyTurn) return;
@@ -827,53 +828,31 @@
                     <div class="skel-card"><div class="skel-thumb"></div><div style="flex:1"><div class="skel-line" style="width:80%"></div><div class="skel-line" style="width:40%"></div></div></div>
                 `;
 
-                let results = [];
-
                 try {
-                    // Attempt 1: Render Server
+                    // This hits your newly deployed direct yt-search Render Proxy!
                     const res = await fetch(`https://pishaa.onrender.com/api/feed?topics=${encodeURIComponent(query)}&mode=strict`);
                     const data = await res.json();
-                    if (data.bites && data.bites.length > 0) results = data.bites;
-                } catch (err) {
-                    console.warn("Render Proxy Failed, trying Public API fallback...");
-                }
-
-                if (results.length === 0) {
-                    // Attempt 2: Direct Public Invidious API (Failsafe)
-                    try {
-                        const fallback = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=all`);
-                        const fbData = await fallback.json();
-                        if (fbData.items && fbData.items.length > 0) {
-                            results = fbData.items.filter(i => i.type === 'stream').map(v => ({
-                                videoId: v.url.replace('/watch?v=', ''),
-                                title: v.title,
-                                author: v.uploaderName,
-                                imgUrl: v.thumbnail
-                            }));
-                        }
-                    } catch (err) {
-                        console.error("All Search APIs Failed.");
+                    
+                    container.innerHTML = '';
+                    if (data.bites && data.bites.length > 0) {
+                        data.bites.forEach(vid => {
+                            const card = document.createElement('div');
+                            card.className = 'vid-card';
+                            card.onclick = () => selectVideo({ id: vid.videoId, title: vid.title, author: vid.author });
+                            card.innerHTML = `
+                                <img src="${vid.imgUrl}" class="vid-thumb">
+                                <div class="vid-details">
+                                    <div class="vid-title-text">${vid.title}</div>
+                                    <div class="vid-channel">${vid.author || "YouTube"}</div>
+                                </div>
+                            `;
+                            container.appendChild(card);
+                        });
+                    } else {
+                        container.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found.</p>';
                     }
-                }
-
-                // Render Final Results
-                container.innerHTML = '';
-                if (results.length > 0) {
-                    results.forEach(vid => {
-                        const card = document.createElement('div');
-                        card.className = 'vid-card';
-                        card.onclick = () => selectVideo({ id: vid.videoId, title: vid.title, author: vid.author });
-                        card.innerHTML = `
-                            <img src="${vid.imgUrl}" class="vid-thumb">
-                            <div class="vid-details">
-                                <div class="vid-title-text">${vid.title}</div>
-                                <div class="vid-channel">${vid.author || "YouTube"}</div>
-                            </div>
-                        `;
-                        container.appendChild(card);
-                    });
-                } else {
-                    container.innerHTML = '<p style="text-align:center; padding:40px; color:#888;">No results found. Please try a different search or paste a URL.</p>';
+                } catch (err) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:#ff453a;">Network error. Please try again.</p>';
                 }
             }
         });
