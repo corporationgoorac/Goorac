@@ -842,6 +842,40 @@
         }
         .notif-btn-allow:active { transform: scale(0.95); box-shadow: 0 2px 8px rgba(0, 210, 255, 0.3); }
 
+        /* ==========================================================================
+           PROFESSIONAL CAUGHT UP MESSAGE UI
+           ========================================================================== */
+        .caught-up-msg {
+            display: none;
+            text-align: center;
+            padding: 40px 20px 20px 20px;
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            font-weight: 700;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.5s ease;
+        }
+        .caught-up-msg.visible {
+            display: flex;
+        }
+        .caught-up-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 210, 255, 0.05);
+            color: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+            border: 1px solid rgba(0, 210, 255, 0.2);
+        }
+        .caught-up-icon .material-icons-round {
+            font-size: 26px;
+        }
+
     </style>
 
     <script>
@@ -1022,10 +1056,6 @@
     }
 </script>
 
-<div id="caught-up-msg" style="display: none; text-align: center; padding: 25px 20px; color: var(--text-dim); font-size: 0.8rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">
-    <span class="material-icons-round" style="color: var(--accent); font-size: 1.2rem; vertical-align: bottom; margin-right: 5px;">check_circle</span>
-    You're all caught up
-</div>
 <div class="content" id="dashboard-content">
     <span class="section-label">DASHBOARD</span>
     
@@ -1055,7 +1085,14 @@
             </div>
         </div>
     </div>
+
+    <div id="caught-up-indicator" class="caught-up-msg">
+        <div class="caught-up-icon"><span class="material-icons-round">done_all</span></div>
+        <div>You're all caught up</div>
+        <div style="font-size: 0.75rem; color: #555; font-weight: 500;">No new moments from your network</div>
+    </div>
 </div>
+
 <script>
     // 🚀 INSTANT 0ms DASHBOARD CACHE INJECTION
     const cachedDashboardHtmlData = localStorage.getItem('goorac_dashboard_html_cache');
@@ -1134,10 +1171,15 @@
         });
     }
 
-    // FULL SCREEN GREETING ANIMATION LOGIC (Upgraded Cinematic)
-    window.checkGreeting = function(text, sender, msgId) {
+    // 🚀 UPGRADED: FULL SCREEN GREETING ANIMATION LOGIC
+    // Added a timestamp requirement so it doesn't get blocked if someone sends "Good Morning" twice in the same chat
+    window.checkGreeting = function(text, sender, msgId, timestampStr) {
         if (!text) return;
-        const playedKey = 'played_greeting_' + msgId;
+        
+        // Use a unique key including the timestamp so new greetings in the same chat aren't ignored
+        const uniqueTS = timestampStr || Date.now();
+        const playedKey = 'played_greeting_' + msgId + '_' + uniqueTS;
+        
         if (sessionStorage.getItem(playedKey)) return; 
         
         const t = text.toLowerCase();
@@ -1282,47 +1324,43 @@
         }
 
         if (momentsFeed) {
+            // 🚀 UPGRADED: Moments Observer now checks shadow DOM perfectly and toggles Caught Up state
             new MutationObserver(() => {
                 const isModalOpen = momentsFeed.querySelector('.m-full-modal.open') || momentsFeed.querySelector('.c-overlay.open');
                 toggleOverlays(isModalOpen);
-                const hasMoments = momentsFeed.querySelectorAll('.m-card').length > 0;
                 
-                // ==========================================
-                // [FIXED] 1. Toggle Caught Up Message
-                // [FIXED] 2. Always show Dashboard
-                // ==========================================
-                const caughtUpEl = document.getElementById('caught-up-msg');
-                if (caughtUpEl) {
-                    caughtUpEl.style.display = hasMoments ? 'block' : 'none';
-                }
-
+                // Backup query if component uses Shadow DOM
+                const mCards = momentsFeed.shadowRoot ? momentsFeed.shadowRoot.querySelectorAll('.m-card') : momentsFeed.querySelectorAll('.m-card');
+                const hasMoments = mCards.length > 0;
+                
                 if (dashboardContent) {
-                    /* OLD: dashboardContent.style.setProperty('display', hasMoments ? 'none' : 'block', 'important'); */
-                    /* NEW: Ensures Dashboard ALWAYS displays even if moments are active */
-                    dashboardContent.style.setProperty('display', 'block', 'important');
+                    dashboardContent.style.setProperty('display', hasMoments ? 'none' : 'block', 'important');
                     const cacheHideStyle = document.getElementById('dash-cache-hide');
-                    if (cacheHideStyle) cacheHideStyle.remove();
+                    if (cacheHideStyle && !hasMoments) cacheHideStyle.remove();
                 }
                 
+                const caughtUpIndicator = document.getElementById('caught-up-indicator');
+                if (caughtUpIndicator) {
+                    if (!hasMoments) caughtUpIndicator.classList.add('visible');
+                    else caughtUpIndicator.classList.remove('visible');
+                }
             }).observe(momentsFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
-            // ==========================================
-            // [FIXED] Safety fallback if the DOM is cached empty and observer doesn't fire
-            // ==========================================
-            setTimeout(() => {
-                const hasM = momentsFeed.querySelectorAll('.m-card').length > 0;
-                const cacheHideStyle = document.getElementById('dash-cache-hide');
-                if (cacheHideStyle) cacheHideStyle.remove();
-                
+            // 🚀 UPGRADED: Bulletproof fallback interval. If moments completely empty and doesn't trigger MutationObserver, this fixes the stuck display bug permanently.
+            setInterval(() => {
+                const mCards = momentsFeed.shadowRoot ? momentsFeed.shadowRoot.querySelectorAll('.m-card') : momentsFeed.querySelectorAll('.m-card');
+                const hasMoments = mCards.length > 0;
                 if (dashboardContent) {
-                    dashboardContent.style.setProperty('display', 'block', 'important');
+                    dashboardContent.style.setProperty('display', hasMoments ? 'none' : 'block', 'important');
+                    const cacheHideStyle = document.getElementById('dash-cache-hide');
+                    if (cacheHideStyle && !hasMoments) cacheHideStyle.remove();
                 }
-                
-                const caughtUpEl = document.getElementById('caught-up-msg');
-                if (caughtUpEl) {
-                    caughtUpEl.style.display = hasM ? 'block' : 'none';
+                const caughtUpIndicator = document.getElementById('caught-up-indicator');
+                if (caughtUpIndicator) {
+                    if (!hasMoments) caughtUpIndicator.classList.add('visible');
+                    else caughtUpIndicator.classList.remove('visible');
                 }
-            }, 300);
+            }, 800);
         }
     });
 
@@ -1535,19 +1573,24 @@
                     }
                 }
 
-                // ==========================================
-                // [FIXED] GREETING DETECTION LOGIC
-                // Fixed caching bug so it replays for new messages in same thread 
-                // Removed the "latest.lastSender !== uid" restriction so your own sends trigger it too!
-                // ==========================================
-                
-                /* OLD: if (!isInitialLoad && latest && latestDoc && latest.lastSender !== uid) { */
-                let msgUniqueId = latestDoc ? latestDoc.id + "_" + (latest.lastTimestamp?.seconds || latest.lastTimestamp || Date.now()) : Date.now();
-                
-                if (!isInitialLoad && latest && latestDoc) {
+                // --- 🚀 UPGRADED: GREETING DETECTION LOGIC ---
+                if (latest && latestDoc && latest.lastSender !== uid) {
                     let txt = latest.lastMessage || latest.text || latest.message || "";
-                    let sName = latest.lastSender === uid ? "You" : (latest.lastSenderName || "Someone");
-                    if (window.checkGreeting) window.checkGreeting(txt, sName, msgUniqueId);
+                    let tsMillis = 0;
+                    
+                    if (latest.lastTimestamp) {
+                        if (typeof latest.lastTimestamp.toMillis === 'function') tsMillis = latest.lastTimestamp.toMillis();
+                        else if (latest.lastTimestamp.seconds) tsMillis = latest.lastTimestamp.seconds * 1000;
+                        else tsMillis = latest.lastTimestamp;
+                    }
+                    
+                    // Allows greeting on initial load ONLY IF the message was sent less than 60 seconds ago and is unread
+                    let isRecent = (Date.now() - tsMillis) < 60000; 
+                    let isUnreadMsg = (latest.seen === false) || (latest.unreadCount && latest.unreadCount[uid] > 0);
+                    
+                    if (!isInitialLoad || (isInitialLoad && isRecent && isUnreadMsg)) {
+                        if (window.checkGreeting) window.checkGreeting(txt, latest.lastSenderName || "Someone", latestDoc.id, tsMillis);
+                    }
                 }
 
                 // --- EXISTING DASHBOARD CARD UPDATE ---
