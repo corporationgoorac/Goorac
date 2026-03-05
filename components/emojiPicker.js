@@ -288,13 +288,12 @@ class EmojiPicker extends HTMLElement {
                     display: flex;
                     flex-direction: column;
                     background: #121212;
-                    /* Feature: Match size to mobile keyboard dynamically using CSS environment variables */
+                    /* Dynamically uses the EXACT pixel size calculated by chat.html */
                     height: var(--emoji-keyboard-height, 320px);
-                    max-height: 50vh;
                     width: 100%;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                     overflow: hidden;
-                    padding-bottom: env(safe-area-inset-bottom);
+                    /* Removed max-height & safe-area padding so it maps down to the pixel perfectly */
                 }
                 .ep-header {
                     padding: 8px 12px;
@@ -489,27 +488,71 @@ class EmojiPicker extends HTMLElement {
         });
     }
 
-    // New Feature: Use local storage of CURRENT chat to calculate VADER-inspired AI Mood Context
-    getRecentChatContext() {
-        // Read the global chatId variable injected by chat.html
-        const currentChatId = window.currentChatId || window.chatId; 
-        if (!currentChatId) return [];
+    // NEW: Built-in Keyboard Observer (No need to inject an external script, it handles itself)
+    setupKeyboardObserver() {
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                const viewportHeight = window.visualViewport.height;
+                const totalHeight = window.innerHeight;
+                const keyboardHeight = totalHeight - viewportHeight;
+                
+                if (keyboardHeight > 100) { // If keyboard is open
+                    this.style.setProperty('--emoji-keyboard-height', keyboardHeight + 'px');
+                } else {
+                    // Fallback when closed (resets to default 320)
+                    this.style.setProperty('--emoji-keyboard-height', '320px');
+                }
+            });
+        }
+    }
 
+    // New Feature: Safely reads the EXACT LIVE memory from your chat.html to find the vibe
+    getRecentChatContext() {
         let allChatMessages = [];
         
         try {
-            // Only fetch messages for the currently open chat
-            const key = `chat_msgs_${currentChatId}`;
-            let msgs = JSON.parse(localStorage.getItem(key)) || [];
-            allChatMessages = msgs;
+            // PRIORITY 1: Read the live memory map directly from chat.html
+            // This is the absolute most accurate way to get the vibe of the CURRENT chat you are looking at
+            if (typeof window.messagesMap !== 'undefined' && window.messagesMap.size > 0 && window.targetUid) {
+                // Filter only messages sent by the OTHER person (targetUid)
+                allChatMessages = Array.from(window.messagesMap.values())
+                    .filter(m => m.sender === window.targetUid); 
+            } 
+            // PRIORITY 2: Fallback - find the most recently updated chat in local storage
+            else {
+                let latestTime = 0;
+                let bestKey = null;
+                for (let i = 0; i < localStorage.length; i++) {
+                    let key = localStorage.key(i);
+                    if (key && key.startsWith('chat_msgs_')) {
+                        let msgs = JSON.parse(localStorage.getItem(key)) || [];
+                        if (msgs.length > 0) {
+                            let lastMsgTime = new Date(msgs[msgs.length - 1].timestampIso || 0).getTime();
+                            if (lastMsgTime > latestTime) {
+                                latestTime = lastMsgTime;
+                                bestKey = key;
+                            }
+                        }
+                    }
+                }
+                if (bestKey) {
+                    let rawMsgs = JSON.parse(localStorage.getItem(bestKey)) || [];
+                    // Filter out your own messages so we only get their vibe
+                    if (window.myUid) {
+                        allChatMessages = rawMsgs.filter(m => m.sender !== window.myUid);
+                    } else {
+                        allChatMessages = rawMsgs; 
+                    }
+                }
+            }
         } catch(e) {
             console.error("Error reading chat context:", e);
         }
 
-        // Sort all messages descending to analyze latest context
+        // Sort all messages descending (newest first)
         allChatMessages.sort((a, b) => {
-            const tA = new Date(a.timestampIso || 0).getTime();
-            const tB = new Date(b.timestampIso || 0).getTime();
+            const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(a.timestampIso || 0).getTime();
+            const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : new Date(b.timestampIso || 0).getTime();
             return tB - tA; 
         });
 
