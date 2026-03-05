@@ -364,7 +364,15 @@
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
-                return { id: d.id, chat, u: userData, otherUid, isPinned };
+                
+                // --- PRE-CALCULATE UNREAD STATUS ---
+                let isUnread = false;
+                let count = 0;
+                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) count = Number(chat.unreadCount[myUid]);
+                if (count > 0) isUnread = true;
+                else if (chat.lastSender && chat.lastSender !== myUid) isUnread = (chat.seen !== true);
+
+                return { id: d.id, chat, u: userData, otherUid, isPinned, isUnread };
             });
 
             const results = await Promise.all(chatPromises);
@@ -373,6 +381,11 @@
             currentChatData.sort((a,b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
+
+                // --- UNREAD SORTING FIX ---
+                if (a.isUnread && !b.isUnread) return -1;
+                if (!a.isUnread && b.isUnread) return 1;
+
                 return (b.chat.lastTimestamp?.seconds || 0) - (a.chat.lastTimestamp?.seconds || 0);
             });
 
@@ -393,12 +406,10 @@
         const list = document.getElementById('chats-list');
         list.innerHTML = "";
 
-        const filteredData = currentChatData.filter(({chat}) => {
+        // --- FILTERING FIX ---
+        const filteredData = currentChatData.filter((item) => {
             if (currentFilter === 'all') return true;
-            if (currentFilter === 'unread') {
-                if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) return Number(chat.unreadCount[myUid]) > 0;
-                return (chat.lastSender !== myUid && chat.seen === false);
-            }
+            if (currentFilter === 'unread') return item.isUnread;
             return true;
         });
 
@@ -407,15 +418,9 @@
             return;
         }
 
-        filteredData.forEach(({id, chat, u, otherUid, isPinned}) => {
+        filteredData.forEach(({id, chat, u, otherUid, isPinned, isUnread}) => {
             if(!u) return;
             
-            let isUnread = false;
-            let count = 0;
-            if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) count = Number(chat.unreadCount[myUid]);
-            if (count > 0) isUnread = true;
-            else if (chat.lastSender && chat.lastSender !== myUid) isUnread = chat.seen === false;
-
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
             const amIFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
 
@@ -599,12 +604,21 @@
 
         db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', allContacts.slice(0, 10))
         .get().then(snap => {
+            // --- SEARCH RESULTS LAYOUT FIX ---
             results.innerHTML = snap.docs.filter(d => {
                 const u = d.data();
                 return (u.name||"").toLowerCase().includes(q) || (u.username||"").toLowerCase().includes(q);
             }).map(d => {
                 const u = d.data();
-                return `<div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'"><img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px;"><div class="chat-info"><div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div><div style="font-size:0.8rem; color:#444;">@${u.username}</div></div></div>`;
+                return `<div class="chat-item" onclick="window.location.href='chat.html?user=${u.username}'">
+                    <div class="pfp-container" style="margin-right: 15px;">
+                        <img src="${u.photoURL||'https://via.placeholder.com/150'}" class="chat-pfp" style="width:40px; height:40px; border-radius: 12px;">
+                    </div>
+                    <div class="chat-info">
+                        <div class="u-name">${u.name} ${u.verified?`<img src="${V_URL}" class="v-badge">`:''}</div>
+                        <div style="font-size:0.8rem; color:#444;">@${u.username}</div>
+                    </div>
+                </div>`;
             }).join('');
         });
     }
