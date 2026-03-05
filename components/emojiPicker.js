@@ -389,6 +389,23 @@ class EmojiPicker extends HTMLElement {
                 }
                 .ep-emoji:active { transform: scale(1.2); background: #333; }
                 
+                /* Large suggestion styling */
+                .ep-emoji.large-suggestion {
+                    grid-column: span 2;
+                    grid-row: span 2;
+                    font-size: 3.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(161, 98, 247, 0.1);
+                    border: 1px solid rgba(161, 98, 247, 0.3);
+                    animation: pulseGlow 2s infinite alternate;
+                }
+                @keyframes pulseGlow {
+                    from { box-shadow: 0 0 5px rgba(161, 98, 247, 0.2); }
+                    to { box-shadow: 0 0 15px rgba(161, 98, 247, 0.6); }
+                }
+
                 /* Tooltip styling */
                 .ep-emoji[title]:hover::after {
                     content: attr(title);
@@ -472,19 +489,21 @@ class EmojiPicker extends HTMLElement {
         });
     }
 
-    // New Feature: Use local storage of chats to calculate VADER-inspired AI Mood Context
+    // New Feature: Use local storage of CURRENT chat to calculate VADER-inspired AI Mood Context
     getRecentChatContext() {
+        // Read the global chatId variable injected by chat.html
+        const currentChatId = window.currentChatId || window.chatId; 
+        if (!currentChatId) return [];
+
         let allChatMessages = [];
         
-        // Loop through localStorage to find active chat messages
-        for (let i = 0; i < localStorage.length; i++) {
-            let key = localStorage.key(i);
-            if (key && key.startsWith('chat_msgs_')) {
-                try {
-                    let msgs = JSON.parse(localStorage.getItem(key)) || [];
-                    allChatMessages = allChatMessages.concat(msgs);
-                } catch(e) {}
-            }
+        try {
+            // Only fetch messages for the currently open chat
+            const key = `chat_msgs_${currentChatId}`;
+            let msgs = JSON.parse(localStorage.getItem(key)) || [];
+            allChatMessages = msgs;
+        } catch(e) {
+            console.error("Error reading chat context:", e);
         }
 
         // Sort all messages descending to analyze latest context
@@ -583,7 +602,7 @@ class EmojiPicker extends HTMLElement {
         }
 
         if (dominant) {
-            // New Feature: Show multiple emojis based on the dominant ML calculated mood
+            // Show multiple emojis based on the dominant ML calculated mood
             const moodDisplayMap = {
                 happy: { name: 'Happy', list: ['😁', '😃', '🥳', '😎', '😇', '😌', '🙌', '🌞'] },
                 sad: { name: 'Sad', list: ['😢', '💔', '😔', '😞', '🥺', '🌧️', '🫂', '🩹'] },
@@ -665,6 +684,18 @@ class EmojiPicker extends HTMLElement {
             }
         }
         
+        // Special Case: Hardcoded 🖤 -> 💎 prediction based on user request
+        if (lastUsed === '🖤') {
+            // Check if gem is already there, if not, force it in as top prediction
+            if (!topSuggestions.find(e => e.c === '💎')) {
+                 topSuggestions.unshift({ c: '💎', k: 'special prediction', isLarge: true });
+                 topSuggestions.pop(); // keep it to 8 items
+            } else {
+                 let gem = topSuggestions.find(e => e.c === '💎');
+                 gem.isLarge = true;
+            }
+        }
+        
         // Exactly 1 line (8 elements max)
         return topSuggestions.slice(0, 8);
     }
@@ -735,42 +766,45 @@ class EmojiPicker extends HTMLElement {
         navBar.innerHTML = '';
         body.innerHTML = '';
 
-        let displayData = [...this.emojiData];
+        let displayData = [];
 
-        // NEW Feature: Inject VADER NLP AI Mood Row reading directly from Local Storage
+        // 1. Recents in exactly 1 row (Top)
+        if (this.recentEmojis.length > 0) {
+            displayData.push({
+                id: 'recents', name: 'Recent', icon: '🕒', 
+                emojis: this.recentEmojis.slice(0, 8).map(e => ({c: e, k: 'recent'})) // Force 1 row (8)
+            });
+        }
+        
+        // 2. Chat Vibe (Second Section)
         const chatMoodData = this.calculateChatMood();
         if (chatMoodData && chatMoodData.emojis.length > 0) {
-            displayData.unshift({
+            displayData.push({
                 id: 'chatmood', name: `Chat Vibe: ${chatMoodData.name}`, icon: '🧠',
                 emojis: chatMoodData.emojis.map(e => ({c: e, k: 'ai mood chat context dynamic'}))
             });
         }
         
-        // Feature 2: Inject "Related" Row Context based on very last click
+        // 3. Related Row
         const relatedList = this.getRelatedEmojis();
         if(relatedList.length > 0) {
-            displayData.unshift({
+            displayData.push({
                 id: 'related', name: 'Related to Recent', icon: '🔗', 
                 emojis: relatedList 
             });
         }
         
-        // Insert Suggestions AI if we have data (Now strictly 1 line, up to 8 emojis)
+        // 4. Suggested Row
         const suggestedList = this.getSuggestedEmojis();
         if (suggestedList.length > 0) {
-            displayData.unshift({
+            displayData.push({
                 id: 'suggested', name: 'Smart AI', icon: '✨', 
                 emojis: suggestedList 
             });
         }
-
-        // Insert Recents (limit to 16 handled in addToRecents/constructor)
-        if (this.recentEmojis.length > 0) {
-            displayData.unshift({
-                id: 'recents', name: 'Recent', icon: '🕒', 
-                emojis: this.recentEmojis.map(e => ({c: e, k: 'recent'})) 
-            });
-        }
+        
+        // Append all standard emoji categories after the smart sections
+        displayData = displayData.concat(this.emojiData);
 
         displayData.forEach(cat => {
             if(cat.id === 'recents' && this.recentEmojis.length === 0) return;
@@ -815,6 +849,7 @@ class EmojiPicker extends HTMLElement {
             cat.emojis.forEach(eObj => {
                 const el = document.createElement('div');
                 el.className = 'ep-emoji';
+                if(eObj.isLarge) el.classList.add('large-suggestion'); // Apply large class if flagged
                 el.title = eObj.k.split(' ')[0] || cat.name; // Simple hover title logic
                 el.innerText = eObj.c; // Removed skin tone application
                 el.onclick = () => {
