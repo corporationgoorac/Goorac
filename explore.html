@@ -68,6 +68,7 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             padding-bottom: 120px;
             overflow-x: hidden;
+            /* Prevent global selection to make app feel native */
             user-select: none; 
             -webkit-user-select: none;
             -webkit-font-smoothing: antialiased;
@@ -93,15 +94,17 @@
         }
 
         .header-icon { 
-            width: 28px; 
-            height: 28px; 
-            border-radius: 8px; 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 10px; 
             object-fit: cover; 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: block;
         }
 
         .header-title { 
             font-weight: 800; 
-            font-size: 1.1rem; 
+            font-size: 1.15rem; 
             letter-spacing: -0.3px; 
             color: var(--text-main); 
         }
@@ -112,7 +115,7 @@
         .search-container { 
             padding: 12px 20px; 
             position: sticky; 
-            top: calc(60px + var(--safe-top)); 
+            top: calc(62px + var(--safe-top)); 
             background: var(--bg); 
             z-index: 40; 
             width: 100%; 
@@ -155,8 +158,10 @@
             font-family: 'Inter', sans-serif;
             font-weight: 500;
             letter-spacing: -0.2px;
-            -webkit-user-select: text !important; 
-            user-select: text !important;
+            /* Explicitly ALLOW text selection and copy/paste here */
+            user-select: text !important; 
+            -webkit-user-select: text !important;
+            touch-action: manipulation;
         }
 
         .search-input::placeholder { 
@@ -190,6 +195,16 @@
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
+        }
+
+        .section-title {
+            font-size: 13px; 
+            font-weight: 700; 
+            color: var(--text-dim); 
+            margin-bottom: 2px; 
+            padding-left: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
         .user-card {
@@ -315,6 +330,7 @@
             padding: 60px 20px; 
             font-size: 0.95rem; 
             font-weight: 500; 
+            line-height: 1.5;
         }
 
         #load-more { 
@@ -521,10 +537,31 @@
         }
     </style>
 </head>
+
 <body oncontextmenu="return false;">
 
+    <script>
+        // Immediately load the mutual friends cache if it exists, before anything else runs.
+        // This creates a 0ms render experience for the default state.
+        (function loadMutualsCache() {
+            const cachedHTML = localStorage.getItem('goorac_explore_mutuals_html');
+            if (cachedHTML) {
+                // Ensure DOM is ready, wait for DOMContentLoaded if needed, but since script is here,
+                // we can bind it directly to an event to be safe.
+                document.addEventListener('DOMContentLoaded', () => {
+                    const searchInput = document.getElementById('search-input');
+                    const resultArea = document.getElementById('result-area');
+                    // Only inject cache if the user hasn't typed anything yet
+                    if (searchInput && searchInput.value.trim() === '') {
+                        resultArea.innerHTML = cachedHTML;
+                    }
+                });
+            }
+        })();
+    </script>
+
     <header>
-        <img src="images/icon.png" class="header-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/28/000000/fff?text=G'">
+        <img src="images/icon.png" class="header-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/32/000000/fff?text=G'">
         <div class="header-title">Explore People</div>
     </header>
 
@@ -549,7 +586,8 @@
                    name="goorac_explore_search_field_safe"
                    data-lpignore="true"
                    data-1p-ignore="true"
-                   data-form-type="other">
+                   data-form-type="other"
+                   oncontextmenu="event.stopPropagation(); return true;">
                    
             <button class="kbd-toggle" id="kbd-toggle" title="Switch to Goorac ID Search">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -691,6 +729,7 @@
         let myBlockedList = [];
         let myFollowingList = [];
         let myFollowersList = [];
+        let mutualUidsList = [];
 
         // ---------------------------------------------
         // 5. AUTHENTICATION & DATA FETCHING
@@ -708,6 +747,14 @@
                         myBlockedList = (data.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
                         myFollowingList = (data.following || []).map(f => typeof f === 'string' ? f : f.uid);
                         myFollowersList = (data.followers || []).map(f => typeof f === 'string' ? f : f.uid);
+                        
+                        // Calculate mutual connections (present in both following and followers)
+                        mutualUidsList = myFollowingList.filter(uid => myFollowersList.includes(uid));
+
+                        // If search field is empty, load mutual friends silently
+                        if (searchInput.value.trim() === '') {
+                            loadMutualFriends(mutualUidsList);
+                        }
                     }
                 });
             } else {
@@ -788,7 +835,14 @@
             
             // Reset state on switch
             searchInput.value = '';
-            resultArea.innerHTML = '';
+            
+            // Re-load mutuals if empty
+            if (mutualUidsList.length > 0) {
+                loadMutualFriends(mutualUidsList);
+            } else {
+                resultArea.innerHTML = '';
+            }
+            
             searchInput.focus();
         };
 
@@ -803,24 +857,38 @@
             lastQuery = query;
             currentLimit = 10; // Reset pagination for a fresh query
 
-            if (isNumericMode) {
-                // Restrict input to numbers only
-                const numericOnly = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
-                e.target.value = numericOnly;
-                
-                // Only execute search if exactly 10 digits are typed
-                if (numericOnly.length === 10) {
-                    renderSkeletons();
-                    searchTimeout = setTimeout(() => executeSearch(numericOnly), 350);
+            // If input is cleared, load default mutual friends state
+            if (query.length === 0) {
+                loadMutualFriends(mutualUidsList);
+                return;
+            }
+
+            // --- SMART DETECTION: Check if text is exactly a 10-digit number ---
+            const isSmartNumeric = /^\d{10}$/.test(query);
+
+            if (isNumericMode || isSmartNumeric) {
+                // Restrict input to numbers only if in pure numeric mode
+                if (isNumericMode) {
+                    const numericOnly = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    e.target.value = numericOnly;
+                    
+                    if (numericOnly.length === 10) {
+                        renderSkeletons();
+                        searchTimeout = setTimeout(() => executeSearch(numericOnly, true), 350);
+                    } else {
+                        resultArea.innerHTML = '';
+                    }
                 } else {
-                    resultArea.innerHTML = '';
+                    // Smart detection in text mode: Execute bypass immediately
+                    renderSkeletons();
+                    searchTimeout = setTimeout(() => executeSearch(query, true), 350);
                 }
             } else {
                 // For standard text search, require at least 2 characters
                 if (query.length >= 2) {
                     renderSkeletons();
                     // 500ms debounce for text to save reads
-                    searchTimeout = setTimeout(() => executeSearch(query), 500); 
+                    searchTimeout = setTimeout(() => executeSearch(query, false), 500); 
                 } else {
                     resultArea.innerHTML = '';
                 }
@@ -828,10 +896,74 @@
         });
 
         // ---------------------------------------------
-        // 10. PRIVACY FILTER & DATA PARSER
+        // 10. MUTUAL FRIENDS DEFAULT LOAD
+        // ---------------------------------------------
+        async function loadMutualFriends(mutualUids) {
+            // Prevent interference if user is currently searching
+            if (searchInput.value.trim() !== '') return;
+
+            if (!mutualUids || mutualUids.length === 0) {
+                const emptyHTML = `
+                    <div class="no-results" style="padding-top: 40px;">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 15px; opacity: 0.5;">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg><br>
+                        Search for people to connect with.<br>Your mutual connections will appear here automatically.
+                    </div>`;
+                    
+                if (searchInput.value.trim() === '') {
+                    resultArea.innerHTML = emptyHTML;
+                    localStorage.setItem('goorac_explore_mutuals_html', emptyHTML);
+                }
+                return;
+            }
+
+            try {
+                // Fetch up to top 10 mutuals to avoid massive query payload limits
+                const topMutuals = mutualUids.slice(0, 10);
+                const snapshot = await db.collection('users')
+                                         .where(firebase.firestore.FieldPath.documentId(), 'in', topMutuals)
+                                         .get();
+                
+                let resultsMap = new Map();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Basic block check
+                    if (!myBlockedList.includes(doc.id)) {
+                        const theirBlockedList = (data.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+                        if (!theirBlockedList.includes(myUid)) {
+                            resultsMap.set(doc.id, data);
+                        }
+                    }
+                });
+
+                let finalResults = Array.from(resultsMap.values());
+                
+                // Sort mutuals so verified users appear first
+                finalResults.sort((a, b) => {
+                    const aVerified = a.verified ? 1 : 0;
+                    const bVerified = b.verified ? 1 : 0;
+                    return bVerified - aVerified;
+                });
+                
+                // Final safety check to ensure user hasn't started typing
+                if (searchInput.value.trim() === '') {
+                    renderResults(finalResults, true); // true = cache this as mutual load
+                }
+
+            } catch (error) {
+                console.error("Failed to load mutual connections:", error);
+            }
+        }
+
+        // ---------------------------------------------
+        // 11. PRIVACY FILTER & DATA PARSER
         // ---------------------------------------------
         // This function enforces strict privacy rules before showing a user in search
-        function filterAndAddUser(doc, resultsMap) {
+        function filterAndAddUser(doc, resultsMap, bypassDiscoverability = false) {
             const data = doc.data();
             const otherUid = data.uid || doc.id;
 
@@ -849,8 +981,8 @@
             const isMutual = myFollowingList.includes(otherUid) && myFollowersList.includes(otherUid);
 
             // RULE 5: Mode-Specific Privacy Logic
-            if (isNumericMode) {
-                // If using exact 10-digit Goorac ID, bypass the Discoverability toggle.
+            if (bypassDiscoverability || isNumericMode) {
+                // If using exact 10-digit Goorac ID (or smart detected), bypass the Discoverability toggle.
                 // As long as no block is in place, the user is added.
                 resultsMap.set(doc.id, data);
             } else {
@@ -863,20 +995,20 @@
         }
 
         // ---------------------------------------------
-        // 11. CORE DATABASE SEARCH LOGIC
+        // 12. CORE DATABASE SEARCH LOGIC
         // ---------------------------------------------
-        async function executeSearch(query) {
+        async function executeSearch(query, forceNumericBypass = false) {
             try {
                 // We use a Map to automatically deduplicate documents based on their ID
                 let resultsMap = new Map(); 
 
-                if (isNumericMode) {
+                if (isNumericMode || forceNumericBypass) {
                     // Numeric query: Search directly against the gooracNumber field
                     const snapshot = await db.collection('users')
                                              .where('gooracNumber', '==', parseInt(query))
                                              .get();
                     
-                    snapshot.forEach(doc => filterAndAddUser(doc, resultsMap));
+                    snapshot.forEach(doc => filterAndAddUser(doc, resultsMap, true));
                 } else {
                     // Text query: Search against both 'username' and 'name'
                     const userRef = db.collection('users');
@@ -895,8 +1027,8 @@
                         .get();
 
                     // Apply filters to both sets of results
-                    userSnap.forEach(doc => filterAndAddUser(doc, resultsMap));
-                    nameSnap.forEach(doc => filterAndAddUser(doc, resultsMap));
+                    userSnap.forEach(doc => filterAndAddUser(doc, resultsMap, false));
+                    nameSnap.forEach(doc => filterAndAddUser(doc, resultsMap, false));
                 }
 
                 // Convert deduplicated Map back to a standard Array for sorting
@@ -920,7 +1052,7 @@
                 });
 
                 // Pass the sorted data to the view engine
-                renderResults(finalResults);
+                renderResults(finalResults, false);
 
             } catch (error) {
                 console.error("Search Query Execution Error:", error);
@@ -930,24 +1062,25 @@
         }
 
         // ---------------------------------------------
-        // 12. INFINITE SCROLL OBSERVER
+        // 13. INFINITE SCROLL OBSERVER
         // ---------------------------------------------
         const observer = new IntersectionObserver((entries) => {
             // Trigger when the last element is visible
-            if (entries[0].isIntersecting && lastQuery.length >= 2 && !isNumericMode) {
+            // Only trigger if NOT a numeric search (which is exact 1 result) and NOT empty query
+            if (entries[0].isIntersecting && lastQuery.length >= 2 && !isNumericMode && !/^\d{10}$/.test(lastQuery)) {
                 // Increment the fetch limit
                 currentLimit += 10;
                 loadMoreIndicator.style.display = 'block';
                 
                 // Re-run the search with the higher limit
-                executeSearch(lastQuery).then(() => {
+                executeSearch(lastQuery, false).then(() => {
                     loadMoreIndicator.style.display = 'none';
                 });
             }
         }, { threshold: 1.0 });
 
         // ---------------------------------------------
-        // 13. UI RENDER ENGINE: SKELETON LOADER
+        // 14. UI RENDER ENGINE: SKELETON LOADER
         // ---------------------------------------------
         function renderSkeletons() {
             let html = '';
@@ -976,11 +1109,11 @@
         }
 
         // ---------------------------------------------
-        // 14. UI RENDER ENGINE: FINAL RESULTS
+        // 15. UI RENDER ENGINE: FINAL RESULTS
         // ---------------------------------------------
-        function renderResults(users) {
+        function renderResults(users, isMutualCacheLoad = false) {
             // Handle Empty State
-            if (users.length === 0) {
+            if (users.length === 0 && !isMutualCacheLoad) {
                 resultArea.innerHTML = `
                     <div class="no-results">
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 15px; opacity: 0.5;">
@@ -993,6 +1126,11 @@
             }
 
             let html = '';
+            
+            // If this is the default mutual state, add a sleek subtle title header
+            if (isMutualCacheLoad && users.length > 0) {
+                html += `<div class="section-title">Mutual Connections</div>`;
+            }
             
             // Iterate over data and build DOM templates
             users.forEach(user => {
@@ -1028,12 +1166,17 @@
                 </div>`;
             });
 
+            // If this is a mutual load, cache the exact HTML payload to localStorage for 0ms loads later
+            if (isMutualCacheLoad) {
+                localStorage.setItem('goorac_explore_mutuals_html', html);
+            }
+
             // Inject finalized HTML into the container
             resultArea.innerHTML = html;
 
             // Re-attach infinite scroll observer to the new last element
             // (Only for text search, numeric search is exact match and needs no pagination)
-            if (!isNumericMode && users.length === currentLimit) {
+            if (!isNumericMode && !isMutualCacheLoad && users.length === currentLimit) {
                 const lastCard = resultArea.lastElementChild;
                 if (lastCard) {
                     observer.observe(lastCard);
