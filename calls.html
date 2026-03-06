@@ -28,6 +28,8 @@
             --danger: #ff4444; 
             --success: #1ebea5;
             --ig-blue: #0095f6;
+            --text-main: #ffffff;
+            --sheet-bg: #121212;
         }
 
         /* Anti-Copy & Layout CSS */
@@ -53,12 +55,21 @@
             backdrop-filter: blur(20px); 
             padding-top: max(15px, env(safe-area-inset-top)); 
             width: 100%; box-sizing: border-box; 
+            display: flex; flex-direction: column; /* Changed to accommodate search bar below title */
         }
+        
+        /* NEW HEADER ICON STYLES */
+        .header-top { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px 5px; width: 100%; box-sizing: border-box; }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-icon { width: 32px; height: 32px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.08); display: block; }
+        .header-title { font-weight: 800; font-size: 1.15rem; letter-spacing: -0.3px; color: var(--text-main); }
+
         .header-logo { 
             font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; 
             background: linear-gradient(to right, #fff, var(--accent)); 
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
             cursor: pointer; padding: 0 20px; 
+            display: none; /* Hidden in favor of new header-left layout */
         }
         
         .search-box { padding: 12px 20px; width: 100%; box-sizing: border-box; }
@@ -163,15 +174,57 @@
         .btn-end { width: 65px; height: 65px; background: var(--danger) !important; transform: rotate(135deg); }
         .btn-accept { width: 65px; height: 65px; background: var(--success) !important; }
         .btn-off { background: rgba(255,255,255,0.5); color: black; }
+
+        /* --- NEW: INTRO BOTTOM MODAL FOR CALLS --- */
+        .modal-overlay-intro { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 200000; display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .bottom-modal-intro { position: fixed; bottom: -100%; left: 0; width: 100%; background: var(--sheet-bg); border-radius: 32px 32px 0 0; z-index: 200001; padding: 24px 24px calc(40px + env(safe-area-inset-bottom)); transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1); border-top: 1px solid var(--border); box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.8); }
+        .modal-handle-intro { width: 48px; height: 5px; background: #333333; border-radius: 10px; margin: 0 auto 24px; cursor: pointer; }
+        .modal-title-intro { font-size: 1.3rem; font-weight: 800; margin-bottom: 12px; color: #ffffff; letter-spacing: -0.5px; }
+        .modal-desc-intro { font-size: 0.95rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 28px; }
+        .feature-list-intro { list-style: none; margin-bottom: 36px; padding: 0; }
+        .feature-list-intro li { display: flex; align-items: flex-start; gap: 16px; font-size: 0.95rem; margin-bottom: 20px; color: #d1d1d1; line-height: 1.5; font-weight: 500; }
+        .feature-list-intro li svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+        .modal-btn-intro { width: 100%; background: var(--text-main); color: #000000; border: none; padding: 18px; border-radius: 16px; font-weight: 800; font-size: 1.05rem; cursor: pointer; transition: transform 0.2s ease, opacity 0.2s ease; }
+        .modal-btn-intro:active { transform: scale(0.97); opacity: 0.9; }
     </style>
 </head>
 <body oncontextmenu="return false;">
+
+<div class="modal-overlay-intro" id="calls-intro-overlay" onclick="closeIntroModal()"></div>
+<div class="bottom-modal-intro" id="calls-intro-modal">
+    <div class="modal-handle-intro" onclick="closeIntroModal()"></div>
+    <div class="modal-title-intro">Quantum Calls</div>
+    <div class="modal-desc-intro">Experience peer-to-peer encrypted audio and video communications.</div>
+    <ul class="feature-list-intro">
+        <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>
+            <span>High-fidelity audio and video calling directly from your browser.</span>
+        </li>
+        <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span><strong>Please Note:</strong> The calling feature is currently optimized for Web/Desktop users. Mobile performance may vary while we work on native improvements.</span>
+        </li>
+    </ul>
+    <button class="modal-btn-intro" onclick="closeIntroModal()">Got it, let's connect</button>
+</div>
 
     <audio id="ringtone" loop preload="auto"><source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg"></audio>
     <audio id="dialtone" loop preload="auto"><source src="https://www.soundjay.com/phone/sounds/phone-calling-1.mp3" type="audio/mpeg"></audio>
 
     <header>
-        <div class="header-logo">Quantum</div>
+        <div class="header-top">
+            <div class="header-left">
+                <img src="images/icon.png" class="header-icon" id="header-app-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/32/000000/fff?text=G'">
+                <div class="header-title">Calls</div>
+            </div>
+        </div>
+        
         <div class="search-box">
             <input type="text" id="search" placeholder="Search callers..." autocomplete="off">
         </div>
@@ -180,6 +233,29 @@
             <div class="tab" id="tab-contacts" onclick="switchTab('contacts')">Contacts</div>
         </div>
     </header>
+
+<script>
+    (function loadAppIconInstant() {
+        const el = document.getElementById('header-app-icon');
+        const cached = localStorage.getItem('goorac_app_icon_cache_b64');
+        if (cached && el) el.src = cached;
+        
+        // Background fetch to ensure icon is up-to-date
+        fetch('images/icon.png?t=' + new Date().getTime())
+            .then(r => r.blob())
+            .then(b => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (cached !== reader.result) {
+                        localStorage.setItem('goorac_app_icon_cache_b64', reader.result);
+                        if (el) el.src = reader.result;
+                    }
+                }
+                reader.readAsDataURL(b);
+            }).catch(e=>{});
+    })();
+</script>
+
 <script src="components/chatLoader.js" defer></script>
 <chat-loader></chat-loader>
 
@@ -228,6 +304,53 @@
     <main-navbar></main-navbar>
 
     <script>
+        // --- NEW FEATURE: FIRST-TIME ONBOARDING LOGIC ---
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('goorac_calls_intro_seen')) {
+                setTimeout(() => {
+                    const overlay = document.getElementById('calls-intro-overlay');
+                    const modal = document.getElementById('calls-intro-modal');
+                    
+                    overlay.style.display = 'block';
+                    const nav = document.querySelector('main-navbar');
+                    if(nav) nav.style.display = 'none';
+                    
+                    // History state for back button support
+                    history.pushState({ modal: 'intro' }, "", "#intro");
+
+                    setTimeout(() => {
+                        overlay.style.opacity = '1';
+                        modal.style.bottom = '0';
+                    }, 20);
+                }, 600);
+            }
+        });
+
+        window.closeIntroModal = function(shouldGoBack = true) {
+            localStorage.setItem('goorac_calls_intro_seen', 'true');
+            const overlay = document.getElementById('calls-intro-overlay');
+            const modal = document.getElementById('calls-intro-modal');
+            
+            modal.style.bottom = '-100%';
+            overlay.style.opacity = '0';
+            
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                const nav = document.querySelector('main-navbar');
+                if(nav) nav.style.display = 'block';
+            }, 350);
+
+            if(shouldGoBack && window.location.hash === "#intro") {
+                history.back();
+            }
+        };
+
+        window.onpopstate = (e) => { 
+            if(document.getElementById('calls-intro-overlay').style.display === 'block') {
+                closeIntroModal(false);
+            }
+        };
+
         /* -------------------------------------------------------------------------- */
         /* CUSTOM ELEMENT: CALL NOTIFIER                                              */
         /* -------------------------------------------------------------------------- */
@@ -899,4 +1022,3 @@
     </script>
 </body>
 </html>
-
