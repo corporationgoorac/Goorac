@@ -5,33 +5,32 @@
  * A professional, sleek bottom navigation bar.
  * Features:
  * - Premium Glassmorphism & adaptive dark/light mode
- * - Mobile safe-area support for modern smartphones
- * - 100% Unified Custom SVGs for a cohesive, premium UI (stored in localStorage)
+ * - Mobile safe-area support for modern smartphones (notch/home indicator)
  * - Dynamic active states and high-fidelity micro-animations
  * - MutationObserver to automatically hide during active calls
  */
 class MainNavbar extends HTMLElement {
     
+    /**
+     * Called when the element is inserted into the DOM.
+     * Contains initialization logic, DOM rendering, and event bindings.
+     */
     connectedCallback() {
         // --- AUTO-STORAGE LOGIC ---
         // Stores the class definition code to local storage automatically
         localStorage.setItem('goorac_navbar_component', this.constructor.toString());
 
-        // Define a unified set of premium, stroke-based SVGs
-        const navSVGs = {
-            home: `<svg viewBox="0 0 24 24" class="nav-svg"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
-            chat: `<svg viewBox="0 0 24 24" class="nav-svg"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
-            explore: `<svg viewBox="0 0 24 24" class="nav-svg"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`,
-            // Sleek "Live/Monitor" icon for Vision
-            vision: `<svg viewBox="0 0 24 24" class="nav-svg vision-graphic"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 2l-4 5-4-5"></path></svg>`,
-            // Professional phone/call icon
-            calls: `<svg viewBox="0 0 24 24" class="nav-svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`
-        };
-        
-        localStorage.setItem('goorac_nav_svgs', JSON.stringify(navSVGs));
+        // Import Google Material Icons Round dynamically if not already present
+        if (!document.getElementById('material-icons-round-css')) {
+            const link = document.createElement('link');
+            link.id = 'material-icons-round-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons+Round';
+            document.head.appendChild(link);
+        }
 
-        // Render the HTML and CSS, passing in our SVGs
-        this.render(navSVGs);
+        // Render the HTML and CSS
+        this.render();
         
         // Highlight the current page based on URL
         this._highlightActive();
@@ -40,7 +39,10 @@ class MainNavbar extends HTMLElement {
         this._setupVisibilityToggle();
     }
 
-    render(svgs) {
+    /**
+     * Renders the internal styling and HTML structure for the component.
+     */
+    render() {
         this.innerHTML = `
         <style>
             /* ==========================================================================
@@ -103,13 +105,14 @@ class MainNavbar extends HTMLElement {
                 border-top: 0.5px solid var(--nav-border);
                 box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.04);
                 
-                z-index: 9999; 
+                z-index: 9999; /* Ensure priority */
                 
                 transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
                             opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
                             background-color 0.4s ease;
             }
 
+            /* Floating Tablet/Desktop Mode */
             @media (min-width: 601px) {
                 .bottom-nav {
                     bottom: 24px;
@@ -123,7 +126,7 @@ class MainNavbar extends HTMLElement {
             }
 
             /* ==========================================================================
-               NAVIGATION ITEMS & ICONS
+               NAVIGATION ITEMS
                ========================================================================== */
             .nav-item {
                 position: relative;
@@ -140,20 +143,14 @@ class MainNavbar extends HTMLElement {
                 transition: color 0.3s ease;
             }
 
-            /* Unified SVG Styling */
-            .nav-item .nav-svg {
-                width: 24px; /* Scaled down slightly for a tighter, native look */
-                height: 24px;
-                fill: none;
-                stroke: currentColor;
-                stroke-width: 2;
-                stroke-linecap: round;
-                stroke-linejoin: round;
+            .nav-item .material-icons-round {
+                font-size: 28px; 
                 transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-                            fill 0.3s ease, filter 0.3s ease;
+                            color 0.3s ease,
+                            filter 0.3s ease;
             }
 
-            .nav-item span {
+            .nav-item span:not(.material-icons-round) {
                 font-size: 10px;
                 font-weight: 600;
                 margin-top: 4px;
@@ -162,24 +159,23 @@ class MainNavbar extends HTMLElement {
                 transition: all 0.3s ease;
             }
 
-            /* ACTIVE STATE */
+            /* ACTIVE STATE - Refined Scaling and Glow */
             .nav-item.active {
                 color: var(--icon-active);
             }
 
-            .nav-item.active .nav-svg {
+            .nav-item.active .material-icons-round {
                 transform: translateY(-2px) scale(1.1); 
                 filter: drop-shadow(0px 2px 4px rgba(0,122,255,0.3)); 
-                fill: rgba(0, 122, 255, 0.15); /* Adds a premium semi-transparent fill when active */
             }
 
-            .nav-item.active span {
+            .nav-item.active span:not(.material-icons-round) {
                 opacity: 1;
                 transform: translateY(0);
             }
 
-            /* Tap State */
-            .nav-item:active .nav-svg {
+            /* Micro-Interaction on Tap */
+            .nav-item:active .material-icons-round {
                 transform: scale(0.85);
                 opacity: 0.6;
             }
@@ -197,24 +193,23 @@ class MainNavbar extends HTMLElement {
             }
 
             .nav-item .vision-graphic {
-                stroke: var(--vision-color);
+                color: var(--vision-color);
                 animation: vision-skel 2.5s infinite ease-in-out;
             }
 
             .nav-item.active .vision-graphic {
-                fill: rgba(0, 210, 255, 0.2);
                 filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
                 animation: vision-skel-active 1.5s infinite ease-in-out;
             }
 
             @keyframes vision-skel {
-                0%, 100% { opacity: 0.6; transform: scale(1); }
-                50% { opacity: 1; transform: scale(1.05); }
+                0%, 100% { opacity: 0.5; transform: scale(1); }
+                50% { opacity: 0.9; transform: scale(1.05); }
             }
 
             @keyframes vision-skel-active {
                 0% { transform: scale(1.1); filter: brightness(1); }
-                50% { transform: scale(1.25); filter: brightness(1.2) drop-shadow(0 0 12px rgba(0, 210, 255, 0.7)); }
+                50% { transform: scale(1.3); filter: brightness(1.3) drop-shadow(0 0 15px rgba(0, 210, 255, 0.8)); }
                 100% { transform: scale(1.1); filter: brightness(1); }
             }
 
@@ -231,7 +226,6 @@ class MainNavbar extends HTMLElement {
                 transform: scale(0);
                 transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             }
-            
             .nav-item.active::after {
                 opacity: 1;
                 transform: scale(1);
@@ -242,31 +236,34 @@ class MainNavbar extends HTMLElement {
 
         <nav class="bottom-nav" id="main-nav-container" aria-label="Main Navigation">
             <a href="home.html" class="nav-item" aria-label="Home">
-                ${svgs.home}
+                <span class="material-icons-round">home</span>
                 <span>Home</span>
             </a>
             <a href="messages.html" class="nav-item" aria-label="Messages">
-                ${svgs.chat}
+                <span class="material-icons-round">chat_bubble_outline</span>
                 <span>Chats</span>
             </a>
             <a href="explore.html" class="nav-item" aria-label="Explore">
-                ${svgs.explore}
+                <span class="material-icons-round">explore</span>
                 <span>Explore</span>
             </a>
             <a href="visionLobby.html" class="nav-item" aria-label="Vision">
                 <div class="vision-icon-container">
-                    ${svgs.vision}
+                    <span class="material-icons-round vision-graphic">live_tv</span>
                 </div>
                 <span>Vision</span>
             </a>
             <a href="calls.html" class="nav-item" aria-label="Calls">
-                ${svgs.calls}
+                <span class="material-icons-round">call</span>
                 <span>Calls</span>
             </a>
         </nav>
         `;
     }
 
+    /**
+     * Examines the current window URL and applies the 'active' class
+     */
     _highlightActive() {
         const path = window.location.pathname;
         const page = path.split("/").pop() || "home.html";
@@ -276,18 +273,27 @@ class MainNavbar extends HTMLElement {
             const href = link.getAttribute('href');
             if (page === href) {
                 link.classList.add('active');
+                // Fill in the chat bubble icon if it's the active page
+                const icon = link.querySelector('.material-icons-round');
+                if (icon && icon.innerText === 'chat_bubble_outline') {
+                    icon.innerText = 'chat_bubble';
+                }
             } else {
                 link.classList.remove('active');
             }
         });
     }
 
+    /**
+     * Logic to observe and hide the navbar when #call-screen is visible.
+     */
     _setupVisibilityToggle() {
         const navContainer = this.querySelector('#main-nav-container');
         
         const checkVisibility = () => {
             const callScreen = document.getElementById('call-screen');
             
+            // Added falsy check here to prevent errors if element doesn't exist
             if (!callScreen) {
                 navContainer.classList.remove('nav-hidden');
                 return;
