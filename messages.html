@@ -25,14 +25,15 @@
         * { box-sizing: border-box !important; }
 
         :root {
-            --bg: #000000;
+            --bg: #000;
             --accent: #00d2ff;
             --border: rgba(255, 255, 255, 0.1);
-            --text-dim: #888888;
+            --text-dim: #888;
             --danger: #ff4444;
             --glass: rgba(255, 255, 255, 0.03);
             --sheet-bg: #121212;
             --online: #00ff41;
+            --text-main: #ffffff;
             --safe-top: env(safe-area-inset-top);
         }
 
@@ -46,12 +47,12 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* --- UPDATED HEADER (Matched to Explore Page) --- */
+        /* HEADER UPDATED TO MATCH EXPLORE PAGE */
         header {
             position: sticky; top: 0; background: rgba(0,0,0,0.85);
             padding: calc(15px + var(--safe-top)) 20px 15px; 
-            display: flex; align-items: center; gap: 12px;
-            border-bottom: 1px solid var(--border); z-index: 1000;
+            display: flex; justify-content: space-between;
+            align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
             backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
             width: 100%;
         }
@@ -63,6 +64,12 @@
             object-fit: cover; 
             border: 1px solid rgba(255, 255, 255, 0.08);
             display: block;
+            cursor: pointer;
+        }
+        
+        .header-icon.skeleton {
+            background: #222;
+            animation: quantumPulse 1.5s infinite ease-in-out;
         }
 
         .header-title { 
@@ -74,8 +81,7 @@
             cursor: pointer;
         }
 
-        /* Legacy class retained for absolute safety */
-        .header-logo { display: none; }
+        .header-logo { display: none; } /* Retained for safety/legacy reference */
         
         /* SEARCH */
         .search-wrap { padding: 12px 20px; padding-bottom: 0; width: 100%; }
@@ -179,11 +185,11 @@
 
         /* SKELETON */
         .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; width: 100%; }
-        .skeleton-circle { width: 55px; height: 55px; border-radius: 20px; background: #222; margin-right: 15px; flex-shrink: 0; }
+        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; flex-shrink: 0; }
         .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
         @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
 
-        /* DELETE CONTEXT MENU */
+        /* MODAL */
         #delete-menu {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: var(--sheet-bg); border-top: 1px solid var(--border);
@@ -193,7 +199,8 @@
             box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
         }
         #delete-menu.active { bottom: 0; }
-        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+        /* FIXED UNCLICKABLE SCREEN BUG: added visibility toggle */
+        .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; visibility: hidden; backdrop-filter: blur(8px); }
 
         @media (min-width: 768px) {
             #delete-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; }
@@ -237,13 +244,13 @@
         .intro-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); 
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            z-index: 2000; display: none; opacity: 0; transition: opacity 0.3s ease;
+            z-index: 200000; display: none; opacity: 0; visibility: hidden; transition: opacity 0.3s ease;
         }
 
         .intro-modal {
             position: fixed; bottom: -100%; left: 0; width: 100%;
             background: var(--sheet-bg); border-radius: 32px 32px 0 0; 
-            z-index: 2001; padding: 24px 24px calc(40px + env(safe-area-inset-bottom));
+            z-index: 200001; padding: 24px 24px calc(40px + env(safe-area-inset-bottom));
             transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             border-top: 1px solid var(--border); box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.8);
         }
@@ -264,9 +271,25 @@
 <body oncontextmenu="return false;">
 
 <header>
-    <img src="images/icon.png" class="header-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/32/000000/fff?text=G'">
-    <div class="header-title" ondblclick="clearAllUnreadBages()" title="Double tap to clear all unread badges">Messages</div>
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+        <img id="header-pfp" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-icon skeleton" onclick="window.location.href='profile.html'" alt="Profile">
+        <div class="header-title" ondblclick="clearAllUnreadBages()" title="Double tap to clear all unread badges">Messages</div>
+    </div>
 </header>
+
+<script>
+    // 0ms cache injection for header PFP
+    document.addEventListener("DOMContentLoaded", () => {
+        const cachedPfp = localStorage.getItem('my_pfp_cache');
+        if(cachedPfp) {
+            const pfp = document.getElementById('header-pfp');
+            if(pfp) {
+                pfp.src = cachedPfp;
+                pfp.classList.remove('skeleton');
+            }
+        }
+    });
+</script>
 
 <div id="offline-toast">Waiting for network...</div>
 
@@ -325,7 +348,7 @@
     <button class="intro-btn" onclick="closeIntroModal(true)">Got it, enter Inbox</button>
 </div>
 
-<div id="ai-fab" onclick="window.location.href='ai.html'" style="display: none; position: fixed; bottom: 85px; right: 20px; width: 40px; height: 40px; border-radius: 50%; z-index: 999; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.15); background: #111; overflow: hidden; transition: transform 0.2s; touch-action: manipulation;">
+<div id="ai-fab" onclick="window.location.href='ai.html'" style="display: none; position: fixed; bottom: 90px; right: 20px; width: 50px; height: 50px; border-radius: 50%; z-index: 99999; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); border: 2px solid rgba(255,255,255,0.15); background: #111; overflow: hidden; transition: transform 0.2s; touch-action: manipulation; pointer-events: auto;">
     <img id="ai-fab-img" src="" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     <div style="position: absolute; bottom: 0px; right: 0px; width: 10px; height: 10px; background: #00ff41; border-radius: 50%; border: 2px solid #111; z-index: 2;"></div>
 </div>
@@ -360,6 +383,8 @@
                 const modal = document.getElementById('intro-modal');
                 
                 overlay.style.display = 'block';
+                overlay.style.visibility = 'visible'; // Explicit visibility fix
+                
                 const nav = document.querySelector('main-navbar');
                 if(nav) nav.classList.add('hide-nav'); 
                 
@@ -382,6 +407,7 @@
         
         setTimeout(() => {
             overlay.style.display = 'none';
+            overlay.style.visibility = 'hidden';
             const nav = document.querySelector('main-navbar');
             if(nav) nav.classList.remove('hide-nav');
         }, 350);
@@ -484,11 +510,23 @@
             fetchUserData();
             db.collection("users").doc(myUid).onSnapshot(doc => {
                 const data = doc.data();
-                myFollowingList = data?.following || [];
-                myFollowersList = data?.followers || [];
-                myPinnedChats = data?.pinnedChats || [];
-                myBlockedList = (data?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
-                myShowActivityStatus = data?.showActivityStatus !== false;
+                if(data) {
+                    myFollowingList = data.following || [];
+                    myFollowersList = data.followers || [];
+                    myPinnedChats = data.pinnedChats || [];
+                    myBlockedList = (data.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+                    myShowActivityStatus = data.showActivityStatus !== false;
+                    
+                    // Update Header PFP logic
+                    if(data.photoURL) {
+                        const pfp = document.getElementById('header-pfp');
+                        if(pfp) {
+                            pfp.src = data.photoURL;
+                            pfp.classList.remove('skeleton');
+                        }
+                        localStorage.setItem('my_pfp_cache', data.photoURL);
+                    }
+                }
                 listenToInbox();
             });
         } else { window.location.href = 'login.html'; }
@@ -519,8 +557,10 @@
     async function fetchUserData() {
         const userDoc = await db.collection("users").doc(myUid).get();
         const data = userDoc.data();
-        myFollowingList = data?.following || [];
-        myFollowersList = data?.followers || [];
+        if(data) {
+            myFollowingList = data.following || [];
+            myFollowersList = data.followers || [];
+        }
     }
 
     async function syncUserProfile(uid) {
@@ -746,21 +786,28 @@
         const pinBtn = document.getElementById('pin-chat-btn');
         pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
         pinBtn.onclick = () => togglePin(chatId, isPinned);
-        document.getElementById('delete-menu').classList.add('active');
-        document.getElementById('overlay').style.display = 'block';
+        
+        const overlay = document.getElementById('overlay');
+        const menu = document.getElementById('delete-menu');
+        
+        overlay.style.display = 'block';
+        overlay.style.visibility = 'visible'; // Overcome Safari invisible click blocking
+        menu.classList.add('active');
+        
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
     }
 
-    // Single unified history popstate event listener
-    window.onpopstate = (e) => { 
+    // Unified history popstate event listener for both modals
+    window.addEventListener('popstate', (e) => { 
         if(document.getElementById('delete-menu').classList.contains('active')) {
             closeDeleteMenu(false); 
         }
-        if(document.getElementById('intro-overlay') && document.getElementById('intro-overlay').style.display === 'block') {
+        const introOverlay = document.getElementById('intro-overlay');
+        if(introOverlay && introOverlay.style.display === 'block') {
             closeIntroModal(false);
         }
-    };
+    });
 
     async function togglePin(chatId, isPinned) {
         closeDeleteMenu(true);
@@ -771,8 +818,12 @@
 
     window.closeDeleteMenu = function(shouldGoBack) {
         activeChatId = null;
+        const overlay = document.getElementById('overlay');
+        
         document.getElementById('delete-menu').classList.remove('active');
-        document.getElementById('overlay').style.display = 'none';
+        overlay.style.display = 'none';
+        overlay.style.visibility = 'hidden';
+        
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.remove('hide-nav');
         if(shouldGoBack && window.location.hash === "#menu") history.back();
