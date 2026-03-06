@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Search</title>
+    <title>Explore People | Goorac</title>
     
     <script src="config.js"></script>
     <link rel="manifest" href="/manifest.json">
@@ -20,352 +20,414 @@
 
     <style>
         :root {
-            --bg: #000;
+            --bg: #000000;
+            --surface: #121212;
             --card: #0a0a0a;
             --accent: #00d2ff;
-            --border: rgba(255, 255, 255, 0.08);
-            --glass: rgba(255, 255, 255, 0.03);
-            --text-dim: #888;
+            --border: #262626;
+            --text-main: #ffffff;
+            --text-dim: #8e8e8e;
+            --safe-top: env(safe-area-inset-top);
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background-color: var(--bg);
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding-bottom: 120px;
-            /* Global Lock: Prevents accidental selection of UI text, buttons, and headers */
-            -webkit-user-select: none;
-            user-select: none;
-            touch-action: manipulation;
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            padding-bottom: 100px;
             overflow-x: hidden;
+            user-select: none; -webkit-user-select: none;
         }
 
-        /* --- Professional Header --- */
+        /* --- HEADER --- */
         header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            padding: calc(12px + var(--safe-top)) 16px 12px;
+            display: flex; align-items: center; gap: 12px;
             border-bottom: 1px solid var(--border);
-            z-index: 1000;
         }
+        .header-icon { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
+        .header-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.3px; }
 
-        .header-title { 
-            font-weight: 800; 
-            font-size: 1.1rem; 
-            letter-spacing: -0.5px; 
-            background: linear-gradient(to right, #fff, #aaa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* --- Search Area --- */
-        .search-container { 
-            padding: 30px 20px; 
-            max-width: 500px;
-            margin: 0 auto;
-        }
-
-        .search-instructions {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            margin-bottom: 15px;
-            display: block;
-            text-align: left;
-            padding-left: 5px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
+        /* --- SEARCH BAR --- */
+        .search-container { padding: 16px; position: sticky; top: calc(52px + var(--safe-top)); background: var(--bg); z-index: 40; }
         .search-wrapper {
-            position: relative;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 8px;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            align-items: center;
+            background: #262626; border-radius: 12px;
+            display: flex; align-items: center; padding: 0 12px;
+            height: 40px; transition: 0.2s;
         }
-
-        .search-wrapper:focus-within {
-            border-color: var(--accent);
-            box-shadow: 0 0 25px rgba(0, 210, 255, 0.15);
-            background: #0f0f0f;
-        }
-
+        .search-wrapper:focus-within { background: #333; border: 1px solid #444; }
+        .search-icon { color: var(--text-dim); font-size: 1.1rem; margin-right: 8px; }
+        
         .search-input {
-            width: 100%;
-            background: transparent;
-            border: none;
-            padding: 15px 12px;
-            color: white;
-            font-size: 1.15rem;
-            font-weight: 600;
-            outline: none;
-            box-sizing: border-box;
-            /* ONLY the input allows copy, paste, and selection */
-            -webkit-user-select: text !important;
-            user-select: text !important;
-            letter-spacing: 1px;
+            flex: 1; background: transparent; border: none; color: white;
+            font-size: 0.95rem; outline: none; height: 100%;
+            -webkit-user-select: text !important; user-select: text !important;
+        }
+        .search-input::placeholder { color: var(--text-dim); }
+
+        .kbd-toggle {
+            background: transparent; border: none; color: var(--text-dim);
+            font-size: 1.2rem; cursor: pointer; padding: 4px;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        /* Placeholder style */
-        .search-input::placeholder {
-            color: #444;
-            font-weight: 400;
-            letter-spacing: 0px;
-        }
-
-        /* Hide number spinners */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-        .search-btn {
-            width: 100%;
-            background: #fff;
-            color: #000;
-            border: none;
-            padding: 18px;
-            border-radius: 20px;
-            font-weight: 800;
-            margin-top: 18px;
-            cursor: pointer;
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            font-size: 1rem;
-            letter-spacing: -0.2px;
-        }
-        .search-btn:active { transform: scale(0.96); opacity: 0.9; }
-        .search-btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: scale(1); }
-
-        /* --- Result Area --- */
-        #result-area { 
-            margin: 0 auto; 
-            padding: 0 20px 40px;
-            max-width: 500px;
-            display: none; 
-        }
+        /* --- RESULTS GRID --- */
+        #result-area { padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
 
         .user-card {
-            background: linear-gradient(145deg, #0f0f0f 0%, #050505 100%);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            padding: 40px 25px;
-            text-align: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
         }
+        .uc-top { display: flex; align-items: center; gap: 12px; }
+        .uc-pfp { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; background: #333; border: 1px solid #444; }
+        .uc-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .uc-name-row { display: flex; align-items: center; gap: 4px; font-weight: 700; font-size: 1rem; color: #fff; }
+        .v-badge { width: 14px; height: 14px; }
+        .uc-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
+        .uc-stats { font-size: 0.75rem; color: var(--accent); font-weight: 600; margin-top: 4px; }
 
-        @keyframes slideUp { 
-            from { opacity: 0; transform: translateY(30px) scale(0.9); } 
-            to { opacity: 1; transform: translateY(0) scale(1); } 
+        .uc-actions { display: flex; gap: 8px; }
+        .btn {
+            flex: 1; height: 36px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;
         }
+        .btn-view { background: #262626; color: white; }
+        .btn-msg { background: var(--accent); color: black; }
+        
+        .no-results { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 0.9rem; }
 
-        .res-pfp { 
-            width: 110px; 
-            height: 110px; 
-            border-radius: 38px; 
-            object-fit: cover; 
-            margin-bottom: 20px; 
-            border: 3px solid #000;
-            outline: 1px solid var(--border);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        /* --- SKELETON LOADING --- */
+        .skeleton { background: #222 !important; position: relative; overflow: hidden; border-color: transparent !important; color: transparent !important; }
+        .skeleton * { visibility: hidden; }
+        .skeleton::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+            animation: shimmer 1.2s infinite;
         }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        .res-name-row { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 8px; 
-            font-size: 1.5rem; 
-            font-weight: 800; 
-            letter-spacing: -0.5px;
+        /* --- TOAST --- */
+        #toast {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background: #ff4444; color: white; padding: 12px 24px; border-radius: 30px;
+            font-weight: 600; font-size: 0.85rem; z-index: 9999; transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(255,0,0,0.3);
         }
+        #toast.show { top: calc(20px + var(--safe-top)); }
 
-        .v-tick { width: 22px; height: 22px; }
-
-        .res-id-tag { 
-            color: var(--accent); 
-            font-size: 0.85rem; 
-            font-weight: 700; 
-            margin-top: 8px; 
-            display: inline-block;
-            background: rgba(0, 210, 255, 0.1);
-            padding: 6px 16px;
-            border-radius: 100px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(0, 210, 255, 0.2);
+        /* --- ONE-TIME MODAL --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 2000; display: none; opacity: 0; transition: opacity 0.3s;
         }
-
-        .action-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
+        .bottom-modal {
+            position: fixed; bottom: -100%; left: 0; width: 100%;
+            background: var(--surface); border-radius: 24px 24px 0 0; z-index: 2001;
+            padding: 24px 24px calc(40px + env(safe-area-inset-bottom));
+            transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-top: 1px solid var(--border);
         }
-
-        .action-btn {
-            padding: 18px;
-            border-radius: 20px;
-            border: none;
-            font-weight: 800;
-            cursor: pointer;
-            transition: 0.2s;
-            font-size: 0.9rem;
+        .modal-handle { width: 40px; height: 4px; background: #444; border-radius: 10px; margin: 0 auto 20px; }
+        .modal-title { font-size: 1.2rem; font-weight: 800; margin-bottom: 10px; color: #fff; }
+        .modal-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 20px; }
+        .feature-list { list-style: none; margin-bottom: 25px; }
+        .feature-list li { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; margin-bottom: 12px; color: #ccc; }
+        .feature-list li span { font-size: 1.2rem; }
+        .modal-btn {
+            width: 100%; background: var(--accent); color: #000; border: none; padding: 16px;
+            border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer;
         }
-
-        .btn-view { 
-            background: rgba(255,255,255,0.05); 
-            color: white; 
-            border: 1px solid var(--border); 
-        }
-
-        .btn-msg { 
-            background: var(--accent); 
-            color: black; 
-            box-shadow: 0 8px 20px rgba(0, 210, 255, 0.25);
-        }
-
-        .action-btn:active { transform: scale(0.94); }
-
-        /* Highlight Color for Input Text */
-        .search-input::selection {
-            background: var(--accent);
-            color: black;
-        }
+        
+        #load-more { text-align: center; padding: 20px; color: var(--text-dim); display: none; font-size: 0.85rem; }
     </style>
 </head>
-<body oncontextmenu="return false;"> <header>
-    <div class="header-title">Find Contacts</div>
-    <div style="font-size: 1.2rem; filter: drop-shadow(0 0 5px var(--accent));">🔍</div>
+<body oncontextmenu="return false;">
+
+<header>
+    <img src="images/icon.png" class="header-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/28/00d2ff/000?text=G'">
+    <div class="header-title">Explore People</div>
 </header>
 
 <div class="search-container">
-    <span class="search-instructions">Secure Network Search</span>
     <div class="search-wrapper">
-        <input type="number" 
+        <span class="search-icon">🔍</span>
+        <input type="text" 
                id="search-input" 
                class="search-input" 
-               placeholder="Enter 10-digit Goorac ID" 
-               inputmode="numeric"
-               pattern="[0-9]*"
-               oncontextmenu="event.stopPropagation(); return true;"
-               oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);">
+               placeholder="Search Name or Username" 
+               autocomplete="off" 
+               autocorrect="off" 
+               spellcheck="false" 
+               data-lpignore="true">
+        <button class="kbd-toggle" id="kbd-toggle" title="Switch to Goorac ID Search">🔢</button>
     </div>
-    <button class="search-btn" id="search-btn">Search Network</button>
 </div>
 
 <div id="result-area">
-    <div class="user-card">
-        <img id="res-pfp" src="" class="res-pfp">
-        <div class="res-name-row">
-            <span id="res-name">User Name</span>
-            <img id="res-v" src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="v-tick" style="display:none;">
-        </div>
-        <span class="res-id-tag">ID: <span id="res-num">----------</span></span>
-        
-        <div class="action-group">
-            <button id="view-profile-btn" class="action-btn btn-view">View Profile</button>
-            <button id="message-btn" class="action-btn btn-msg">Message</button>
-        </div>
     </div>
+<div id="load-more">Fetching more...</div>
+
+<div id="toast">Error Message</div>
+
+<div class="modal-overlay" id="intro-overlay"></div>
+<div class="bottom-modal" id="intro-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Welcome to Explore</div>
+    <div class="modal-desc">Discover and connect with people securely across the Goorac network.</div>
+    <ul class="feature-list">
+        <li><span>🔍</span> Find users by Name or Username.</li>
+        <li><span>🔢</span> Tap the numbers icon to search via exact Goorac ID.</li>
+        <li><span>🛡️</span> Privacy first: Users who hide their profile from search can only be found via their exact Goorac ID.</li>
+        <li><span>✨</span> Machine learning prioritizes verified and relevant accounts.</li>
+    </ul>
+    <button class="modal-btn" onclick="closeIntroModal()">Got it, let's explore</button>
 </div>
 
 <script src="components/navbar.js" defer></script>
-<main-navbar></main-navbar>
+<main-navbar id="main-nav"></main-navbar>
+<script src="components/call-notifier.js" defer></script>
+<call-notifier></call-notifier>
 
 <script>
     // --- FIREBASE INIT ---
-    // 1. Try to use the shared init function first (from config.js)
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
-    } 
-    // 2. Strict Check: If config.js didn't load, look for window.firebaseConfig
-    else if (!firebase.apps.length && window.firebaseConfig) {
+    } else if (!firebase.apps.length && window.firebaseConfig) {
         firebase.initializeApp(window.firebaseConfig);
     }
     
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    let currentUserUID = "";
-    let targetUsername = "";
+    // UI Elements
+    const searchInput = document.getElementById('search-input');
+    const kbdToggle = document.getElementById('kbd-toggle');
+    const resultArea = document.getElementById('result-area');
+    const loadMoreIndicator = document.getElementById('load-more');
+    const toast = document.getElementById('toast');
+    const mainNav = document.getElementById('main-nav');
 
-    auth.onAuthStateChanged(user => {
-        if(user) currentUserUID = user.uid;
-        else window.location.href = "login.html";
+    let isNumericMode = false;
+    let searchTimeout = null;
+    let currentLimit = 10;
+    let lastQuery = "";
+
+    // --- ONE TIME MODAL LOGIC ---
+    window.addEventListener('DOMContentLoaded', () => {
+        if (!localStorage.getItem('goorac_explore_intro')) {
+            setTimeout(() => {
+                document.getElementById('intro-overlay').style.display = 'block';
+                if(mainNav) mainNav.style.display = 'none';
+                setTimeout(() => {
+                    document.getElementById('intro-overlay').style.opacity = '1';
+                    document.getElementById('intro-modal').style.bottom = '0';
+                }, 10);
+            }, 500);
+        }
     });
 
-    document.getElementById('search-btn').onclick = async () => {
-        const btn = document.getElementById('search-btn');
-        const inputField = document.getElementById('search-input');
-        const idToSearch = inputField.value;
-        
-        if(idToSearch.length < 10) {
-            alert("Please enter a valid 10-digit ID");
+    function closeIntroModal() {
+        localStorage.setItem('goorac_explore_intro', 'true');
+        document.getElementById('intro-modal').style.bottom = '-100%';
+        document.getElementById('intro-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('intro-overlay').style.display = 'none';
+            if(mainNav) mainNav.style.display = 'block';
+        }, 300);
+    }
+
+    function showToast(msg) {
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // --- KEYBOARD / MODE SWITCHER ---
+    kbdToggle.onclick = () => {
+        isNumericMode = !isNumericMode;
+        if (isNumericMode) {
+            searchInput.type = 'tel'; // Best for numbers without UI arrows, prevents password popups
+            searchInput.placeholder = 'Enter 10-digit Goorac ID';
+            kbdToggle.innerText = '🔤';
+        } else {
+            searchInput.type = 'text';
+            searchInput.placeholder = 'Search Name or Username';
+            kbdToggle.innerText = '🔢';
+        }
+        searchInput.value = '';
+        resultArea.innerHTML = '';
+        searchInput.focus();
+    };
+
+    // --- SEARCH LOGIC ---
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim().toLowerCase();
+        lastQuery = query;
+        currentLimit = 10; // reset pagination
+
+        if (isNumericMode) {
+            // Force numbers only
+            e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+            if (e.target.value.length === 10) {
+                renderSkeletons();
+                searchTimeout = setTimeout(() => executeSearch(e.target.value), 300);
+            } else {
+                resultArea.innerHTML = '';
+            }
+        } else {
+            if (query.length >= 2) {
+                renderSkeletons();
+                searchTimeout = setTimeout(() => executeSearch(query), 500); // 500ms debounce
+            } else {
+                resultArea.innerHTML = '';
+            }
+        }
+    });
+
+    async function executeSearch(query) {
+        try {
+            let resultsMap = new Map(); // Use Map to deduplicate by UID
+
+            if (isNumericMode) {
+                // Exact Goorac ID Match (Bypasses Discoverability Toggle)
+                const snapshot = await db.collection('users').where('gooracNumber', '==', parseInt(query)).get();
+                snapshot.forEach(doc => resultsMap.set(doc.id, doc.data()));
+            } else {
+                // Prefix search for username and name. 
+                // Using \uf8ff is the standard Firebase way to do "startsWith" string queries.
+                const userRef = db.collection('users');
+                
+                // Query 1: Username
+                const userSnap = await userRef
+                    .where('username', '>=', query)
+                    .where('username', '<=', query + '\uf8ff')
+                    .limit(currentLimit)
+                    .get();
+                
+                // Query 2: Name (Requires lowercase indexing or exact match, assuming basic matching for now)
+                // Note: Firestore is case sensitive. We assume name searches might need exact or proper case matching,
+                // but we will do our best with standard queries.
+                const nameSnap = await userRef
+                    .where('name', '>=', query)
+                    .where('name', '<=', query + '\uf8ff')
+                    .limit(currentLimit)
+                    .get();
+
+                userSnap.forEach(doc => {
+                    const data = doc.data();
+                    // Apply discoverability filter ONLY for name/username search
+                    if (data.searchResult !== false) resultsMap.set(doc.id, data);
+                });
+                
+                nameSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.searchResult !== false) resultsMap.set(doc.id, data);
+                });
+            }
+
+            let finalResults = Array.from(resultsMap.values());
+
+            // Machine Learning / Sorting Simulation (Verified first, then by followers)
+            finalResults.sort((a, b) => {
+                const aV = a.verified ? 1 : 0;
+                const bV = b.verified ? 1 : 0;
+                if (aV !== bV) return bV - aV;
+                
+                const aF = a.followers ? a.followers.length : 0;
+                const bF = b.followers ? b.followers.length : 0;
+                return bF - aF;
+            });
+
+            renderResults(finalResults);
+
+        } catch (error) {
+            console.error("Search Error:", error);
+            showToast("Network error. Please try again.");
+            resultArea.innerHTML = '<div class="no-results">An error occurred while fetching data.</div>';
+        }
+    }
+
+    // --- INFINITE SCROLL (Intersection Observer) ---
+    const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && lastQuery.length >= 2 && !isNumericMode) {
+            currentLimit += 10;
+            loadMoreIndicator.style.display = 'block';
+            executeSearch(lastQuery).then(() => {
+                loadMoreIndicator.style.display = 'none';
+            });
+        }
+    }, { threshold: 1.0 });
+
+    // --- UI RENDERING ---
+    function renderSkeletons() {
+        let html = '';
+        for(let i=0; i<3; i++) {
+            html += `
+            <div class="user-card skeleton">
+                <div class="uc-top">
+                    <div class="uc-pfp"></div>
+                    <div class="uc-info">
+                        <div style="height: 16px; width: 60%; background: #444; border-radius: 4px; margin-bottom: 6px;"></div>
+                        <div style="height: 12px; width: 40%; background: #444; border-radius: 4px;"></div>
+                    </div>
+                </div>
+                <div class="uc-actions">
+                    <div class="btn" style="background: #444;"></div>
+                    <div class="btn" style="background: #444;"></div>
+                </div>
+            </div>`;
+        }
+        resultArea.innerHTML = html;
+        observer.disconnect(); // pause observer while loading
+    }
+
+    function renderResults(users) {
+        if (users.length === 0) {
+            resultArea.innerHTML = `<div class="no-results">No users found. Try refining your search.</div>`;
             return;
         }
 
-        btn.innerText = "Accessing Network...";
-        btn.disabled = true;
+        let html = '';
+        users.forEach(user => {
+            const pfp = user.photoURL || 'https://via.placeholder.com/150/111/fff?text=U';
+            const name = user.name || user.username;
+            const uname = user.username ? `@${user.username}` : '';
+            const isVer = user.verified ? `<img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="v-badge">` : '';
+            const followersCount = user.followers ? user.followers.length : 0;
+            const pointsText = user.verified ? `${followersCount} Network Points` : `${followersCount} Followers`;
 
-        try {
-            const snapshot = await db.collection("users").where("gooracNumber", "==", parseInt(idToSearch)).get();
+            html += `
+            <div class="user-card">
+                <div class="uc-top">
+                    <img src="${pfp}" class="uc-pfp" loading="lazy">
+                    <div class="uc-info">
+                        <div class="uc-name-row">${name} ${isVer}</div>
+                        <div class="uc-username">${uname}</div>
+                        <div class="uc-stats">${pointsText}</div>
+                    </div>
+                </div>
+                <div class="uc-actions">
+                    <button class="btn btn-view" onclick="window.location.href='userProfile.html?user=${user.username}'">View Profile</button>
+                    <button class="btn btn-msg" onclick="window.location.href='chat.html?user=${user.username}'">Message</button>
+                </div>
+            </div>`;
+        });
 
-            if (snapshot.empty) {
-                alert("No user found on the Goorac network.");
-                document.getElementById('result-area').style.display = "none";
-            } else {
-                const userData = snapshot.docs[0].data();
-                targetUsername = userData.username;
+        resultArea.innerHTML = html;
 
-                document.getElementById('res-pfp').src = userData.photoURL || 'https://via.placeholder.com/150';
-                document.getElementById('res-name').innerText = userData.name || userData.username;
-                document.getElementById('res-num').innerText = userData.gooracNumber;
-                document.getElementById('res-v').style.display = userData.verified ? 'inline' : 'none';
-                
-                document.getElementById('result-area').style.display = "block";
-                
-                if (window.navigator.vibrate) window.navigator.vibrate(50);
-
-                setTimeout(() => {
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                }, 100);
-            }
-        } catch (error) {
-            console.error("Search error:", error);
-            alert("An error occurred during the search.");
-        } finally {
-            btn.innerText = "Search Network";
-            btn.disabled = false;
+        // Re-attach observer to the last element if not numeric mode
+        if (!isNumericMode && users.length === currentLimit) {
+            const lastCard = resultArea.lastElementChild;
+            if (lastCard) observer.observe(lastCard);
         }
-    };
-
-    document.getElementById('view-profile-btn').onclick = () => {
-        if(targetUsername) window.location.href = `userProfile.html?user=${targetUsername}`;
-    };
-
-    document.getElementById('message-btn').onclick = () => {
-        if(targetUsername) window.location.href = `chat.html?user=${targetUsername}`;
-    };
-
-    document.getElementById('search-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('search-btn').click();
-            document.getElementById('search-input').blur();
-        }
-    });
+    }
 </script>
 
-<script src="components/call-notifier.js" defer></script>
-<call-notifier></call-notifier>
 </body>
 </html>
-
-
