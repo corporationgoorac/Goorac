@@ -1395,12 +1395,21 @@ const NotesManager = {
         
         if (!btn || !preview) return; 
 
+        // 🚀 GHOST HTML SWEEPER FOR OWN NOTE
+        try {
+            const rawCacheStr = localStorage.getItem('my_note_cache_' + user.uid);
+            if (!rawCacheStr) {
+                preview.classList.remove('visible');
+                btn.classList.remove('has-note');
+            }
+        } catch(e) {}
+
         try {
             const cached = localStorage.getItem('my_note_cache_' + user.uid);
             if (cached) {
                 const data = JSON.parse(cached);
                 
-                // Calculate proper expiry using createdAt as a fallback
+                // FIX: Calculate proper expiry using createdAt as a fallback
                 const createdAtDate = data.createdAt ? new Date(data.createdAt) : new Date();
                 const expiryTime = data.expiresAt ? new Date(data.expiresAt) : new Date(createdAtDate.getTime() + 24 * 60 * 60 * 1000);
 
@@ -1424,6 +1433,8 @@ const NotesManager = {
                     };
                 } else {
                     localStorage.removeItem('my_note_cache_' + user.uid);
+                    preview.classList.remove('visible'); // ADDED HTML REMOVAL
+                    btn.classList.remove('has-note');    // ADDED HTML REMOVAL
                 }
             }
         } catch(e) {}
@@ -1441,13 +1452,13 @@ const NotesManager = {
                     data = doc.data();
                     noteId = doc.id;
                     
-                    // Reliable expiry check inside the snapshot
+                    // FIX: Reliable expiry check inside the snapshot
                     const createdAtDate = data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)) : new Date();
                     const expiryTime = data.expiresAt ? data.expiresAt.toDate() : new Date(createdAtDate.getTime() + 24 * 60 * 60 * 1000);
 
                     if (expiryTime < new Date()) {
                         db.collection("notes").doc(noteId).update({ isActive: false });
-                        data = null; // Mark as null so it falls into the cleanup block below
+                        data = null;
                     }
                 }
 
@@ -1478,7 +1489,6 @@ const NotesManager = {
                         const viewer = document.querySelector('view-notes');
                         if(data && viewer) viewer.open({ ...data, id: noteId }, true);
                     };
-
                 } else {
                     // 🚀 THE GHOST FIX FOR YOUR OWN NOTE:
                     // If snapshot is empty, the note was archived or deleted. Wipe the cache AND the screen.
@@ -1499,6 +1509,18 @@ const NotesManager = {
         const container = document.getElementById('notes-container');
         if(!container) return;
 
+        // 🚀 GHOST HTML SWEEPER (Added to strictly remove deleted notes injected by 0ms cache)
+        try {
+            const rawCacheStr = localStorage.getItem('mutual_notes_cache_' + user.uid);
+            const parsedCache = rawCacheStr ? JSON.parse(rawCacheStr) : {};
+            container.querySelectorAll('.friend-note').forEach(el => {
+                const fUid = el.id.replace('note-', '');
+                if (!parsedCache[fUid]) {
+                    el.remove();
+                }
+            });
+        } catch(e) {}
+
         let cachedMutualNotes = {};
         try {
             const cached = localStorage.getItem('mutual_notes_cache_' + user.uid);
@@ -1506,7 +1528,7 @@ const NotesManager = {
                 cachedMutualNotes = JSON.parse(cached);
                 for (const [userUid, noteData] of Object.entries(cachedMutualNotes)) {
                     
-                    // Fallback expiry calculation for cached mutual notes
+                    // FIX: Fallback expiry calculation for cached mutual notes
                     const createdAtDate = noteData.createdAt ? new Date(noteData.createdAt) : new Date();
                     const expiryTime = noteData.expiresAt ? new Date(noteData.expiresAt) : new Date(createdAtDate.getTime() + 24 * 60 * 60 * 1000);
 
@@ -1550,6 +1572,8 @@ const NotesManager = {
                         container.appendChild(div);
                     } else {
                         delete cachedMutualNotes[userUid];
+                        const existingEl = document.getElementById(`note-${userUid}`); // ADDED HTML REMOVAL
+                        if(existingEl) existingEl.remove(); // ADDED HTML REMOVAL
                     }
                 }
                 localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
@@ -1610,7 +1634,7 @@ const NotesManager = {
                             const existingEl = document.getElementById(`note-${userUid}`);
                             if(existingEl) existingEl.remove();
 
-                            // Reliable expiry check for incoming snapshots
+                            // FIX: Reliable expiry check for incoming snapshots
                             const createdAtDate = noteData.createdAt ? (noteData.createdAt.toDate ? noteData.createdAt.toDate() : new Date(noteData.createdAt)) : new Date();
                             const expiryTime = noteData.expiresAt ? noteData.expiresAt.toDate() : new Date(createdAtDate.getTime() + 24 * 60 * 60 * 1000);
 
@@ -1692,6 +1716,8 @@ const NotesManager = {
                                         delete cachedMutualNotes[userUid];
                                         localStorage.setItem('mutual_notes_cache_' + user.uid, JSON.stringify(cachedMutualNotes));
                                     }
+                                    const deadNoteEl = document.getElementById(`note-${userUid}`); // ADDED HTML REMOVAL
+                                    if (deadNoteEl) deadNoteEl.remove(); // ADDED HTML REMOVAL
                                 } catch(e){}
                             }
                         });
