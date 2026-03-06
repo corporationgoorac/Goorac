@@ -205,6 +205,18 @@
         .received .msg-media-wrapper.group-bottom .chat-media-img { border-top-left-radius: 4px; border-bottom-left-radius: 18px; }
         .bubble.has-media { border-top-left-radius: 4px; border-top-right-radius: 4px; margin-top: 2px; }
 
+        /* --- NEW ADDITIONS: GREEN DOT & MESSAGE MODAL --- */
+        .header-online-dot { position: absolute; bottom: 0px; right: -2px; width: 12px; height: 12px; background: #00ff41; border-radius: 50%; border: 2px solid #1a1a1a; box-shadow: 0 0 8px #00ff41; z-index: 2; }
+        
+        #msg-options-menu { position: fixed; bottom: -100%; left: 0; width: 100%; background: #121212; border-top: 1px solid var(--border); z-index: 100000; border-radius: 30px 30px 0 0; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); padding: 20px 20px calc(30px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,0.9); }
+        #msg-options-menu.active { bottom: 0; }
+        @media (min-width: 768px) { #msg-options-menu { width: 400px; left: 50%; transform: translateX(-50%); bottom: -100%; border-radius: 24px; border: 1px solid var(--border); padding-bottom: 20px; } #msg-options-menu.active { bottom: 50%; transform: translate(-50%, 50%); } }
+        .msg-menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: none; backdrop-filter: blur(8px); }
+        .msg-action-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .btn-msg-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .read-btn-big { background: rgba(255, 109, 0, 0.1); color: var(--accent); border: 1px solid rgba(255, 109, 0, 0.2); }
+        .copy-btn-big { background: #1a1a1a; color: #fff; border: 1px solid var(--border); }
+        .cancel-btn-msg { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; padding: 10px; }
     </style>
 </head>
 <body>
@@ -226,6 +238,7 @@
         <div class="h-profile-group">
             <div class="pfp-container">
                 <img id="h-pfp" src="images/ai.png" class="h-pfp">
+                <div class="header-online-dot"></div>
             </div>
             <div class="h-info">
                 <div class="h-name-wrapper">
@@ -287,6 +300,20 @@
              <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
         </div>
 
+    </div>
+</div>
+
+<div class="msg-menu-overlay" id="msg-overlay" onclick="closeMsgMenu(true)"></div>
+<div id="msg-options-menu">
+    <div style="width: 40px; height: 4px; background: #333; border-radius: 4px; margin: 0 auto 20px auto;"></div>
+    <div class="msg-action-list">
+        <button class="btn-msg-action read-btn-big" onclick="readAloudSelected()">
+            <span class="material-icons-round">volume_up</span> Read Aloud
+        </button>
+        <button class="btn-msg-action copy-btn-big" onclick="copySelectedText()">
+            <span class="material-icons-round">content_copy</span> Copy Text
+        </button>
+        <button class="btn-msg-action cancel-btn-msg" onclick="closeMsgMenu(true)">Cancel</button>
     </div>
 </div>
 
@@ -558,6 +585,80 @@
     const mainPicker = document.getElementById('main-picker');
     if(mainPicker) { mainPicker.addEventListener('emoji-click', event => { mInput.value += event.detail.emoji || event.detail.unicode; mInput.dispatchEvent(new Event('input')); }); }
 
+    // --- NEW ADDITION: LONG PRESS AND MODAL LOGIC ---
+    let msgPressTimer;
+    let selectedMsgText = "";
+
+    window.startMsgLongPress = function(e, textElementId) {
+        const el = document.getElementById(textElementId);
+        if(!el) return;
+        const text = el.innerText || el.textContent;
+        if(!text || text.trim() === "") return;
+        
+        selectedMsgText = text;
+        msgPressTimer = setTimeout(() => {
+            if(navigator.vibrate) navigator.vibrate(40);
+            openMsgMenu();
+        }, 500); // 500ms hold time
+    };
+    
+    window.cancelMsgLongPress = function() { clearTimeout(msgPressTimer); };
+    window.endMsgLongPress = function() { clearTimeout(msgPressTimer); };
+
+    window.openMsgMenu = function() {
+        history.pushState({ msgMenuOpen: true }, "", "#msgoptions");
+        document.getElementById('msg-options-menu').classList.add('active');
+        document.getElementById('msg-overlay').style.display = 'block';
+    };
+
+    window.closeMsgMenu = function(goBack) {
+        document.getElementById('msg-options-menu').classList.remove('active');
+        document.getElementById('msg-overlay').style.display = 'none';
+        if(goBack && window.location.hash === "#msgoptions") history.back();
+        window.speechSynthesis.cancel(); // Stop reading if closed
+    };
+
+    window.addEventListener('popstate', (e) => { 
+        if(document.getElementById('msg-options-menu').classList.contains('active')) {
+            closeMsgMenu(false); 
+        }
+    });
+
+    window.copySelectedText = async function() {
+        try {
+            await navigator.clipboard.writeText(selectedMsgText);
+            const btn = document.querySelector('.copy-btn-big');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<span class="material-icons-round">check</span> Copied!`;
+            setTimeout(() => { 
+                btn.innerHTML = originalHtml; 
+                closeMsgMenu(true); 
+            }, 1000);
+        } catch (err) { alert('Failed to copy text.'); }
+    };
+
+    window.readAloudSelected = function() {
+        if (!('speechSynthesis' in window)) return alert("Text-to-speech not supported on this device.");
+        window.speechSynthesis.cancel(); // Stop any current speech
+        
+        const utterance = new SpeechSynthesisUtterance(selectedMsgText);
+        
+        // Find best professional/premium voice
+        const voices = window.speechSynthesis.getVoices();
+        let bestVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Premium') || v.name.includes('Natural') || v.name.includes('Samantha'));
+        if(!bestVoice) bestVoice = voices.find(v => v.lang.startsWith('en-'));
+        if(bestVoice) utterance.voice = bestVoice;
+        
+        utterance.rate = 1.0; // Professional pacing
+        
+        window.speechSynthesis.speak(utterance);
+    };
+
+    // Pre-load voices for mobile devices
+    if('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
     // --- VIRTUAL DOM RENDER ---
     function renderAll() {
         let tempContainer = document.createElement('div');
@@ -607,6 +708,14 @@
         if(isFirstInGroup && isLastInGroup) rowClass += ' single';
         rowDiv.className = rowClass;
         
+        // NEW ADDITION: Long press listeners attached to the message row
+        rowDiv.setAttribute("ontouchstart", `startMsgLongPress(event, 'text-${id}')`);
+        rowDiv.setAttribute("ontouchend", "endMsgLongPress()");
+        rowDiv.setAttribute("ontouchmove", "cancelMsgLongPress()");
+        rowDiv.setAttribute("onmousedown", `startMsgLongPress(event, 'text-${id}')`);
+        rowDiv.setAttribute("onmouseup", "endMsgLongPress()");
+        rowDiv.setAttribute("onmouseleave", "cancelMsgLongPress()");
+
         let groupClass = (isFirstInGroup && isLastInGroup) ? 'single' : isFirstInGroup ? 'group-top' : isLastInGroup ? 'group-bottom' : 'group-mid';
         let mediaHtml = ''; let bubbleClass = `bubble ${groupClass}`; let bubbleStyle = '';
 
