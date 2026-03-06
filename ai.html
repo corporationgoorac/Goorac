@@ -223,8 +223,10 @@
             position: fixed;
             top: 15%; left: 5%; width: 90%; height: 35%;
             display: none; align-content: flex-start; justify-content: center; flex-wrap: wrap; gap: 8px;
-            z-index: 100001; pointer-events: none; overflow: hidden;
+            z-index: 100001; pointer-events: none; 
+            overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; /* Fixed smooth scrolling */
         }
+        #tts-overlay-text::-webkit-scrollbar { display: none; }
         #tts-overlay-text.active { display: flex; }
         .tts-word {
             font-size: 2rem; font-weight: 800; color: rgba(255, 255, 255, 0.2);
@@ -720,20 +722,62 @@
         
         utterance.rate = 0.95; // Optimal professional pace
         
-        // Synced highlight animation
+        // --- BULLETPROOF HIGHLIGHT SYNC (Handles missing boundaries on mobile networks) ---
+        let wordIndex = 0;
+        let hasBoundaryFired = false;
+        
         utterance.onboundary = (event) => {
             if (event.name === 'word') {
+                hasBoundaryFired = true;
                 const charIndex = event.charIndex;
                 wordData.forEach(w => w.element.classList.remove('spoken'));
-                const currentWord = wordData.find(w => charIndex >= w.start && charIndex <= w.end);
+                
+                let currentWord = wordData.find(w => charIndex >= w.start && charIndex <= w.end + 1);
+                
+                // Fallback for tricky spaces/punctuation mismatch
+                if (!currentWord && wordIndex < wordData.length) {
+                    currentWord = wordData.find(w => w.start >= charIndex) || wordData[wordIndex];
+                }
+                
                 if (currentWord) {
                     currentWord.element.classList.add('spoken');
                     currentWord.element.scrollIntoView({ behavior: "smooth", block: "center" });
+                    wordIndex = wordData.indexOf(currentWord) + 1;
                 }
             }
         };
 
-        utterance.onend = () => { ttsContainer.classList.remove('active'); };
+        // Simulated fallback engine for devices/voices that silently drop the onboundary event
+        let simInterval;
+        utterance.onstart = () => {
+            setTimeout(() => {
+                if(!hasBoundaryFired && wordData.length > 0) {
+                    let simIndex = 0;
+                    // Calculate rough duration per word (avg 300ms for 0.95 rate)
+                    const simulatedPacing = 320; 
+                    simInterval = setInterval(() => {
+                        wordData.forEach(w => w.element.classList.remove('spoken'));
+                        if(simIndex < wordData.length) {
+                            wordData[simIndex].element.classList.add('spoken');
+                            wordData[simIndex].element.scrollIntoView({ behavior: "smooth", block: "center" });
+                            simIndex++;
+                        } else {
+                            clearInterval(simInterval);
+                        }
+                    }, simulatedPacing);
+                }
+            }, 400); // Wait briefly to see if native boundary engine kicks in first
+        };
+
+        utterance.onend = () => { 
+            ttsContainer.classList.remove('active'); 
+            if(simInterval) clearInterval(simInterval);
+        };
+        utterance.onerror = () => { 
+            ttsContainer.classList.remove('active'); 
+            if(simInterval) clearInterval(simInterval);
+        };
+        
         window.speechSynthesis.speak(utterance);
     };
 
