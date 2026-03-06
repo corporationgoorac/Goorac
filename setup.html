@@ -129,6 +129,18 @@
         .btn-save:active { transform: scale(0.97); }
         .btn-save:disabled { opacity: 0.4; filter: grayscale(1); }
 
+        /* Toggle Switch Settings */
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-top: 1px solid var(--border); margin-top: 10px; }
+        .setting-info { display: flex; flex-direction: column; gap: 4px; max-width: 75%; }
+        .setting-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+        .setting-desc { font-size: 0.65rem; color: var(--text-dim); line-height: 1.4; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
         svg { fill: currentColor; }
     </style>
 </head>
@@ -169,6 +181,17 @@
     <div class="form-group">
         <label class="field-label">Directive (Bio)</label>
         <textarea id="bio" class="input-box" placeholder="System bio..." rows="3" style="resize: none;"></textarea>
+    </div>
+
+    <div class="setting-row">
+        <div class="setting-info">
+            <span class="setting-title">Profile Discoverability</span>
+            <span class="setting-desc">When enabled, users can easily find you via search. Otherwise, your exact Network ID is required to locate you.</span>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="search-result-toggle">
+            <span class="slider"></span>
+        </label>
     </div>
 </div>
 
@@ -211,6 +234,12 @@
         document.getElementById('bio').value = data.bio || "";
         document.getElementById('display-id').innerText = data.gooracNumber || "--------";
         
+        // Populate the real-time status of the search toggle (defaults false if undefined)
+        const searchToggle = document.getElementById('search-result-toggle');
+        if (searchToggle) {
+            searchToggle.checked = data.searchResult === true;
+        }
+
         // If data.photoURL exists, use it. If not, use the specific stars image.
         const src = data.photoURL || DEFAULT_PFP_URL;
         document.getElementById('user-pfp').src = src;
@@ -318,6 +347,7 @@
             username: userInp.value,
             bio: document.getElementById('bio').value,
             photoURL: finalPhoto,
+            searchResult: document.getElementById('search-result-toggle').checked, // Capture real-time toggle value
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
