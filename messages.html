@@ -123,11 +123,13 @@
 
         /* UNREAD BADGE */
         .unread-badge { 
-            width: 12px; height: 12px; 
+            width: 14px !important; height: 14px !important; 
+            min-width: 14px !important; min-height: 14px !important;
             border-radius: 50%; 
-            display: block;
+            display: inline-block !important;
             box-shadow: 0 0 10px rgba(255,255,255,0.3);
             flex-shrink: 0;
+            z-index: 10;
             animation: popBadge 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         @keyframes popBadge { from { transform: scale(0); } to { transform: scale(1); } }
@@ -210,6 +212,11 @@
     </div>
 </div>
 
+<div id="ai-fab" onclick="window.location.href='ai.html'" style="display: none; position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; border-radius: 50%; z-index: 999; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 109, 0, 0.4); border: 2px solid #FF6D00; background: #111; overflow: hidden; transition: transform 0.2s; touch-action: manipulation;">
+    <img id="ai-fab-img" src="" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+    <div style="position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; background: #00ff41; border-radius: 50%; border: 2px solid #111; z-index: 2;"></div>
+</div>
+
 <script src="components/navbar.js" defer></script>
 <main-navbar></main-navbar>
 <script src="components/call-notifier.js" defer></script>
@@ -223,6 +230,29 @@
             document.getElementById('chats-list').innerHTML = cachedHTML;
             console.log("⚡ Loaded inbox from cache");
         }
+    })();
+
+    // --- QUANTUM AI FLOATING BUTTON (0ms Cache) ---
+    (function initAIFab() {
+        const fab = document.getElementById('ai-fab');
+        const fabImg = document.getElementById('ai-fab-img');
+        const defaultUrl = 'https://api.dicebear.com/9.x/bottts/svg?seed=Quantum&backgroundColor=FF6D00';
+        const cached = localStorage.getItem('quantum_ai_pfp_cache');
+        
+        fab.style.display = 'block';
+        if (cached) {
+            fabImg.src = cached;
+        } else {
+            fabImg.src = defaultUrl;
+            fetch(defaultUrl).then(r => r.blob()).then(blob => {
+                const reader = new FileReader();
+                reader.onloadend = () => localStorage.setItem('quantum_ai_pfp_cache', reader.result);
+                reader.readAsDataURL(blob);
+            }).catch(e => {});
+        }
+        
+        fab.addEventListener('touchstart', () => fab.style.transform = 'scale(0.9)');
+        fab.addEventListener('touchend', () => fab.style.transform = 'scale(1)');
     })();
 
     // --- FIREBASE INIT ---
