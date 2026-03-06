@@ -19,6 +19,9 @@
     <chat-loader></chat-loader>
 
     <style>
+        /* GLOBAL RESET FOR HORIZONTAL SCROLL FIX */
+        * { box-sizing: border-box !important; }
+
         :root {
             --bg: #000;
             --accent: #00d2ff;
@@ -36,7 +39,7 @@
             padding-bottom: 90px; overflow-x: hidden;
             -webkit-user-select: none; user-select: none;
             -webkit-tap-highlight-color: transparent;
-            width: 100% !important; max-width: 100% !important; /* FIXED HORIZONTAL SCROLLING */
+            width: 100% !important; max-width: 100vw !important; /* LOCKED HORIZONTAL */
         }
 
         /* HEADER */
@@ -46,14 +49,15 @@
             align-items: center; border-bottom: 1px solid var(--border); z-index: 1000;
             backdrop-filter: blur(20px);
             padding-top: max(15px, env(safe-area-inset-top));
+            width: 100%;
         }
         .header-logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; cursor: pointer; }
         
         /* SEARCH */
-        .search-wrap { padding: 12px 20px; padding-bottom: 0; }
+        .search-wrap { padding: 12px 20px; padding-bottom: 0; width: 100%; }
         .search-input {
             width: 100%; background: #111; border: 1px solid var(--border);
-            padding: 12px 15px; border-radius: 14px; color: white; outline: none; box-sizing: border-box;
+            padding: 12px 15px; border-radius: 14px; color: white; outline: none;
             font-size: 16px !important; transition: all 0.3s ease;
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
@@ -61,7 +65,7 @@
         /* FILTER CHIPS */
         .filter-scroll {
             display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
-            scrollbar-width: none; -ms-overflow-style: none;
+            scrollbar-width: none; -ms-overflow-style: none; width: 100%;
         }
         .filter-scroll::-webkit-scrollbar { display: none; }
         
@@ -76,17 +80,18 @@
             border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
         }
 
-        /* CHAT LIST ITEM */
+        /* CHAT LIST ITEM - LAYOUT LOCKED */
         .chat-item { 
             display: flex; align-items: center; padding: 15px 20px; 
             cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03);
             transition: background 0.2s, transform 0.1s;
             touch-action: pan-y; position: relative;
+            width: 100%; overflow: hidden; /* STRICT BOUNDARY */
         }
         .chat-item:active { background: var(--glass); transform: scale(0.98); }
 
         /* PFP Container for Online Dot */
-        .pfp-container { position: relative; margin-right: 15px; }
+        .pfp-container { position: relative; margin-right: 15px; flex-shrink: 0; }
         .chat-pfp { width: 58px; height: 58px; border-radius: 20px; object-fit: cover; border: 1px solid var(--border); pointer-events: none; display: block; }
         
         /* The Real-Time Green Dot */
@@ -100,12 +105,13 @@
         }
         .online-indicator.active { display: block; }
 
-        .chat-info { flex: 1; min-width: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: center; overflow: hidden; } /* ADDED OVERFLOW HIDDEN FOR SAFETY */
-        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .chat-info { flex: 1; min-width: 0; width: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: center; overflow: hidden; } 
+        .chat-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; width: 100%; }
         
-        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; }
-        .v-badge { height: 14px; width: 14px; }
-        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; transition: color 0.3s; flex: 1; min-width: 0; padding-right: 10px; } /* ADDED MIN-WIDTH 0 TO FORCE TRUNCATION */
+        .u-name { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 6px; color: #fff; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .v-badge { height: 14px; width: 14px; flex-shrink: 0; }
+        
+        .last-msg { color: var(--text-dim); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; transition: color 0.3s; flex: 1; min-width: 0; padding-right: 10px; display: block; } 
         .typing-text { color: var(--accent); font-weight: 600; font-style: italic; animation: pulseType 1s infinite; }
         @keyframes pulseType { 50% { opacity: 0.6; } }
 
@@ -113,7 +119,7 @@
             width: 14px; height: 14px; 
             background: var(--accent);
             clip-path: polygon(44% 0%, 100% 0%, 56% 44%, 100% 44%, 0% 100%, 35% 50%, 0% 50%);
-            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px;
+            display: inline-block; filter: drop-shadow(0 0 5px var(--accent)); margin-left: 4px; flex-shrink: 0;
         }
 
         .follow-btn { 
@@ -135,20 +141,19 @@
             opacity: 1 !important;
             visibility: visible !important;
             background-color: var(--accent);
-            border: 2px solid #000 !important; /* Forcing visual separation */
+            border: 2px solid #000 !important; 
             box-shadow: 0 0 10px rgba(255,255,255,0.3);
             z-index: 10;
             margin: 0 !important;
             padding: 0 !important;
-            animation: popBadge 0s forwards; /* Disabled duration to prevent flickering on re-render */
+            animation: popBadge 0s forwards; 
             position: relative;
         }
-        /* Neutralized keyframes so the badge doesn't pulse rapidly when Firebase updates */
         @keyframes popBadge { from { transform: scale(1); } to { transform: scale(1); } }
 
         /* SKELETON */
-        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; }
-        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; }
+        .skeleton-item { display: flex; align-items: center; padding: 15px 20px; opacity: 0.5; animation: quantumPulse 1.5s infinite ease-in-out; width: 100%; }
+        .skeleton-circle { width: 55px; height: 55px; border-radius: 50%; background: #222; margin-right: 15px; flex-shrink: 0; }
         .skeleton-line { height: 12px; background: #222; border-radius: 4px; margin-bottom: 8px; }
         @keyframes quantumPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
 
@@ -158,7 +163,7 @@
             background: var(--sheet-bg); border-top: 1px solid var(--border);
             z-index: 100000; border-radius: 30px 30px 0 0;
             transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 20px 20px calc(30px + env(safe-area-inset-bottom)); box-sizing: border-box;
+            padding: 20px 20px calc(30px + env(safe-area-inset-bottom));
             box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
         }
         #delete-menu.active { bottom: 0; }
@@ -170,19 +175,19 @@
         }
 
         /* CONTEXT UI */
-        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; }
+        .sheet-context { display: flex; flex-direction: column; align-items: center; padding-bottom: 25px; margin-bottom: 10px; width: 100%; }
         .context-pfp { width: 70px; height: 70px; border-radius: 25px; border: 2px solid var(--accent); margin-bottom: 12px; object-fit: cover; }
         .context-name { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
         .context-username { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px; }
-        .action-list { display: flex; flex-direction: column; gap: 12px; }
+        .action-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
         .btn-action { width: 100%; padding: 18px; border-radius: 18px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; }
         .del-btn-big { background: rgba(255, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(255, 68, 68, 0.2); }
         .pin-btn-big { background: #1a1a1a; color: var(--accent); border: 1px solid var(--border); }
         .cancel-btn { background: transparent; color: #666; font-size: 0.9rem; margin-top: 10px; }
 
-        #search-results { display: none; background: #000; min-height: 100vh; }
+        #search-results { display: none; background: #000; min-height: 100vh; width: 100%; }
         .hide-nav { opacity: 0 !important; pointer-events: none !important; transform: translateY(20px); }
-        main-navbar { transition: all 0.4s ease; }
+        main-navbar { transition: all 0.4s ease; width: 100%; }
 
         /* NETWORK TOAST */
         #offline-toast {
@@ -521,7 +526,7 @@
             item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
             item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
 
-            // Alignment fixed by adding width:100% and min-width:0 to the flex container to force proper boundaries
+            // Absolute physics constraint applied here
             item.innerHTML = `
                 <div class="pfp-container">
                     <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
@@ -534,7 +539,7 @@
                             ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
                             ${isPinned ? `<span class="pin-indicator"></span>` : ''}
                         </span>
-                        <span style="font-size:0.7rem; color:#444;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
+                        <span style="font-size:0.7rem; color:#444; flex-shrink: 0;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; width:100%; min-width:0;">
                         <div class="last-msg" id="last-msg-${id}" style="${isUnread ? 'color:#fff; font-weight:700;' : ''}">
