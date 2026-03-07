@@ -206,6 +206,17 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Realtime Forward Button */
+        .v-forward-btn {
+            position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
+            width: 50px; height: 50px; background: rgba(0,0,0,0.6); border-radius: 50%;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; cursor: pointer; transition: 0.2s var(--ease-out-back); z-index: 35;
+        }
+        .v-forward-btn:active { background: rgba(255,255,255,0.2); transform: translateY(-50%) scale(0.9); }
+        .v-forward-btn span { font-size: 28px; }
+
         /* Progress Timer Bar Feature */
         #video-progress-bar {
             position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent);
@@ -412,6 +423,10 @@
                 <div class="video-touch-overlay" id="video-touch-overlay" onclick="handleVideoTap()" style="display:none;">
                     <div class="v-spinner" id="v-spinner"></div>
                     <div class="v-state-icon" id="v-state-icon"><span class="material-icons-round">play_arrow</span></div>
+                    
+                    <div class="v-forward-btn" id="v-forward-btn" onclick="seekForward(event, 10)" style="display:none;">
+                        <span class="material-icons-round">forward_10</span>
+                    </div>
                 </div>
             </div>
 
@@ -706,11 +721,15 @@
             }
 
             // FIX: HIDE BUTTON AFTER SELECTING SO IT DISAPPEARS AND SHOWS PROPERLY WHEN TURN SWAPS
+            // SHOW/HIDE FORWARD BUTTON ACCORDING TO TURN
             if (data.status === 'playing') {
                 btn.style.display = 'none';
+                if (isMyTurn) document.getElementById('v-forward-btn').style.display = 'flex';
+                else document.getElementById('v-forward-btn').style.display = 'none';
             } else {
                 btn.style.display = 'flex';
                 document.getElementById('video-progress-bar').style.width = '0%'; // Reset progress bar visually
+                document.getElementById('v-forward-btn').style.display = 'none';
             }
 
             // Phase: Picking
@@ -820,6 +839,42 @@
             } else {
                 player.playVideo();
             }
+        }
+
+        // REALTIME FORWARD FEATURE
+        function seekForward(event, seconds) {
+            event.stopPropagation(); // Prevent handleVideoTap (play/pause toggle) from firing
+            if (!isPlayerReady || !currentVideoId || !isMyTurn) return;
+
+            const dur = player.getDuration();
+            let newTime = player.getCurrentTime() + seconds;
+            
+            // If they forward exactly to the end or past it, adjust so the hardware timer catches it to auto-swap seamlessly
+            if (newTime >= dur - 1.5) newTime = dur - 1.5; 
+
+            player.seekTo(newTime, true);
+            
+            // Broadcast the forward jump to the other user instantly
+            visionDb.collection('vision_rooms').doc(roomId).update({
+                time: newTime,
+                playbackState: player.getPlayerState() === 1 ? 'playing' : 'paused',
+                updatedBy: myUid,
+                ts: Date.now()
+            });
+
+            // Fast forward visual feedback animation
+            const overlay = document.getElementById('video-touch-overlay');
+            const icon = document.getElementById('v-state-icon');
+            
+            overlay.style.background = 'transparent';
+            icon.className = "v-state-icon show playing";
+            icon.innerHTML = '<span class="material-icons-round">forward_10</span>';
+            
+            setTimeout(() => {
+                icon.classList.remove('show', 'playing');
+                // Restore paused visual if it was paused when forwarding
+                if (player.getPlayerState() !== 1) updateOverlayUI('paused'); 
+            }, 800);
         }
 
         function updateOverlayUI(state) {
