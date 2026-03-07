@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Goorac | Quantum Experience</title>
+    <title>Quantum</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
@@ -131,12 +131,20 @@
             background: linear-gradient(to bottom, #fff, #888);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
+
+        .company-subtitle {
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
         
         .hero p { 
             color: var(--text-dim); 
             font-size: 0.9rem; 
             margin-top: 8px; 
-            line-height: 1.4;
+            line-height: 1.5;
             max-width: 450px;
         }
 
@@ -150,7 +158,7 @@
             gap: 12px;
         }
 
-        #install-btn, #update-btn {
+        #install-btn {
             background: var(--gradient);
             color: #fff;
             border: none;
@@ -166,13 +174,25 @@
             box-shadow: 0 10px 25px rgba(188, 56, 255, 0.3);
             transition: transform 0.2s ease;
         }
-        #install-btn:active, #update-btn:active { transform: scale(0.96); }
+        #install-btn:active { transform: scale(0.96); }
 
-        /* Update button specific color to distinguish */
         #update-btn {
-            background: linear-gradient(135deg, #00ffa3 0%, #00d2ff 100%);
-            box-shadow: 0 10px 25px rgba(0, 255, 163, 0.2);
+            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+            color: #fff;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 30px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: none; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 10px 25px rgba(0, 210, 255, 0.3);
+            transition: transform 0.2s ease;
         }
+        #update-btn:active { transform: scale(0.96); }
 
         /* --- SCREENSHOTS GALLERY --- */
         .gallery-container {
@@ -381,8 +401,7 @@
 <body oncontextmenu="return false;">
 
     <header>
-        <div class="logo">GOORAC QUANTUM</div>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <div class="logo">QUANTUM</div>
     </header>
 
     <div class="hero">
@@ -391,15 +410,16 @@
         </div>
         
         <div class="hero-text">
-            <h1>The Quantum Era</h1>
+            <h1>Quantum</h1>
+            <div class="company-subtitle">by Goorac Corporation</div>
             <div class="status-badge"><div class="dot"></div> QUANTUM CORE v3.0</div>
-            <p>A unified network for real-time vision, rhythmic pulses, and intelligent AI interaction.</p>
+            <p>A revolutionary messaging and social platform. Watch real-time content seamlessly with friends and stay connected like never before.</p>
         </div>
     </div>
 
     <div class="install-section">
         <button id="install-btn">Install App</button>
-        <button id="update-btn">Update App Available</button>
+        <button id="update-btn">Update App</button>
 
         <div id="unsupported-msg" style="color: var(--text-dim); font-size: 0.9rem; text-align: center;">
             Initializing Quantum Secure Link...
@@ -527,7 +547,14 @@
         const msg = document.getElementById('unsupported-msg');
         const iosGuide = document.getElementById('ios-guide');
         let deferredPrompt;
-        let newWorker;
+
+        // --- UPDATE VERIFICATION LOGIC ---
+        // Change these server variables whenever a new update is pushed
+        const SERVER_VERSION = "3.0"; 
+        const SERVER_ICON_HASH = "icon_v3"; 
+        
+        const localVersion = localStorage.getItem('quantum_version');
+        const localIconHash = localStorage.getItem('quantum_icon_hash');
 
         // --- BROWSER BREAKOUT LOGIC ---
         const ua = navigator.userAgent || navigator.vendor;
@@ -548,8 +575,30 @@
             msg.textContent = "⚠️ In-app browser detected. Please open in Chrome.";
         } 
         else if (isStandalone) {
-            msg.textContent = "✅ Quantum Core Installed & Optimized";
-            installBtn.style.display = 'none';
+            // Check for Update
+            if (localVersion !== SERVER_VERSION || localIconHash !== SERVER_ICON_HASH) {
+                msg.textContent = "✨ New Update Available: App Icon or Version changed.";
+                updateBtn.style.display = 'block';
+                installBtn.style.display = 'none';
+                
+                updateBtn.addEventListener('click', () => {
+                    updateBtn.textContent = "Updating...";
+                    localStorage.setItem('quantum_version', SERVER_VERSION);
+                    localStorage.setItem('quantum_icon_hash', SERVER_ICON_HASH);
+                    
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(registrations => {
+                            for(let registration of registrations) {
+                                registration.update();
+                            }
+                        });
+                    }
+                    setTimeout(() => window.location.reload(true), 1500);
+                });
+            } else {
+                msg.textContent = "✅ Quantum Core Installed & Optimized";
+                installBtn.style.display = 'none';
+            }
         } else if (isIos) {
             msg.style.display = 'none';
             iosGuide.style.display = 'block';
@@ -575,34 +624,17 @@
         }
 
         window.addEventListener('appinstalled', () => {
+            // Save initial version to storage upon fresh install
+            localStorage.setItem('quantum_version', SERVER_VERSION);
+            localStorage.setItem('quantum_icon_hash', SERVER_ICON_HASH);
             installBtn.style.display = 'none';
             msg.textContent = "✅ Connection Established. Welcome.";
             msg.style.display = 'block';
         });
 
-        // --- SERVICE WORKER & UPDATE LOGIC ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(reg => {
-                    reg.addEventListener('updatefound', () => {
-                        newWorker = reg.installing;
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // New version found! Show the update button
-                                updateBtn.style.display = 'block';
-                                msg.style.display = 'none';
-                            }
-                        });
-                    });
-                }).catch(e => console.log(e));
-            });
-
-            // Handle Update Click
-            updateBtn.addEventListener('click', () => {
-                if (newWorker) {
-                    newWorker.postMessage({ action: 'skipWaiting' });
-                }
-                window.location.reload();
+                navigator.serviceWorker.register('/sw.js').catch(e => console.log(e));
             });
         }
 
@@ -626,13 +658,10 @@
                 lightbox.classList.add('active');
                 // Tiny timeout allows the display change to register before scrolling
                 setTimeout(() => {
-                    const targetImg = document.getElementById(`lb-img-${index}`);
-                    if(targetImg) {
-                        targetImg.scrollIntoView({
-                            behavior: 'instant',
-                            inline: 'center'
-                        });
-                    }
+                    document.getElementById(`lb-img-${index}`).scrollIntoView({
+                        behavior: 'instant',
+                        inline: 'center'
+                    });
                 }, 10);
             });
         });
