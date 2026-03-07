@@ -78,12 +78,12 @@
             max-width: 800px;
             display: flex;
             align-items: center;
-            gap: 24px;
+            gap: 20px;
         }
 
         .app-icon-container {
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             flex-shrink: 0;
             position: relative;
         }
@@ -91,7 +91,7 @@
         .app-icon {
             width: 100%;
             height: 100%;
-            border-radius: 22px;
+            border-radius: 20px;
             border: 1px solid var(--border);
             background: #000;
             object-fit: cover;
@@ -116,27 +116,27 @@
             font-size: 0.65rem;
             font-weight: 700;
             letter-spacing: 1px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             border: 1px solid rgba(188, 56, 255, 0.2);
         }
 
         .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
 
         h1 { 
-            font-size: 2.2rem; 
+            font-size: 1.8rem; /* Adjusted for better mobile fit */
             font-weight: 800; 
             margin: 0; 
-            line-height: 1.1; 
-            letter-spacing: -1px; 
+            line-height: 1.2; 
+            letter-spacing: -0.5px; 
             background: linear-gradient(to bottom, #fff, #888);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         
         .hero p { 
             color: var(--text-dim); 
-            font-size: 0.95rem; 
-            margin-top: 12px; 
-            line-height: 1.5;
+            font-size: 0.9rem; 
+            margin-top: 8px; 
+            line-height: 1.4;
             max-width: 450px;
         }
 
@@ -150,14 +150,14 @@
             gap: 12px;
         }
 
-        #install-btn {
+        #install-btn, #update-btn {
             background: var(--gradient);
             color: #fff;
             border: none;
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             border-radius: 30px; /* Pill shape for Play Store look */
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             font-weight: 800;
             cursor: pointer;
             display: none; 
@@ -166,7 +166,13 @@
             box-shadow: 0 10px 25px rgba(188, 56, 255, 0.3);
             transition: transform 0.2s ease;
         }
-        #install-btn:active { transform: scale(0.96); }
+        #install-btn:active, #update-btn:active { transform: scale(0.96); }
+
+        /* Update button specific color to distinguish */
+        #update-btn {
+            background: linear-gradient(135deg, #00ffa3 0%, #00d2ff 100%);
+            box-shadow: 0 10px 25px rgba(0, 255, 163, 0.2);
+        }
 
         /* --- SCREENSHOTS GALLERY --- */
         .gallery-container {
@@ -191,11 +197,13 @@
         .gallery-scroll img {
             height: 320px;
             width: auto;
-            border-radius: 16px;
+            border-radius: 12px;
             scroll-snap-align: center;
             object-fit: cover;
             border: 1px solid var(--border);
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            background-color: var(--surface);
+            cursor: pointer; /* Added cursor pointer for clickability */
         }
 
         /* --- CENTERED INSTALL CARD (Now just for features) --- */
@@ -304,6 +312,70 @@
         .ios-notice b { color: var(--accent); display: block; margin-bottom: 16px; font-size: 1.1rem; }
         .ios-step { font-size: 0.95rem; color: #fff; margin: 16px 0; display: flex; gap: 12px; align-items: center; }
         .ios-step i { color: var(--accent); font-style: normal; font-weight: bold; background: rgba(188, 56, 255, 0.2); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.8rem; }
+
+        /* --- FULL SCREEN LIGHTBOX --- */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .lightbox.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        #lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .lightbox-scroll {
+            display: flex;
+            overflow-x: auto;
+            width: 100%;
+            height: 100%;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none; /* Firefox */
+            align-items: center;
+        }
+        
+        .lightbox-scroll::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        .lightbox-scroll img {
+            width: 100vw;
+            height: auto;
+            max-height: 90vh;
+            object-fit: contain;
+            scroll-snap-align: center;
+            flex-shrink: 0;
+            padding: 10px;
+        }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -320,13 +392,14 @@
         
         <div class="hero-text">
             <h1>The Quantum Era</h1>
-            <div class="status-badge"><div class="dot"></div> QUANTUM CORE v3.0 ONLINE</div>
+            <div class="status-badge"><div class="dot"></div> QUANTUM CORE v3.0</div>
             <p>A unified network for real-time vision, rhythmic pulses, and intelligent AI interaction.</p>
         </div>
     </div>
 
     <div class="install-section">
         <button id="install-btn">Install App</button>
+        <button id="update-btn">Update App Available</button>
 
         <div id="unsupported-msg" style="color: var(--text-dim); font-size: 0.9rem; text-align: center;">
             Initializing Quantum Secure Link...
@@ -342,14 +415,14 @@
 
     <div class="gallery-container">
         <div class="gallery-scroll">
-            <img src="https://drive.google.com/uc?export=view&id=1Q9e3m8BOV2icyxeIlZWKJ8fbZkLobaE8" alt="Screenshot 1">
-            <img src="https://drive.google.com/uc?export=view&id=1f78RXs7GyMHVKQ_5zr4VhngtHYoLNpdp" alt="Screenshot 2">
-            <img src="https://drive.google.com/uc?export=view&id=1cCXYZJnmGffGUtPAB0dVECjFMsSFP7wX" alt="Screenshot 3">
-            <img src="https://drive.google.com/uc?export=view&id=1h2jI9CcVTdLT1VgvNUa6M-6DeN7z5K8E" alt="Screenshot 4">
-            <img src="https://drive.google.com/uc?export=view&id=1JoJtHTkZg05Ag9vql2ZotPpLdMHu4hgs" alt="Screenshot 5">
-            <img src="https://drive.google.com/uc?export=view&id=1UAF4z4rWDAOzsCdhjAYvQFV0AOsGUMjH" alt="Screenshot 6">
-            <img src="https://drive.google.com/uc?export=view&id=17hwQ4qWr87iPv7Q8B5sPfTWK8zVonMJ_" alt="Screenshot 7">
-            <img src="https://drive.google.com/uc?export=view&id=1N5fvm95PY-Hc6x1A7spmiHNbxXCHXA5m" alt="Screenshot 8">
+            <img src="https://drive.google.com/thumbnail?id=1Q9e3m8BOV2icyxeIlZWKJ8fbZkLobaE8&sz=w1080" alt="Screenshot 1">
+            <img src="https://drive.google.com/thumbnail?id=1f78RXs7GyMHVKQ_5zr4VhngtHYoLNpdp&sz=w1080" alt="Screenshot 2">
+            <img src="https://drive.google.com/thumbnail?id=1cCXYZJnmGffGUtPAB0dVECjFMsSFP7wX&sz=w1080" alt="Screenshot 3">
+            <img src="https://drive.google.com/thumbnail?id=1h2jI9CcVTdLT1VgvNUa6M-6DeN7z5K8E&sz=w1080" alt="Screenshot 4">
+            <img src="https://drive.google.com/thumbnail?id=1JoJtHTkZg05Ag9vql2ZotPpLdMHu4hgs&sz=w1080" alt="Screenshot 5">
+            <img src="https://drive.google.com/thumbnail?id=1UAF4z4rWDAOzsCdhjAYvQFV0AOsGUMjH&sz=w1080" alt="Screenshot 6">
+            <img src="https://drive.google.com/thumbnail?id=17hwQ4qWr87iPv7Q8B5sPfTWK8zVonMJ_&sz=w1080" alt="Screenshot 7">
+            <img src="https://drive.google.com/thumbnail?id=1N5fvm95PY-Hc6x1A7spmiHNbxXCHXA5m&sz=w1080" alt="Screenshot 8">
         </div>
     </div>
 
@@ -429,6 +502,11 @@
         <p style="font-size: 0.75rem; color: #333; margin-top: 40px; letter-spacing: 2px;">GOORAC QUANTUM © 2026. ALL SYSTEMS STABLE.</p>
     </div>
 
+    <div class="lightbox" id="lightbox">
+        <button id="lightbox-close">&times;</button>
+        <div class="lightbox-scroll" id="lightbox-scroll"></div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
         export const firebaseConfig = {
@@ -445,9 +523,11 @@
 
     <script>
         const installBtn = document.getElementById('install-btn');
+        const updateBtn = document.getElementById('update-btn');
         const msg = document.getElementById('unsupported-msg');
         const iosGuide = document.getElementById('ios-guide');
         let deferredPrompt;
+        let newWorker;
 
         // --- BROWSER BREAKOUT LOGIC ---
         const ua = navigator.userAgent || navigator.vendor;
@@ -500,11 +580,74 @@
             msg.style.display = 'block';
         });
 
+        // --- SERVICE WORKER & UPDATE LOGIC ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(e => console.log(e));
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    reg.addEventListener('updatefound', () => {
+                        newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New version found! Show the update button
+                                updateBtn.style.display = 'block';
+                                msg.style.display = 'none';
+                            }
+                        });
+                    });
+                }).catch(e => console.log(e));
+            });
+
+            // Handle Update Click
+            updateBtn.addEventListener('click', () => {
+                if (newWorker) {
+                    newWorker.postMessage({ action: 'skipWaiting' });
+                }
+                window.location.reload();
             });
         }
+
+        // --- FULL SCREEN LIGHTBOX LOGIC ---
+        const galleryImages = document.querySelectorAll('.gallery-scroll img');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxScroll = document.getElementById('lightbox-scroll');
+        const lightboxClose = document.getElementById('lightbox-close');
+
+        // Populate lightbox with ultra high-res versions of the images
+        galleryImages.forEach((img, index) => {
+            const lbImg = document.createElement('img');
+            // Bump the size to w1920 for full screen clarity
+            lbImg.src = img.src.replace('sz=w1080', 'sz=w1920'); 
+            lbImg.alt = img.alt;
+            lbImg.id = `lb-img-${index}`;
+            lightboxScroll.appendChild(lbImg);
+
+            // Click listener to open full screen and scroll to specific image
+            img.addEventListener('click', () => {
+                lightbox.classList.add('active');
+                // Tiny timeout allows the display change to register before scrolling
+                setTimeout(() => {
+                    const targetImg = document.getElementById(`lb-img-${index}`);
+                    if(targetImg) {
+                        targetImg.scrollIntoView({
+                            behavior: 'instant',
+                            inline: 'center'
+                        });
+                    }
+                }, 10);
+            });
+        });
+
+        // Close logic
+        lightboxClose.addEventListener('click', () => {
+            lightbox.classList.remove('active');
+        });
+
+        // Optional: Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+                lightbox.classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html>
