@@ -4,7 +4,6 @@ const ASSETS = [
     '/home.html',
     '/chat.html',
     '/config.js',
-    '/notification-worker.js',
     'https://cdn-icons-png.flaticon.com/128/3067/3067451.png',
     'https://cdn-icons-png.flaticon.com/512/3067/3067451.png'
 ];
@@ -53,4 +52,11 @@ self.addEventListener('notificationclick', (e) => {
     e.notification.close();
     const url = e.notification.data?.url || '/home.html';
     e.waitUntil(clients.openWindow(url));
+});
+
+// 5. Update Listener (Added to connect to your UI Update Button)
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'skipWaiting') {
+        self.skipWaiting();
+    }
 });
