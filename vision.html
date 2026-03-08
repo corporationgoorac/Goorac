@@ -246,6 +246,18 @@
         .dj-btn:active { transform: scale(0.95); }
         .dj-btn.disabled { background: #333; color: #888; box-shadow: none; pointer-events: none; }
 
+        /* NEW: ACTION CONTROLS & ICONS */
+        .action-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .icon-action-btn {
+            background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.1);
+            width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .icon-action-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+        .icon-action-btn span { font-size: 18px; }
+        #delete-vid-btn:hover, #delete-vid-btn:active { background: rgba(255, 69, 58, 0.2); color: #ff453a; border-color: rgba(255, 69, 58, 0.4); }
+        #swap-turn-btn:hover, #swap-turn-btn:active { background: rgba(0, 210, 255, 0.2); color: var(--accent); border-color: var(--accent-glow); }
+
         /* --- 3. LIVE CHAT ENGINE (Fills bottom) --- */
         #chat-container {
             flex: 1; /* Takes all remaining space strictly below info bar */
@@ -434,9 +446,18 @@
                     <div class="info-title" id="info-title">Waiting for selection...</div>
                     <div class="info-sub" id="info-sub">Room Active</div>
                 </div>
-                <button class="dj-btn" id="action-btn" onclick="openPicker()">
-                    <span class="material-icons-round">search</span> PICK VIDEO
-                </button>
+                
+                <div class="action-controls">
+                    <button class="icon-action-btn" id="delete-vid-btn" onclick="clearVideo()" style="display:none;" title="Clear Video">
+                        <span class="material-icons-round">delete_outline</span>
+                    </button>
+                    <button class="icon-action-btn" id="swap-turn-btn" onclick="swapTurn()" style="display:none;" title="Pass Turn">
+                        <span class="material-icons-round">swap_horiz</span>
+                    </button>
+                    <button class="dj-btn" id="action-btn" onclick="openPicker()">
+                        <span class="material-icons-round">search</span> PICK VIDEO
+                    </button>
+                </div>
             </div>
 
             <div id="chat-container">
@@ -716,17 +737,28 @@
         function syncVisionEngine(data) {
             isMyTurn = (data.turn === myUid);
             const btn = document.getElementById('action-btn');
+            const swapBtn = document.getElementById('swap-turn-btn');
+            const deleteBtn = document.getElementById('delete-vid-btn');
             
             // UI Updates based on turn (FIXED "WAITING..." BUG)
             if (isMyTurn) {
                 btn.className = "dj-btn";
                 btn.innerHTML = data.status === 'picking' ? `<span class="material-icons-round">search</span> PICK VIDEO` : `<span class="material-icons-round">search</span> CHANGE VIDEO`;
                 document.getElementById('info-sub').innerText = "YOUR TURN";
+                swapBtn.style.display = 'flex'; // Show swap button if it's your turn
             } else {
                 btn.className = "dj-btn disabled";
                 btn.innerHTML = data.status === 'picking' ? `WAITING...` : `WATCHING`;
                 const name = targetProfile ? targetProfile.name.split(' ')[0].toUpperCase() : 'THEM';
                 document.getElementById('info-sub').innerText = `${name}'S TURN`;
+                swapBtn.style.display = 'none'; // Hide swap button if it's not your turn
+            }
+
+            // Global Delete Video visibility: show to BOTH users if a video is currently loaded
+            if (data.videoData && data.videoData.id) {
+                deleteBtn.style.display = 'flex';
+            } else {
+                deleteBtn.style.display = 'none';
             }
 
             // FIX: HIDE BUTTON AFTER SELECTING SO IT DISAPPEARS AND SHOWS PROPERLY WHEN TURN SWAPS
@@ -922,6 +954,21 @@
                 updatedBy: 'system',
                 ts: Date.now()
             });
+        }
+
+        // ALLOWS EITHER USER TO CLEAR THE CURRENT VIDEO WITHOUT FORCING A TURN SWAP
+        function clearVideo() {
+            if (!roomId) return;
+            if (syncInterval) clearInterval(syncInterval);
+            visionDb.collection('vision_rooms').doc(roomId).update({
+                status: 'picking',
+                videoData: null, 
+                playbackState: 'paused',
+                time: 0,
+                updatedBy: myUid,
+                ts: Date.now()
+            });
+            sendSystemMessage(`${myProfile ? myProfile.name.split(' ')[0] : 'Someone'} cleared the video.`);
         }
 
         // ==========================================================================
