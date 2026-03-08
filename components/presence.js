@@ -220,9 +220,9 @@ function renderServerErrorScreen() {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                 </svg>
             </div>
-            <h1 class="crash-title">503 Service Unavailable</h1>
+            <h1 class="crash-title">503 Server Crashed</h1>
             <div class="crash-subtitle">Quantum Core Overload</div>
-            <p class="crash-message">The Quantum servers are currently experiencing an unprecedented volume of users. We have temporarily restricted access to stabilize the network infrastructure.</p>
+            <p class="crash-message">The Quantum servers are currently experiencing an unprecedented volume of users. We are trying to rectify the issue..</p>
             <div class="crash-details">
                 > STATUS: CRITICAL<br>
                 > LOAD: 99.8% CAPACITY<br>
