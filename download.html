@@ -575,26 +575,11 @@
             msg.textContent = "⚠️ In-app browser detected. Please open in Chrome.";
         } 
         else if (isStandalone) {
-            // Check for Update
+            // Check for Update (Logic enhanced to handle SW states)
             if (localVersion !== SERVER_VERSION || localIconHash !== SERVER_ICON_HASH) {
                 msg.textContent = "✨ New Update Available: App Icon or Version changed.";
                 updateBtn.style.display = 'block';
                 installBtn.style.display = 'none';
-                
-                updateBtn.addEventListener('click', () => {
-                    updateBtn.textContent = "Updating...";
-                    localStorage.setItem('quantum_version', SERVER_VERSION);
-                    localStorage.setItem('quantum_icon_hash', SERVER_ICON_HASH);
-                    
-                    if ('serviceWorker' in navigator) {
-                        navigator.serviceWorker.getRegistrations().then(registrations => {
-                            for(let registration of registrations) {
-                                registration.update();
-                            }
-                        });
-                    }
-                    setTimeout(() => window.location.reload(true), 1500);
-                });
             } else {
                 msg.textContent = "✅ Quantum Core Installed & Optimized";
                 installBtn.style.display = 'none';
@@ -623,6 +608,55 @@
             });
         }
 
+        // --- SERVICE WORKER REGISTRATION & UPDATE HANDLER ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    // Check for updates instantly when page loads
+                    reg.onupdatefound = () => {
+                        const newWorker = reg.installing;
+                        newWorker.onstatechange = () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // A new service worker is ready but waiting
+                                msg.textContent = "✨ Quantum update ready.";
+                                updateBtn.style.display = 'block';
+                                installBtn.style.display = 'none';
+                            }
+                        };
+                    };
+                }).catch(e => console.log(e));
+            });
+
+            // Re-usable update function for the button
+            updateBtn.addEventListener('click', () => {
+                updateBtn.textContent = "Installing...";
+                
+                navigator.serviceWorker.getRegistration().then(reg => {
+                    if (reg && reg.waiting) {
+                        // Send message to the waiting Service Worker to skip waiting
+                        reg.waiting.postMessage('SKIP_WAITING');
+                    } else if (reg) {
+                        // If no worker is waiting, force check again
+                        reg.update().then(() => {
+                            // Fallback if no SW change found but version mismatch exists
+                            localStorage.setItem('quantum_version', SERVER_VERSION);
+                            localStorage.setItem('quantum_icon_hash', SERVER_ICON_HASH);
+                            setTimeout(() => window.location.reload(true), 1000);
+                        });
+                    } else {
+                        window.location.reload(true);
+                    }
+                });
+            });
+
+            // Listen for the new worker taking control, then reload
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                localStorage.setItem('quantum_version', SERVER_VERSION);
+                localStorage.setItem('quantum_icon_hash', SERVER_ICON_HASH);
+                window.location.reload();
+            });
+        }
+
         window.addEventListener('appinstalled', () => {
             // Save initial version to storage upon fresh install
             localStorage.setItem('quantum_version', SERVER_VERSION);
@@ -631,12 +665,6 @@
             msg.textContent = "✅ Connection Established. Welcome.";
             msg.style.display = 'block';
         });
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(e => console.log(e));
-            });
-        }
 
         // --- FULL SCREEN LIGHTBOX LOGIC ---
         const galleryImages = document.querySelectorAll('.gallery-scroll img');
@@ -658,7 +686,8 @@
                 lightbox.classList.add('active');
                 // Tiny timeout allows the display change to register before scrolling
                 setTimeout(() => {
-                    document.getElementById(`lb-img-${index}`).scrollIntoView({
+                    const target = document.getElementById(`lb-img-${index}`);
+                    if(target) target.scrollIntoView({
                         behavior: 'instant',
                         inline: 'center'
                     });
