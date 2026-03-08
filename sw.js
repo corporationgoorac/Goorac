@@ -10,19 +10,17 @@ const ASSETS = [
 
 // 1. Install (Cache Files)
 self.addEventListener('install', (e) => {
-    self.skipWaiting();
+    // IMPORTANT: Removed self.skipWaiting() here so the UI update button actually works!
     e.waitUntil(caches.open(CACHE_NAME).then(c => {
-        // Use cache.addAll if you want strict "all or nothing" caching
-        // Your current method is fine if you want to be lenient
         return Promise.all(ASSETS.map(url => c.add(url).catch(console.warn)));
     }));
 });
 
-// 2. Activate (Clean old caches) - FIXED
+// 2. Activate (Clean old caches)
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         Promise.all([
-            self.clients.claim(), // Take control immediately
+            self.clients.claim(), 
             caches.keys().then(keys => {
                 return Promise.all(
                     keys.map(key => {
@@ -54,7 +52,7 @@ self.addEventListener('notificationclick', (e) => {
     e.waitUntil(clients.openWindow(url));
 });
 
-// 5. Update Listener (Added to connect to your UI Update Button)
+// 5. Update Listener (Triggered by your 'Update App' button in HTML)
 self.addEventListener('message', (event) => {
     if (event.data && (event.data === 'SKIP_WAITING' || event.data.action === 'skipWaiting')) {
         self.skipWaiting();
