@@ -1262,4 +1262,31 @@
 
         const groupData = {
             isGroup: true,
-            groupId:
+            groupId: newGroupRef.id, // SAVED UNIQUE ID
+            groupName: name,
+            groupDescription: desc,
+            groupPhoto: groupBase64Image || 'https://via.placeholder.com/150/000000/FFFFFF?text=' + name.charAt(0).toUpperCase(),
+            participants: finalParticipants,
+            admin: myUid, // Fallback
+            admins: [myUid], // NEW ADMINS ARRAY (CREATOR INCLUDED)
+            lastMessage: "Group created",
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            seen: true,
+            unreadCount: {}
+        };
+
+        try {
+            await newGroupRef.set(groupData);
+            closeGroupModal(true);
+            // REDIRECT TARGET UPDATED
+            window.location.href = `groupChat.html?id=${newGroupRef.id}`;
+        } catch(e) {
+            console.error("Group creation failed", e);
+            btn.disabled = false;
+            btn.innerText = "Create Group";
+        }
+    };
+</script>
+</body>
+</html>
