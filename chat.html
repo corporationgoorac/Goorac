@@ -27,6 +27,7 @@
 
     <script type="module" src="components/presence.js"></script>
     <script src="components/emojiPicker.js" defer></script>
+    <script src="components/gifPicker.js" defer></script>
     <script src="components/imagePicker.js" defer></script>
     <script src="components/filePicker.js" defer></script>
     <script src="components/viewMedia.js" defer></script>
@@ -1131,14 +1132,14 @@ box-shadow: var(--received-shadow);
 
         /* EMOJI & ATTACHMENT MENUS */
         /* Modified height and layout for glitch-free smooth toggle */
-        #emoji-tray { 
+        #emoji-tray, #gif-tray { 
             display: none; background: var(--bg); border-top: 1px solid var(--border); 
             height: 320px; padding: 0; width: 100%; flex-shrink: 0; 
             overflow-y: auto; touch-action: auto !important; z-index: 100;
         }
         
         /* Apply touch fix specifically to emoji component */
-        emoji-picker {
+        emoji-picker, gif-picker {
             touch-action: pan-y !important; 
         }
 
@@ -1630,6 +1631,10 @@ box-shadow: var(--received-shadow);
             <div id="emoji-toggle-right" class="emoji-toggle-btn" onclick="toggleEmojiKeyboard()">
                 <span class="material-icons-round">emoji_emotions</span>
             </div>
+            
+            <div id="gif-toggle-right" class="emoji-toggle-btn" onclick="toggleGifKeyboard()">
+                <span class="material-icons-round">gif_box</span>
+            </div>
 
             <button id="send-btn" class="send-btn">
                 <span class="material-icons-round">send</span>
@@ -1644,6 +1649,10 @@ box-shadow: var(--received-shadow);
         <div id="emoji-tray">
              <emoji-picker id="main-picker" style="width:100%; height:100%;"></emoji-picker>
         </div>
+        
+        <div id="gif-tray">
+             <gif-picker id="main-gif-picker" style="width:100%; height:100%;"></gif-picker>
+        </div>
 
     </div>
 </div>
@@ -1655,6 +1664,7 @@ box-shadow: var(--received-shadow);
     window.isEmojiTrayOpen = false;
     window.toggleEmojiKeyboard = function() {
         const emojiTray = document.getElementById('emoji-tray');
+        const gifTray = document.getElementById('gif-tray');
         const inputArea = document.querySelector('.input-area');
         
         if (window.isEmojiTrayOpen) {
@@ -1682,6 +1692,12 @@ box-shadow: var(--received-shadow);
             const wasFocused = document.activeElement === mInput;
             window.isEmojiTrayOpen = true;
             
+            if (window.isGifTrayOpen) {
+                window.isGifTrayOpen = false;
+                gifTray.style.display = 'none';
+                document.getElementById('gif-toggle-right').innerHTML = '<span class="material-icons-round">gif_box</span>';
+            }
+            
             document.getElementById('emoji-toggle-right').innerHTML = '<span class="material-icons-round">keyboard</span>';
             document.getElementById('emoji-toggle-left').innerHTML = '<span class="material-icons-round">keyboard</span>';
             
@@ -1698,6 +1714,53 @@ box-shadow: var(--received-shadow);
             
             window.scrollToBottom();
             pushModalState('emoji');
+        }
+    };
+
+    // =========================================
+    //  NEW: GIF KEYBOARD TOGGLE SYSTEM
+    // =========================================
+    window.isGifTrayOpen = false;
+    window.toggleGifKeyboard = function() {
+        const gifTray = document.getElementById('gif-tray');
+        const emojiTray = document.getElementById('emoji-tray');
+        const inputArea = document.querySelector('.input-area');
+        
+        if (window.isGifTrayOpen) {
+            window.isGifTrayOpen = false;
+            document.getElementById('gif-toggle-right').innerHTML = '<span class="material-icons-round">gif_box</span>';
+            
+            inputArea.classList.add('force-expand');
+            mInput.focus(); 
+            
+            setTimeout(() => {
+                gifTray.style.display = 'none';
+                if(history.state && history.state.modal === 'gif') history.back();
+                window.scrollToBottom();
+            }, 150); 
+            
+        } else {
+            const wasFocused = document.activeElement === mInput;
+            window.isGifTrayOpen = true;
+            
+            if (window.isEmojiTrayOpen) {
+                window.isEmojiTrayOpen = false;
+                emojiTray.style.display = 'none';
+                document.getElementById('emoji-toggle-right').innerHTML = '<span class="material-icons-round">emoji_emotions</span>';
+                document.getElementById('emoji-toggle-left').innerHTML = '<span class="material-icons-round">emoji_emotions</span>';
+            }
+
+            document.getElementById('gif-toggle-right').innerHTML = '<span class="material-icons-round">keyboard</span>';
+            
+            inputArea.classList.add('force-expand');
+            gifTray.style.display = 'block';
+            
+            if (wasFocused) {
+                mInput.blur(); 
+            }
+            
+            window.scrollToBottom();
+            pushModalState('gif');
         }
     };
 
@@ -1949,8 +2012,9 @@ box-shadow: var(--received-shadow);
             // Strictly stop page scroll/drag when touching the capsule (unless scrolling the text inside or emoji picker)
             const path = e.composedPath ? e.composedPath() : [];
             const isEmojiPicker = path.some(el => el.tagName === 'EMOJI-PICKER') || e.target.closest('emoji-picker');
+            const isGifPicker = path.some(el => el.tagName === 'GIF-PICKER') || e.target.closest('gif-picker');
 
-            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT' && !e.target.closest('#emoji-tray') && !isEmojiPicker) {
+            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT' && !e.target.closest('#emoji-tray') && !isEmojiPicker && !e.target.closest('#gif-tray') && !isGifPicker) {
                 e.preventDefault(); 
                 e.stopPropagation();
             }
@@ -1984,7 +2048,7 @@ box-shadow: var(--received-shadow);
         }
         
         // Don't ripple on inputs or mic button
-        if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('emoji-picker') || e.target.closest('.mic-btn')) return;
+        if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('emoji-picker') || e.target.closest('gif-picker') || e.target.closest('.mic-btn')) return;
         
         const circle = document.createElement('div');
         const diameter = 30;
@@ -2019,6 +2083,7 @@ box-shadow: var(--received-shadow);
             document.querySelector('.plus-btn').style.display = 'none';
             document.getElementById('emoji-toggle-left').style.display = 'flex';
             document.getElementById('emoji-toggle-right').style.display = 'none';
+            document.getElementById('gif-toggle-right').style.display = 'none';
             // Send Typing Indicator
             rdb.ref(`typing/${chatId}/${myUid}`).set(true);
         } else {
@@ -2028,6 +2093,7 @@ box-shadow: var(--received-shadow);
             document.querySelector('.plus-btn').style.display = 'flex';
             document.getElementById('emoji-toggle-left').style.display = 'none';
             document.getElementById('emoji-toggle-right').style.display = 'flex';
+            document.getElementById('gif-toggle-right').style.display = 'flex';
             rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         }
         
@@ -2065,6 +2131,7 @@ box-shadow: var(--received-shadow);
     //  14. COMPONENT INTEGRATION
     // =========================================
     const mainPicker = document.getElementById('main-picker');
+    const mainGifPicker = document.getElementById('main-gif-picker');
     const imagePickerComponent = document.getElementById('img-picker');
     const filePickerComponent = document.getElementById('file-picker');
 
@@ -2074,6 +2141,16 @@ box-shadow: var(--received-shadow);
             mInput.value += emoji;
             // Kept blurred so keyboard does not pop up automatically 
             mInput.dispatchEvent(new Event('input'));
+        });
+    }
+
+    if (mainGifPicker) {
+        mainGifPicker.addEventListener('gif-selected', (e) => {
+            const url = e.detail.url;
+            if (url) {
+                sendGifMessage(url);
+                if (window.isGifTrayOpen) toggleGifKeyboard();
+            }
         });
     }
 
@@ -2097,6 +2174,7 @@ box-shadow: var(--received-shadow);
             closeAttachmentMenu();
         } else {
             emojiTray.style.display = 'none'; 
+            document.getElementById('gif-tray').style.display = 'none';
             attachmentMenu.style.display = 'flex';
             pushModalState('attachment');
         }
@@ -2121,6 +2199,7 @@ box-shadow: var(--received-shadow);
 
     function toggleEmojiTray() {
         attachmentMenu.style.display = 'none'; 
+        document.getElementById('gif-tray').style.display = 'none';
         if (emojiTray.style.display === 'block') {
             emojiTray.style.display = 'none';
             if(history.state && history.state.modal === 'emoji') history.back();
@@ -2175,6 +2254,7 @@ box-shadow: var(--received-shadow);
     mInput.addEventListener("focus", () => { 
         document.querySelector('.input-area').classList.add('force-expand'); // Expands the capsule smoothly
         if(window.isEmojiTrayOpen) toggleEmojiKeyboard(); // Auto swap icon logic internally
+        if(window.isGifTrayOpen) toggleGifKeyboard();
         if(attachmentMenu.style.display === 'flex') closeAttachmentMenu();
         // FIX: Aggressively lock header and scroll when keyboard opens
         lockViewportAndHeader();
@@ -2184,7 +2264,7 @@ box-shadow: var(--received-shadow);
     
     mInput.addEventListener("blur", () => {
         // FIXED: Only shrink the capsule if we are NOT holding the emoji tray open
-        if (!window.isEmojiTrayOpen) {
+        if (!window.isEmojiTrayOpen && !window.isGifTrayOpen) {
             document.querySelector('.input-area').classList.remove('force-expand'); // Shrinks the capsule smoothly
         }
         // Reset safely when keyboard closes
@@ -2529,7 +2609,8 @@ box-shadow: var(--received-shadow);
                                 
                                 // INBOX INSTANT CACHE UPDATE FOR NEW MESSAGE
                                 let displayTxt = msgData.text || "New message";
-                                if(msgData.imageUrl) displayTxt = "📷 Image";
+                                if(msgData.isGif) displayTxt = "🎞️ GIF";
+                                else if(msgData.imageUrl) displayTxt = "📷 Image";
                                 else if(msgData.fileUrl) displayTxt = "📎 Attachment";
                                 updateInboxCacheLocal(chatId, displayTxt, msgData.sender, true);
                             }
@@ -2594,7 +2675,11 @@ box-shadow: var(--received-shadow);
                             seenAt: firebase.firestore.FieldValue.serverTimestamp() 
                         });
                         // INBOX CACHE UPDATE FOR READ STATUS (BACKGROUND)
-                        updateInboxCacheLocal(chatId, msgData.text || "Message", msgData.sender, false);
+                        let displayTxt2 = msgData.text || "Message";
+                        if(msgData.isGif) displayTxt2 = "🎞️ GIF";
+                        else if(msgData.imageUrl) displayTxt2 = "📷 Image";
+                        else if(msgData.fileUrl) displayTxt2 = "📎 Attachment";
+                        updateInboxCacheLocal(chatId, displayTxt2, msgData.sender, false);
                     }
                 });
 
@@ -3285,7 +3370,8 @@ box-shadow: var(--received-shadow);
                     vibrate(40);
                     let replyText = m.text;
                     if(!replyText) {
-                        if(m.imageUrl) replyText = "📷 Photo";
+                        if(m.isGif) replyText = "🎞️ GIF";
+                        else if(m.imageUrl) replyText = "📷 Photo";
                         else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
                         else replyText = "Attachment";
                     }
@@ -3655,7 +3741,7 @@ box-shadow: var(--received-shadow);
     //  19. MESSAGING CORE ACTIONS
     // =========================================
 
-        const sendPushNotification = async (messageText) => {
+    const sendPushNotification = async (messageText) => {
         // Only run if we have a person to send it to
         if (!targetUid) return;
         
@@ -3663,14 +3749,16 @@ box-shadow: var(--received-shadow);
         const senderName = myUserData && myUserData.name ? myUserData.name : "Someone";
         const senderPhoto = myUserData && myUserData.photoURL ? myUserData.photoURL : "https://www.goorac.biz/icon.png";
         
-        // Dynamic link to open the chat page directly with the sender
-        const deepLink = `https://www.goorac.biz/chat.html?user=${myUserData.username}`;
+        // FIX: Ensure username is defined, fallback to uid if missing to prevent null deep link breaks
+        const linkUserParam = (myUserData && myUserData.username) ? myUserData.username : myUid;
+        const deepLink = `https://www.goorac.biz/chat.html?user=${linkUserParam}`;
 
         try {
             // Your unique, permanent Render URL
             const backendUrl = "https://pish-uigm.onrender.com/send-push";
 
-            await fetch(backendUrl, {
+            // Make the fetch call non-blocking but track its resolution
+            fetch(backendUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -3682,17 +3770,19 @@ box-shadow: var(--received-shadow);
                     icon: senderPhoto, // This sends your PFP to the notification
                     click_action: deepLink // Tells the server where the notification should lead
                 })
+            }).then(res => {
+                if (!res.ok) console.error("Push failed with status:", res.status);
+                else console.log("✅ Push successfully triggered via Render!");
+            }).catch(err => {
+                console.error("❌ Error sending push:", err);
             });
             
-            console.log("✅ Push successfully triggered via Render!");
         } catch (error) {
-            console.error("❌ Error sending push:", error);
+            console.error("❌ Error configuring push:", error);
         }
     };
     
 
-    
-    
     async function sendImageMessage(imageUrl) {
         popSound.play().catch(e => {});
         window.scrollToBottom(true);
@@ -3711,6 +3801,28 @@ box-shadow: var(--received-shadow);
         updateLastMsg("📷 Image");
         updateInboxCacheLocal(chatId, "📷 Image", myUid, false); // INBOX SYNC
         sendPushNotification("📷 Sent you an image");
+        window.scrollToBottom(true);
+    }
+    
+    async function sendGifMessage(gifUrl) {
+        popSound.play().catch(e => {});
+        window.scrollToBottom(true);
+
+        let msgData = {
+            text: "", 
+            sender: myUid, 
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            replyTo: replyingTo, 
+            seen: false, 
+            reactions: {},
+            imageUrl: gifUrl,
+            isGif: true // Special flag for replies/inbox UI
+        };
+        cancelInteraction();
+        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        updateLastMsg("🎞️ GIF");
+        updateInboxCacheLocal(chatId, "🎞️ GIF", myUid, false); // INBOX SYNC
+        sendPushNotification("🎞️ Sent you a GIF");
         window.scrollToBottom(true);
     }
 
@@ -3762,8 +3874,10 @@ box-shadow: var(--received-shadow);
         document.querySelector('.plus-btn').style.display = 'flex';
         document.getElementById('emoji-toggle-left').style.display = 'none';
         document.getElementById('emoji-toggle-right').style.display = 'flex';
+        document.getElementById('gif-toggle-right').style.display = 'flex';
         
         emojiTray.style.display = 'none';
+        document.getElementById('gif-tray').style.display = 'none';
         attachmentMenu.style.display = 'none';
         rdb.ref(`typing/${chatId}/${myUid}`).set(false);
         mInput.focus(); 
@@ -3853,7 +3967,9 @@ box-shadow: var(--received-shadow);
             let txt = lastMsg.text || "";
             
             // Logic to determine type of the NEW last message
-            if (lastMsg.imageUrl) {
+            if (lastMsg.isGif) {
+                txt = txt ? "🎞️ " + txt : "🎞️ GIF";
+            } else if (lastMsg.imageUrl) {
                 txt = txt ? "📷 " + txt : "📷 Image";
             } else if (lastMsg.fileUrl) {
                 const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
@@ -4045,7 +4161,19 @@ box-shadow: var(--received-shadow);
     
     function initReplyFromActive() {
         const el = document.getElementById('text-'+activeMenuId);
-        const text = el ? el.innerText.split('(edited)')[0].trim() : "Image";
+        let text = el ? el.innerText.split('(edited)')[0].trim() : "Attachment";
+        
+        // If there's no text (it's media only), grab the correct label
+        if (!text || text === "Attachment") {
+             const msgData = messagesMap.get(activeMenuId);
+             if (msgData) {
+                 if (msgData.isGif) text = "🎞️ GIF";
+                 else if (msgData.imageUrl) text = "📷 Photo";
+                 else if (msgData.fileMeta && msgData.fileMeta.type.includes('audio')) text = "🎵 Audio";
+                 else if (msgData.fileUrl) text = "📄 File";
+             }
+        }
+        
         triggerReply(text);
         closeMenu();
     }
@@ -4334,6 +4462,7 @@ box-shadow: var(--received-shadow);
         // We manually check if any modal is open and force close it (redundancy)
         const modals = [
             { id: 'emoji-tray', style: 'block' },
+            { id: 'gif-tray', style: 'block' },
             { id: 'attachment-menu', style: 'flex' },
             { id: 'reaction-picker-modal', style: 'flex' },
             { id: 'menu-overlay', style: 'flex' },
@@ -4346,10 +4475,12 @@ box-shadow: var(--received-shadow);
             if(el && el.style.display === m.style) {
                 el.style.display = 'none';
                 modalClosed = true;
-                if(m.id === 'emoji-tray') {
+                if(m.id === 'emoji-tray' || m.id === 'gif-tray') {
                     window.isEmojiTrayOpen = false;
+                    window.isGifTrayOpen = false;
                     document.getElementById('emoji-toggle-right').innerHTML = '<span class="material-icons-round">emoji_emotions</span>';
                     document.getElementById('emoji-toggle-left').innerHTML = '<span class="material-icons-round">emoji_emotions</span>';
+                    document.getElementById('gif-toggle-right').innerHTML = '<span class="material-icons-round">gif_box</span>';
                 }
             }
         });
