@@ -497,7 +497,17 @@
     // --- NEW FEATURE: DOUBLE TAP CLEAR UNREAD ---
     window.clearAllUnreadBages = function() {
         if(currentChatData.length > 0) {
-            currentChatData.forEach(c => c.isUnread = false);
+            currentChatData.forEach(c => {
+                c.isUnread = false;
+                // Safely clear in firestore so it actually sticks
+                if(c.isGroup) {
+                    db.collection("chats").doc(c.id).update({ [`unreadCount.${myUid}`]: 0 }).catch(e=>{});
+                } else {
+                    if (c.chat.lastSender && c.chat.lastSender !== myUid) {
+                        db.collection("chats").doc(c.id).update({ seen: true }).catch(e=>{});
+                    }
+                }
+            });
             renderInbox();
             if(navigator.vibrate) navigator.vibrate([30, 50, 30]);
         }
@@ -694,13 +704,21 @@
                 
                 const isPinned = myPinnedChats.includes(d.id);
                 
+                // --- PRE-CALCULATE UNREAD STATUS ---
                 let isUnread = false;
                 let count = 0;
                 if (chat.unreadCount && chat.unreadCount[myUid] !== undefined) {
                     count = Number(chat.unreadCount[myUid]) || 0;
                 }
-                if (count > 0) isUnread = true;
-                else if (chat.lastSender && chat.lastSender !== myUid) isUnread = (chat.seen !== true);
+                
+                if (isGroup) {
+                    // FIX: Groups use individual unreadCounts. Ignore the global 'seen' boolean!
+                    isUnread = (count > 0);
+                } else {
+                    // Legacy 1-on-1 chat fallback
+                    if (count > 0) isUnread = true;
+                    else if (chat.lastSender && chat.lastSender !== myUid) isUnread = (chat.seen !== true);
+                }
 
                 return { id: d.id, chat, u: userData, otherUid, isPinned, isUnread, isGroup }; 
             });
