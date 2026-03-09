@@ -17,6 +17,8 @@
     <script type="module" src="components/presence.js"></script>
     <script src="components/chatLoader.js" defer></script>
     <chat-loader></chat-loader>
+    
+    <script src="components/imagePicker.js" defer></script>
 
     <style>
         /* GLOBAL RESET FOR HORIZONTAL SCROLL FIX */
@@ -225,9 +227,51 @@
         
         /* PERFECT AI FAB DOT ANIMATION */
         @keyframes pulseOnlineFAB { 0% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(0, 255, 65, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0); } }
+        
+        /* --- NEW GROUP MODAL STYLES (PURE BLACK/SLEEK) --- */
+        .side-modal {
+            position: fixed; top: 0; right: -100%; width: 100%; height: 100%;
+            background: #000000; z-index: 100005; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .side-modal.active { right: 0; }
+        .modal-header-top { display: flex; align-items: center; padding: 15px 20px; padding-top: max(15px, env(safe-area-inset-top)); border-bottom: 1px solid var(--border); background: #000; }
+        .modal-back-btn { background: none; border: none; color: white; padding: 5px; cursor: pointer; margin-right: 15px; display: flex; align-items: center; }
+        .modal-title-main { font-weight: 800; font-size: 1.2rem; flex: 1; color: #fff; }
+        
+        .group-form-container { padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
+        .group-pic-wrapper { display: flex; justify-content: center; margin-bottom: 10px; }
+        .group-pic-upload { width: 100px; height: 100px; border-radius: 30px; background: #111; border: 2px dashed #333; display: flex; align-items: center; justify-content: center; color: #888; cursor: pointer; overflow: hidden; position: relative; }
+        .group-pic-preview { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; display: none; }
+        
+        .group-input { width: 100%; background: #111; border: 1px solid #222; padding: 16px; border-radius: 16px; color: white; font-size: 1rem; outline: none; transition: 0.3s; }
+        .group-input:focus { border-color: var(--accent); background: #161616; }
+        textarea.group-input { resize: none; min-height: 100px; }
+        
+        .add-members-trigger { background: #1a1a1a; border: 1px solid var(--border); padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: white; font-weight: 600; }
+        .member-count-badge { background: var(--accent); color: #000; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; font-weight: 800; }
+        
+        .create-group-submit { background: white; color: black; border: none; padding: 18px; border-radius: 18px; font-weight: 800; font-size: 1.05rem; cursor: pointer; margin-top: auto; margin-bottom: 20px; }
+        .create-group-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* MEMBERS MODAL LIST */
+        .member-list-container { flex: 1; overflow-y: auto; padding-bottom: 100px; }
+        .selectable-member { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #111; cursor: pointer; }
+        .sel-pfp { width: 50px; height: 50px; border-radius: 16px; margin-right: 15px; object-fit: cover; }
+        .sel-info { flex: 1; }
+        .sel-name { font-weight: 700; color: #fff; font-size: 1rem; }
+        .sel-handle { color: #888; font-size: 0.85rem; }
+        .sel-checkbox { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #444; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .sel-checkbox.checked { background: var(--accent); border-color: var(--accent); }
+        .sel-checkbox.checked::after { content: "✓"; color: #000; font-weight: 900; }
+        
+        .done-members-btn { position: absolute; bottom: 30px; left: 20px; right: 20px; background: white; color: black; border: none; padding: 18px; border-radius: 18px; font-weight: 800; font-size: 1.05rem; cursor: pointer; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
+        .infinite-scroll-trigger { height: 40px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 0.9rem; }
     </style>
 </head>
 <body oncontextmenu="return false;">
+
+<image-picker id="group-image-picker"></image-picker>
 
 <div class="modal-overlay-intro" id="msg-intro-overlay" onclick="closeIntroModal()"></div>
 <div class="bottom-modal-intro" id="msg-intro-modal">
@@ -263,6 +307,9 @@
         <img src="images/icon.png" class="header-icon" id="header-app-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/32/000000/fff?text=G'">
         <div class="header-title" ondblclick="clearAllUnreadBages()">Messages</div>
     </div>
+    <div class="header-right" style="display: flex; align-items: center;">
+        <svg onclick="openGroupModal()" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 26px; height: 26px; cursor: pointer; opacity: 0.9;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    </div>
 </header>
 
 <script>
@@ -296,6 +343,7 @@
 <div class="filter-scroll">
     <div class="filter-chip active" onclick="setFilter('all', this)">All</div>
     <div class="filter-chip" onclick="setFilter('unread', this)">Unread</div>
+    <div class="filter-chip" onclick="setFilter('groups', this)">Groups</div>
 </div>
 
 <div id="search-results"></div>
@@ -317,9 +365,53 @@
     
     <div class="action-list">
         <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
-        <button class="btn-action del-btn-big" id="confirm-delete">Erase History For Both</button>
+        <button class="btn-action del-btn-big" id="confirm-delete" data-is-group="false">Erase History For Both</button>
         <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
     </div>
+</div>
+
+<div id="group-modal" class="side-modal">
+    <div class="modal-header-top">
+        <button class="modal-back-btn" onclick="closeGroupModal(true)">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="modal-title-main">New Group</div>
+    </div>
+    <div class="group-form-container">
+        <div class="group-pic-wrapper">
+            <div class="group-pic-upload" onclick="document.getElementById('group-image-picker').openPicker()">
+                <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                <img id="group-pic-preview" class="group-pic-preview" src="">
+            </div>
+            <input type="file" id="group-img-input" style="display:none" accept="image/*" onchange="previewGroupImage(event)">
+        </div>
+        
+        <input type="text" id="group-name-input" class="group-input" placeholder="Group Subject" autocomplete="off" oninput="validateGroupForm()">
+        <textarea id="group-desc-input" class="group-input" placeholder="Group Description (Optional)"></textarea>
+        
+        <div class="add-members-trigger" onclick="openMembersModal()">
+            <span>Participants</span>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span id="selected-members-count" class="member-count-badge" style="display:none;">0</span>
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+        </div>
+        
+        <button id="create-group-btn-submit" class="create-group-submit" disabled onclick="executeGroupCreation()">Create Group</button>
+    </div>
+</div>
+
+<div id="members-modal" class="side-modal">
+    <div class="modal-header-top">
+        <button class="modal-back-btn" onclick="closeMembersModal(true)">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="modal-title-main">Add Members</div>
+    </div>
+    <div class="member-list-container" id="mutual-friends-list">
+        </div>
+    <div id="scroll-trigger" class="infinite-scroll-trigger">Loading...</div>
+    <button class="done-members-btn" onclick="closeMembersModal(true)">Done</button>
 </div>
 
 <div id="ai-fab" onclick="window.location.href='ai.html'" style="display: none; position: fixed; bottom: 85px; right: 20px; width: 46px; height: 46px; border-radius: 50%; z-index: 999; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8); border: 1.5px solid rgba(255,255,255,0.15); background: #111; overflow: hidden; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); touch-action: manipulation;">
@@ -333,6 +425,20 @@
 <call-notifier></call-notifier>
 
 <script>
+    // --- EVENT LISTENER FOR IMAGE PICKER UPLOADS ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const picker = document.getElementById('group-image-picker');
+        if (picker) {
+            picker.addEventListener('image-uploaded', (e) => {
+                groupBase64Image = e.detail.url; // ImgBB URL replaces Base64
+                const preview = document.getElementById('group-pic-preview');
+                preview.src = groupBase64Image;
+                preview.style.display = "block";
+                validateGroupForm();
+            });
+        }
+    });
+
     // --- NEW FEATURE: NETWORK STATUS LISTENERS ---
     window.addEventListener('offline', () => document.getElementById('offline-toast').style.display = 'block');
     window.addEventListener('online', () => document.getElementById('offline-toast').style.display = 'none');
@@ -473,6 +579,14 @@
     // Neon Palette for Badges
     const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
 
+    // --- NEW GROUP VARIABLES ---
+    let mutualFriends = [];
+    let selectedGroupMembers = [];
+    let friendsLoadedCount = 0;
+    const friendsPerPage = 20;
+    let observer;
+    let groupBase64Image = null;
+
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
@@ -546,30 +660,36 @@
             const chatPromises = snap.docs.map(async d => {
                 const chat = d.data();
                 const otherUid = chat.participants.find(id => id !== myUid);
+                const isGroup = chat.isGroup === true; // GROUP FLAG
                 
-                // Fetch other user's block list for reciprocal block check
-                const otherDoc = await db.collection("users").doc(otherUid).get();
-                const otherData = otherDoc.data();
-                const theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
+                // Fetch other user's block list for reciprocal block check (Skip if group)
+                let theirBlockedList = [];
+                let userData = null;
+                
+                if(!isGroup) {
+                    const otherDoc = await db.collection("users").doc(otherUid).get();
+                    const otherData = otherDoc.data();
+                    theirBlockedList = (otherData?.blocked || []).map(b => typeof b === 'string' ? b : b.uid);
 
-                if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
-                    return null; // FILTER BLOCKED PERSON CHAT
-                }
-
-                let userData = otherData || userCache[otherUid];
-                syncUserProfile(otherUid).then(fresh => {
-                    if(fresh) {
-                        const nameEl = document.getElementById(`name-${d.id}`);
-                        if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
-                             nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
-                        }
+                    if(myBlockedList.includes(otherUid) || theirBlockedList.includes(myUid)) {
+                        return null; // FILTER BLOCKED PERSON CHAT
                     }
-                });
 
-                if (!userData) {
-                    userData = otherData;
-                    userCache[otherUid] = userData;
-                    localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                    userData = otherData || userCache[otherUid];
+                    syncUserProfile(otherUid).then(fresh => {
+                        if(fresh) {
+                            const nameEl = document.getElementById(`name-${d.id}`);
+                            if(nameEl && fresh.verified && !nameEl.innerHTML.includes('v-badge')) {
+                                 nameEl.innerHTML += ` <img src="${V_URL}" class="v-badge">`;
+                            }
+                        }
+                    });
+
+                    if (!userData) {
+                        userData = otherData;
+                        userCache[otherUid] = userData;
+                        localStorage.setItem('goorac_u_cache', JSON.stringify(userCache));
+                    }
                 }
                 
                 const isPinned = myPinnedChats.includes(d.id);
@@ -581,7 +701,7 @@
                 if (count > 0) isUnread = true;
                 else if (chat.lastSender && chat.lastSender !== myUid) isUnread = (chat.seen !== true);
 
-                return { id: d.id, chat, u: userData, otherUid, isPinned, isUnread };
+                return { id: d.id, chat, u: userData, otherUid, isPinned, isUnread, isGroup }; // INJECTED ISGROUP
             });
 
             const results = await Promise.all(chatPromises);
@@ -623,6 +743,7 @@
         const filteredData = currentChatData.filter((item) => {
             if (currentFilter === 'all') return true;
             if (currentFilter === 'unread') return item.isUnread;
+            if (currentFilter === 'groups') return item.isGroup;
             return true;
         });
 
@@ -631,35 +752,38 @@
             return;
         }
 
-        filteredData.forEach(({id, chat, u, otherUid, isPinned, isUnread}) => {
-            if(!u) return;
+        filteredData.forEach(({id, chat, u, otherUid, isPinned, isUnread, isGroup}) => {
+            if(!u && !isGroup) return; // SAFEGUARD
             
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
-            const amIFollowing = myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
+            const amIFollowing = isGroup ? false : myFollowingList.some(item => (typeof item === 'string' ? item : item.uid) === otherUid);
 
-            const finalName = u.name || u.displayName || u.username || "Unknown";
+            const finalName = isGroup ? chat.groupName : (u.name || u.displayName || u.username || "Unknown");
+            const finalPfp = isGroup ? (chat.groupPhoto || 'https://via.placeholder.com/150/000000/FFFFFF?text=G') : (u.photoURL || 'https://via.placeholder.com/150');
             const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
+            const isVerified = isGroup ? false : u.verified;
+            const chatLinkUser = isGroup ? id : u.username;
             
-            const safeUserStr = encodeURIComponent(JSON.stringify({ name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified }));
+            const safeUserStr = encodeURIComponent(JSON.stringify({ name: finalName, username: chatLinkUser, photoURL: finalPfp, verified: isVerified, isGroup: isGroup }));
 
             const item = document.createElement('div');
             item.className = 'chat-item';
             item.setAttribute("ontouchstart", `startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')`);
             item.setAttribute("ontouchend", "endLongPress(this)");
             item.setAttribute("ontouchmove", "cancelLongPress(this)"); 
-            item.setAttribute("onclick", `enterChat(event, '${u.username}')`); 
+            item.setAttribute("onclick", `enterChat(event, '${chatLinkUser}', ${isGroup})`); 
 
             // Absolute physics constraint applied here
             item.innerHTML = `
                 <div class="pfp-container">
-                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                    <div class="online-indicator" id="online-${otherUid}"></div>
+                    <img src="${finalPfp}" class="chat-pfp">
+                    ${!isGroup ? `<div class="online-indicator" id="online-${otherUid}"></div>` : ''}
                 </div>
                 <div class="chat-info">
                     <div class="chat-top-row">
                         <span class="u-name" id="name-${id}">
                             ${finalName} 
-                            ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                            ${isVerified ? `<img src="${V_URL}" class="v-badge">` : ''}
                             ${isPinned ? `<span class="pin-indicator"></span>` : ''}
                         </span>
                         <span style="font-size:0.7rem; color:#444; flex-shrink: 0;">${chat.lastTimestamp ? formatTime(chat.lastTimestamp.toDate()) : ''}</span>
@@ -669,7 +793,7 @@
                             ${lastMsg}
                         </div>
                         <div style="display:flex; align-items:center; gap:8px; flex-shrink: 0; justify-content: flex-end;" id="meta-${id}">
-                            ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
+                            ${!amIFollowing && !isGroup ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
                             ${isUnread ? `<div class="unread-badge" style="background:${randomColor} !important; box-shadow: 0 0 12px ${randomColor} !important;"></div>` : ''}
                         </div>
                     </div>
@@ -685,7 +809,7 @@
             });
 
             // --- INSTANT ONLINE / 20S OFFLINE DELAY LOGIC ---
-            if (myShowActivityStatus) {
+            if (myShowActivityStatus && !isGroup) {
                 rdb.ref(`/status/${otherUid}/state`).on('value', snap => {
                     const dot = document.getElementById(`online-${otherUid}`);
                     if (!dot) return;
@@ -726,9 +850,14 @@
     window.cancelLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
     window.endLongPress = function(el) { clearTimeout(longPressTimer); el.style.transform = "scale(1)"; };
 
-    window.enterChat = function(e, username) {
+    window.enterChat = function(e, usernameOrGroupId, isGroup) {
         if(isLongPress || e.target.closest('button')) return;
-        window.location.href = `chat.html?user=${username}`;
+        if(isGroup) {
+            // CHANGED TARGET REDIRECT AS REQUESTED
+            window.location.href = `groupChat.html?id=${usernameOrGroupId}`; 
+        } else {
+            window.location.href = `chat.html?user=${usernameOrGroupId}`;
+        }
     };
 
     window.visitProfile = function(e, username) { e.stopPropagation(); window.location.href = `userProfile.html?user=${username}`; };
@@ -738,23 +867,34 @@
         history.pushState({ menuOpen: true }, "", "#menu");
         document.getElementById('active-pfp').src = userObj.photoURL || 'https://via.placeholder.com/150';
         document.getElementById('active-name').innerHTML = `${userObj.name} ${userObj.verified ? `<img src="${V_URL}" class="v-badge">` : ''}`;
-        document.getElementById('active-username').innerText = `@${userObj.username}`;
+        document.getElementById('active-username').innerText = userObj.isGroup ? "Group Transmission" : `@${userObj.username}`;
         const pinBtn = document.getElementById('pin-chat-btn');
         pinBtn.innerText = isPinned ? "Unpin Conversation" : "Pin Conversation";
         pinBtn.onclick = () => togglePin(chatId, isPinned);
+        
+        const delBtn = document.getElementById('confirm-delete');
+        delBtn.innerText = userObj.isGroup ? "Leave Group" : "Erase History For Both";
+        delBtn.dataset.isGroup = userObj.isGroup ? "true" : "false";
+
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
         const nav = document.querySelector('main-navbar');
         if(nav) nav.classList.add('hide-nav');
     }
 
-    // UPDATED ONPOPSTATE TO HANDLE BOTH MODALS
+    // UPDATED ONPOPSTATE TO HANDLE BOTH MODALS AND GROUP MODALS
     window.onpopstate = (e) => { 
         if(document.getElementById('delete-menu').classList.contains('active')) {
             closeDeleteMenu(false); 
         }
         if(document.getElementById('msg-intro-overlay').style.display === 'block') {
             closeIntroModal(false);
+        }
+        if(document.getElementById('group-modal').classList.contains('active')) {
+            closeGroupModal(false);
+        }
+        if(document.getElementById('members-modal').classList.contains('active')) {
+            closeMembersModal(false);
         }
     };
 
@@ -774,42 +914,46 @@
         if(shouldGoBack && window.location.hash === "#menu") history.back();
     }
 
-    document.getElementById('confirm-delete').onclick = async () => {
+    document.getElementById('confirm-delete').onclick = async function() {
         if(!activeChatId) return;
         const cid = activeChatId; 
+        const isGroup = this.dataset.isGroup === "true";
         closeDeleteMenu(true);
+        
         if(confirm("Are you sure? This action is irreversible.")) {
             // === 1. LOCAL STORAGE & CACHE CLEANUP ===
             localStorage.removeItem('goorac_inbox_html'); 
             localStorage.removeItem('chat_msgs_' + cid); 
             
             try {
-                // === 2. CRITICAL: DELETE CHAT DOCUMENT FIRST ===
-                // Separating this from the batch ensures the chat disappears from the Inbox
-                // instantly, even if the message deletion batch limit (500) is hit later.
-                await db.collection("chats").doc(cid).delete();
-
-                // === 3. SUB-RESOURCE CLEANUP ===
-                db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
-                rdb.ref(`typing/${cid}`).remove();
-                
-                // === 4. BATCH MESSAGE DELETION (WITH SAFETY LIMIT) ===
-                const msgs = await db.collection("chats").doc(cid).collection("messages").get();
-                if (!msgs.empty) {
-                    const batch = db.batch();
-                    let count = 0;
-                    // Prevent Batch Limit Crash (>500 ops makes the whole batch fail)
-                    // We cap it at 480 to be safe.
-                    msgs.docs.forEach((d, index) => {
-                        if (index < 480) { 
-                            batch.delete(d.ref);
-                            count++;
-                        }
+                if(isGroup) {
+                    await db.collection("chats").doc(cid).update({
+                        participants: firebase.firestore.FieldValue.arrayRemove(myUid)
                     });
-                    if (count > 0) await batch.commit();
+                    db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
+                } else {
+                    // === 2. CRITICAL: DELETE CHAT DOCUMENT FIRST ===
+                    await db.collection("chats").doc(cid).delete();
+
+                    // === 3. SUB-RESOURCE CLEANUP ===
+                    db.collection("users").doc(myUid).update({ pinnedChats: firebase.firestore.FieldValue.arrayRemove(cid) }).catch(e=>{});
+                    rdb.ref(`typing/${cid}`).remove();
+                    
+                    // === 4. BATCH MESSAGE DELETION (WITH SAFETY LIMIT) ===
+                    const msgs = await db.collection("chats").doc(cid).collection("messages").get();
+                    if (!msgs.empty) {
+                        const batch = db.batch();
+                        let count = 0;
+                        msgs.docs.forEach((d, index) => {
+                            if (index < 480) { 
+                                batch.delete(d.ref);
+                                count++;
+                            }
+                        });
+                        if (count > 0) await batch.commit();
+                    }
                 }
-                
-            } catch(e) { console.error("Erase failed:", e); }
+            } catch(e) { console.error("Erase/Leave failed:", e); }
         }
     };
 
@@ -855,6 +999,188 @@
         if(day < 7) return `${day}d ago`;
         return date.toLocaleDateString();
     }
+
+    // --- NEW GROUP CREATION LOGIC ---
+    window.openGroupModal = function() {
+        document.getElementById('group-modal').classList.add('active');
+        history.pushState({ modal: 'group' }, "", "#group");
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.add('hide-nav');
+        
+        // Reset state
+        selectedGroupMembers = [];
+        groupBase64Image = null;
+        document.getElementById('group-name-input').value = "";
+        document.getElementById('group-desc-input').value = "";
+        document.getElementById('group-pic-preview').style.display = "none";
+        document.getElementById('group-pic-preview').src = "";
+        validateGroupForm();
+        updateSelectedMembersCount();
+    };
+
+    window.closeGroupModal = function(shouldGoBack) {
+        document.getElementById('group-modal').classList.remove('active');
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.remove('hide-nav');
+        if(shouldGoBack && window.location.hash === "#group") history.back();
+    };
+
+    window.previewGroupImage = function(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            groupBase64Image = e.target.result;
+            const preview = document.getElementById('group-pic-preview');
+            preview.src = groupBase64Image;
+            preview.style.display = "block";
+            validateGroupForm();
+        }
+        reader.readAsDataURL(file);
+    };
+
+    window.validateGroupForm = function() {
+        const name = document.getElementById('group-name-input').value.trim();
+        const btn = document.getElementById('create-group-btn-submit');
+        if(name.length > 0 && selectedGroupMembers.length > 0) {
+            btn.disabled = false;
+        } else {
+            btn.disabled = true;
+        }
+    };
+
+    // MEMBERS SELECTION LOGIC
+    window.openMembersModal = function() {
+        document.getElementById('members-modal').classList.add('active');
+        history.pushState({ modal: 'members' }, "", "#members");
+        
+        // Calculate Mutuals
+        const followingIds = myFollowingList.map(f => typeof f === 'string' ? f : f.uid);
+        const followersIds = myFollowersList.map(f => typeof f === 'string' ? f : f.uid);
+        mutualFriends = followingIds.filter(id => followersIds.includes(id));
+        
+        friendsLoadedCount = 0;
+        document.getElementById('mutual-friends-list').innerHTML = "";
+        setupInfiniteScroll();
+    };
+
+    window.closeMembersModal = function(shouldGoBack) {
+        document.getElementById('members-modal').classList.remove('active');
+        if(shouldGoBack && window.location.hash === "#members") history.back(); // Returns to #group
+    };
+
+    function setupInfiniteScroll() {
+        if(observer) observer.disconnect();
+        const trigger = document.getElementById('scroll-trigger');
+        trigger.style.display = "flex";
+        
+        observer = new IntersectionObserver((entries) => {
+            if(entries[0].isIntersecting) {
+                loadMoreFriends();
+            }
+        });
+        observer.observe(trigger);
+        loadMoreFriends(); // Initial load
+    }
+
+    function loadMoreFriends() {
+        const slice = mutualFriends.slice(friendsLoadedCount, friendsLoadedCount + friendsPerPage);
+        if(slice.length === 0) {
+            document.getElementById('scroll-trigger').style.display = "none";
+            document.getElementById('scroll-trigger').innerText = "End of list";
+            return;
+        }
+
+        db.collection("users").where(firebase.firestore.FieldPath.documentId(), 'in', slice).get()
+        .then(snap => {
+            const listEl = document.getElementById('mutual-friends-list');
+            snap.docs.forEach(doc => {
+                const u = doc.data();
+                const uid = doc.id;
+                const isSelected = selectedGroupMembers.includes(uid);
+                
+                const div = document.createElement('div');
+                div.className = 'selectable-member';
+                div.onclick = () => toggleMemberSelection(uid, div.querySelector('.sel-checkbox'));
+                div.innerHTML = `
+                    <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="sel-pfp">
+                    <div class="sel-info">
+                        <div class="sel-name">${u.name || u.username}</div>
+                        <div class="sel-handle">@${u.username}</div>
+                    </div>
+                    <div class="sel-checkbox ${isSelected ? 'checked' : ''}"></div>
+                `;
+                listEl.appendChild(div);
+            });
+            friendsLoadedCount += slice.length;
+            if(friendsLoadedCount >= mutualFriends.length) {
+                document.getElementById('scroll-trigger').style.display = "none";
+            }
+        });
+    }
+
+    window.toggleMemberSelection = function(uid, checkboxEl) {
+        const index = selectedGroupMembers.indexOf(uid);
+        if(index > -1) {
+            selectedGroupMembers.splice(index, 1);
+            checkboxEl.classList.remove('checked');
+        } else {
+            selectedGroupMembers.push(uid);
+            checkboxEl.classList.add('checked');
+        }
+        updateSelectedMembersCount();
+        validateGroupForm();
+    };
+
+    function updateSelectedMembersCount() {
+        const badge = document.getElementById('selected-members-count');
+        if(selectedGroupMembers.length > 0) {
+            badge.style.display = "inline-block";
+            badge.innerText = selectedGroupMembers.length;
+        } else {
+            badge.style.display = "none";
+        }
+    }
+
+    window.executeGroupCreation = async function() {
+        const btn = document.getElementById('create-group-btn-submit');
+        btn.disabled = true;
+        btn.innerText = "Quantum Assembling...";
+
+        const name = document.getElementById('group-name-input').value.trim();
+        const desc = document.getElementById('group-desc-input').value.trim();
+        const finalParticipants = [myUid, ...selectedGroupMembers];
+        
+        // UNIQUE ID GENERATION
+        const newGroupRef = db.collection("chats").doc(); 
+
+        const groupData = {
+            isGroup: true,
+            groupId: newGroupRef.id, // SAVED UNIQUE ID
+            groupName: name,
+            groupDescription: desc,
+            groupPhoto: groupBase64Image || 'https://via.placeholder.com/150/000000/FFFFFF?text=' + name.charAt(0).toUpperCase(),
+            participants: finalParticipants,
+            admin: myUid, // Fallback
+            admins: [myUid], // NEW ADMINS ARRAY (CREATOR INCLUDED)
+            lastMessage: "Group created",
+            lastSender: myUid,
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            seen: true,
+            unreadCount: {}
+        };
+
+        try {
+            await newGroupRef.set(groupData);
+            closeGroupModal(true);
+            // REDIRECT TARGET UPDATED
+            window.location.href = `groupChat.html?id=${newGroupRef.id}`;
+        } catch(e) {
+            console.error("Group creation failed", e);
+            btn.disabled = false;
+            btn.innerText = "Create Group";
+        }
+    };
 </script>
 </body>
 </html>
