@@ -1,30 +1,41 @@
+/**
+ * Goorac Quantum Engine - Advanced Giphy GIF Picker Component
+ * Includes: VADER NLP Chat Vibe Analysis, Infinite Scroll Pagination, 
+ * Smart Context Suggestions, Category Pills, and Shimmer Loading.
+ */
+
 class GifPicker extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
         
-        // --- API CONFIGURATION ---
-        // Integrated with your new GIPHY SDK API Key
-        this.apiKey = 'RYDUFLrZbgYKk0iS3yUqo3SinXC8mIeH'; 
+        // --- 1. CORE API CONFIGURATION ---
+        // Your Verified Giphy API Key
+        this.apiKey = 'Zs8xMqmwlAhWcjzoYGjVDKxb8FOXddli'; 
         
-        // Load Recents (Limit to 6 to save space)
+        // Local Storage State
         let savedRecents = JSON.parse(localStorage.getItem('goorac_gif_recents')) || [];
-        this.recentGifs = savedRecents.slice(0, 6);
+        this.recentGifs = savedRecents.slice(0, 8); // Keep up to 8 recents
         
+        // Search & Pagination State
         this.lastSearchedTerm = "";
         this.searchTimeout = null;
-        this.lastMoodName = null;
+        this.currentOffset = 0;
+        this.isFetchingMore = false;
+        this.hasReachedEnd = false;
+        this.activeCategory = 'trending';
         
-        // Cache to prevent spamming the API on every open
+        // AI State
+        this.lastMoodName = null;
         this.apiCache = {};
     }
 
     connectedCallback() {
         this.render();
         this.setupEvents();
-        this.loadGifSections();
+        this.loadInitialViews();
 
-        // Check for chat mood changes every 3 seconds to update the Vibe row
+        // AI Mood Polling: Check chat context every 3 seconds
         this.moodRefreshInterval = setInterval(() => {
             this.refreshChatMood();
         }, 3000);
@@ -34,18 +45,10 @@ class GifPicker extends HTMLElement {
         if (this.moodRefreshInterval) clearInterval(this.moodRefreshInterval);
     }
 
-    refreshChatMood() {
-        if (this.lastSearchedTerm) return; 
-        
-        const newMoodData = this.calculateChatMood();
-        const newMoodName = newMoodData ? newMoodData.name : null;
-        
-        if (this.lastMoodName !== newMoodName) {
-            this.loadGifSections(); 
-        }
-    }
+    // ==========================================
+    //  AI ENGINE: VADER NLP PORT (QUANTUM MOOD)
+    // ==========================================
 
-    // --- 1. AI: CHAT VIBE ENGINE (VADER NLP PORT) ---
     getRecentChatContext() {
         let allChatMessages = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -57,6 +60,7 @@ class GifPicker extends HTMLElement {
                 } catch(e) {}
             }
         }
+        // Sort newest first
         allChatMessages.sort((a, b) => new Date(b.timestampIso || 0).getTime() - new Date(a.timestampIso || 0).getTime());
         return allChatMessages.slice(0, 25);
     }
@@ -65,30 +69,82 @@ class GifPicker extends HTMLElement {
         const messages = this.getRecentChatContext();
         if (messages.length === 0) return null;
 
-        const scores = { happy: 0, sad: 0, angry: 0, love: 0, funny: 0, surprised: 0, party: 0, work: 0 };
-        const negations = ['not', "don't", "dont", 'never', 'no', 'illa', 'illai'];
+        const scores = { happy: 0, sad: 0, angry: 0, love: 0, funny: 0, surprised: 0, party: 0, work: 0, chill: 0 };
+        const negations = ['not', "don't", "dont", 'never', 'no', 'illa', 'illai', 'illay', 'illam', 'kidayathu', 'இல்லை'];
+        const intensifiers = ['very', 'really', 'so', 'too', 'extremely', 'romba', 'rumba', 'migavum', 'மிகவும்', 'ரொம்ப'];
         
-        // Simplified lexicons for quick scanning
+        // Massive lexicons mapping words to emotions
         const lexicons = {
-            tamil: { happy: ['sema', 'mass', 'jolly'], sad: ['kavalai', 'sogam', 'feel'], angry: ['kovam', 'kaduppu', 'tension'], love: ['kadhal', 'chellam', 'kutti'], funny: ['sirippu', 'comedy', 'fun'], party: ['enjoy', 'vibes'] },
-            english: { happy: ['good', 'great', 'awesome'], sad: ['sad', 'bad', 'cry'], angry: ['mad', 'hate', 'wtf'], love: ['love', 'babe', 'cute'], funny: ['haha', 'lmao', 'lol'], party: ['party', 'drink', 'lit'], work: ['work', 'busy', 'stress'] }
+            emojis: {
+                happy: ['😊', '😁', '😄', '🙂', '🥳', '😎', '😇', '👍', '☀️'],
+                sad: ['😢', '😭', '😞', '😔', '💔', '☹️', '😓', '👎', '🌧️'],
+                angry: ['😠', '😡', '🤬', '😾', '😤', '🖕', '💥', '💢'],
+                love: ['❤️', '😍', '🥰', '😘', '💕', '💖', '💗', '🫂'],
+                funny: ['😂', '🤣', '💀', '😹', '🤡', '🤪'],
+                surprised: ['😮', '😱', '😲', '🤯', '😳', '👀', '⁉️'],
+                party: ['🎉', '🎊', '🍻', '🥂', '🍾', '💃', '🕺', '🔥'],
+                work: ['💻', '📝', '📈', '🏢', '💼', '☕', '🧠', '🛠️'],
+                chill: ['🧘', '🎧', '🛀', '🛋️', '🍵', '🍃']
+            },
+            tamil: {
+                happy: ['santhosham', 'magilchi', 'super', 'sema', 'nalla', 'mass', 'verithanam', 'jolly', 'arputham'],
+                sad: ['kavalai', 'varutham', 'sogam', 'kavala', 'kashtam', 'vali', 'paavam', 'feel', 'azhugai'],
+                angry: ['kovam', 'kaduppu', 'erichal', 'poda', 'loosu', 'mutal', 'tension', 'veri', 'moodu'],
+                love: ['kadhal', 'anbu', 'chellam', 'kutti', 'uyire', 'thangam', 'kannu', 'pasam', 'muththam'],
+                funny: ['sirippu', 'nagaichuvai', 'siripa', 'kalaai', 'comedy', 'mokkai', 'fun'],
+                surprised: ['achariyam', 'athirchi', 'enna', 'nijamava', 'appadiya', 'shok', 'bayam'],
+                party: ['kondaattam', 'enjoy', 'kudhukalam', 'vibes'],
+                work: ['velai', 'office', 'project', 'padipu', 'exam']
+            },
+            english: {
+                happy: ['good', 'great', 'happy', 'yay', 'awesome', 'nice', 'sweet', 'cool', 'amazing', 'best', 'fantastic'],
+                sad: ['sad', 'bad', 'sorry', 'depressed', 'down', 'miss', 'cry', 'hurt', 'pain', 'lonely'],
+                angry: ['angry', 'mad', 'hate', 'annoyed', 'wtf', 'stupid', 'idiot', 'furious', 'pissed', 'crap'],
+                love: ['love', 'miss you', 'babe', 'baby', 'kiss', 'heart', 'beautiful', 'cute', 'darling'],
+                funny: ['haha', 'lmao', 'lol', 'rofl', 'dead', 'funny', 'joke', 'hilarious', 'goofy', 'meme'],
+                surprised: ['wow', 'omg', 'really', 'shocked', 'whoa', 'crazy', 'insane', 'stunned'],
+                party: ['party', 'drink', 'drunk', 'celebrate', 'weekend', 'club', 'dance', 'lit', 'fire', 'cheers'],
+                work: ['work', 'job', 'busy', 'meeting', 'tired', 'code', 'deploy', 'office', 'boss', 'stress'],
+                chill: ['relax', 'chill', 'calm', 'peace', 'sleep', 'rest', 'lazy', 'vibe']
+            }
         };
 
         messages.forEach((msg, index) => {
             const rawText = (msg.text || '').toLowerCase();
             const tokens = rawText.split(/[\s,.\?!]+/);
-            const timeWeight = 1.0 - (index * 0.04); 
+            const timeWeight = 1.0 - (index * 0.04); // Older messages matter less
+
+            for (const [emotion, emojiList] of Object.entries(lexicons.emojis)) {
+                emojiList.forEach(emoji => {
+                    if (rawText.includes(emoji)) scores[emotion] += 3.0 * timeWeight;
+                });
+            }
 
             for (let i = 0; i < tokens.length; i++) {
                 let word = tokens[i];
                 if (!word) continue;
-                let isNegated = (i > 0 && negations.includes(tokens[i - 1]));
 
-                const applyScore = (emotion, val) => {
+                let isNegated = false;
+                let isIntensified = false;
+
+                // Lookback window for modifiers
+                for(let j = 1; j <= 2; j++) {
+                    if (i - j >= 0) {
+                        if (negations.includes(tokens[i - j])) isNegated = true;
+                        if (intensifiers.includes(tokens[i - j])) isIntensified = true;
+                    }
+                }
+
+                const applyScore = (emotion, baseValue) => {
+                    let finalValue = baseValue * timeWeight;
+                    if (isIntensified) finalValue *= 1.5;
+
                     if (isNegated) {
-                        if (['happy', 'love', 'funny', 'party'].includes(emotion)) scores.sad += val * timeWeight;
-                        else if (['sad', 'angry'].includes(emotion)) scores.happy += val * timeWeight;
-                    } else scores[emotion] += val * timeWeight;
+                        if (['happy', 'love', 'funny', 'party', 'chill'].includes(emotion)) scores.sad += finalValue;
+                        else if (['sad', 'angry', 'work'].includes(emotion)) scores.happy += finalValue;
+                    } else {
+                        scores[emotion] += finalValue;
+                    }
                 };
 
                 for (const [emotion, words] of Object.entries(lexicons.tamil)) if (words.includes(word)) applyScore(emotion, 2.0);
@@ -103,23 +159,36 @@ class GifPicker extends HTMLElement {
         }
 
         if (dominant) {
-            // Map the NLP emotion to a high-quality GIF search query
+            // Maps the internal emotion to a highly optimized Giphy search query
             const moodDisplayMap = {
-                happy: { name: 'Happy', query: 'happy dance excitement' },
-                sad: { name: 'Sad', query: 'crying sad hugs' },
-                angry: { name: 'Angry', query: 'angry mad rage' },
-                love: { name: 'In Love', query: 'love hugs blowing kiss' },
-                funny: { name: 'Funny', query: 'laughing hysterically lmao' },
-                surprised: { name: 'Surprised', query: 'shocked wtf mind blown' },
-                party: { name: 'Vibes / Party', query: 'party lit dancing' },
-                work: { name: 'Grind / Work', query: 'tired working stressed coffee' }
+                happy: { name: 'Happy', query: 'happy dance excitement joy' },
+                sad: { name: 'Sad', query: 'crying sad hugs lonely' },
+                angry: { name: 'Angry', query: 'angry mad rage flip table' },
+                love: { name: 'In Love', query: 'love hugs blowing kiss heart eyes' },
+                funny: { name: 'Funny', query: 'laughing hysterically lmao rofl' },
+                surprised: { name: 'Surprised', query: 'shocked wtf mind blown gasp' },
+                party: { name: 'Vibes / Party', query: 'party lit dancing cheers' },
+                work: { name: 'Grind / Work', query: 'tired working stressed coffee typing' },
+                chill: { name: 'Chill', query: 'relaxing chilling zen peaceful' }
             };
             return moodDisplayMap[dominant];
         }
         return null;
     }
 
-    // --- 2. AI: SMART SUGGESTIONS ENGINE ---
+    refreshChatMood() {
+        if (this.lastSearchedTerm) return; 
+        
+        const newMoodData = this.calculateChatMood();
+        const newMoodName = newMoodData ? newMoodData.name : null;
+        
+        // If the AI detects a mood shift, silently update the top row without ruining scroll position
+        if (this.lastMoodName !== newMoodName) {
+            this.lastMoodName = newMoodName;
+            this.loadInitialViews(true); 
+        }
+    }
+
     getSmartSuggestionQuery() {
         const date = new Date();
         const hour = date.getHours();
@@ -128,9 +197,9 @@ class GifPicker extends HTMLElement {
         let query = "";
         if (hour >= 5 && hour < 11) query = "good morning coffee wake up";
         else if (hour >= 11 && hour < 14) query = "lunch hungry eating";
-        else if (hour >= 14 && hour < 17) query = "tired afternoon nap";
-        else if (hour >= 17 && hour < 21) query = "relaxing chill evening";
-        else query = "good night sleep tired";
+        else if (hour >= 14 && hour < 17) query = "tired afternoon nap bored";
+        else if (hour >= 17 && hour < 21) query = "relaxing chill evening sunset";
+        else query = "good night sleep tired bed";
         
         if (dayOfWeek === 5 && hour >= 16) query = "friday feeling weekend party";
         if (dayOfWeek === 1 && hour < 12) query = "monday morning tired";
@@ -138,34 +207,45 @@ class GifPicker extends HTMLElement {
         return query;
     }
 
-    // --- API FETCHING LOGIC (GIPHY IMPLEMENTATION) ---
-    async fetchGiphyGifs(endpoint, query = '', limit = 6) {
-        const cacheKey = `${endpoint}_${query}_${limit}`;
-        if (this.apiCache[cacheKey]) return this.apiCache[cacheKey];
+    // ==========================================
+    //  API LOGIC: GIPHY INTEGRATION & PAGINATION
+    // ==========================================
 
-        let url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${this.apiKey}&limit=${limit}&rating=pg-13`;
+    async fetchGiphyGifs(endpoint, query = '', limit = 20, offset = 0) {
+        // Build the Giphy URL
+        let url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${this.apiKey}&limit=${limit}&offset=${offset}&rating=pg-13`;
         if (query) url += `&q=${encodeURIComponent(query)}`;
 
         try {
             const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            
             const data = await response.json();
             
-            // Format Giphy's data so your HTML grid still renders perfectly
+            // Format the messy Giphy payload into clean, optimized objects for our UI
             const results = data.data.map(gif => ({
                 id: gif.id,
-                url: gif.images.fixed_width_small.url, // Optimized for mobile grids
-                preview: gif.images.fixed_width_small.url 
+                // We use fixed_width_small to save bandwidth and prevent lag in chat
+                url: gif.images.fixed_width_small.url, 
+                width: gif.images.fixed_width_small.width,
+                height: gif.images.fixed_width_small.height,
+                title: gif.title
             }));
             
-            this.apiCache[cacheKey] = results;
-            return results;
+            return {
+                results: results,
+                totalCount: data.pagination.total_count
+            };
         } catch (error) {
-            console.error("GIF Fetch Error:", error);
-            return [];
+            console.error("Giphy API Fetch Error:", error);
+            return { results: [], totalCount: 0 };
         }
     }
 
-    // --- RENDERING ---
+    // ==========================================
+    //  RENDERING & UI LOGIC
+    // ==========================================
+
     render() {
         this.shadowRoot.innerHTML = `
             <style>
@@ -180,32 +260,78 @@ class GifPicker extends HTMLElement {
                     overflow: hidden;
                     padding-bottom: env(safe-area-inset-bottom);
                 }
+                
+                /* HEADER & SEARCH */
                 .gp-header {
                     padding: 8px 12px;
-                    border-bottom: 1px solid #262626;
-                    display: flex; align-items: center; gap: 10px;
                     background: rgba(18,18,18,0.95);
                     flex-shrink: 0; 
+                    z-index: 10;
                 }
-                .gp-search-container { flex: 1; position: relative; display: flex; align-items: center; }
+                .gp-search-container { 
+                    position: relative; 
+                    display: flex; 
+                    align-items: center; 
+                }
                 .gp-search {
                     width: 100%; background: #262626; border: none; border-radius: 8px;
-                    padding: 8px 30px 8px 12px; color: #fff; font-size: 14px; outline: none;
+                    padding: 10px 35px 10px 12px; color: #fff; font-size: 15px; outline: none;
+                    transition: border 0.2s;
                 }
+                .gp-search:focus { border: 1px solid #FF6D00; }
                 .gp-clear {
                     position: absolute; right: 10px; background: none; border: none;
-                    color: #888; cursor: pointer; display: none; font-size: 16px; outline: none;
+                    color: #888; cursor: pointer; display: none; font-size: 20px; outline: none;
                 }
-                .gp-body {
-                    flex: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; min-height: 0;
-                }
-                .gp-category-title {
-                    font-size: 0.75rem; color: #888; margin: 15px 0 8px 5px; font-weight: 600; text-transform: uppercase;
-                }
-                #cat-suggested .gp-category-title { color: #a162f7; }
-                #cat-chatmood .gp-category-title { color: #ff3366; text-shadow: 0 0 8px rgba(255, 51, 102, 0.4); }
                 
-                /* 2-Column Masonry for GIFs */
+                /* PILL NAVIGATION (CATEGORIES) */
+                .gp-nav-pills {
+                    display: flex;
+                    gap: 8px;
+                    padding: 0 12px 10px 12px;
+                    overflow-x: auto;
+                    scrollbar-width: none;
+                    border-bottom: 1px solid #262626;
+                }
+                .gp-nav-pills::-webkit-scrollbar { display: none; }
+                .gp-pill {
+                    background: #1e1e1e;
+                    color: #aaa;
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    white-space: nowrap;
+                    cursor: pointer;
+                    border: 1px solid #333;
+                    transition: all 0.2s ease;
+                }
+                .gp-pill.active {
+                    background: rgba(255, 109, 0, 0.15);
+                    color: #FF6D00;
+                    border-color: #FF6D00;
+                }
+                .gp-pill:active { transform: scale(0.95); }
+
+                /* SCROLLABLE BODY */
+                .gp-body {
+                    flex: 1; 
+                    overflow-y: auto; 
+                    padding: 10px; 
+                    scroll-behavior: smooth; 
+                    min-height: 0;
+                }
+                .gp-body::-webkit-scrollbar { display: none; }
+                
+                /* SECTION HEADERS */
+                .gp-category-title {
+                    font-size: 0.75rem; color: #888; margin: 15px 0 8px 5px; 
+                    font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+                }
+                .gp-category-title.ai-glow { color: #a162f7; }
+                .gp-category-title.vibe-glow { color: #ff3366; text-shadow: 0 0 8px rgba(255, 51, 102, 0.4); }
+                
+                /* 2-COLUMN MASONRY GRID */
                 .gp-grid {
                     column-count: 2;
                     column-gap: 8px;
@@ -215,26 +341,66 @@ class GifPicker extends HTMLElement {
                     margin-bottom: 8px;
                     border-radius: 8px;
                     overflow: hidden;
-                    background: #262626; /* Shimmer fallback color */
+                    background: #262626; 
                     cursor: pointer;
                     position: relative;
+                    min-height: 100px; /* Base height before load */
                 }
                 .gp-gif-wrapper:active { filter: brightness(0.8); transform: scale(0.98); }
                 .gp-gif {
                     width: 100%;
                     display: block;
                     border-radius: 8px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
                 }
-                .loading-text { color: #888; text-align: center; padding: 20px; font-size: 0.9rem; }
+                .gp-gif.loaded { opacity: 1; }
+
+                /* LOADING EFFECTS */
+                .shimmer {
+                    background: linear-gradient(90deg, #222 0%, #333 50%, #222 100%);
+                    background-size: 400% 100%;
+                    animation: shimmerAnim 1.5s infinite linear;
+                }
+                @keyframes shimmerAnim {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+                .loading-text { 
+                    color: #888; text-align: center; padding: 20px; font-size: 0.9rem; 
+                    display: flex; flex-direction: column; align-items: center; gap: 10px;
+                }
+                .spinner {
+                    width: 24px; height: 24px; border: 3px solid #333;
+                    border-top-color: #FF6D00; border-radius: 50%;
+                    animation: spin 1s infinite linear;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+                
+                /* EMPTY STATE */
+                .empty-state { text-align: center; color: #666; padding: 40px 20px; }
+                .empty-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.5; }
             </style>
+            
             <div class="gp-header">
                 <div class="gp-search-container">
-                    <input type="text" class="gp-search" placeholder="Search GIFs...">
+                    <input type="text" class="gp-search" placeholder="Search GIPHY...">
                     <button class="gp-clear">&times;</button>
                 </div>
             </div>
+            
+            <div class="gp-nav-pills" id="nav-pills">
+                <div class="gp-pill active" data-query="">Trending</div>
+                <div class="gp-pill" data-query="reactions">Reactions</div>
+                <div class="gp-pill" data-query="anime">Anime</div>
+                <div class="gp-pill" data-query="memes">Memes</div>
+                <div class="gp-pill" data-query="gaming">Gaming</div>
+                <div class="gp-pill" data-query="sports">Sports</div>
+                <div class="gp-pill" data-query="music">Music</div>
+            </div>
+
             <div class="gp-body" id="gif-body">
-                <div class="loading-text">Initializing Quantum Engine...</div>
+                <div class="loading-text"><div class="spinner"></div>Initializing Quantum Engine...</div>
             </div>
         `;
     }
@@ -242,102 +408,244 @@ class GifPicker extends HTMLElement {
     setupEvents() {
         const searchInput = this.shadowRoot.querySelector('.gp-search');
         const clearBtn = this.shadowRoot.querySelector('.gp-clear');
+        const body = this.shadowRoot.getElementById('gif-body');
+        const pills = this.shadowRoot.querySelectorAll('.gp-pill');
         
+        // Search Input Logic (Debounced)
         searchInput.addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase().trim();
             this.lastSearchedTerm = val;
             clearBtn.style.display = val ? 'block' : 'none';
             
+            // Remove active pill states if typing custom search
+            pills.forEach(p => p.classList.remove('active'));
+
             clearTimeout(this.searchTimeout);
             this.searchTimeout = setTimeout(() => {
                 this.executeSearch(val);
-            }, 400); // Debounce API calls
+            }, 500); 
         });
 
+        // Clear Button
         clearBtn.addEventListener('click', () => {
             searchInput.value = '';
             this.lastSearchedTerm = '';
             clearBtn.style.display = 'none';
-            this.loadGifSections(); // Revert to AI / Trending views
+            pills.forEach(p => p.classList.remove('active'));
+            pills[0].classList.add('active'); // Reset to trending
+            this.loadInitialViews(); 
+        });
+
+        // Category Pills Logic
+        pills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                pills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                
+                const query = pill.getAttribute('data-query');
+                searchInput.value = query; // Auto fill search bar
+                this.lastSearchedTerm = query;
+                clearBtn.style.display = query ? 'block' : 'none';
+                
+                if (query === "") {
+                    this.loadInitialViews(); // Trending view
+                } else {
+                    this.executeSearch(query);
+                }
+            });
+        });
+
+        // Infinite Scroll Logic
+        body.addEventListener('scroll', () => {
+            // Only trigger infinite scroll if we are in a single search/category view 
+            // (Not in the mixed AI/Recents view)
+            if (this.lastSearchedTerm && !this.isFetchingMore && !this.hasReachedEnd) {
+                const scrollDistanceToBottom = body.scrollHeight - body.scrollTop - body.clientHeight;
+                
+                // If within 200px of bottom, load more
+                if (scrollDistanceToBottom < 200) {
+                    this.loadMoreGifs();
+                }
+            }
         });
     }
 
-    async loadGifSections() {
-        const body = this.shadowRoot.getElementById('gif-body');
-        body.innerHTML = ''; // Clear loading
+    // ==========================================
+    //  DATA LOADING & SECTION MANAGEMENT
+    // ==========================================
 
-        // 1. Recents (Local Storage)
+    async loadInitialViews(isSilentUpdate = false) {
+        const body = this.shadowRoot.getElementById('gif-body');
+        
+        if (!isSilentUpdate) {
+            body.innerHTML = '<div class="loading-text"><div class="spinner"></div>Loading...</div>';
+        }
+
+        // Fetch everything in parallel for speed
+        const aiMoodData = this.calculateChatMood();
+        const smartQuery = this.getSmartSuggestionQuery();
+        
+        const [vibeGifs, smartGifs, trendingGifs] = await Promise.all([
+            aiMoodData ? this.fetchGiphyGifs('search', aiMoodData.query, 6) : Promise.resolve(null),
+            this.fetchGiphyGifs('search', smartQuery, 6),
+            this.fetchGiphyGifs('trending', '', 14)
+        ]);
+
+        body.innerHTML = ''; 
+
+        // 1. Render Recents
         if (this.recentGifs.length > 0) {
             this.renderSection(body, 'recents', 'Recent', this.recentGifs);
         }
 
-        // 2. Chat Vibe (VADER NLP -> API)
-        const chatMoodData = this.calculateChatMood();
-        this.lastMoodName = chatMoodData ? chatMoodData.name : null;
-        if (chatMoodData) {
-            const vibeGifs = await this.fetchGiphyGifs('search', chatMoodData.query, 6);
-            if (vibeGifs.length > 0) {
-                this.renderSection(body, 'chatmood', `Chat Vibe: ${chatMoodData.name}`, vibeGifs);
-            }
+        // 2. Render AI Chat Vibe
+        this.lastMoodName = aiMoodData ? aiMoodData.name : null;
+        if (vibeGifs && vibeGifs.results.length > 0) {
+            this.renderSection(body, 'chatmood', `Chat Vibe: ${aiMoodData.name}`, vibeGifs.results, 'vibe-glow');
         }
 
-        // 3. Smart AI / Suggested (Time/Context -> API)
-        const smartQuery = this.getSmartSuggestionQuery();
-        const smartGifs = await this.fetchGiphyGifs('search', smartQuery, 6);
-        if (smartGifs.length > 0) {
-            this.renderSection(body, 'suggested', 'Smart AI', smartGifs);
+        // 3. Render Smart AI
+        if (smartGifs && smartGifs.results.length > 0) {
+            this.renderSection(body, 'suggested', 'Smart AI', smartGifs.results, 'ai-glow');
         }
 
-        // 4. Trending (Default API) - Using Giphy's 'trending' endpoint
-        const trendingGifs = await this.fetchGiphyGifs('trending', '', 12);
-        if (trendingGifs.length > 0) {
-            this.renderSection(body, 'trending', 'Trending', trendingGifs);
+        // 4. Render Trending
+        if (trendingGifs && trendingGifs.results.length > 0) {
+            this.renderSection(body, 'trending', 'Trending Now', trendingGifs.results);
         }
+        
+        // Reset infinite scroll state (disabled on mixed view)
+        this.currentOffset = 0;
+        this.hasReachedEnd = true; 
     }
 
     async executeSearch(query) {
         const body = this.shadowRoot.getElementById('gif-body');
-        body.innerHTML = '<div class="loading-text">Searching...</div>';
+        
+        // Reset Pagination State
+        this.currentOffset = 0;
+        this.hasReachedEnd = false;
+        this.isFetchingMore = false;
 
-        if (!query) {
-            this.loadGifSections();
+        body.innerHTML = `
+            <div class="gp-category-title">Results for "${query}"</div>
+            <div class="gp-grid" id="search-grid"></div>
+            <div class="loading-text" id="scroll-loader"><div class="spinner"></div></div>
+        `;
+        
+        const grid = this.shadowRoot.getElementById('search-grid');
+        
+        // Pre-fill with Skeleton Loaders
+        for(let i=0; i<10; i++) this.appendSkeleton(grid);
+
+        const response = await this.fetchGiphyGifs('search', query, 20, this.currentOffset);
+        grid.innerHTML = ''; // Clear skeletons
+
+        if (response.results.length === 0) {
+            body.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">🤷</div>
+                    <div>No GIFs found for "${query}"</div>
+                </div>`;
             return;
         }
 
-        const results = await this.fetchGiphyGifs('search', query, 20);
-        body.innerHTML = '';
+        this.appendGifsToGrid(grid, response.results);
+        this.currentOffset += response.results.length;
 
-        if (results.length === 0) {
-            body.innerHTML = '<div class="loading-text">No GIFs found.</div>';
-            return;
+        if (this.currentOffset >= response.totalCount) {
+            this.hasReachedEnd = true;
+            this.shadowRoot.getElementById('scroll-loader').style.display = 'none';
         }
-
-        this.renderSection(body, 'search-results', `Results for "${query}"`, results);
     }
 
-    renderSection(container, id, titleText, gifsArray) {
+    async loadMoreGifs() {
+        this.isFetchingMore = true;
+        const grid = this.shadowRoot.getElementById('search-grid');
+        const loader = this.shadowRoot.getElementById('scroll-loader');
+        
+        if(loader) loader.style.display = 'flex';
+
+        const response = await this.fetchGiphyGifs('search', this.lastSearchedTerm, 20, this.currentOffset);
+        
+        if (response.results.length > 0) {
+            this.appendGifsToGrid(grid, response.results);
+            this.currentOffset += response.results.length;
+        } else {
+            this.hasReachedEnd = true;
+        }
+
+        if (this.currentOffset >= response.totalCount) {
+            this.hasReachedEnd = true;
+        }
+
+        if(loader && this.hasReachedEnd) loader.style.display = 'none';
+        this.isFetchingMore = false;
+    }
+
+    // ==========================================
+    //  DOM CONSTRUCTION HELPERS
+    // ==========================================
+
+    renderSection(container, id, titleText, gifsArray, titleClass = '') {
         const section = document.createElement('div');
         section.id = `cat-${id}`;
         
         const title = document.createElement('div');
-        title.className = 'gp-category-title';
+        title.className = `gp-category-title ${titleClass}`;
         title.innerText = titleText;
         
         const grid = document.createElement('div');
         grid.className = 'gp-grid';
 
+        this.appendGifsToGrid(grid, gifsArray);
+
+        section.appendChild(title);
+        section.appendChild(grid);
+        container.appendChild(section);
+    }
+
+    appendGifsToGrid(gridElement, gifsArray) {
         gifsArray.forEach(gif => {
             const wrapper = document.createElement('div');
-            wrapper.className = 'gp-gif-wrapper';
+            wrapper.className = 'gp-gif-wrapper shimmer';
             
+            // Optional: Maintain aspect ratio space while loading if data provides it
+            if (gif.width && gif.height) {
+                const ratio = gif.height / gif.width;
+                wrapper.style.paddingBottom = `${ratio * 100}%`;
+            } else {
+                wrapper.style.height = '120px'; // fallback
+            }
+
             const img = document.createElement('img');
             img.className = 'gp-gif';
-            img.src = gif.url;
-            img.loading = "lazy"; // Important for performance
+            img.dataset.src = gif.url; // Use dataset for lazy load trigger
+            img.alt = gif.title || "GIF";
+            img.loading = "lazy"; 
             
+            // Positioning fix if using padding-bottom hack
+            if (gif.width && gif.height) {
+                img.style.position = 'absolute';
+                img.style.top = '0';
+                img.style.left = '0';
+                img.style.height = '100%';
+            }
+
+            // Remove shimmer when image fully downloads
+            img.onload = () => {
+                wrapper.classList.remove('shimmer');
+                img.classList.add('loaded');
+                wrapper.style.paddingBottom = '0'; // reset hack
+                img.style.position = 'relative'; // reset hack
+            };
+            
+            // Trigger actual load
+            img.src = gif.url; 
+
             wrapper.onclick = () => {
                 this.addToRecents(gif);
-                // Emits a custom event your chat.html can listen to
+                // EMIT TO MAIN CHAT.HTML
                 this.dispatchEvent(new CustomEvent('gif-selected', { 
                     detail: { url: gif.url },
                     bubbles: true, 
@@ -346,19 +654,26 @@ class GifPicker extends HTMLElement {
             };
 
             wrapper.appendChild(img);
-            grid.appendChild(wrapper);
+            gridElement.appendChild(wrapper);
         });
+    }
 
-        section.appendChild(title);
-        section.appendChild(grid);
-        container.appendChild(section);
+    appendSkeleton(gridElement) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'gp-gif-wrapper shimmer';
+        // Randomize heights slightly to simulate masonry while loading
+        const randomHeight = Math.floor(Math.random() * (160 - 90 + 1) + 90);
+        wrapper.style.height = `${randomHeight}px`;
+        gridElement.appendChild(wrapper);
     }
 
     addToRecents(gifObj) {
-        // Remove if it already exists to move it to the front
+        // Prevent duplicates, move to front
         this.recentGifs = this.recentGifs.filter(g => g.id !== gifObj.id);
         this.recentGifs.unshift(gifObj);
-        if (this.recentGifs.length > 6) this.recentGifs.pop(); // Keep array small
+        
+        // Keep maximum of 8 recent gifs to save memory and space
+        if (this.recentGifs.length > 8) this.recentGifs.pop(); 
         
         localStorage.setItem('goorac_gif_recents', JSON.stringify(this.recentGifs));
     }
