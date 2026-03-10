@@ -626,6 +626,35 @@
             const targetUid = params.get('targetUid');
 
             if (autoAnswer === 'true' && targetUid) {
+                
+                // --- NEW FIX: Bypassing Firebase check and waiting 15 seconds instead ---
+                pendingAutoAnswer = true;
+                document.getElementById('ringtone').pause();
+                showCallUI("Connecting...", null, "ESTABLISHING CONNECTION...", false);
+                
+                db.collection("users").doc(targetUid).get().then(doc => {
+                    const d = doc.exists ? doc.data() : {};
+                    currentActiveTarget = { uid: targetUid, name: d.name || "User", pfp: d.photoURL };
+                    updateCallScreenInfo(d.name || "User", d.photoURL, d.verified);
+                });
+
+                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({path:newurl},'',newurl);
+
+                if(incomingCallRef) {
+                    triggerAnswer();
+                } else {
+                    // Start the 15-second timeout if no peer connection yet
+                    setTimeout(() => {
+                        if (!incomingCallRef && pendingAutoAnswer) {
+                            pendingAutoAnswer = false;
+                            alert("Missed call. The caller has already hung up.");
+                            window.location.href = "calls.html";
+                        }
+                    }, 15000);
+                }
+
+                /* --- OLD FIREBASE CHECK COMMENTED OUT TO NOT REMOVE LINES ---
                 // Instant Database Check to verify if the call is still ringing
                 rdb.ref(`calls_status/${targetUid}`).once('value', snapshot => {
                     const callData = snapshot.val();
@@ -652,6 +681,7 @@
                         window.location.href = "calls.html"; 
                     }
                 });
+                ------------------------------------------------------------ */
             }
         }
 
@@ -789,6 +819,16 @@
             if (!incomingCallRef) {
                 updateCallStatus("WAITING FOR SIGNAL...", "var(--accent)");
                 pendingAutoAnswer = true;
+                
+                // --- NEW FIX: 15 Second Timeout added here as well ---
+                setTimeout(() => {
+                    if (!incomingCallRef && pendingAutoAnswer) {
+                        pendingAutoAnswer = false;
+                        alert("Missed call. The caller has already hung up.");
+                        window.location.href = "calls.html"; 
+                    }
+                }, 15000);
+                
                 return;
             }
 
