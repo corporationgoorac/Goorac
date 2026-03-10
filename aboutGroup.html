@@ -58,7 +58,7 @@
         .back-btn { font-size: 24px; color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: flex-start; width: 60px; height: 44px; border-radius: 50%; transition: background 0.2s; margin-left: -8px; z-index: 2; position: relative; }
         .back-btn:active { background: rgba(255,255,255,0.1); }
         .back-btn span { font-size: 32px; font-weight: 500; }
-        .header-title { font-weight: 800; font-size: 1.2rem; position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; white-space: nowrap; }
+        .header-title { font-weight: 800; font-size: 1.2rem; position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; white-space: nowrap; z-index: 1; }
         .edit-btn-container { width: 60px; display: flex; justify-content: flex-end; z-index: 2; position: relative; }
         .edit-btn { color: var(--accent); font-weight: 700; font-size: 1rem; cursor: pointer; padding: 8px; display: none; }
         .edit-btn:active { opacity: 0.7; }
@@ -150,7 +150,7 @@
         #security-block p { color: #888; font-size: 0.95rem; margin-bottom: 30px; }
         #security-block button { background: var(--accent); color: #fff; border: none; padding: 14px 30px; border-radius: 20px; font-weight: 700; font-size: 1rem; cursor: pointer; }
 
-        /* Skeleton Loading for Hero */
+        /* Skeleton Loading for Hero & Participants */
         .shimmer { background: linear-gradient(90deg, #111 0%, #222 50%, #111 100%); background-size: 400% 100%; animation: shimmerAnim 1.5s infinite linear; }
         @keyframes shimmerAnim { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
     </style>
@@ -287,10 +287,13 @@
     //  NAVIGATION
     // =========================================
     window.goBackToChat = function() {
-        if (groupId) {
-            window.location.href = `groupChat.html?id=${groupId}`;
+        // Fix: Safely navigate backward in history. Avoids loop when replacing URLs.
+        if (window.history.length > 1 && document.referrer.includes('groupChat')) {
+            history.back();
+        } else if (groupId) {
+            window.location.replace(`groupChat.html?id=${groupId}`);
         } else {
-            window.location.href = `chat.html`;
+            window.location.replace(`chat.html`);
         }
     };
 
@@ -412,33 +415,43 @@
         });
 
         sortedUids.forEach(uid => {
-            const user = userCache[uid] || { name: 'Loading...', username: uid, photoURL: 'https://via.placeholder.com/150' };
+            // Check if it's cached so we know if we need to show a skeleton
+            const isCached = !!userCache[uid];
+            const user = userCache[uid] || { name: 'Loading...', username: 'loading', photoURL: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' };
             const isAdmin = groupData.admins && groupData.admins.includes(uid);
             const isMe = uid === myUid;
             
-            // Fix: Remove the "(You)" text mapping as requested.
+            // Render exact name (no "You" text as requested)
             const nameDisplay = user.name || user.username;
             
             const verifiedIcon = user.verified ? `<img src="${V_URL}" class="v-badge">` : '';
             const adminBadgeHtml = isAdmin ? `<div class="admin-badge">Admin</div>` : '';
 
-            // Serialize user data for long press
+            // Serialize user data for long press safely
             const safeUserStr = encodeURIComponent(JSON.stringify(user));
 
             const div = document.createElement('div');
             div.className = 'participant-item';
-            div.setAttribute('ontouchstart', `startLongPress(this, '${uid}', '${safeUserStr}')`);
-            div.setAttribute('ontouchend', `endLongPress(this, '${uid}')`);
-            div.setAttribute('ontouchmove', `cancelLongPress(this)`);
-            div.onclick = (e) => { if(!isLongPress && !isMe) window.location.href = `userProfile.html?user=${user.username}`; };
+            
+            // Only attach interaction if fully loaded
+            if (isCached) {
+                div.setAttribute('ontouchstart', `startLongPress(this, '${uid}', '${safeUserStr}')`);
+                div.setAttribute('ontouchend', `endLongPress(this, '${uid}')`);
+                div.setAttribute('ontouchmove', `cancelLongPress(this)`);
+                div.onclick = (e) => { if(!isLongPress && !isMe) window.location.href = `userProfile.html?user=${user.username}`; };
+            }
+
+            // Apply Skeleton classes if user data is missing
+            const skeletonClass = isCached ? '' : 'shimmer';
+            const textSkeleton = isCached ? '' : 'color: transparent; border-radius: 4px; display: inline-block;';
 
             div.innerHTML = `
-                <img src="${user.photoURL || 'https://via.placeholder.com/150'}" class="p-pfp">
+                <img src="${user.photoURL || 'https://via.placeholder.com/150'}" class="p-pfp ${skeletonClass}">
                 <div class="p-info">
-                    <div class="p-name">${nameDisplay} ${verifiedIcon}</div>
-                    <div class="p-username">@${user.username}</div>
+                    <div class="p-name"><span class="${skeletonClass}" style="${textSkeleton}">${nameDisplay}</span> ${isCached ? verifiedIcon : ''}</div>
+                    <div class="p-username"><span class="${skeletonClass}" style="${textSkeleton}">@${user.username}</span></div>
                 </div>
-                ${adminBadgeHtml}
+                ${isCached ? adminBadgeHtml : ''}
             `;
             container.appendChild(div);
         });
