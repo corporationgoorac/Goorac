@@ -132,12 +132,20 @@ class ChatLoader extends HTMLElement {
                 const updates = snapshot.docChanges().map(async change => {
                     const chatData = change.doc.data();
                     const chatId = change.doc.id;
+                    const isGroup = chatData.isGroup === true;
                     const otherUid = chatData.participants.find(id => id !== this.myUid);
 
-                    // 1. Ensure we have the Opponent's Profile Data Cached
-                    if (!this.userCache[otherUid]) {
-                        await this.fetchAndCacheUser(otherUid);
-                        needsInboxUpdate = true;
+                    // 1. Ensure we have the Opponent's/Sender's Profile Data Cached
+                    if (!isGroup) {
+                        if (!this.userCache[otherUid]) {
+                            await this.fetchAndCacheUser(otherUid);
+                            needsInboxUpdate = true;
+                        }
+                    } else {
+                        const lastSender = chatData.lastSender;
+                        if (lastSender && lastSender !== this.myUid && !this.userCache[lastSender]) {
+                            await this.fetchAndCacheUser(lastSender);
+                        }
                     }
 
                     // 2. SMART CACHING (The Fix for 109k Reads)
@@ -157,21 +165,30 @@ class ChatLoader extends HTMLElement {
 
                          // NEW: TRIGGER NOTIFICATION POPUP
                          // Conditions: Modified event (new msg), I am NOT the sender, It is NOT seen
+                         let isUnreadNotif = false;
+                         if (isGroup) {
+                             isUnreadNotif = chatData.unreadCount && chatData.unreadCount[this.myUid] > 0;
+                         } else {
+                             isUnreadNotif = chatData.seen === false;
+                         }
+
                          if (change.type === 'modified' && 
                              chatData.lastSender !== this.myUid && 
-                             chatData.seen === false) {
+                             isUnreadNotif) {
                              
-                             // Wait slightly for user cache if missing
-                             let user = this.userCache[otherUid];
-                             if(!user) {
+                             let entityObj = isGroup ? chatData : this.userCache[otherUid];
+                             let senderUserObj = isGroup ? (this.userCache[chatData.lastSender] || {}) : null;
+
+                             if (!isGroup && !entityObj) {
                                 await this.fetchAndCacheUser(otherUid);
-                                user = this.userCache[otherUid];
+                                entityObj = this.userCache[otherUid];
                              }
                              
                              // Don't show if already on that chat page
-                             const isChattingWithUser = window.location.href.includes(`chat.html?user=${user?.username}`);
-                             if (!isChattingWithUser) {
-                                 this.showNotification(chatData, user);
+                             const targetUrl = isGroup ? `groupChat.html?id=${chatId}` : `chat.html?user=${entityObj?.username}`;
+                             const isChattingWithUser = window.location.href.includes(targetUrl);
+                             if (!isChattingWithUser && entityObj) {
+                                 this.showNotification(chatData, entityObj, isGroup, senderUserObj, chatId);
                              }
                          }
                     }
@@ -188,9 +205,9 @@ class ChatLoader extends HTMLElement {
             });
     }
 
-    // NEW: Function to render and show the notification popup
-    showNotification(chat, user) {
-        if (!user) return;
+    // NEW: Function to render and show the notification popup with Group Support
+    showNotification(chat, entity, isGroup, senderUser, chatId) {
+        if (!entity) return;
 
         // Play Sound (Commented out as requested)
         // this.notifSound.currentTime = 0;
@@ -205,6 +222,11 @@ class ChatLoader extends HTMLElement {
         let msgText = chat.lastMessage || "New Message";
         if(msgText.includes('<svg') || msgText.includes('Sent a photo')) msgText = "Sent a photo 📷";
 
+        // Append Sender's name if it's a group
+        if (isGroup && senderUser && senderUser.name) {
+            msgText = `${senderUser.name}: ${msgText}`;
+        }
+
         const time = "Now";
 
         // Check if there is already an active notification
@@ -214,13 +236,15 @@ class ChatLoader extends HTMLElement {
             // Group notifications
             this.activeNotifCount = (this.activeNotifCount || 1) + 1;
             if (!this.activeNotifUsers) this.activeNotifUsers = new Set();
-            this.activeNotifUsers.add(user.username);
+            
+            const uniqueId = isGroup ? chatId : entity.username;
+            this.activeNotifUsers.add(uniqueId);
 
             if (this.activeNotifUsers.size === 1) {
-                // Multiple messages from the SAME user
+                // Multiple messages from the SAME user/group
                 existingNotif.querySelector('.cl-toast-msg').innerText = `[${this.activeNotifCount} new messages] ${msgText}`;
             } else {
-                // Messages from MULTIPLE users
+                // Messages from MULTIPLE users/groups
                 existingNotif.querySelector('.cl-toast-name').innerText = `New Messages`;
                 existingNotif.querySelector('.cl-toast-msg').innerText = `You have ${this.activeNotifCount} new messages from ${this.activeNotifUsers.size} chats`;
                 existingNotif.querySelector('.cl-toast-pfp').src = 'https://via.placeholder.com/150'; // Generic icon for multiple
@@ -252,14 +276,15 @@ class ChatLoader extends HTMLElement {
 
         // Setup for a completely fresh notification
         this.activeNotifCount = 1;
-        this.activeNotifUsers = new Set([user.username]);
+        this.activeNotifUsers = new Set([isGroup ? chatId : entity.username]);
 
         const notif = document.createElement('div');
         notif.className = 'cl-toast';
         
-        const pfp = user.photoURL || 'https://via.placeholder.com/150';
-        const name = user.name || user.username || "User";
-        const verifiedBadge = user.verified ? `<img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="cl-toast-verified">` : '';
+        const DEFAULT_GROUP_IMAGE = "https://fabulouspic.com/wp-content/uploads/2024/08/a-black-and-white-photo-of-a-persons-face.jpg";
+        const pfp = isGroup ? (entity.groupPhoto || DEFAULT_GROUP_IMAGE) : (entity.photoURL || 'https://via.placeholder.com/150');
+        const name = isGroup ? entity.groupName : (entity.name || entity.username || "User");
+        const verifiedBadge = (!isGroup && entity.verified) ? `<img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg" class="cl-toast-verified">` : '';
 
         notif.innerHTML = `
             <img src="${pfp}" class="cl-toast-pfp">
@@ -272,10 +297,10 @@ class ChatLoader extends HTMLElement {
             </div>
         `;
 
-        // Click interaction
+        // Click interaction dynamically routes to standard or group chat
         notif.onclick = () => {
             // if(navigator.vibrate) navigator.vibrate(10);
-            window.location.href = `chat.html?user=${user.username}`;
+            window.location.href = isGroup ? `groupChat.html?id=${chatId}` : `chat.html?user=${entity.username}`;
         };
 
         container.appendChild(notif);
@@ -360,22 +385,21 @@ class ChatLoader extends HTMLElement {
     // This replicates the render logic in messages.html so it's ready to go.
     regenerateInboxCache(docs) {
         if (!docs) {
-            // If docs not provided (called from loadUserData), we might need to rely on what we have
-            // But since this is a background loader, we rely on the listener to provide docs usually.
-            // If strictly needed, we could store 'lastDocs' in memory.
             return; 
         }
 
         const badgeColors = ['#ff00ff', '#00ff41', '#00d2ff', '#ffff00', '#ff4444', '#aa00ff', '#ff9900'];
         const V_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg";
+        const DEFAULT_GROUP_IMAGE = "https://fabulouspic.com/wp-content/uploads/2024/08/a-black-and-white-photo-of-a-persons-face.jpg";
 
         // Map and Sort
         const chatItems = docs.map(doc => {
             const chat = doc.data();
+            const isGroup = chat.isGroup === true;
             const otherUid = chat.participants.find(id => id !== this.myUid);
-            const u = this.userCache[otherUid];
+            const u = isGroup ? null : this.userCache[otherUid];
             const isPinned = this.pinnedChats.includes(doc.id);
-            return { id: doc.id, chat, u, otherUid, isPinned };
+            return { id: doc.id, chat, u, otherUid, isPinned, isGroup };
         });
 
         // Sort: Pinned first, then by timestamp
@@ -387,45 +411,58 @@ class ChatLoader extends HTMLElement {
 
         let htmlAccumulator = "";
 
-        chatItems.forEach(({id, chat, u, otherUid, isPinned}) => {
-            if (!u) return; // Skip if user data missing (will be caught next update)
+        chatItems.forEach(({id, chat, u, otherUid, isPinned, isGroup}) => {
+            if (!isGroup && !u) return; // Skip if user data missing (will be caught next update)
 
-            // Unread Logic
+            // Unread Logic Corrected for Group
             let isUnread = false;
             let count = 0;
             if (chat.unreadCount && chat.unreadCount[this.myUid] !== undefined) {
                 count = Number(chat.unreadCount[this.myUid]);
             }
-            if (count > 0) isUnread = true;
-            else if (chat.lastSender && chat.lastSender !== this.myUid) isUnread = chat.seen === false;
+            
+            if (isGroup) {
+                isUnread = (count > 0);
+            } else {
+                if (count > 0) isUnread = true;
+                else if (chat.lastSender && chat.lastSender !== this.myUid) isUnread = chat.seen === false;
+            }
 
-            const finalName = u.name || u.displayName || u.username || "Unknown";
+            const finalName = isGroup ? chat.groupName : (u.name || u.displayName || u.username || "Unknown");
+            const finalPfp = isGroup ? (chat.groupPhoto || DEFAULT_GROUP_IMAGE) : (u.photoURL || 'https://via.placeholder.com/150');
             const lastMsg = chat.lastMessage ? chat.lastMessage : `<span style="font-style:italic; opacity:0.6;">Frequency cleared</span>`;
             
-            const amIFollowing = this.following.some(f => (typeof f === 'string' ? f : f.uid) === otherUid);
+            const amIFollowing = isGroup ? false : this.following.some(f => (typeof f === 'string' ? f : f.uid) === otherUid);
+            const isVerified = isGroup ? false : u.verified;
+            const chatLinkUser = isGroup ? id : u.username;
             const randomColor = badgeColors[Math.floor(Math.random() * badgeColors.length)];
             const timeStr = chat.lastTimestamp ? this.formatTime(chat.lastTimestamp.toDate()) : '';
 
             // Safe User String for Long Press
             const safeUserStr = encodeURIComponent(JSON.stringify({
-                name: finalName, username: u.username, photoURL: u.photoURL, verified: u.verified
+                name: finalName, username: chatLinkUser, photoURL: finalPfp, verified: isVerified, isGroup: isGroup
             }));
+
+            // Conditional HTML Elements
+            const onlineIndicator = !isGroup ? `<div class="online-indicator" id="online-${otherUid}"></div>` : '';
+            const verifiedBadge = isVerified ? `<img src="${V_URL}" class="v-badge">` : '';
+            const followBtn = (!amIFollowing && !isGroup) ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : '';
 
             htmlAccumulator += `
                 <div class="chat-item" 
                      ontouchstart="startLongPress(this, '${id}', ${isPinned}, '${safeUserStr}')" 
                      ontouchend="endLongPress(this)" 
                      ontouchmove="cancelLongPress(this)" 
-                     onclick="enterChat(event, '${u.username}')">
+                     onclick="enterChat(event, '${chatLinkUser}', ${isGroup})">
                     <div class="pfp-container">
-                        <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="chat-pfp">
-                        <div class="online-indicator" id="online-${otherUid}"></div>
+                        <img src="${finalPfp}" class="chat-pfp">
+                        ${onlineIndicator}
                     </div>
                     <div class="chat-info">
                         <div class="chat-top-row">
                             <span class="u-name" id="name-${id}">
                                 ${finalName} 
-                                ${u.verified ? `<img src="${V_URL}" class="v-badge">` : ''}
+                                ${verifiedBadge}
                                 ${isPinned ? `<span class="pin-indicator"></span>` : ''}
                             </span>
                             <span style="font-size:0.7rem; color:#444;">${timeStr}</span>
@@ -435,7 +472,7 @@ class ChatLoader extends HTMLElement {
                                 ${lastMsg}
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;" id="meta-${id}">
-                                ${!amIFollowing ? `<button class="follow-btn" onclick="visitProfile(event, '${u.username}')">Profile</button>` : ''}
+                                ${followBtn}
                                 ${isUnread ? `<div class="unread-badge" style="background:${randomColor}; box-shadow: 0 0 12px ${randomColor};"></div>` : ''}
                             </div>
                         </div>
@@ -447,7 +484,9 @@ class ChatLoader extends HTMLElement {
         // SAVE TO LOCAL STORAGE
         if (htmlAccumulator) {
             localStorage.setItem('goorac_inbox_html', htmlAccumulator);
-            // console.log("⚡ BG Loader: Inbox HTML updated in cache");
+            // Also store pure data for group Chat check glitches
+            const mappedData = docs.map(d => ({id: d.id, chat: d.data(), isGroup: d.data().isGroup===true}));
+            localStorage.setItem('goorac_inbox_data', JSON.stringify(mappedData));
         }
     }
 
