@@ -55,10 +55,11 @@
             border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;
             z-index: 1000; backdrop-filter: var(--header-blur); -webkit-backdrop-filter: var(--header-blur);
         }
-        .back-btn { font-size: 24px; color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; height: 44px; width: 44px; border-radius: 50%; transition: background 0.2s; margin-left: -8px; }
+        .back-btn { font-size: 24px; color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: flex-start; width: 60px; height: 44px; border-radius: 50%; transition: background 0.2s; margin-left: -8px; z-index: 2; position: relative; }
         .back-btn:active { background: rgba(255,255,255,0.1); }
         .back-btn span { font-size: 32px; font-weight: 500; }
-        .header-title { font-weight: 800; font-size: 1.2rem; flex: 1; text-align: center; }
+        .header-title { font-weight: 800; font-size: 1.2rem; position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; white-space: nowrap; }
+        .edit-btn-container { width: 60px; display: flex; justify-content: flex-end; z-index: 2; position: relative; }
         .edit-btn { color: var(--accent); font-weight: 700; font-size: 1rem; cursor: pointer; padding: 8px; display: none; }
         .edit-btn:active { opacity: 0.7; }
 
@@ -166,11 +167,13 @@
 </div>
 
 <header>
-    <div class="back-btn" onclick="history.back()">
+    <div class="back-btn" onclick="goBackToChat()">
         <span class="material-icons-round">chevron_left</span>
     </div>
     <div class="header-title">Group Info</div>
-    <div class="edit-btn" id="edit-group-trigger" onclick="openEditModal()">Edit</div>
+    <div class="edit-btn-container">
+        <div class="edit-btn" id="edit-group-trigger" onclick="openEditModal()">Edit</div>
+    </div>
 </header>
 
 <div class="group-hero">
@@ -188,7 +191,7 @@
 <div class="participant-list" id="participants-container">
     </div>
 
-<div class="menu-overlay" id="overlay" onclick="closeActionMenu()"></div>
+<div class="menu-overlay" id="overlay" onclick="closeActionMenu(true)"></div>
 <div id="action-menu">
     <div class="sheet-context">
         <img src="" class="context-pfp" id="action-pfp">
@@ -201,7 +204,7 @@
 
 <div id="edit-modal" class="side-modal">
     <div class="modal-header-top">
-        <button class="modal-back-btn" onclick="closeEditModal()">
+        <button class="modal-back-btn" onclick="closeEditModal(true)">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
         <div class="modal-title-main">Edit Group</div>
@@ -224,7 +227,7 @@
 
 <div id="add-members-modal" class="side-modal">
     <div class="modal-header-top">
-        <button class="modal-back-btn" onclick="closeAddMembersModal()">
+        <button class="modal-back-btn" onclick="closeAddMembersModal(true)">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
         <div class="modal-title-main">Add Members</div>
@@ -281,6 +284,17 @@
     let isLongPress = false;
 
     // =========================================
+    //  NAVIGATION
+    // =========================================
+    window.goBackToChat = function() {
+        if (groupId) {
+            window.location.href = `groupChat.html?id=${groupId}`;
+        } else {
+            window.location.href = `chat.html`;
+        }
+    };
+
+    // =========================================
     //  INSTANT CACHE LOAD (0ms rendering)
     // =========================================
     (function loadFromCache() {
@@ -290,6 +304,7 @@
             try {
                 groupData = JSON.parse(cacheStr);
                 renderGroupHero();
+                // Render participants from local userCache if available
                 renderParticipantsList(true); 
             } catch(e) {}
         }
@@ -401,7 +416,9 @@
             const isAdmin = groupData.admins && groupData.admins.includes(uid);
             const isMe = uid === myUid;
             
-            const nameDisplay = isMe ? `${user.name} (You)` : (user.name || user.username);
+            // Fix: Remove the "(You)" text mapping as requested.
+            const nameDisplay = user.name || user.username;
+            
             const verifiedIcon = user.verified ? `<img src="${V_URL}" class="v-badge">` : '';
             const adminBadgeHtml = isAdmin ? `<div class="admin-badge">Admin</div>` : '';
 
