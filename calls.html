@@ -984,7 +984,13 @@
             const results = await Promise.all(callPromises);
             html = results.filter(res => res !== null).join('');
             
+            // --- NEW FIX: Prevent async overwrite glitch when switching tabs ---
+            if (activeTab !== 'recent') return;
+            
             document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No call history</p>";
+            
+            // --- NEW FIX: Re-apply search filter after load ---
+            if(document.getElementById('search').value) document.getElementById('search').dispatchEvent(new Event('input'));
             
             // NEW: Set cache for 0ms loading
             if (activeTab === 'recent') {
@@ -1041,7 +1047,15 @@
                         </div>`;
                 }
             }
+            
+            // --- NEW FIX: Prevent async overwrite glitch when switching tabs ---
+            if (activeTab !== 'contacts') return;
+            
             document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
+            
+            // --- NEW FIX: Re-apply search filter after load ---
+            if(document.getElementById('search').value) document.getElementById('search').dispatchEvent(new Event('input'));
+            
             // Smart caching for Contacts tab
             localStorage.setItem('goorac_calls_contacts_html', document.getElementById('list-container').innerHTML);
         }
@@ -1124,6 +1138,20 @@
         document.addEventListener('keydown', e => {
             if (e.ctrlKey && ['c', 'v', 'u', 's', 'a', 'p'].includes(e.key)) e.preventDefault();
             if (e.key === 'F12') e.preventDefault();
+        });
+        
+        // --- NEW FIX: Search Functionality ---
+        document.getElementById('search').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const callItems = document.querySelectorAll('.call-item');
+            callItems.forEach(item => {
+                const textContent = item.innerText.toLowerCase();
+                if (textContent.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
         });
     </script>
 </body>
