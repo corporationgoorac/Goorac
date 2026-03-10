@@ -99,6 +99,32 @@
         }
 
         // ==========================================
+        // 🤖 AI-LIKE SMART FILE RENAMER
+        // ==========================================
+        shortenFileName(originalName) {
+            const lastDot = originalName.lastIndexOf('.');
+            if (lastDot === -1) return originalName;
+            
+            const ext = originalName.substring(lastDot);
+            let base = originalName.substring(0, lastDot);
+            
+            // Smart truncation: splits at the first occurrence of a hyphen or underscore that is followed by a number
+            // This cleanly converts "screenshot-867676_2.973-___ududu" to just "screenshot"
+            const splitMatch = base.match(/[-_]\d/);
+            if (splitMatch) {
+                base = base.substring(0, splitMatch.index);
+            }
+            
+            // Cleanup any trailing garbage symbols
+            base = base.replace(/[-_]+$/, '').trim();
+            
+            // Fallback if name becomes empty
+            if (base.length === 0) base = "file";
+            
+            return base + ext;
+        }
+
+        // ==========================================
         // 🎨 PRO UI & CSS DEFINITION (PURE BLACK)
         // ==========================================
         render() {
@@ -990,9 +1016,35 @@
         // ==========================================
         async startPipeline() {
             if (!this.originalFile) return;
+            if (this.mode === 'exporting') return; // Prevent multiple clicks!
 
             if (this.fileType !== 'video') {
-                return this.uploadFile(this.originalFile);
+                // Instantly Trigger Export Screen to show the "Sending Bar" for all generic files
+                this.mode = 'exporting';
+                this.querySelector('#fp-toolbar').style.display = 'none';
+                this.querySelector('#fp-workspace').style.display = 'none';
+                this.querySelector('.fp-nav-send').style.display = 'none'; 
+                
+                const exportScreen = this.querySelector('#fp-export-screen');
+                exportScreen.classList.add('active');
+                
+                // Generate a cool static icon thumbnail dynamically
+                let icon = '📄';
+                const mime = this.originalFile.type;
+                if(mime.startsWith('image/')) icon = '🖼️';
+                else if(mime.startsWith('audio/')) icon = '🎵';
+                else if(mime === 'application/pdf') icon = '📕';
+                else if(mime.startsWith('text/')) icon = '📝';
+                else if(mime.includes('zip') || mime.includes('rar') || mime.includes('tar')) icon = '🗜️';
+                
+                const thumbnailEl = this.querySelector('#fp-export-thumbnail');
+                thumbnailEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='400' height='400' fill='%230a0a0a'/><text x='50%' y='50%' font-size='120' text-anchor='middle' dominant-baseline='central'>${icon}</text></svg>`;
+
+                // Use the new smart AI filename truncation here
+                const shortenedName = this.shortenFileName(this.originalFile.name);
+                const renamedFile = new File([this.originalFile], shortenedName, { type: this.originalFile.type });
+
+                return this.uploadFile(renamedFile);
             }
 
             // 1. Capture the Thumbnail
