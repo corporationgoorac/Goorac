@@ -881,7 +881,7 @@ box-shadow: var(--received-shadow);
             font-size: 40px;
             pointer-events: none;
             z-index: 3001;
-            animation: floatUp 1.2s var(--ease-spring forwards; /* Improved physics */
+            animation: floatUp 1.2s var(--ease-spring) forwards; /* Improved physics */
             will-change: transform, opacity;
         }
 
@@ -3106,11 +3106,20 @@ box-shadow: var(--received-shadow);
         let bubbleClass = `bubble ${groupClass}`;
         let bubbleStyle = '';
 
+        // NEW LOGIC FOR MEDIA DIMENSIONS AND SCROLL FIX
+        let dynamicStyle = '';
+        let storedRatio = localStorage.getItem('media_ratio_' + id);
+        if (storedRatio) {
+            dynamicStyle = `aspect-ratio: ${storedRatio}; min-height: auto;`;
+        } else {
+            dynamicStyle = `min-height: 200px;`;
+        }
+
         // Media Types Construction - LOAD EVENT ADDED TO FIX SCROLL HIDDEN BUG
         if (renderImageUrl) {
             mediaHtml = `
             <div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${renderImageUrl}')">
-                <img src="${renderImageUrl}" class="chat-media-img" onload="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)">
+                <img src="${renderImageUrl}" class="chat-media-img" style="${dynamicStyle}" onload="if(this.naturalWidth && this.naturalHeight){ localStorage.setItem('media_ratio_${id}', this.naturalWidth + '/' + this.naturalHeight); this.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)">
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>`;
             bubbleClass = `bubble has-media ${groupClass}`;
@@ -3119,7 +3128,7 @@ box-shadow: var(--received-shadow);
         else if (renderFileUrl && renderFileMeta && renderFileMeta.type.includes('video')) {
             mediaHtml = `
             <div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${renderFileUrl}', 'video')">
-                <video src="${renderFileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:220px; background:#000;" preload="metadata" onloadeddata="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)"></video>
+                <video src="${renderFileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:auto; max-height:380px; background:#000; ${dynamicStyle}" preload="metadata" onloadeddata="if(this.videoWidth && this.videoHeight){ localStorage.setItem('media_ratio_${id}', this.videoWidth + '/' + this.videoHeight); this.style.aspectRatio = this.videoWidth + '/' + this.videoHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)"></video>
                 <div class="play-overlay"><span class="material-icons-round" style="font-size:32px; color:white;">play_arrow</span></div>
                 <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
             </div>`;
@@ -4664,114 +4673,6 @@ box-shadow: var(--received-shadow);
         // Start the continuous cycle
         runMoodCycle();
     })();
-
-    // =======================================================================
-    // NEW FIX: ADVANCED MEDIA SCROLL ANCHORING & CACHING LOGIC
-    // =======================================================================
-    (function initScrollAnchoring() {
-        let prevScrollHeight = 0;
-        let prevScrollTop = 0;
-        let isAnchoring = false;
-
-        function safeHash(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash).toString();
-        }
-
-        const resizeObserver = new ResizeObserver((entries) => {
-            const cf = document.getElementById('chat-flow');
-            if (!cf || isAnchoring || window.isLoadingMore) return;
-            
-            const currentScrollHeight = cf.scrollHeight;
-            const currentScrollTop = cf.scrollTop;
-            const clientHeight = cf.clientHeight;
-            
-            const heightDiff = currentScrollHeight - prevScrollHeight;
-            
-            // If user is scrolled up by more than 150px (middle of the chat)
-            const isScrolledUp = (prevScrollHeight - prevScrollTop - clientHeight) > 150;
-            
-            // If content expanded (images/gifs loaded) AND user is reading old messages
-            if (heightDiff > 0 && isScrolledUp) {
-                isAnchoring = true;
-                
-                // Freeze visual position by absorbing the expansion
-                cf.scrollTop = prevScrollTop + heightDiff;
-                
-                // Pre-cache media heights for future loads
-                document.querySelectorAll('.chat-media-img').forEach(el => {
-                    try {
-                        let url = el.src || el.currentSrc;
-                        if(url && url !== '' && url !== 'true') {
-                            if (el.tagName === 'IMG' && el.complete && el.naturalHeight) {
-                                localStorage.setItem('media_h_' + safeHash(url), el.naturalHeight);
-                            } else if (el.tagName === 'VIDEO' && el.videoHeight) {
-                                localStorage.setItem('media_h_' + safeHash(url), el.videoHeight);
-                            }
-                        }
-                    } catch(e) {}
-                });
-
-                requestAnimationFrame(() => {
-                    prevScrollHeight = cf.scrollHeight;
-                    prevScrollTop = cf.scrollTop;
-                    isAnchoring = false;
-                });
-                return;
-            }
-            prevScrollHeight = currentScrollHeight;
-        });
-
-        const chatFlow = document.getElementById('chat-flow');
-        if (chatFlow) {
-            chatFlow.addEventListener('scroll', () => {
-                if (!isAnchoring) {
-                    prevScrollHeight = chatFlow.scrollHeight;
-                    prevScrollTop = chatFlow.scrollTop;
-                }
-            }, { passive: true });
-        }
-
-        // Apply cached min-heights dynamically before images even load to prevent layout shifts
-        const domObserver = new MutationObserver((mutations) => {
-            mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === 1) {
-                        let mediaElements = node.querySelectorAll ? node.querySelectorAll('.chat-media-img') : [];
-                        if (node.classList && node.classList.contains('chat-media-img')) mediaElements = [node];
-                        
-                        mediaElements.forEach(el => {
-                            try {
-                                let url = el.src || el.currentSrc || el.getAttribute('src');
-                                if(url) {
-                                    let cachedH = localStorage.getItem('media_h_' + safeHash(url));
-                                    if (cachedH && !el.style.minHeight) {
-                                        let scaledH = Math.min(parseInt(cachedH), 380); // 380 is max-height in css
-                                        el.style.minHeight = scaledH + 'px';
-                                        el.style.height = scaledH + 'px'; // Enforce initial space reservation
-                                    }
-                                }
-                            } catch(e) {}
-                        });
-                    }
-                });
-            });
-        });
-
-        let checkInterval = setInterval(() => {
-            const mc = document.getElementById('messages-container');
-            if (mc) {
-                resizeObserver.observe(mc);
-                domObserver.observe(mc, { childList: true, subtree: true });
-                clearInterval(checkInterval);
-            }
-        }, 100);
-    })();
-    // =======================================================================
 
 </script>
 
