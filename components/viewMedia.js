@@ -6,10 +6,19 @@ class ViewMedia extends HTMLElement {
         
         // Interaction State
         this.startY = 0;
+        this.startX = 0;
         this.currentY = 0;
+        this.currentX = 0;
         this.isDragging = false;
         this.lastTap = 0;
         this.isZoomed = false;
+
+        // Native-like Zoom & Pan State
+        this.scale = 1;
+        this.lastScale = 1;
+        this.posX = 0;
+        this.posY = 0;
+        this.pinchStartLen = 0;
     }
 
     connectedCallback() {
@@ -61,12 +70,16 @@ class ViewMedia extends HTMLElement {
                 flex: 1; display: flex; justify-content: center; align-items: center;
                 width: 100%; height: 100%; overflow: hidden;
                 position: relative;
+                /* CRITICAL: Prevents native browser scroll/pull-to-refresh interference */
+                touch-action: none; 
             }
             
             .vm-media {
                 max-width: 100%; max-height: 100%;
                 object-fit: contain;
-                transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                transform-origin: center center;
+                /* Use translate3d for hardware acceleration */
+                transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
                 will-change: transform, opacity;
             }
             
@@ -122,8 +135,8 @@ class ViewMedia extends HTMLElement {
             if (overlay.classList.contains('open')) this.close(true);
         });
 
-        // --- GESTURES: Swipe to Close & Double Tap ---
-        container.addEventListener('touchstart', (e) => this.handleTouchStart(e), {passive: true});
+        // --- GESTURES: Swipe, Pinch & Double Tap ---
+        container.addEventListener('touchstart', (e) => this.handleTouchStart(e), {passive: false});
         container.addEventListener('touchmove', (e) => this.handleTouchMove(e), {passive: false});
         container.addEventListener('touchend', (e) => this.handleTouchEnd(e));
         
@@ -132,8 +145,19 @@ class ViewMedia extends HTMLElement {
     }
 
     handleTouchStart(e) {
-        if (e.touches.length > 1) return; // Ignore multi-touch (pinch)
-        
+        const media = this.querySelector('.vm-media');
+        if(media) media.style.transition = 'none'; // Remove transition for instant drag/zoom
+
+        // Handle Pinch
+        if (e.touches.length === 2) {
+            this.isDragging = false;
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            this.pinchStartLen = Math.hypot(dx, dy);
+            this.lastScale = this.scale;
+            return;
+        }
+
         const now = new Date().getTime();
         const timeDiff = now - this.lastTap;
         
@@ -145,50 +169,91 @@ class ViewMedia extends HTMLElement {
         }
         this.lastTap = now;
 
-        if (this.isZoomed) return; // Disable swipe when zoomed
-
         this.startY = e.touches[0].clientY;
+        this.startX = e.touches[0].clientX;
         this.isDragging = true;
-        
-        const media = this.querySelector('.vm-media');
-        if(media) media.style.transition = 'none'; // Remove transition for instant drag
     }
 
     handleTouchMove(e) {
-        if (!this.isDragging || this.isZoomed) return;
-        
-        this.currentY = e.touches[0].clientY;
-        const deltaY = this.currentY - this.startY;
-
         const media = this.querySelector('.vm-media');
         const overlay = this.querySelector('#vm-overlay');
-        
-        if (media) {
-            e.preventDefault(); // Prevent scrolling bg
-            media.style.transform = `translateY(${deltaY}px) scale(${1 - Math.abs(deltaY)/1000})`;
+        if (!media) return;
+
+        if (e.cancelable) e.preventDefault(); // Master prevent default to lock screen bounds
+
+        // Handle Pinch
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentLen = Math.hypot(dx, dy);
             
-            // Fade background based on distance
-            const opacity = Math.max(0, 1 - Math.abs(deltaY) / 500);
+            // Calculate scale and clamp limits (1x to 4x)
+            this.scale = this.lastScale * (currentLen / this.pinchStartLen);
+            this.scale = Math.min(Math.max(1, this.scale), 4);
+            
+            media.style.transform = `translate3d(${this.posX}px, ${this.posY}px, 0) scale(${this.scale})`;
+            return;
+        }
+
+        if (!this.isDragging) return;
+        
+        const deltaY = e.touches[0].clientY - this.startY;
+        const deltaX = e.touches[0].clientX - this.startX;
+
+        if (this.scale > 1) {
+            // We are zoomed in, enable panning
+            this.currentX = this.posX + deltaX;
+            this.currentY = this.posY + deltaY;
+            media.style.transform = `translate3d(${this.currentX}px, ${this.currentY}px, 0) scale(${this.scale})`;
+        } else {
+            // Swipe to close behavior
+            this.currentY = deltaY;
+            
+            // Added resistance factor (0.7) for a heavier, smoother feel
+            const resistedDeltaY = deltaY * 0.7; 
+            media.style.transform = `translate3d(0, ${resistedDeltaY}px, 0) scale(${1 - Math.abs(resistedDeltaY)/1500})`;
+            
+            // Fade background smoothly based on distance
+            const opacity = Math.max(0, 1 - Math.abs(resistedDeltaY) / 350);
             overlay.style.backgroundColor = `rgba(0,0,0,${opacity})`;
         }
     }
 
     handleTouchEnd(e) {
-        if (!this.isDragging || this.isZoomed) return;
-        this.isDragging = false;
-
-        const deltaY = this.currentY - this.startY;
         const media = this.querySelector('.vm-media');
         const overlay = this.querySelector('#vm-overlay');
+        if (!media) return;
 
-        if (Math.abs(deltaY) > 100) {
-            // Swipe threshold met -> Close
-            this.close();
-        } else if (media) {
-            // Snap back
-            media.style.transition = 'transform 0.3s ease';
-            media.style.transform = 'translateY(0) scale(1)';
-            overlay.style.backgroundColor = '#000';
+        // Restore animation for snaps
+        media.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+        if (this.scale > 1) {
+            // Update pan coordinates on touch end
+            if (this.isDragging) {
+                this.posX = this.currentX || this.posX;
+                this.posY = this.currentY || this.posY;
+            }
+            this.isZoomed = true;
+            this.isDragging = false;
+            this.pinchStartLen = 0;
+        } else {
+            // Swipe to close evaluation
+            this.isDragging = false;
+            this.isZoomed = false;
+            this.scale = 1;
+            this.posX = 0;
+            this.posY = 0;
+
+            if (Math.abs(this.currentY) > 120) {
+                // Swipe threshold met -> Close smoothly
+                this.close();
+            } else {
+                // Snap back
+                media.style.transform = 'translate3d(0, 0, 0) scale(1)';
+                overlay.style.backgroundColor = '#000';
+            }
+            this.currentY = 0;
+            this.currentX = 0;
         }
     }
 
@@ -197,16 +262,34 @@ class ViewMedia extends HTMLElement {
         const media = this.querySelector('.vm-media');
         if (!media) return;
 
-        this.isZoomed = !this.isZoomed;
-        
-        if (this.isZoomed) {
-            media.style.transform = "scale(2)";
-            media.style.cursor = "zoom-out";
-            // Simple zoom logic: Just scale center. 
-            // Full pinch-zoom requires complex matrix math usually handled by libraries (Panzoom/Hammer.js)
+        media.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+        if (this.scale > 1) {
+            // Zoom out
+            this.scale = 1;
+            this.posX = 0;
+            this.posY = 0;
+            media.style.transform = "translate3d(0, 0, 0) scale(1)";
+            media.style.cursor = "zoom-in";
+            this.isZoomed = false;
         } else {
-            media.style.transform = "scale(1)";
-            media.style.cursor = "default";
+            // Zoom in
+            this.scale = 2.5;
+            this.posX = 0;
+            this.posY = 0;
+            
+            // If triggered by mouse double-click, zoom towards cursor
+            if (e && e.clientX && !e.touches) {
+                const rect = media.getBoundingClientRect();
+                const originX = e.clientX - rect.left - rect.width/2;
+                const originY = e.clientY - rect.top - rect.height/2;
+                this.posX = -originX;
+                this.posY = -originY;
+            }
+
+            media.style.transform = `translate3d(${this.posX}px, ${this.posY}px, 0) scale(${this.scale})`;
+            media.style.cursor = "zoom-out";
+            this.isZoomed = true;
         }
     }
 
@@ -254,7 +337,13 @@ class ViewMedia extends HTMLElement {
         
         // Reset State
         this.isZoomed = false;
+        this.scale = 1;
+        this.posX = 0;
+        this.posY = 0;
         this.startY = 0;
+        this.startX = 0;
+        this.currentY = 0;
+        this.currentX = 0;
     }
 
     close(fromHistory = false) {
@@ -270,7 +359,13 @@ class ViewMedia extends HTMLElement {
 
         setTimeout(() => {
             const media = this.querySelector('.vm-media');
-            if(media) media.style.transform = ''; // Reset transform
+            if(media) {
+                media.style.transform = ''; // Reset transform
+                this.scale = 1;
+                this.posX = 0;
+                this.posY = 0;
+                this.isZoomed = false;
+            }
         }, 300);
     }
 
