@@ -292,8 +292,8 @@
             const sendBtn = this.querySelector('#fp-send');
             
             if(input) {
-                input.addEventListener('change', (e) => {
-                    if (e.target.files.length > 0) this.handleFileSelect(e.target.files[0]);
+                input.addEventListener('change', async (e) => {
+                    if (e.target.files.length > 0) await this.handleFileSelect(e.target.files[0]);
                 });
             }
 
@@ -369,7 +369,41 @@
             return `${m}:${s < 10 ? '0'+s : s}`;
         }
 
-        handleFileSelect(file) {
+        // ==========================================
+        // ⚡ WEBCODECS HARDWARE COMPRESSION
+        // ==========================================
+        async compressVideo(file) {
+            // Feature Detection: Return null if WebCodecs isn't supported (e.g., iOS < 16.4)
+            if (!window.VideoEncoder) {
+                return null;
+            }
+
+            try {
+                // Dynamically import the VideoConverter library
+                const { VideoConverter } = await import('https://cdn.jsdelivr.net/npm/video-converter-js@1.0.3/+esm');
+                const converter = new VideoConverter();
+                
+                // Aggressive settings to force down to ~2MB
+                const options = {
+                    width: 640,          
+                    height: 360,         
+                    fps: 24,             
+                    videoBitrate: 250000, 
+                    audioBitrate: 32000,  
+                    keepAudio: true      
+                };
+
+                const compressedBlob = await converter.convert(file, options);
+                const newName = file.name.replace(/\.[^/.]+$/, "") + "_compressed.mp4";
+                return new File([compressedBlob], newName, { type: 'video/mp4' });
+
+            } catch (error) {
+                console.error("Hardware compression failed:", error);
+                throw error; 
+            }
+        }
+
+        async handleFileSelect(file) {
             this.selectedFile = file;
             const overlay = this.querySelector('#fp-overlay');
             const title = this.querySelector('#fp-header-title');
@@ -382,48 +416,89 @@
             this.querySelector('#fp-video-el').src = '';
             this.querySelector('#fp-progress-container').style.display = 'none';
 
+            // Open UI and Push History FIRST so loading screen can be visible if needed
+            this.isOpen = true;
+            overlay.classList.add('open');
+            window.history.pushState({ filePickerOpen: true }, "");
+
             const mime = file.type;
-            const sizeStr = (file.size / (1024*1024)).toFixed(2) + " MB";
-            const setMeta = (name, type) => {
-                infoText.innerHTML = `<div class="fp-file-name">${name}</div><div class="fp-file-meta">${type} • ${sizeStr}</div>`;
+            
+            const setMeta = (targetFile, type) => {
+                const sizeStr = (targetFile.size / (1024*1024)).toFixed(2) + " MB";
+                infoText.innerHTML = `<div class="fp-file-name">${targetFile.name}</div><div class="fp-file-meta">${type} • ${sizeStr}</div>`;
             };
 
             if (mime.startsWith('video/')) {
                 this.fileType = 'video';
                 title.innerText = 'Send Video';
+                
+                let finalFile = file;
+                const sizeInMB = file.size / (1024 * 1024);
+                
+                // Compress IMMEDIATELY on selection if >= 3MB
+                if (sizeInMB >= 3) {
+                    const loadingScreen = this.querySelector('#fp-loading');
+                    const loadingText = this.querySelector('#fp-loading-text');
+                    const sendBtn = this.querySelector('#fp-send');
+                    
+                    sendBtn.disabled = true;
+                    loadingText.innerText = "GPU Optimizing Video...";
+                    loadingScreen.style.display = "flex";
+                    
+                    try {
+                        const compressedFile = await this.compressVideo(file);
+                        
+                        if (!compressedFile) {
+                            this.showToast("Your browser doesn't support video compression. Please select a smaller file (Under 3MB).");
+                            loadingScreen.style.display = "none";
+                            this.hideUI();
+                            return; // Stop processing completely
+                        }
+                        
+                        finalFile = compressedFile;
+                    } catch (e) {
+                        this.showToast("Compression failed. Please try a different video.");
+                        loadingScreen.style.display = "none";
+                        this.hideUI();
+                        return; // Stop processing completely
+                    }
+                    
+                    loadingScreen.style.display = "none";
+                    sendBtn.disabled = false;
+                }
+
+                this.selectedFile = finalFile;
+                
+                // Show the UI elements with the compressed file
                 const vidWrap = this.querySelector('#fp-vid-wrap');
                 const video = this.querySelector('#fp-video-el');
                 const trimmer = this.querySelector('#fp-trimmer');
                 vidWrap.style.display = 'block';
                 trimmer.style.display = 'block';
-                video.src = URL.createObjectURL(file);
-                setMeta(file.name, 'Video');
+                video.src = URL.createObjectURL(finalFile);
+                setMeta(finalFile, 'Video'); // This will now display the small compressed size
+                
             } else if (mime === 'application/pdf') {
                 this.fileType = 'pdf';
                 title.innerText = 'Send PDF';
                 this.showIcon('📄', '#ff3b30');
-                setMeta(file.name, 'PDF');
+                setMeta(file, 'PDF');
             } else if (mime.startsWith('audio/')) {
                 this.fileType = 'audio';
                 title.innerText = 'Send Audio';
                 this.showIcon('🎵', '#00e676');
-                setMeta(file.name, 'Audio');
+                setMeta(file, 'Audio');
             } else if (mime.startsWith('image/')) {
                 this.fileType = 'image';
                 title.innerText = 'Send Image';
                 this.showIcon('🖼️', '#ff6600');
-                setMeta(file.name, 'Image');
+                setMeta(file, 'Image');
             } else {
                 this.fileType = 'file';
                 title.innerText = 'Send File';
                 this.showIcon('📁', '#0095f6');
-                setMeta(file.name, 'File');
+                setMeta(file, 'File');
             }
-
-            // Open UI and Push History
-            this.isOpen = true;
-            overlay.classList.add('open');
-            window.history.pushState({ filePickerOpen: true }, "");
         }
 
         showIcon(emoji, color) {
@@ -441,64 +516,6 @@
             toast.classList.add('show');
             if(this.toastTimeout) clearTimeout(this.toastTimeout);
             this.toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 3000);
-        }
-
-        // ==========================================
-        // 📉 VIDEO COMPRESSION ALGORITHM
-        // Note: Client-side video compression strips audio 
-        // and records in 1x real-time speed.
-        // ==========================================
-        async compressVideo(file) {
-            return new Promise((resolve) => {
-                const video = document.createElement('video');
-                video.src = URL.createObjectURL(file);
-                video.muted = true;
-                
-                video.play().then(() => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Downscale to 480p max resolution for huge size reduction
-                    const MAX_HEIGHT = 480;
-                    let w = video.videoWidth;
-                    let h = video.videoHeight;
-                    if (h > MAX_HEIGHT) {
-                        w = Math.floor(w * (MAX_HEIGHT / h));
-                        h = MAX_HEIGHT;
-                    }
-                    canvas.width = w; canvas.height = h;
-
-                    const stream = canvas.captureStream(30);
-                    // Compress bitrate heavily (500 kbps)
-                    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm', videoBitsPerSecond: 500000 });
-                    const chunks = [];
-                    
-                    recorder.ondataavailable = e => chunks.push(e.data);
-                    recorder.onstop = () => {
-                        const blob = new Blob(chunks, { type: 'video/webm' });
-                        // Create new compressed File object
-                        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.webm", { type: 'video/webm' });
-                        resolve(compressedFile);
-                    };
-                    
-                    recorder.start();
-                    
-                    const drawFrame = () => {
-                        if (video.paused || video.ended) {
-                            recorder.stop();
-                            return;
-                        }
-                        ctx.drawImage(video, 0, 0, w, h);
-                        requestAnimationFrame(drawFrame);
-                    };
-                    drawFrame();
-                    
-                    video.onended = () => recorder.stop();
-                }).catch(() => {
-                    // If video fails to play/compress, upload original
-                    resolve(file); 
-                });
-            });
         }
 
         async uploadFile() {
@@ -524,16 +541,8 @@
             progressContainer.style.display = "block";
             bar.style.width = "5%"; 
 
-            let fileToUpload = this.selectedFile;
-
-            // Trigger compression if it's a video
-            if (this.fileType === 'video') {
-                // MODIFICATION: Bypassing the compression logic and directly assigning the original file
-                // loadingText.innerText = "Optimizing Video...\n(Takes real-time, please wait)";
-                // fileToUpload = await this.compressVideo(this.selectedFile);
-                loadingText.innerText = "Preparing Video...";
-                fileToUpload = this.selectedFile;
-            }
+            // It's already compressed (or safely under 3MB), just grab it.
+            const fileToUpload = this.selectedFile;
 
             loadingText.innerText = "Uploading to Cloud...";
             bar.style.width = "40%"; 
