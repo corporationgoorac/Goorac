@@ -945,9 +945,15 @@
         }
 
         async function loadRecent() {
+            /* OLD QUERY COMMENTED OUT:
             const snapshot = await db.collection("call_logs")
                 .where('participants', 'array-contains', myUid)
                 .orderBy('timestamp', 'desc').limit(20).get();
+            */
+            // NEW QUERY WITH LIMIT 10:
+            const snapshot = await db.collection("call_logs")
+                .where('participants', 'array-contains', myUid)
+                .orderBy('timestamp', 'desc').limit(10).get();
             
             let html = "";
             const callPromises = snapshot.docs.map(async doc => {
@@ -989,6 +995,7 @@
             
             document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>No call history</p>";
             
+            /* --- OLD SEARCH & CACHE LOGIC COMMENTED OUT TO PREVENT CACHING 'DISPLAY: NONE' STYLES ---
             // --- NEW FIX: Re-apply search filter after load ---
             if(document.getElementById('search').value) document.getElementById('search').dispatchEvent(new Event('input'));
             
@@ -996,6 +1003,17 @@
             if (activeTab === 'recent') {
                 localStorage.setItem('goorac_calls_html', document.getElementById('list-container').innerHTML);
                 localStorage.setItem('goorac_calls_recent_html', document.getElementById('list-container').innerHTML); // Store explicitly for smart tab cache
+            }
+            ----------------------------------------------------------------------------------------- */
+            
+            // --- NEW BUG FIX: Save to cache FIRST, then apply the search filter ---
+            if (activeTab === 'recent') {
+                localStorage.setItem('goorac_calls_html', document.getElementById('list-container').innerHTML);
+                localStorage.setItem('goorac_calls_recent_html', document.getElementById('list-container').innerHTML);
+            }
+            
+            if(document.getElementById('search').value) {
+                document.getElementById('search').dispatchEvent(new Event('input'));
             }
         }
 
@@ -1053,11 +1071,20 @@
             
             document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
             
+            /* --- OLD SEARCH & CACHE LOGIC COMMENTED OUT TO PREVENT CACHING 'DISPLAY: NONE' STYLES ---
             // --- NEW FIX: Re-apply search filter after load ---
             if(document.getElementById('search').value) document.getElementById('search').dispatchEvent(new Event('input'));
             
             // Smart caching for Contacts tab
             localStorage.setItem('goorac_calls_contacts_html', document.getElementById('list-container').innerHTML);
+            ----------------------------------------------------------------------------------------- */
+            
+            // --- NEW BUG FIX: Save to cache FIRST, then apply the search filter ---
+            localStorage.setItem('goorac_calls_contacts_html', document.getElementById('list-container').innerHTML);
+
+            if(document.getElementById('search').value) {
+                document.getElementById('search').dispatchEvent(new Event('input'));
+            }
         }
 
         function showSkeleton() {
