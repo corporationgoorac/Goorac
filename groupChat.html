@@ -1217,7 +1217,6 @@
             // --- NEW TYPING AVATAR LOGIC ---
             let typingAvatarImg = document.querySelector('#typing-row img.typing-avatar');
             if (!typingAvatarImg) {
-                // If it doesn't exist for some reason, create it safely
                 typingAvatarImg = document.createElement('img');
                 typingAvatarImg.className = 'typing-avatar';
                 typingAvatarImg.id = 'typing-pfp';
@@ -1661,12 +1660,21 @@
         let bubbleClass = `bubble ${groupClass}`;
         let bubbleStyle = '';
 
+        // NEW LOGIC FOR MEDIA DIMENSIONS AND SCROLL FIX
+        let dynamicStyle = '';
+        let storedRatio = localStorage.getItem('media_ratio_' + id);
+        if (storedRatio) {
+            dynamicStyle = `aspect-ratio: ${storedRatio}; min-height: auto;`;
+        } else {
+            dynamicStyle = `min-height: 200px;`;
+        }
+
         if (renderImageUrl) {
-            mediaHtml = `<div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${renderImageUrl}')"><img src="${renderImageUrl}" class="chat-media-img" onload="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)"><div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div></div>`;
+            mediaHtml = `<div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${renderImageUrl}')"><img src="${renderImageUrl}" class="chat-media-img" style="${dynamicStyle}" onload="if(this.naturalWidth && this.naturalHeight){ localStorage.setItem('media_ratio_${id}', this.naturalWidth + '/' + this.naturalHeight); this.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)"><div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div></div>`;
             bubbleClass = `bubble has-media ${groupClass}`;
             if(!renderText) bubbleStyle = "display:none;";
         } else if (renderFileUrl && renderFileMeta && renderFileMeta.type.includes('video')) {
-            mediaHtml = `<div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${renderFileUrl}', 'video')"><video src="${renderFileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:220px; background:#000;" preload="metadata" onloadeddata="var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 50) window.scrollToBottom(true)"></video><div class="play-overlay"><span class="material-icons-round" style="font-size:32px; color:white;">play_arrow</span></div><div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div></div>`;
+            mediaHtml = `<div class="msg-video-container" onclick="document.getElementById('media-viewer').open('${renderFileUrl}', 'video')"><video src="${renderFileUrl}#t=0.5" class="chat-media-img" style="object-fit:cover; width:100%; height:auto; max-height:380px; background:#000; ${dynamicStyle}" preload="metadata" onloadeddata="if(this.videoWidth && this.videoHeight){ localStorage.setItem('media_ratio_${id}', this.videoWidth + '/' + this.videoHeight); this.style.aspectRatio = this.videoWidth + '/' + this.videoHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)"></video><div class="play-overlay"><span class="material-icons-round" style="font-size:32px; color:white;">play_arrow</span></div><div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div></div>`;
             bubbleClass = `bubble has-media ${groupClass}`;
             if(!renderText) bubbleStyle = "display:none;";
         } else if (renderFileUrl && renderFileMeta && renderFileMeta.type.includes('audio')) {
