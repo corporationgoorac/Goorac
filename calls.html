@@ -11,6 +11,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Goorac | Quantum Calls</title>
     
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -129,7 +131,7 @@
             justify-content: center;
             width: 15px; height: 15px;
             background-color: var(--ig-blue);
-            -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
+            -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
             mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58.8-3.04 2.12-4.03l-1.1-2.48-2.74.05a4.95 4.95 0 0 1-4.04-2.12L14.24 3l-2.47 1.1-1.1-2.48-2.5.78L7.1 5.14a4.95 4.95 0 0 1-4.04 2.12l-2.74-.05-1.1 2.48 2.12 4.03-2.12 4.03 1.1 2.48 2.74-.05a4.95 4.95 0 0 1 4.04 2.12L9.76 21l2.47-1.1 1.1 2.48 2.5-.78.78-2.73a4.95 4.95 0 0 1 4.04-2.12l2.74.05 1.1-2.48-2.12-4.03Z"/></svg>');
             -webkit-mask-size: contain; mask-size: contain;
             -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
@@ -263,7 +265,7 @@
     <script>
         // --- ZERO-MS CACHE ENGINE ---
         (function loadCallsCache() {
-            const cachedHTML = localStorage.getItem('goorac_calls_html');
+            const cachedHTML = localStorage.getItem('goorac_calls_recent_html') || localStorage.getItem('goorac_calls_html');
             if (cachedHTML && cachedHTML.trim() !== "") {
                 const list = document.getElementById('list-container');
                 if(list) list.innerHTML = cachedHTML;
@@ -882,14 +884,20 @@
             activeTab = tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`tab-${tab}`).classList.add('active');
-            showSkeleton();
+            /* showSkeleton(); */ // Commented out to fix skeleton flickering on tab switch
             loadData();
         }
 
         async function loadData() {
-            // Only show skeleton if the container doesn't already have cached items
-            if (!document.getElementById('list-container').innerHTML.includes('call-item')) {
-                showSkeleton();
+            // Smart local storage checking per tab
+            const tabCache = localStorage.getItem('goorac_calls_' + activeTab + '_html');
+            if (tabCache) {
+                document.getElementById('list-container').innerHTML = tabCache;
+            } else {
+                // Only show skeleton if the container doesn't already have cached items
+                if (!document.getElementById('list-container').innerHTML.includes('call-item')) {
+                    showSkeleton();
+                }
             }
             if (activeTab === 'recent') await loadRecent(); else await loadContacts();
         }
@@ -939,6 +947,7 @@
             // NEW: Set cache for 0ms loading
             if (activeTab === 'recent') {
                 localStorage.setItem('goorac_calls_html', document.getElementById('list-container').innerHTML);
+                localStorage.setItem('goorac_calls_recent_html', document.getElementById('list-container').innerHTML); // Store explicitly for smart tab cache
             }
         }
 
@@ -983,7 +992,7 @@
                         <div class="call-item">
                             <img src="${u.photoURL || 'https://via.placeholder.com/150'}" class="call-pfp">
                             <div class="call-info">
-                                <div class="u-name">${u.name} ${u.verified ? '<span class="v-badge"></span>' : ''}</div>
+                                <div class="u-name">${u.name} ${u.verified ? '<span class="material-icons-round" style="color:var(--ig-blue); font-size:16px; margin-left:4px; vertical-align:middle;">verified</span>' : ''}</div>
                                 <div class="call-meta">@${u.username || 'user'}</div>
                             </div>
                             <button class="btn-call" onclick="startCall('${uid}', '${u.name}', '${u.photoURL}', ${u.verified || false})">📞</button>
@@ -991,6 +1000,8 @@
                 }
             }
             document.getElementById('list-container').innerHTML = html || "<p style='text-align:center; padding:40px; opacity:0.5;'>Follow friends to call them</p>";
+            // Smart caching for Contacts tab
+            localStorage.setItem('goorac_calls_contacts_html', document.getElementById('list-container').innerHTML);
         }
 
         function showSkeleton() {
@@ -1059,7 +1070,7 @@
         }
 
         function updateCallScreenInfo(name, pfp, verified) {
-            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="v-badge"></span>' : ''}`;
+            document.getElementById('target-name').innerHTML = `${name} ${verified ? '<span class="material-icons-round" style="color:var(--ig-blue); font-size:22px; vertical-align:middle; margin-left:5px;">verified</span>' : ''}`;
             if(pfp) document.getElementById('target-pfp').src = pfp;
         }
 
