@@ -1441,6 +1441,36 @@ box-shadow: var(--received-shadow);
 </head>
 <body>
 
+<script>
+    // =========================================
+    //  NEW: GLOBALLY HANDLE BITE CLICKS
+    // =========================================
+    window.biteClickTimers = {};
+    window.handleBiteClick = function(event, biteId, msgId) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // If they are swiping/scrolling, don't trigger click
+        if (window.isScrollingNow) return;
+
+        if(window.biteClickTimers[msgId]) {
+            clearTimeout(window.biteClickTimers[msgId]);
+            delete window.biteClickTimers[msgId];
+        } else {
+            window.biteClickTimers[msgId] = setTimeout(() => {
+                delete window.biteClickTimers[msgId];
+                window.location.href = `bites.html?v=${biteId}`;
+            }, 350); 
+        }
+    };
+    window.cancelBiteClick = function(id) {
+        if (window.biteClickTimers && window.biteClickTimers[id]) {
+            clearTimeout(window.biteClickTimers[id]);
+            delete window.biteClickTimers[id];
+        }
+    };
+</script>
+
 <image-picker id="img-picker"></image-picker>
 <file-picker id="file-picker"></file-picker>
 <view-media id="media-viewer"></view-media>
@@ -1658,6 +1688,7 @@ box-shadow: var(--received-shadow);
 </div>
 
 <script>
+
     // =========================================
     //  NEW: EMOJI KEYBOARD TOGGLE SYSTEM
     // =========================================
@@ -2609,7 +2640,8 @@ box-shadow: var(--received-shadow);
                                 
                                 // INBOX INSTANT CACHE UPDATE FOR NEW MESSAGE
                                 let displayTxt = msgData.text || "New message";
-                                if(msgData.isGif) displayTxt = "🎞️ GIF";
+                                if(msgData.isBite) displayTxt = "🎬 Bite";
+                                else if(msgData.isGif) displayTxt = "🎞️ GIF";
                                 else if(msgData.imageUrl) displayTxt = "📷 Image";
                                 else if(msgData.fileUrl) displayTxt = "📎 Attachment";
                                 updateInboxCacheLocal(chatId, displayTxt, msgData.sender, true);
@@ -2676,7 +2708,8 @@ box-shadow: var(--received-shadow);
                         });
                         // INBOX CACHE UPDATE FOR READ STATUS (BACKGROUND)
                         let displayTxt2 = msgData.text || "Message";
-                        if(msgData.isGif) displayTxt2 = "🎞️ GIF";
+                        if(msgData.isBite) displayTxt2 = "🎬 Bite";
+                        else if(msgData.isGif) displayTxt2 = "🎞️ GIF";
                         else if(msgData.imageUrl) displayTxt2 = "📷 Image";
                         else if(msgData.fileUrl) displayTxt2 = "📎 Attachment";
                         updateInboxCacheLocal(chatId, displayTxt2, msgData.sender, false);
@@ -3116,7 +3149,29 @@ box-shadow: var(--received-shadow);
         }
 
         // Media Types Construction - LOAD EVENT ADDED TO FIX SCROLL HIDDEN BUG
-        if (renderImageUrl) {
+        if (m.isBite) {
+            mediaHtml = `
+            <div class="msg-media-wrapper ${groupClass}" onclick="handleBiteClick(event, '${m.biteId}', '${id}')">
+                <div style="position:relative; width:220px; border-radius:18px; overflow:hidden; background:#111; aspect-ratio: 9/16;">
+                    <img src="${m.biteImgUrl || 'https://via.placeholder.com/220x390?text=Bite'}" onload="if(this.naturalWidth && this.naturalHeight){ localStorage.setItem('media_ratio_${id}', this.naturalWidth + '/' + this.naturalHeight); this.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)" style="width:100%; height:100%; object-fit:cover; display:block; opacity:0.85; pointer-events:none;">
+                    <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 40%, transparent 100%); pointer-events:none;"></div>
+                    
+                    <div class="play-overlay" style="border-color: var(--accent); background: rgba(0,0,0,0.6); pointer-events:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent);"><span class="material-icons-round" style="font-size:36px; color:white;">play_arrow</span></div>
+                    
+                    <div style="position:absolute; bottom:12px; left:14px; right:14px; pointer-events:none; text-align:left;">
+                        <div style="color:var(--accent); font-size:0.75rem; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <span class="material-icons-round" style="font-size:14px;">smart_display</span> Bite
+                        </div>
+                        <div style="color:#fff; font-size:0.95rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${m.biteTitle || 'Bite Video'}</div>
+                        <div style="color:#bbb; font-size:0.75rem; font-weight: 500; margin-top:2px;">@${m.biteAuthor || 'Creator'}</div>
+                    </div>
+                </div>
+                <div id="react-${id}" class="reaction-badge" onclick="showReactionDetails('${id}', event)" style="${reactionDisplay ? 'display:block' : ''}">${reactionDisplay}</div>
+            </div>`;
+            bubbleClass = `bubble has-media ${groupClass}`;
+            if(!renderText) bubbleStyle = "display:none;";
+        }
+        else if (renderImageUrl) {
             mediaHtml = `
             <div class="msg-media-wrapper ${groupClass}" onclick="document.getElementById('media-viewer').open('${renderImageUrl}')">
                 <img src="${renderImageUrl}" class="chat-media-img" style="${dynamicStyle}" onload="if(this.naturalWidth && this.naturalHeight){ localStorage.setItem('media_ratio_${id}', this.naturalWidth + '/' + this.naturalHeight); this.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; this.style.minHeight='auto'; } var cf = document.getElementById('chat-flow'); if(!window.isLoadingMore && cf.scrollHeight - cf.scrollTop - cf.clientHeight < 450) window.scrollToBottom(true)">
@@ -3291,6 +3346,7 @@ box-shadow: var(--received-shadow);
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - lastTap;
                 if (tapLength < 300 && tapLength > 0) {
+                    window.cancelBiteClick(id); // Prevent video navigation on double tap
                     e.preventDefault(); // STOP KEYBOARD CLOSING
                     if (document.activeElement === mInput || mInput.matches(':focus')) {
                         setTimeout(() => mInput.focus(), 10);
@@ -3322,6 +3378,7 @@ box-shadow: var(--received-shadow);
                 startX = e.touches[0].clientX;
                 currentX = startX; // FIX: Initialize currentX to startX. Critical for long press detection without movement.
                 isScrolling = false; 
+                window.isScrollingNow = false;
                 
                 menuTimer = setTimeout(() => {
                     if (!isScrolling && Math.abs(currentX - startX) < 10) { 
@@ -3341,6 +3398,7 @@ box-shadow: var(--received-shadow);
                 if (Math.abs(diff) > 10) { 
                       clearTimeout(menuTimer);
                       isScrolling = true;
+                      window.isScrollingNow = true;
                 }
                 
                 // Logic: 
@@ -3366,6 +3424,7 @@ box-shadow: var(--received-shadow);
 
             element.addEventListener('touchend', (e) => {
                 clearTimeout(menuTimer);
+                setTimeout(() => window.isScrollingNow = false, 50);
                 if (e.target.closest('.audio-control-btn') || e.target.closest('.audio-speed-btn')) return;
                 
                 let diff = currentX - startX;
@@ -3379,7 +3438,8 @@ box-shadow: var(--received-shadow);
                     vibrate(40);
                     let replyText = m.text;
                     if(!replyText) {
-                        if(m.isGif) replyText = "🎞️ GIF";
+                        if(m.isBite) replyText = "🎬 Bite";
+                        else if(m.isGif) replyText = "🎞️ GIF";
                         else if(m.imageUrl) replyText = "📷 Photo";
                         else if(m.fileMeta && m.fileMeta.type.includes('audio')) replyText = "🎵 Audio";
                         else replyText = "Attachment";
@@ -3977,7 +4037,9 @@ box-shadow: var(--received-shadow);
             let txt = lastMsg.text || "";
             
             // Logic to determine type of the NEW last message
-            if (lastMsg.isGif) {
+            if (lastMsg.isBite) {
+                txt = txt ? "🎬 " + txt : "🎬 Bite";
+            } else if (lastMsg.isGif) {
                 txt = txt ? "🎞️ " + txt : "🎞️ GIF";
             } else if (lastMsg.imageUrl) {
                 txt = txt ? "📷 " + txt : "📷 Image";
@@ -4177,7 +4239,8 @@ box-shadow: var(--received-shadow);
         if (!text || text === "Attachment") {
              const msgData = messagesMap.get(activeMenuId);
              if (msgData) {
-                 if (msgData.isGif) text = "🎞️ GIF";
+                 if (msgData.isBite) text = "🎬 Bite";
+                 else if (msgData.isGif) text = "🎞️ GIF";
                  else if (msgData.imageUrl) text = "📷 Photo";
                  else if (msgData.fileMeta && msgData.fileMeta.type.includes('audio')) text = "🎵 Audio";
                  else if (msgData.fileUrl) text = "📄 File";
