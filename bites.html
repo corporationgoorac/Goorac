@@ -322,7 +322,7 @@
     let isFetching = false;
     let fetchTimeoutFallback = null; // Failsafe for stuck loading
     let hasStarted = false;
-    let viewedVideoIds = new Set(); 
+    let viewedVideoIds = new Set(); // To strictly ensure no repeats in current session
     
     // 🚀 TELEMETRY & ENGAGEMENT TRACKING
     let bitesHistory = JSON.parse(localStorage.getItem('goorac_bites_history') || '[]');
@@ -342,13 +342,25 @@
     let currentLoadedA = null;
     let currentLoadedB = null;
 
-    // Load from Cache immediately
+    // Load from Cache immediately with Strict Deduplication
     (function loadCache() {
         const cached = localStorage.getItem('goorac_bites_queue');
         if (cached) {
             try { 
                 const parsed = JSON.parse(cached);
-                if (parsed.length > 0) bitesQueue = parsed; 
+                if (parsed.length > 0) {
+                    // Strict deduplication right on cache load
+                    const uniqueCache = [];
+                    const seen = new Set();
+                    parsed.forEach(b => {
+                        if(!seen.has(b.videoId)) {
+                            seen.add(b.videoId);
+                            uniqueCache.push(b);
+                            viewedVideoIds.add(b.videoId);
+                        }
+                    });
+                    bitesQueue = uniqueCache; 
+                }
             } catch(e) {}
         }
     })();
@@ -372,16 +384,24 @@
 
     function checkPlayersReady() {
         playersReady++;
-        if (playersReady === 2 && bitesQueue.length > 0) {
-            playerA.cueVideoById(bitesQueue[0].videoId);
-            currentLoadedA = bitesQueue[0].videoId; // Sync tracker
-            if(bitesQueue.length > 1) {
-                playerB.cueVideoById(bitesQueue[1].videoId);
-                currentLoadedB = bitesQueue[1].videoId; // Sync tracker
+        if (playersReady === 2) {
+            if (bitesQueue.length > 0) {
+                playerA.cueVideoById(bitesQueue[0].videoId);
+                currentLoadedA = bitesQueue[0].videoId; // Sync tracker
+                if(bitesQueue.length > 1) {
+                    playerB.cueVideoById(bitesQueue[1].videoId);
+                    currentLoadedB = bitesQueue[1].videoId; // Sync tracker
+                }
+                renderDOMSlides();
+                
+                // 🚀 PREVENT STUCK ON RELOAD: If the user reloaded near the bottom of their old cache, 
+                // automatically refill the queue immediately so they don't get stuck.
+                if (bitesQueue.length < 5) {
+                    fetchMoreBites();
+                }
+            } else {
+                fetchMoreBites("tamil");
             }
-            renderDOMSlides();
-        } else if (playersReady === 2 && bitesQueue.length === 0) {
-            fetchMoreBites("tamil");
         }
     }
 
@@ -477,7 +497,16 @@
         
         const newIndex = Math.round(scrollPosition / slideHeight);
 
-        // Valid scroll event (and not scrolling onto the loading spinner slide)
+        // 🚀 ADVANCED STUCK-PREVENTION: Did the user scroll all the way to the loading spinner?
+        // bitesQueue.length is the exact index of the loader slide. Force a fetch!
+        if (newIndex === bitesQueue.length) {
+            if (!isFetching && !isSearchPlaying) {
+                fetchMoreBites();
+            }
+            return; // Exit here, do not swap players for the loader slide
+        }
+
+        // Valid scroll event onto an actual video
         if (newIndex !== currentIndex && newIndex >= 0 && newIndex < bitesQueue.length) {
             
             // 🚀 Advanced Throttle to completely kill duplicate firing triggers on erratic scrolls
@@ -492,7 +521,7 @@
             processEngagementAlgorithm(previousBite, timeSpentMs);
             
             // Store in permanent history memory
-            markAsViewed(previousBite.videoId);
+            if(previousBite) markAsViewed(previousBite.videoId);
 
             // 🚀 2. UPDATE STATE
             currentIndex = newIndex;
@@ -704,7 +733,7 @@
     }
 
     // ==========================================================================
-    // NETWORK FETCHING & STUCK-PREVENTION
+    // NETWORK FETCHING & PARANOID DEDUPLICATION
     // ==========================================================================
     async function fetchMoreBites(overrideTopic = null) {
         if (isFetching) return;
@@ -714,7 +743,7 @@
             document.getElementById('main-skeleton').style.display = 'flex';
         }
 
-        // Failsafe: If Render hangs for 10 seconds, unlock the fetcher so they can try again by scrolling
+        // Failsafe: If Render hangs for 10 seconds, unlock the fetcher so they can try again
         clearTimeout(fetchTimeoutFallback);
         fetchTimeoutFallback = setTimeout(() => { isFetching = false; }, 10000);
 
@@ -728,17 +757,26 @@
             const data = await res.json();
             
             if (data.success && data.bites.length > 0) {
-                // Filter out current session AND historical 200
-                const newBites = data.bites.filter(b => !viewedVideoIds.has(b.videoId) && !bitesHistory.includes(b.videoId));
                 
-                newBites.forEach(b => {
+                // 🚀 PARANOID DEDUPLICATION: Ensure no video can EVER enter the queue twice
+                const uniqueNewBites = [];
+                data.bites.forEach(b => {
+                    // Check against viewed session IDs
+                    if (viewedVideoIds.has(b.videoId)) return;
+                    // Check against historical 200 memory limit
+                    if (bitesHistory.includes(b.videoId)) return;
+                    // Sanity check against current queue
+                    if (bitesQueue.some(q => q.videoId === b.videoId)) return;
+                    
                     viewedVideoIds.add(b.videoId);
-                    bitesQueue.push(b);
+                    uniqueNewBites.push(b);
                 });
+
+                uniqueNewBites.forEach(b => bitesQueue.push(b));
 
                 renderDOMSlides();
                 
-                if (currentIndex === 0 && !hasStarted && playersReady === 2) {
+                if (currentIndex === 0 && !hasStarted && playersReady === 2 && bitesQueue.length > 0) {
                     playerA.cueVideoById(bitesQueue[0].videoId);
                     currentLoadedA = bitesQueue[0].videoId;
                     if(bitesQueue.length > 1) {
@@ -758,6 +796,7 @@
     function cleanUpQueueAndCache() {
         if (isSearchPlaying) return; 
         const cacheSlice = bitesQueue.slice(currentIndex);
+        // Only keep upcoming 10 videos to save memory, but don't slice if we are out of videos
         localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 10))); 
     }
 
