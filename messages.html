@@ -20,6 +20,8 @@
     
     <script src="components/imagePicker.js" defer></script>
     <script src="components/navbar.js" defer></script>
+    
+    <script src="components/viewNotes.js" defer></script>
 
     <style>
         /* GLOBAL RESET FOR HORIZONTAL SCROLL FIX */
@@ -62,32 +64,29 @@
         .header-icon { width: 32px; height: 32px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.08); display: block; }
         .header-title { font-weight: 800; font-size: 1.15rem; letter-spacing: -0.3px; color: var(--text-main); cursor: pointer; }
 
-        /* SEARCH */
-        .search-wrap { padding: 12px 20px; padding-bottom: 0; width: 100%; }
+        /* SEARCH MODAL STYLES (Replaced old inline search) */
+        .search-input-wrapper { flex: 1; margin-left: 10px; }
         .search-input {
             width: 100%; background: #111; border: 1px solid var(--border);
-            padding: 12px 15px; border-radius: 14px; color: white; outline: none;
+            padding: 10px 15px; border-radius: 14px; color: white; outline: none;
             font-size: 16px !important; transition: all 0.3s ease;
         }
         .search-input:focus { border-color: var(--accent); background: #161616; box-shadow: 0 0 15px rgba(0, 210, 255, 0.1); }
 
-        /* FILTER CHIPS */
-        .filter-scroll {
-            display: flex; gap: 10px; padding: 15px 20px; overflow-x: auto;
-            scrollbar-width: none; -ms-overflow-style: none; width: 100%;
+        /* NEW SORT/FILTER BOTTOM SHEET STYLES */
+        .filter-options-column { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .filter-row {
+            padding: 18px 20px; border-radius: 16px; background: #1a1a1a;
+            color: #fff; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid var(--border); transition: all 0.2s;
         }
-        .filter-scroll::-webkit-scrollbar { display: none; }
-        
-        .filter-chip {
-            padding: 8px 16px; border-radius: 20px; background: #1a1a1a;
-            border: 1px solid var(--border); color: #888; font-size: 0.85rem;
-            font-weight: 600; white-space: nowrap; transition: all 0.2s;
-            cursor: pointer;
+        .filter-row:active { transform: scale(0.98); }
+        .filter-row.active {
+            background: rgba(0, 210, 255, 0.1); color: var(--accent);
+            border-color: var(--accent); box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
         }
-        .filter-chip.active {
-            background: rgba(0, 210, 255, 0.15); color: var(--accent);
-            border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
-        }
+        .filter-row.active::after { content: '✓'; font-weight: 900; font-size: 1.2rem; }
 
         /* CHAT LIST ITEM - LAYOUT LOCKED */
         .chat-item { 
@@ -277,9 +276,30 @@
         
         .done-members-btn { position: absolute; bottom: 30px; left: 20px; right: 20px; background: white; color: black; border: none; padding: 18px; border-radius: 18px; font-weight: 800; font-size: 1.05rem; cursor: pointer; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
         .infinite-scroll-trigger { height: 40px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 0.9rem; }
+
+        /* 🚀 NEW: NOTES & INBOX CONTROLS STYLES */
+        #notes-wrapper {
+            background: #000;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-top: -15px; /* Pulls it up tight under the blurry header */
+        }
+        .add-note-badge {
+            position: absolute; bottom: 20px; right: 0px; background: #333; color: white;
+            width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 800; border: 2px solid #000; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .inbox-controls {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 20px 10px 20px; background: #000; position: sticky; top: 60px; z-index: 50;
+        }
+        .inbox-controls-title { font-weight: 800; font-size: 1.15rem; color: #fff; }
+        .sort-icon-btn { cursor: pointer; color: var(--text-dim); display: flex; align-items: center; justify-content: center; padding: 5px; transition: color 0.2s; }
+        .sort-icon-btn:active { color: #fff; transform: scale(0.9); }
     </style>
 </head>
 <body oncontextmenu="return false;">
+
+<view-notes></view-notes>
 
 <image-picker id="group-image-picker" style="position: relative; z-index: 999999; display: block;"></image-picker>
 
@@ -312,12 +332,24 @@
     <button class="modal-btn-intro" onclick="closeIntroModal()">Got it, start messaging</button>
 </div>
 
+<div class="modal-overlay-intro" id="sort-overlay" onclick="closeSortModal(true)"></div>
+<div class="bottom-modal-intro" id="sort-modal" style="padding-bottom: 30px;">
+    <div class="modal-handle-intro" onclick="closeSortModal(true)"></div>
+    <div class="modal-title-intro" style="text-align:center; margin-bottom: 20px;">Filter Messages</div>
+    <div class="filter-options-column">
+        <div class="filter-row active" onclick="setFilter('all', this); closeSortModal(true);">All Messages</div>
+        <div class="filter-row" onclick="setFilter('unread', this); closeSortModal(true);">Unread</div>
+        <div class="filter-row" onclick="setFilter('groups', this); closeSortModal(true);">Groups</div>
+    </div>
+</div>
+
 <header>
     <div class="header-left">
         <img src="images/icon.png" class="header-icon" id="header-app-icon" alt="Goorac" onerror="this.src='https://via.placeholder.com/32/000000/fff?text=G'">
         <div class="header-title" ondblclick="clearAllUnreadBages()">Messages</div>
     </div>
-    <div class="header-right" style="display: flex; align-items: center;">
+    <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+        <svg onclick="openSearchModal()" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; cursor: pointer; opacity: 0.9;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <svg onclick="openGroupModal()" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 26px; height: 26px; cursor: pointer; opacity: 0.9;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
     </div>
 </header>
@@ -345,17 +377,26 @@
 
 <div id="offline-toast">Waiting for network...</div>
 
-<div class="search-wrap">
-    <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
+<div id="notes-wrapper">
+    <div id="notes-container">
+        <div class="note-item" id="my-note-btn">
+            <div id="my-note-preview"></div>
+            <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
+            <span class="note-username">Your Note</span>
+            <div class="add-note-badge">+</div>
+        </div>
+        </div>
 </div>
 
-<div class="filter-scroll">
-    <div class="filter-chip active" onclick="setFilter('all', this)">All</div>
-    <div class="filter-chip" onclick="setFilter('unread', this)">Unread</div>
-    <div class="filter-chip" onclick="setFilter('groups', this)">Groups</div>
+<div class="inbox-controls">
+    <span class="inbox-controls-title">Chats</span>
+    <div class="sort-icon-btn" onclick="openSortModal()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+    </div>
 </div>
 
-<div id="search-results"></div>
+<div class="search-wrap" style="display:none;"></div>
+<div class="filter-scroll" style="display:none;"></div>
 
 <div id="inbox-content">
     <div id="chats-list">
@@ -376,6 +417,20 @@
         <button class="btn-action pin-btn-big" id="pin-chat-btn">Pin Transmission</button>
         <button class="btn-action del-btn-big" id="confirm-delete" data-is-group="false">Erase History For Both</button>
         <button class="btn-action cancel-btn" onclick="closeDeleteMenu(true)">Close Options</button>
+    </div>
+</div>
+
+<div id="search-modal" class="side-modal">
+    <div class="modal-header-top">
+        <button class="modal-back-btn" onclick="closeSearchModal(true)">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="search-input-wrapper">
+            <input type="text" class="search-input" id="main-search" placeholder="Search transmissions..." oninput="handleSearch(this.value)" autocomplete="off">
+        </div>
+    </div>
+    <div style="flex: 1; overflow-y: auto; padding-bottom: 20px;">
+        <div id="search-results" style="display:block; min-height:auto;"></div>
     </div>
 </div>
 
@@ -565,6 +620,60 @@
         }
     };
 
+    // --- 🚀 NEW MODAL CONTROLS FOR SEARCH AND SORT ---
+    window.openSearchModal = function() {
+        if(navigator.vibrate) navigator.vibrate(10);
+        document.getElementById('search-modal').classList.add('active');
+        history.pushState({ modal: 'search' }, "", "#search");
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.add('hide-nav');
+        setTimeout(() => document.getElementById('main-search').focus(), 100);
+    };
+
+    window.closeSearchModal = function(shouldGoBack) {
+        document.getElementById('search-modal').classList.remove('active');
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.remove('hide-nav');
+        
+        // Reset search field when closing
+        document.getElementById('main-search').value = "";
+        window.handleSearch(""); 
+
+        if(shouldGoBack && window.location.hash === "#search") history.back();
+    };
+
+    window.openSortModal = function() {
+        if(navigator.vibrate) navigator.vibrate(10);
+        const overlay = document.getElementById('sort-overlay');
+        const modal = document.getElementById('sort-modal');
+        
+        overlay.style.display = 'block';
+        history.pushState({ modal: 'sort' }, "", "#sort");
+        const nav = document.querySelector('main-navbar');
+        if(nav) nav.classList.add('hide-nav');
+
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+            modal.style.bottom = '0';
+        }, 20);
+    };
+
+    window.closeSortModal = function(shouldGoBack) {
+        const overlay = document.getElementById('sort-overlay');
+        const modal = document.getElementById('sort-modal');
+        
+        modal.style.bottom = '-100%';
+        overlay.style.opacity = '0';
+        
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            const nav = document.querySelector('main-navbar');
+            if(nav) nav.classList.remove('hide-nav');
+        }, 350);
+
+        if(shouldGoBack && window.location.hash === "#sort") history.back();
+    };
+
     // --- FIREBASE INIT ---
     if (typeof window.initFirebaseCore === 'function') {
         window.initFirebaseCore();
@@ -615,6 +724,11 @@
     auth.onAuthStateChanged(user => {
         if (user) {
             myUid = user.uid;
+            
+            // 🚀 POPULATE THE USER PFP FOR THE NOTES UI TRAY
+            const myNotePfpEl = document.getElementById('my-note-pfp');
+            if(myNotePfpEl) myNotePfpEl.src = user.photoURL || 'https://via.placeholder.com/65';
+
             setupPresence(); 
             fetchUserData();
             db.collection("users").doc(myUid).onSnapshot(doc => {
@@ -755,10 +869,11 @@
         });
     }
 
+    // 🚀 MODIFIED FILTER LOGIC TO WORK WITH THE NEW BOTTOM MODAL
     window.setFilter = function(filterType, el) {
         currentFilter = filterType;
-        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-        el.classList.add('active');
+        document.querySelectorAll('.filter-row').forEach(c => c.classList.remove('active'));
+        if (el) el.classList.add('active');
         renderInbox();
     }
 
@@ -925,12 +1040,17 @@
         else if(document.getElementById('group-modal').classList.contains('active') && hash !== '#group' && hash !== '#members') {
             closeGroupModal(false);
         }
-        
         if(document.getElementById('delete-menu').classList.contains('active') && hash !== '#menu') {
             closeDeleteMenu(false); 
         }
         if(document.getElementById('msg-intro-overlay').style.display === 'block' && hash !== '#intro') {
             closeIntroModal(false);
+        }
+        if(document.getElementById('search-modal').classList.contains('active') && hash !== '#search') {
+            closeSearchModal(false);
+        }
+        if(document.getElementById('sort-overlay').style.display === 'block' && hash !== '#sort') {
+            closeSortModal(false);
         }
     };
 
@@ -993,9 +1113,12 @@
 
     function searchUsers(val) {
         const results = document.getElementById('search-results');
-        const content = document.getElementById('inbox-content');
-        if(val.length < 1) { results.style.display = 'none'; content.style.display = 'block'; return; }
-        results.style.display = 'block'; content.style.display = 'none';
+        const content = document.getElementById('inbox-content'); // Maintained for integrity although it's in a different overlay context now
+        if(val.length < 1) { 
+            results.innerHTML = ""; 
+            return; 
+        }
+        
         const q = val.toLowerCase();
         
         const groupResultsHtml = currentChatData.filter(c => c.isGroup && (c.chat.groupName || "").toLowerCase().includes(q))
