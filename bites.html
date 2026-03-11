@@ -370,19 +370,19 @@
     });
 
     // ==========================================================================
-    // YOUTUBE IFRAME API DYNAMIC INJECTION (FIX FOR DEADLOCK)
+    // YOUTUBE IFRAME API DYNAMIC INJECTION
     // ==========================================================================
     window.onYouTubeIframeAPIReady = function() {
         const playerVars = { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'modestbranding': 1, 'playsinline': 1, 'mute': 0 };
         
         playerA = new YT.Player('yt-player-a', {
             playerVars: playerVars,
-            events: { 'onReady': () => checkPlayersReady(), 'onStateChange': onPlayerStateChange }
+            events: { 'onReady': checkPlayersReady, 'onStateChange': onPlayerStateChange }
         });
         
         playerB = new YT.Player('yt-player-b', {
             playerVars: playerVars,
-            events: { 'onReady': () => checkPlayersReady(), 'onStateChange': onPlayerStateChange }
+            events: { 'onReady': checkPlayersReady, 'onStateChange': onPlayerStateChange }
         });
     };
 
@@ -396,10 +396,10 @@
         playersReady++;
         if (playersReady === 2) {
             if (bitesQueue.length > 0) {
-                // Initialize the correct videos and state seamlessly
                 syncPlayersToScrollPosition(); 
                 renderDOMSlides();
                 
+                // If cache is running low, automatically fetch in background
                 if (bitesQueue.length < 5) fetchMoreBites();
             } else {
                 fetchMoreBites();
@@ -488,9 +488,9 @@
         const viewport = document.getElementById('bites-viewport');
         if (!viewport || playersReady < 2) return;
         
-        const slideHeight = viewport.clientHeight;
+        const slideHeight = viewport.clientHeight || window.innerHeight;
         const scrollPosition = viewport.scrollTop;
-        const actualIndex = Math.round(scrollPosition / slideHeight);
+        const actualIndex = Math.round(scrollPosition / slideHeight) || 0;
 
         if (actualIndex >= 0 && actualIndex < bitesQueue.length) {
             if (actualIndex !== currentIndex) {
@@ -499,9 +499,34 @@
                 if (hasStarted) {
                     currentVideoStartTime = Date.now();
                 }
-            } else if (hasStarted) {
-                // Same index, just ensure the correct one is playing in case it was paused by the loader
-                playActivePlayer();
+            } else {
+                // FORCE LOAD: Even if the index didn't change, ensure hardware is primed
+                const currentVid = bitesQueue[currentIndex]?.videoId;
+                const nextVid = bitesQueue[currentIndex + 1]?.videoId;
+                
+                if (activePlayer === 'A') {
+                    if (currentVid && currentLoadedA !== currentVid) {
+                        if (hasStarted) playerA.loadVideoById(currentVid);
+                        else playerA.cueVideoById(currentVid);
+                        currentLoadedA = currentVid;
+                    }
+                    if (nextVid && currentLoadedB !== nextVid) {
+                        playerB.cueVideoById(nextVid);
+                        currentLoadedB = nextVid;
+                    }
+                    if (hasStarted && typeof playerA.playVideo === 'function') playerA.playVideo();
+                } else {
+                    if (currentVid && currentLoadedB !== currentVid) {
+                        if (hasStarted) playerB.loadVideoById(currentVid);
+                        else playerB.cueVideoById(currentVid);
+                        currentLoadedB = currentVid;
+                    }
+                    if (nextVid && currentLoadedA !== nextVid) {
+                        playerA.cueVideoById(nextVid);
+                        currentLoadedA = nextVid;
+                    }
+                    if (hasStarted && typeof playerB.playVideo === 'function') playerB.playVideo();
+                }
             }
         }
     }
@@ -521,7 +546,7 @@
         
         const newIndex = Math.round(scrollPosition / slideHeight);
 
-        // 🚀 OVERRIDE: If scrolled to the spinner, FORCE a fetch immediately and pause video
+        // 🚀 OVERRIDE: If scrolled to the spinner, FORCE a fetch immediately
         if (newIndex === bitesQueue.length) {
             if (playerA && typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
             if (playerB && typeof playerB.pauseVideo === 'function') playerB.pauseVideo();
@@ -639,6 +664,9 @@
         
         const currentVid = bitesQueue[currentIndex]?.videoId;
         const nextVid = bitesQueue[currentIndex + 1]?.videoId;
+
+        if (typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
+        if (typeof playerB.pauseVideo === 'function') playerB.pauseVideo();
 
         if (activePlayer === 'A') {
             activePlayer = 'B';
@@ -779,7 +807,9 @@
                 if (uniqueNewBites.length > 0) {
                     uniqueNewBites.forEach(b => bitesQueue.push(b));
                     renderDOMSlides();
-                    syncPlayersToScrollPosition(); // 🚀 GOLDEN FIX: Instantly sync player if user was stuck
+                    
+                    // 🚀 GOLDEN FIX: Instantly sync player if user was stuck waiting for fetch
+                    syncPlayersToScrollPosition(); 
                 }
             }
         } catch (error) {
@@ -793,7 +823,8 @@
     function cleanUpQueueAndCache() {
         if (isSearchPlaying) return; 
         const cacheSlice = bitesQueue.slice(currentIndex);
-        localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 10))); 
+        // Only keep upcoming 15 videos to save memory, ensuring immediate load next time
+        localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 15))); 
     }
 
     window.shareBite = function(event, index) {
