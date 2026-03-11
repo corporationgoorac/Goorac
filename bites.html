@@ -336,6 +336,7 @@
     let hasStarted = false;
     let viewedVideoIds = new Set(); 
     
+    // INCREASED CAPACITY: App now remembers the last 2000 watched videos
     let bitesHistory = JSON.parse(localStorage.getItem('goorac_bites_history') || '[]');
     let currentVideoStartTime = 0; 
 
@@ -350,7 +351,7 @@
     let currentLoadedA = null;
     let currentLoadedB = null;
 
-    // Load from Cache immediately with Strict Deduplication
+    // Load from Cache strictly applying History deduplication
     (function loadCache() {
         const cached = localStorage.getItem('goorac_bites_queue');
         if (cached) {
@@ -360,6 +361,7 @@
                     const uniqueCache = [];
                     const seen = new Set();
                     parsed.forEach(b => {
+                        // Strict filter: If it exists in History, do NOT load it
                         if(b && b.videoId && !seen.has(b.videoId) && !bitesHistory.includes(b.videoId)) {
                             seen.add(b.videoId);
                             uniqueCache.push(b);
@@ -373,13 +375,33 @@
     })();
 
     // ==========================================================================
+    // WATCH HISTORY "BURN-ON-SIGHT" LOGIC
+    // ==========================================================================
+    function markAsViewed(videoId) {
+        if (!videoId || isSearchPlaying) return; 
+        if (!bitesHistory.includes(videoId)) {
+            bitesHistory.push(videoId);
+            if (bitesHistory.length > 2000) bitesHistory.shift(); 
+            localStorage.setItem('goorac_bites_history', JSON.stringify(bitesHistory));
+        }
+    }
+
+    function cleanUpQueueAndCache() {
+        if (isSearchPlaying) return; 
+        // 🚀 CRITICAL FIX: Save from `currentIndex + 1`. 
+        // We explicitly delete the currently playing video from the cache so it never repeats on a refresh.
+        const cacheSlice = bitesQueue.slice(currentIndex + 1);
+        localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 15))); 
+    }
+
+    // ==========================================================================
     // BACKGROUND APP SUPPORT & FIRESTORE BATCH SYNC TRIGGER
     // ==========================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             if (playerA && typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
             if (playerB && typeof playerB.pauseVideo === 'function') playerB.pauseVideo();
-            syncInterestsToFirestore(); // 🚀 Prevent data loss and flush queue safely
+            syncInterestsToFirestore(); 
         } else {
             if (hasStarted) playActivePlayer();
         }
@@ -426,8 +448,12 @@
         hasStarted = true;
         
         if (playersReady === 2 && bitesQueue.length > 0) {
+            // BURN ON SIGHT: Mark the very first video as viewed the second you click Play
+            if(bitesQueue[currentIndex]) markAsViewed(bitesQueue[currentIndex].videoId);
+            
             playActivePlayer();
             currentVideoStartTime = Date.now(); 
+            cleanUpQueueAndCache(); // Instantly evict it from next session cache
         }
     }
 
@@ -479,7 +505,6 @@
             viewport.appendChild(slide);
         }
 
-        // Seamless Skeleton Slide appended at the bottom
         const loaderSlide = document.createElement('div');
         loaderSlide.id = 'infinite-loader-slide';
         loaderSlide.className = 'bite-slide';
@@ -517,16 +542,20 @@
         if (actualIndex >= 0 && actualIndex < bitesQueue.length) {
             if (actualIndex !== currentIndex) {
                 currentIndex = actualIndex;
+                if(bitesQueue[currentIndex]) markAsViewed(bitesQueue[currentIndex].videoId); // BURN ON SIGHT
                 swapPlayers();
                 if (hasStarted) currentVideoStartTime = Date.now();
             } else {
-                if (hasStarted) playActivePlayer();
+                if (hasStarted) {
+                    if(bitesQueue[currentIndex]) markAsViewed(bitesQueue[currentIndex].videoId); // BURN ON SIGHT
+                    playActivePlayer();
+                }
             }
         }
     }
 
     // ==========================================================================
-    // SCROLL ENGINE & FIRESTORE COST MITIGATION
+    // SCROLL ENGINE 
     // ==========================================================================
     let lastScrollProcessTime = 0; 
     
@@ -563,15 +592,17 @@
             const previousBite = bitesQueue[currentIndex];
             
             processEngagementAlgorithm(previousBite, timeSpentMs);
-            if(previousBite) markAsViewed(previousBite.videoId);
 
             currentIndex = newIndex;
+            
+            // BURN ON SIGHT
+            if(bitesQueue[currentIndex]) markAsViewed(bitesQueue[currentIndex].videoId); 
+            
             currentVideoStartTime = Date.now(); 
             
             cleanUpQueueAndCache();
             swapPlayers();
 
-            // SMART FETCH: Load aggressively early when 5 videos remain
             if (currentIndex >= bitesQueue.length - 5 && !isFetching) {
                 if (!isSearchPlaying) fetchMoreBites(); 
             }
@@ -584,7 +615,6 @@
     let pendingInterestUpdates = {};
     let interestSyncTimer = null;
 
-    // 🚀 Adds interests to a local queue rather than slamming Firestore instantly
     function queueInterestUpdate(category, scoreChange) {
         if(!myUid || !category) return;
         const key = `interests.${category.toLowerCase()}`;
@@ -592,7 +622,6 @@
         if (pendingInterestUpdates[key]) pendingInterestUpdates[key] += scoreChange;
         else pendingInterestUpdates[key] = scoreChange;
 
-        // Auto-flush the queue every 15 seconds to minimize writes
         if(!interestSyncTimer) {
             interestSyncTimer = setTimeout(syncInterestsToFirestore, 15000); 
         }
@@ -663,15 +692,6 @@
             
             trackExplicitAction(bite.category, 'liked', bite.title);
             if(navigator.vibrate) navigator.vibrate(50);
-        }
-    }
-
-    function markAsViewed(videoId) {
-        if (!videoId || isSearchPlaying) return; 
-        if (!bitesHistory.includes(videoId)) {
-            bitesHistory.push(videoId);
-            if (bitesHistory.length > 200) bitesHistory.shift(); 
-            localStorage.setItem('goorac_bites_history', JSON.stringify(bitesHistory));
         }
     }
 
@@ -803,7 +823,9 @@
                 if (data.success && data.bites && data.bites.length > 0) {
                     const uniqueNewBites = [];
                     data.bites.forEach(b => {
+                        // Strict check: Is it in the session set, the 2000+ history array, or the current queue?
                         if (viewedVideoIds.has(b.videoId) || bitesHistory.includes(b.videoId) || bitesQueue.some(q => q.videoId === b.videoId)) return;
+                        
                         viewedVideoIds.add(b.videoId);
                         uniqueNewBites.push(b);
                     });
@@ -812,6 +834,7 @@
                         uniqueNewBites.forEach(b => bitesQueue.push(b));
                         renderDOMSlides();
                         syncPlayersToScrollPosition(); 
+                        cleanUpQueueAndCache(); // Cache instantly
                         success = true;
                     }
                 }
@@ -822,12 +845,6 @@
 
         if (!success && loaderText) loaderText.innerText = "Network slow or no new videos. Scroll to retry.";
         isFetching = false; 
-    }
-
-    function cleanUpQueueAndCache() {
-        if (isSearchPlaying) return; 
-        const cacheSlice = bitesQueue.slice(currentIndex);
-        localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 15))); 
     }
 
     window.shareBite = function(event, index) {
