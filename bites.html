@@ -190,6 +190,17 @@
         .start-btn-pulse { width: 80px; height: 80px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px var(--accent); animation: startPulse 2s infinite; margin-bottom: 20px; color: #000; }
         @keyframes startPulse { 0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(0, 210, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); } }
 
+        /* MAIN FEED SKELETON LOADER */
+        #main-skeleton {
+            position: absolute; inset: 0; z-index: 15; background: #000;
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 20px; padding-bottom: 65px;
+        }
+        .skel-side { position: absolute; right: 15px; bottom: 80px; display: flex; flex-direction: column; gap: 25px; align-items: center; }
+        .skel-circle { width: 45px; height: 45px; border-radius: 50%; background: #1a1a1a; animation: skelPulse 1.5s infinite; }
+        .skel-bottom { max-width: 80%; }
+        .skel-line-long { height: 16px; width: 60%; background: #1a1a1a; border-radius: 8px; margin-bottom: 12px; animation: skelPulse 1.5s infinite; }
+        .skel-line-short { height: 14px; width: 40%; background: #1a1a1a; border-radius: 8px; margin-bottom: 10px; animation: skelPulse 1.5s infinite; }
+
         /* 🚀 MAIN NAVBAR */
         main-navbar { 
             display: block; position: fixed; bottom: 0; left: 0; width: 100%;
@@ -216,6 +227,20 @@
 
 <div id="player-container-a" class="yt-player-container active"><div id="yt-player-a" class="yt-iframe"></div></div>
 <div id="player-container-b" class="yt-player-container"><div id="yt-player-b" class="yt-iframe"></div></div>
+
+<div id="main-skeleton" style="display:none;">
+    <div class="skel-side">
+        <div class="skel-circle"></div>
+        <div class="skel-circle" style="width:35px; height:35px;"></div>
+        <div class="skel-circle" style="width:35px; height:35px;"></div>
+        <div class="skel-circle" style="width:35px; height:35px;"></div>
+    </div>
+    <div class="skel-bottom">
+        <div class="skel-line-long"></div>
+        <div class="skel-line-short"></div>
+        <div class="skel-line-short" style="width: 30%;"></div>
+    </div>
+</div>
 
 <div class="play-indicator" id="play-pause-icon"><span class="material-icons-round" id="pp-icon-inner">pause</span></div>
 
@@ -346,7 +371,13 @@
     // ==========================================================================
     function renderDOMSlides() {
         const viewport = document.getElementById('bites-viewport');
+        const skeleton = document.getElementById('main-skeleton');
         
+        // Hide Skeleton once slides are rendering
+        if(bitesQueue.length > 0 && skeleton.style.display !== 'none') {
+            skeleton.style.display = 'none';
+        }
+
         // Append missing slides to match queue length
         while (viewport.children.length < bitesQueue.length) {
             const index = viewport.children.length;
@@ -528,6 +559,10 @@
         if (isFetching) return;
         isFetching = true;
 
+        if(bitesQueue.length === 0) {
+            document.getElementById('main-skeleton').style.display = 'flex';
+        }
+
         // 🚀 ALGORITHM: If no specific topic requested, send the user's top 5 interests to backend
         let queryTopic = overrideTopic;
         if (!queryTopic || queryTopic === "tamil") {
@@ -700,7 +735,8 @@
         grid.innerHTML = skelHtml;
 
         try {
-            const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(query)}`);
+            // 🚀 UPDATED API URL TO INCLUDE &search=true
+            const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(query)}&search=true`);
             const data = await res.json();
             
             if (data.success && data.bites.length > 0) {
