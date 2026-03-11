@@ -263,6 +263,11 @@
     let hasStarted = false;
     let viewedVideoIds = new Set(); // To ensure no repeats in session
 
+    // --- NEW: Backup State for Temporary Search Mode ---
+    let backupQueue = [];
+    let backupIndex = 0;
+    let isSearchPlaying = false;
+
     // The Dual Players
     let playerA, playerB;
     let activePlayer = 'A'; // 'A' or 'B'
@@ -304,7 +309,7 @@
             if(bitesQueue.length > 1) playerB.cueVideoById(bitesQueue[1].videoId);
             renderDOMSlides();
         } else if (playersReady === 2 && bitesQueue.length === 0) {
-            fetchMoreBites("trending"); // Initial fetch if empty
+            fetchMoreBites("tamil"); // Initial fetch if empty
         }
     }
 
@@ -393,7 +398,9 @@
 
             // 4. Fetch more if we are nearing the bottom
             if (currentIndex >= bitesQueue.length - 4 && !isFetching) {
-                fetchMoreBites(bitesQueue[currentIndex].category);
+                if (!isSearchPlaying) {
+                    fetchMoreBites(bitesQueue[currentIndex].category || "tamil");
+                }
             }
         }
     }
@@ -509,6 +516,7 @@
     }
 
     function cleanUpQueueAndCache() {
+        if (isSearchPlaying) return; // Prevent overwriting cache with temporary search results
         // Update LocalStorage to only store upcoming videos (instant load next time)
         const cacheSlice = bitesQueue.slice(currentIndex);
         localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 10))); // Max 10 in cache
@@ -573,7 +581,7 @@
         
         // Auto-load trending grid if empty
         const grid = document.getElementById('search-grid');
-        if(grid.children.length <= 1) executeSearch("trending");
+        if(grid.children.length <= 1) executeSearch("tamil");
     }
 
     window.closeDiscoverModal = function(shouldGoBack) {
@@ -582,7 +590,40 @@
     }
 
     window.onpopstate = (e) => { 
-        if(document.getElementById('discover-modal').classList.contains('active') && window.location.hash !== '#discover') {
+        const hash = window.location.hash;
+
+        // If going back from search video feed to the search modal
+        if (isSearchPlaying && hash === '#discover') {
+            isSearchPlaying = false;
+            
+            // Restore original feed
+            bitesQueue = [...backupQueue];
+            currentIndex = backupIndex;
+            
+            const viewport = document.getElementById('bites-viewport');
+            viewport.innerHTML = '';
+            renderDOMSlides();
+            
+            // Restore scroll position
+            viewport.scrollTop = currentIndex * viewport.clientHeight;
+            
+            // Resume previous video
+            if (activePlayer === 'A') {
+                playerA.loadVideoById(bitesQueue[currentIndex].videoId);
+                playerA.playVideo();
+                if(bitesQueue[currentIndex+1]) playerB.cueVideoById(bitesQueue[currentIndex+1].videoId);
+            } else {
+                playerB.loadVideoById(bitesQueue[currentIndex].videoId);
+                playerB.playVideo();
+                if(bitesQueue[currentIndex+1]) playerA.cueVideoById(bitesQueue[currentIndex+1].videoId);
+            }
+            
+            // Show modal again
+            document.getElementById('discover-modal').classList.add('active');
+            return;
+        }
+
+        if(document.getElementById('discover-modal').classList.contains('active') && hash !== '#discover') {
             closeDiscoverModal(false);
         }
     };
@@ -630,7 +671,16 @@
 
     // When user clicks a search result, it overwrites the main feed and plays instantly
     function launchSearchResultFeed(clickedBite, allResults) {
-        closeDiscoverModal(true);
+        // BACKUP STATE
+        backupQueue = [...bitesQueue];
+        backupIndex = currentIndex;
+        isSearchPlaying = true;
+
+        // Push state for back button handling
+        history.pushState({ modal: 'search-playing' }, "", "#search-playing");
+
+        // Manually close modal so it doesn't pop history
+        document.getElementById('discover-modal').classList.remove('active');
         
         // Re-arrange the queue: Put clicked item first, then the rest
         const otherResults = allResults.filter(b => b.videoId !== clickedBite.videoId);
@@ -656,7 +706,7 @@
             if(bitesQueue[1]) playerA.cueVideoById(bitesQueue[1].videoId);
         }
 
-        cleanUpQueueAndCache();
+        // NO CACHE UPDATE HERE (Keeps it temporary)
     }
 
 </script>
