@@ -555,7 +555,25 @@
                 payload.youtubeId = state.youtubeId;
             }
 
-            // CRITICAL: Overwrite the specific user's document
+            // CRITICAL CLEANUP: Delete old likes and views subcollections before overwriting
+            try {
+                const dropRef = db.collection("drops").doc(currentUser.uid);
+                const batch = db.batch();
+                
+                const likesSnap = await dropRef.collection("likes").get();
+                likesSnap.forEach(doc => batch.delete(doc.ref));
+                
+                const viewsSnap = await dropRef.collection("views").get();
+                viewsSnap.forEach(doc => batch.delete(doc.ref));
+                
+                if (likesSnap.size > 0 || viewsSnap.size > 0) {
+                    await batch.commit();
+                }
+            } catch (cleanupErr) {
+                console.warn("Failed to clean up old stats, proceeding to save anyway", cleanupErr);
+            }
+
+            // OVERWRITE the specific user's document
             await db.collection("drops").doc(currentUser.uid).set(payload);
             
             window.location.href = 'home.html';
