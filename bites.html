@@ -114,11 +114,19 @@
             display: flex; flex-direction: column; gap: 25px; align-items: center;
         }
 
-        .action-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #fff; cursor: pointer; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); transition: 0.2s;}
+        .action-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #fff; cursor: pointer; transition: 0.2s;}
         .action-btn:active { transform: scale(0.85); }
-        .action-btn .material-icons-round { font-size: 34px; }
-        .action-btn span.count { font-size: 0.75rem; font-weight: 700; }
         
+        /* Sleek transparent icons */
+        .action-btn .material-icons-round { 
+            font-size: 36px; 
+            color: #fff; 
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); 
+        }
+        
+        .action-btn span.count { font-size: 0.75rem; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+        
+        /* Filled Like State */
         .action-btn.liked .material-icons-round { color: var(--danger); }
         .action-btn.liked { animation: heartPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
@@ -132,26 +140,9 @@
             border: 2px solid #000;
         }
 
-        .bottom-info { max-width: 78%; padding-bottom: 5px; }
+        .bottom-info { max-width: 80%; padding-bottom: 5px; }
         .bite-author { font-size: 1rem; font-weight: 800; color: #fff; margin-bottom: 8px; text-shadow: 0 1px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 6px; }
         .bite-desc { font-size: 0.9rem; color: #eee; line-height: 1.4; text-shadow: 0 1px 5px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-
-        /* ==========================================================================
-           INFINITE SCROLL LOADER SLIDE
-           ========================================================================== */
-        .loader-slide {
-            width: 100vw; height: calc(100vh - var(--nav-height));
-            scroll-snap-align: start; scroll-snap-stop: always;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: transparent; color: #666;
-        }
-        .circular-loader {
-            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
-            border-top-color: var(--accent); border-radius: 50%;
-            animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loader-text { margin-top: 15px; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; }
 
         /* ==========================================================================
            SEARCH DISCOVER MODAL
@@ -255,7 +246,6 @@
         <div class="skel-circle"></div>
         <div class="skel-circle" style="width:35px; height:35px;"></div>
         <div class="skel-circle" style="width:35px; height:35px;"></div>
-        <div class="skel-circle" style="width:35px; height:35px;"></div>
     </div>
     <div class="skel-bottom">
         <div class="skel-line-long"></div>
@@ -319,7 +309,7 @@
     let fetchTimeoutFallback = null; 
     let hasStarted = false;
     let viewedVideoIds = new Set(); 
-    let consecutiveDuplicateFetches = 0; // 🚀 New Anti-Duplicate Failsafe
+    let consecutiveDuplicateFetches = 0; 
     
     let bitesHistory = JSON.parse(localStorage.getItem('goorac_bites_history') || '[]');
     let currentVideoStartTime = 0; 
@@ -386,7 +376,6 @@
         });
     };
 
-    // Safely inject API to guarantee load order
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -398,16 +387,13 @@
             if (bitesQueue.length > 0) {
                 syncPlayersToScrollPosition(); 
                 renderDOMSlides();
-                
-                // If cache is running low, automatically fetch in background
-                if (bitesQueue.length < 5) fetchMoreBites();
+                if (bitesQueue.length < 8) fetchMoreBites(); // Aggressive early fetch
             } else {
                 fetchMoreBites();
             }
         }
     }
 
-    // Handle Tap to Start 
     window.initExperience = function() {
         document.getElementById('start-screen').style.opacity = '0';
         setTimeout(() => document.getElementById('start-screen').style.display = 'none', 300);
@@ -420,7 +406,7 @@
     }
 
     // ==========================================================================
-    // DOM SLIDE RENDERER & INFINITE SCROLL LOADER
+    // DOM SLIDE RENDERER (INFINITE SMART SCROLL - NO LOADERS)
     // ==========================================================================
     function renderDOMSlides() {
         const viewport = document.getElementById('bites-viewport');
@@ -430,9 +416,7 @@
             skeleton.style.display = 'none';
         }
 
-        const existingLoader = document.getElementById('infinite-loader-slide');
-        if (existingLoader) existingLoader.remove();
-
+        // Smart append: Only add slides that don't exist yet
         while (viewport.children.length < bitesQueue.length) {
             const index = viewport.children.length;
             const bite = bitesQueue[index];
@@ -442,6 +426,7 @@
             slide.dataset.index = index;
             slide.onclick = () => togglePlayPause();
 
+            // Action stack uses transparent favorite_border default and Share
             slide.innerHTML = `
                 <div class="bite-ui-layer">
                     <div class="side-actions">
@@ -450,12 +435,8 @@
                             <div class="follow-badge">+</div>
                         </div>
                         <div class="action-btn" id="like-btn-${index}" onclick="handleLike(event, ${index})">
-                            <span class="material-icons-round">favorite</span>
+                            <span class="material-icons-round" id="like-icon-${index}">favorite_border</span>
                             <span class="count">${formatNumber(bite.likes)}</span>
-                        </div>
-                        <div class="action-btn" onclick="event.stopPropagation()">
-                            <span class="material-icons-round">chat_bubble</span>
-                            <span class="count">${formatNumber(Math.floor(bite.likes * 0.1))}</span>
                         </div>
                         <div class="action-btn" onclick="shareBite(event, ${index})">
                             <span class="material-icons-round">reply</span>
@@ -470,19 +451,10 @@
             `;
             viewport.appendChild(slide);
         }
-
-        const loaderSlide = document.createElement('div');
-        loaderSlide.id = 'infinite-loader-slide';
-        loaderSlide.className = 'loader-slide';
-        loaderSlide.innerHTML = `
-            <div class="circular-loader"></div>
-            <div class="loader-text">Finding more bites...</div>
-        `;
-        viewport.appendChild(loaderSlide);
     }
 
     // ==========================================================================
-    // 🚀 THE ULTIMATE "STUCK ON LOADING" FIX (SCROLL-SYNC ENGINE)
+    // 🚀 SCROLL-SYNC ENGINE
     // ==========================================================================
     function syncPlayersToScrollPosition() {
         const viewport = document.getElementById('bites-viewport');
@@ -500,7 +472,6 @@
                     currentVideoStartTime = Date.now();
                 }
             } else {
-                // FORCE LOAD: Even if the index didn't change, ensure hardware is primed
                 const currentVid = bitesQueue[currentIndex]?.videoId;
                 const nextVid = bitesQueue[currentIndex + 1]?.videoId;
                 
@@ -546,19 +517,6 @@
         
         const newIndex = Math.round(scrollPosition / slideHeight);
 
-        // 🚀 OVERRIDE: If scrolled to the spinner, FORCE a fetch immediately
-        if (newIndex === bitesQueue.length) {
-            if (playerA && typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
-            if (playerB && typeof playerB.pauseVideo === 'function') playerB.pauseVideo();
-            
-            if (!isFetching && !isSearchPlaying) {
-                const loaderText = document.querySelector('.loader-text');
-                if (loaderText) loaderText.innerText = "Finding more bites...";
-                fetchMoreBites();
-            }
-            return; 
-        }
-
         if (newIndex !== currentIndex && newIndex >= 0 && newIndex < bitesQueue.length) {
             if (now - lastScrollProcessTime < 100) return;
             lastScrollProcessTime = now;
@@ -575,7 +533,8 @@
             cleanUpQueueAndCache();
             swapPlayers();
 
-            if (currentIndex >= bitesQueue.length - 3 && !isFetching) {
+            // 🚀 SMART FETCH: Load aggressively early when 8 videos are remaining
+            if (currentIndex >= bitesQueue.length - 8 && !isFetching) {
                 if (!isSearchPlaying) {
                     fetchMoreBites(); 
                 }
@@ -639,6 +598,8 @@
         
         if (!btn.classList.contains('liked')) {
             btn.classList.add('liked');
+            // Change transparent outline to solid filled icon
+            document.getElementById(`like-icon-${index}`).innerText = 'favorite';
             let cSpan = btn.querySelector('.count');
             cSpan.innerText = formatNumber(bite.likes + 1);
             
@@ -748,7 +709,7 @@
     }
 
     // ==========================================================================
-    // NETWORK FETCHING & CACHE BUSTING (ANTI-DUPLICATE ENGINE)
+    // 🚀 BULLETPROOF NETWORK FETCHING & CACHE BUSTER
     // ==========================================================================
     async function fetchMoreBites(overrideTopic = null) {
         if (isFetching) return;
@@ -758,17 +719,13 @@
             document.getElementById('main-skeleton').style.display = 'flex';
         }
 
+        // Extremely robust failsafe lock breaker
         clearTimeout(fetchTimeoutFallback);
         fetchTimeoutFallback = setTimeout(() => { 
             isFetching = false; 
-            const loaderText = document.querySelector('.loader-text');
-            if (loaderText) loaderText.innerText = "Network slow, scroll to retry.";
         }, 12000);
 
-        let queryTopic = overrideTopic;
-        if (!queryTopic || queryTopic === "tamil") {
-            queryTopic = myInterests.length > 0 ? myInterests.join(',') : "tamil";
-        }
+        let queryTopic = overrideTopic || (myInterests.length > 0 ? myInterests.join(',') : "tamil");
 
         try {
             const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(queryTopic)}`);
@@ -776,7 +733,7 @@
             
             if (data.success && data.bites && data.bites.length > 0) {
                 
-                // 🚀 PARANOID DEDUPLICATION
+                // 🚀 Absolute Duplicate Destruction
                 const uniqueNewBites = [];
                 data.bites.forEach(b => {
                     if (viewedVideoIds.has(b.videoId)) return;
@@ -787,43 +744,44 @@
                     uniqueNewBites.push(b);
                 });
 
-                // 🚀 CACHE BUSTER: If backend gave us duplicate pool items, force a new dynamic scrape!
+                // 🚀 CACHE BUSTER: If backend gave us duplicate pool items, force a new dynamic scrape instantly
                 if (uniqueNewBites.length === 0 && !isSearchPlaying) {
                     consecutiveDuplicateFetches++;
-                    isFetching = false; 
-                    if (consecutiveDuplicateFetches < 3) {
-                        const bustWords = ["viral", "hits", "trending", "wow"];
+                    if (consecutiveDuplicateFetches < 4) {
+                        const bustWords = ["viral", "hits", "trending", "wow", "latest"];
                         const bust = bustWords[Math.floor(Math.random() * bustWords.length)];
-                        fetchMoreBites(queryTopic + " " + bust);
-                    } else {
-                        const loaderText = document.querySelector('.loader-text');
-                        if (loaderText) loaderText.innerText = "All caught up! Refresh to discover more.";
+                        isFetching = false; // explicitly unlock before recursive call
+                        clearTimeout(fetchTimeoutFallback);
+                        return fetchMoreBites(queryTopic + " " + bust);
                     }
-                    return;
-                }
-
-                consecutiveDuplicateFetches = 0; // Reset failsafe
-
-                if (uniqueNewBites.length > 0) {
+                } else {
+                    consecutiveDuplicateFetches = 0; 
                     uniqueNewBites.forEach(b => bitesQueue.push(b));
                     renderDOMSlides();
-                    
-                    // 🚀 GOLDEN FIX: Instantly sync player if user was stuck waiting for fetch
                     syncPlayersToScrollPosition(); 
+                }
+            } else if (!isSearchPlaying) {
+                // 🚀 Backend returned Empty Array Failsafe
+                consecutiveDuplicateFetches++;
+                if (consecutiveDuplicateFetches < 4) {
+                    const bustWords = ["viral", "hits", "trending", "wow"];
+                    const bust = bustWords[Math.floor(Math.random() * bustWords.length)];
+                    isFetching = false; // explicitly unlock before recursive call
+                    clearTimeout(fetchTimeoutFallback);
+                    return fetchMoreBites(queryTopic + " " + bust);
                 }
             }
         } catch (error) {
             console.error("Failed to fetch bites", error);
+        } finally {
+            clearTimeout(fetchTimeoutFallback);
+            isFetching = false;
         }
-        
-        clearTimeout(fetchTimeoutFallback);
-        isFetching = false;
     }
 
     function cleanUpQueueAndCache() {
         if (isSearchPlaying) return; 
         const cacheSlice = bitesQueue.slice(currentIndex);
-        // Only keep upcoming 15 videos to save memory, ensuring immediate load next time
         localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 15))); 
     }
 
@@ -877,7 +835,7 @@
             viewport.scrollTop = currentIndex * viewport.clientHeight;
             currentVideoStartTime = Date.now(); 
             
-            syncPlayersToScrollPosition(); // Perfectly restores hardware state
+            syncPlayersToScrollPosition(); 
             
             document.getElementById('discover-modal').classList.add('active');
             return;
@@ -953,7 +911,7 @@
         renderDOMSlides();
         currentVideoStartTime = Date.now(); 
         
-        syncPlayersToScrollPosition(); // Forces immediate hardware playback
+        syncPlayersToScrollPosition(); 
     }
 
 </script>
