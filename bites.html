@@ -17,8 +17,6 @@
     <script type="module" src="components/presence.js"></script>
     <script src="components/navbar.js" defer></script>
     
-    <script src="https://www.youtube.com/iframe_api"></script>
-
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
@@ -35,13 +33,13 @@
             --danger: #ff4444;
             --glass: rgba(0, 0, 0, 0.4);
             --text-main: #ffffff;
-            --nav-height: calc(65px + env(safe-area-inset-bottom)); /* Dynamic Nav Height */
+            --nav-height: calc(65px + env(safe-area-inset-bottom)); 
         }
 
         body {
             background: var(--bg); color: white; margin: 0;
             font-family: -apple-system, system-ui, sans-serif;
-            overflow: hidden; /* STRICT LOCK FOR REELS FEED */
+            overflow: hidden; 
             width: 100vw; height: 100vh;
         }
 
@@ -54,7 +52,7 @@
             align-items: center; z-index: 1000;
             padding-top: max(15px, env(safe-area-inset-top));
             background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
-            pointer-events: none; /* Let clicks pass through except on icons */
+            pointer-events: none; 
         }
         .header-title { font-weight: 800; font-size: 1.4rem; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.5); pointer-events: auto; }
         .header-right { pointer-events: auto; }
@@ -76,7 +74,7 @@
             overflow-y: scroll; scroll-snap-type: y mandatory;
             scrollbar-width: none; -webkit-overflow-scrolling: touch;
             z-index: 10; padding-bottom: var(--nav-height);
-            scroll-behavior: smooth; /* Advanced smooth scrolling capability */
+            scroll-behavior: smooth; 
         }
         #bites-viewport::-webkit-scrollbar { display: none; }
 
@@ -91,27 +89,28 @@
             position: fixed; top: 0; left: 0; width: 100vw; 
             height: calc(100vh - var(--nav-height));
             z-index: 1; opacity: 0; pointer-events: none; background: #000;
-            transform: scale(1.05); /* Slight scale to hide YouTube borders */
-            transition: opacity 0.35s ease-in-out; /* Enhanced smooth crossfade between players */
+            transform: scale(1.05); 
+            transition: opacity 0.35s ease-in-out; 
         }
         .yt-player-container.active { opacity: 1; z-index: 2; }
-        .yt-iframe { width: 100%; height: 100%; pointer-events: none; }
+        
+        /* 🚀 STRICT IFRAME LOCK: Prevents YouTube from stealing clicks */
+        iframe { width: 100%; height: 100%; border: none; pointer-events: none !important; }
 
         /* ==========================================================================
-           BITES UI OVERLAY (Tiktok Style) - PERFECTLY ALIGNED
+           BITES UI OVERLAY (Tiktok Style)
            ========================================================================== */
         .bite-ui-layer {
             position: absolute; inset: 0; z-index: 20;
             display: flex; flex-direction: column; justify-content: flex-end;
             padding: 15px; 
-            /* Gradient fades out higher up to keep text legible */
             background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 45%);
-            padding-bottom: 25px; /* Breathing room strictly relative to the slide's bottom */
+            padding-bottom: 25px; 
         }
 
         .side-actions {
             position: absolute; right: 15px; 
-            bottom: 25px; /* Aligned with bottom text */
+            bottom: 25px; 
             display: flex; flex-direction: column; gap: 25px; align-items: center;
         }
 
@@ -155,7 +154,7 @@
         .loader-text { margin-top: 15px; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; }
 
         /* ==========================================================================
-           SEARCH DISCOVER MODAL (Instagram Style)
+           SEARCH DISCOVER MODAL
            ========================================================================== */
         #discover-modal {
             position: fixed; top: 0; right: -100%; width: 100vw; height: 100vh;
@@ -248,10 +247,10 @@
     </div>
 </header>
 
-<div id="player-container-a" class="yt-player-container active"><div id="yt-player-a" class="yt-iframe"></div></div>
-<div id="player-container-b" class="yt-player-container"><div id="yt-player-b" class="yt-iframe"></div></div>
+<div id="player-container-a" class="yt-player-container active"><div id="yt-player-a"></div></div>
+<div id="player-container-b" class="yt-player-container"><div id="yt-player-b"></div></div>
 
-<div id="main-skeleton" style="display:none;">
+<div id="main-skeleton" style="display:flex;">
     <div class="skel-side">
         <div class="skel-circle"></div>
         <div class="skel-circle" style="width:35px; height:35px;"></div>
@@ -267,8 +266,7 @@
 
 <div class="play-indicator" id="play-pause-icon"><span class="material-icons-round" id="pp-icon-inner">pause</span></div>
 
-<div id="bites-viewport" onscroll="handleScroll()">
-    </div>
+<div id="bites-viewport" onscroll="handleScroll()"></div>
 
 <div id="discover-modal">
     <div class="modal-header">
@@ -296,18 +294,16 @@
     const db = firebase.firestore();
     const auth = firebase.auth();
     let myUid = null;
-    let myInterests = ["tamil"]; // Default array if completely fresh user
+    let myInterests = ["tamil"]; 
 
     auth.onAuthStateChanged(user => {
         if (user) { 
             myUid = user.uid; 
-            // 🚀 SMART ALGORITHM INIT: Fetch top 5 interests from DB
             db.collection("users").doc(myUid).get().then(doc => {
                 if(doc.exists && doc.data().interests) {
                     const ints = doc.data().interests;
-                    // Sort descending by score, grab the top 5 topic names
                     myInterests = Object.keys(ints).sort((a,b) => ints[b] - ints[a]).slice(0, 5);
-                    if(myInterests.length === 0) myInterests = ["tamil"]; // Failsafe
+                    if(myInterests.length === 0) myInterests = ["tamil"]; 
                 }
             });
         } 
@@ -320,25 +316,21 @@
     let bitesQueue = [];
     let currentIndex = 0;
     let isFetching = false;
-    let fetchTimeoutFallback = null; // Failsafe for stuck loading
+    let fetchTimeoutFallback = null; 
     let hasStarted = false;
-    let viewedVideoIds = new Set(); // To strictly ensure no repeats in current session
+    let viewedVideoIds = new Set(); 
     
-    // 🚀 TELEMETRY & ENGAGEMENT TRACKING
     let bitesHistory = JSON.parse(localStorage.getItem('goorac_bites_history') || '[]');
-    let currentVideoStartTime = 0; // Tracks exactly when the user landed on the slide
+    let currentVideoStartTime = 0; 
 
-    // Backup State for Temporary Search Mode
     let backupQueue = [];
     let backupIndex = 0;
     let isSearchPlaying = false;
 
-    // The Dual Players
     let playerA, playerB;
-    let activePlayer = 'A'; // 'A' or 'B'
+    let activePlayer = 'A'; 
     let playersReady = 0;
     
-    // 🚀 ADVANCED FIX: Explicitly track loaded states to prevent duplicate playback bugs
     let currentLoadedA = null;
     let currentLoadedB = null;
 
@@ -349,11 +341,10 @@
             try { 
                 const parsed = JSON.parse(cached);
                 if (parsed.length > 0) {
-                    // Strict deduplication right on cache load
                     const uniqueCache = [];
                     const seen = new Set();
                     parsed.forEach(b => {
-                        if(!seen.has(b.videoId)) {
+                        if(!seen.has(b.videoId) && !bitesHistory.includes(b.videoId)) {
                             seen.add(b.videoId);
                             uniqueCache.push(b);
                             viewedVideoIds.add(b.videoId);
@@ -366,9 +357,9 @@
     })();
 
     // ==========================================================================
-    // YOUTUBE IFRAME API SETUP
+    // YOUTUBE IFRAME API DYNAMIC INJECTION (FIX FOR DEADLOCK)
     // ==========================================================================
-    function onYouTubeIframeAPIReady() {
+    window.onYouTubeIframeAPIReady = function() {
         const playerVars = { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'modestbranding': 1, 'playsinline': 1, 'mute': 0 };
         
         playerA = new YT.Player('yt-player-a', {
@@ -380,31 +371,41 @@
             playerVars: playerVars,
             events: { 'onReady': () => checkPlayersReady(), 'onStateChange': onPlayerStateChange }
         });
-    }
+    };
+
+    // Safely inject API after the global function is strictly defined
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     function checkPlayersReady() {
         playersReady++;
         if (playersReady === 2) {
             if (bitesQueue.length > 0) {
                 playerA.cueVideoById(bitesQueue[0].videoId);
-                currentLoadedA = bitesQueue[0].videoId; // Sync tracker
+                currentLoadedA = bitesQueue[0].videoId; 
                 if(bitesQueue.length > 1) {
                     playerB.cueVideoById(bitesQueue[1].videoId);
-                    currentLoadedB = bitesQueue[1].videoId; // Sync tracker
+                    currentLoadedB = bitesQueue[1].videoId; 
                 }
                 renderDOMSlides();
                 
-                // 🚀 PREVENT STUCK ON RELOAD: If the user reloaded near the bottom of their old cache, 
-                // automatically refill the queue immediately so they don't get stuck.
-                if (bitesQueue.length < 5) {
-                    fetchMoreBites();
+                // If they tapped start before players were ready, play instantly now
+                if (hasStarted) {
+                    playActivePlayer();
+                    currentVideoStartTime = Date.now();
                 }
+
+                // 🚀 ANTI-STUCK: If cache is small, refill immediately
+                if (bitesQueue.length < 5) fetchMoreBites();
             } else {
-                fetchMoreBites("tamil");
+                fetchMoreBites();
             }
         }
     }
 
+    // Handle Tap to Start 
     window.initExperience = function() {
         document.getElementById('start-screen').style.opacity = '0';
         setTimeout(() => document.getElementById('start-screen').style.display = 'none', 300);
@@ -412,7 +413,7 @@
         
         if (playersReady === 2 && bitesQueue.length > 0) {
             playActivePlayer();
-            currentVideoStartTime = Date.now(); // Start exact telemetry timer
+            currentVideoStartTime = Date.now(); 
         }
     }
 
@@ -427,11 +428,9 @@
             skeleton.style.display = 'none';
         }
 
-        // Remove the loader slide if it exists so we can append real slides
         const existingLoader = document.getElementById('infinite-loader-slide');
         if (existingLoader) existingLoader.remove();
 
-        // Append missing slides
         while (viewport.children.length < bitesQueue.length) {
             const index = viewport.children.length;
             const bite = bitesQueue[index];
@@ -441,7 +440,6 @@
             slide.dataset.index = index;
             slide.onclick = () => togglePlayPause();
 
-            // Note: .bite-category badge removed per instructions
             slide.innerHTML = `
                 <div class="bite-ui-layer">
                     <div class="side-actions">
@@ -471,7 +469,6 @@
             viewport.appendChild(slide);
         }
 
-        // Re-append the loader slide to the very bottom
         const loaderSlide = document.createElement('div');
         loaderSlide.id = 'infinite-loader-slide';
         loaderSlide.className = 'loader-slide';
@@ -485,7 +482,7 @@
     // ==========================================================================
     // SCROLL ENGINE & ALGORITHMIC TELEMETRY
     // ==========================================================================
-    let lastScrollProcessTime = 0; // Throttle state
+    let lastScrollProcessTime = 0; 
     
     function handleScroll() {
         if (!hasStarted) return;
@@ -497,41 +494,30 @@
         
         const newIndex = Math.round(scrollPosition / slideHeight);
 
-        // 🚀 ADVANCED STUCK-PREVENTION: Did the user scroll all the way to the loading spinner?
-        // bitesQueue.length is the exact index of the loader slide. Force a fetch!
+        // 🚀 OVERRIDE: If scrolled to the spinner, FORCE a fetch immediately
         if (newIndex === bitesQueue.length) {
             if (!isFetching && !isSearchPlaying) {
                 fetchMoreBites();
             }
-            return; // Exit here, do not swap players for the loader slide
+            return; 
         }
 
-        // Valid scroll event onto an actual video
         if (newIndex !== currentIndex && newIndex >= 0 && newIndex < bitesQueue.length) {
-            
-            // 🚀 Advanced Throttle to completely kill duplicate firing triggers on erratic scrolls
             if (now - lastScrollProcessTime < 100) return;
             lastScrollProcessTime = now;
             
-            // 🚀 1. CALCULATE EXACT TIME SPENT FOR ALGORITHM
             const timeSpentMs = now - currentVideoStartTime;
             const previousBite = bitesQueue[currentIndex];
             
-            // Fire telemetry processing
             processEngagementAlgorithm(previousBite, timeSpentMs);
-            
-            // Store in permanent history memory
             if(previousBite) markAsViewed(previousBite.videoId);
 
-            // 🚀 2. UPDATE STATE
             currentIndex = newIndex;
-            currentVideoStartTime = Date.now(); // Reset timer for new video
+            currentVideoStartTime = Date.now(); 
             
-            // 3. Clean cache & Swap Players
             cleanUpQueueAndCache();
             swapPlayers();
 
-            // 4. Infinite Fetch Trigger (Fetch when 3 videos away from end)
             if (currentIndex >= bitesQueue.length - 3 && !isFetching) {
                 if (!isSearchPlaying) {
                     fetchMoreBites(); 
@@ -543,71 +529,48 @@
     // ==========================================================================
     // 🧠 THE DEEP-LEARNING ALGORITHM ENGINE
     // ==========================================================================
-
-    // Extracts #hashtags from text to build the user's specific interest profile
     function extractHashtags(text) {
         if (!text) return [];
         const matches = text.match(/#[\w]+/g);
         return matches ? matches.map(t => t.toLowerCase().replace('#', '')) : [];
     }
 
-    // Processes the watch time and fires updates to Firebase
     function processEngagementAlgorithm(bite, timeSpentMs) {
         if (!bite || isSearchPlaying) return;
 
         let scoreChange = 0;
         let shouldExtractTags = false;
 
-        if (timeSpentMs < 2500) {
-            // PENALTY: User skipped immediately. Subtract points from this category.
-            scoreChange = -3;
-        } else if (timeSpentMs >= 7000) {
-            // REWARD: User watched for > 7 seconds. Boost score and map their specific hashtags.
-            scoreChange = 5;
-            shouldExtractTags = true;
-        } else {
-            // NEUTRAL: Watched normally, slight bump.
-            scoreChange = 1;
-        }
+        if (timeSpentMs < 2500) scoreChange = -3;
+        else if (timeSpentMs >= 7000) { scoreChange = 5; shouldExtractTags = true; } 
+        else scoreChange = 1;
 
-        // Build the Firebase update payload dynamically
         let updates = { [`interests.${bite.category.toLowerCase()}`]: firebase.firestore.FieldValue.increment(scoreChange) };
 
         if (shouldExtractTags) {
             const tags = extractHashtags(bite.title);
-            // Cap at 3 tags per video so database doesn't bloat
             tags.slice(0, 3).forEach(tag => {
-                updates[`interests.${tag}`] = firebase.firestore.FieldValue.increment(3); // +3 for tags
+                updates[`interests.${tag}`] = firebase.firestore.FieldValue.increment(3);
             });
         }
 
-        // Fire safely
         if(myUid && scoreChange !== 0) {
             db.collection("users").doc(myUid).set(updates, { merge: true }).catch(e => {});
         }
     }
 
-    // Track explicit actions (Like / Search)
     function trackExplicitAction(category, action, biteTitle = "") {
         if (!myUid || !category || isSearchPlaying) return;
         
         let scoreChange = 0;
         let tags = [];
 
-        if (action === 'liked') {
-            scoreChange = 15;
-            tags = extractHashtags(biteTitle).slice(0, 3);
-        } else if (action === 'searched') {
-            scoreChange = 20;
-        } else if (action === 'rewatched') {
-            scoreChange = 8;
-            tags = extractHashtags(biteTitle).slice(0, 3);
-        }
+        if (action === 'liked') { scoreChange = 15; tags = extractHashtags(biteTitle).slice(0, 3); } 
+        else if (action === 'searched') scoreChange = 20;
+        else if (action === 'rewatched') { scoreChange = 8; tags = extractHashtags(biteTitle).slice(0, 3); }
 
         let updates = { [`interests.${category.toLowerCase()}`]: firebase.firestore.FieldValue.increment(scoreChange) };
-        tags.forEach(tag => {
-            updates[`interests.${tag}`] = firebase.firestore.FieldValue.increment(5); // Explicit tag boost
-        });
+        tags.forEach(tag => { updates[`interests.${tag}`] = firebase.firestore.FieldValue.increment(5); });
 
         db.collection("users").doc(myUid).set(updates, { merge: true }).catch(e => {});
     }
@@ -622,9 +585,7 @@
             let cSpan = btn.querySelector('.count');
             cSpan.innerText = formatNumber(bite.likes + 1);
             
-            // Explicit algorithm boost
             trackExplicitAction(bite.category, 'liked', bite.title);
-            
             if(navigator.vibrate) navigator.vibrate(50);
         }
     }
@@ -633,7 +594,7 @@
         if (!videoId || isSearchPlaying) return; 
         if (!bitesHistory.includes(videoId)) {
             bitesHistory.push(videoId);
-            if (bitesHistory.length > 200) bitesHistory.shift(); // Keep RAM clean, max 200 memory
+            if (bitesHistory.length > 200) bitesHistory.shift(); 
             localStorage.setItem('goorac_bites_history', JSON.stringify(bitesHistory));
         }
     }
@@ -645,7 +606,6 @@
         const pA = document.getElementById('player-container-a');
         const pB = document.getElementById('player-container-b');
 
-        // Advanced Fix: Pre-validate state before loading to eliminate same-video bugs
         const currentVid = bitesQueue[currentIndex]?.videoId;
         const nextVid = bitesQueue[currentIndex + 1]?.videoId;
 
@@ -708,7 +668,7 @@
         const icon = document.getElementById('play-pause-icon');
         const inner = document.getElementById('pp-icon-inner');
 
-        if (state === 1) { // Playing
+        if (state === 1) { 
             p.pauseVideo();
             inner.innerText = 'pause';
             icon.classList.add('show');
@@ -720,12 +680,9 @@
         }
     }
 
-    // 🚀 REWATCH ALGORITHM TRIGGER
     function onPlayerStateChange(event) {
         if (event.data === YT.PlayerState.ENDED) {
-            event.target.playVideo(); // Auto-loop
-            
-            // If it naturally ends and restarts, they watched the whole thing! Reward it.
+            event.target.playVideo(); 
             if(bitesQueue[currentIndex]) {
                 trackExplicitAction(bitesQueue[currentIndex].category, 'rewatched', bitesQueue[currentIndex].title);
             }
@@ -743,9 +700,8 @@
             document.getElementById('main-skeleton').style.display = 'flex';
         }
 
-        // Failsafe: If Render hangs for 10 seconds, unlock the fetcher so they can try again
         clearTimeout(fetchTimeoutFallback);
-        fetchTimeoutFallback = setTimeout(() => { isFetching = false; }, 10000);
+        fetchTimeoutFallback = setTimeout(() => { isFetching = false; }, 15000);
 
         let queryTopic = overrideTopic;
         if (!queryTopic || queryTopic === "tamil") {
@@ -756,32 +712,36 @@
             const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(queryTopic)}`);
             const data = await res.json();
             
-            if (data.success && data.bites.length > 0) {
+            if (data.success && data.bites && data.bites.length > 0) {
                 
-                // 🚀 PARANOID DEDUPLICATION: Ensure no video can EVER enter the queue twice
+                // 🚀 PARANOID DEDUPLICATION
                 const uniqueNewBites = [];
                 data.bites.forEach(b => {
-                    // Check against viewed session IDs
                     if (viewedVideoIds.has(b.videoId)) return;
-                    // Check against historical 200 memory limit
                     if (bitesHistory.includes(b.videoId)) return;
-                    // Sanity check against current queue
                     if (bitesQueue.some(q => q.videoId === b.videoId)) return;
                     
                     viewedVideoIds.add(b.videoId);
                     uniqueNewBites.push(b);
                 });
 
-                uniqueNewBites.forEach(b => bitesQueue.push(b));
-
-                renderDOMSlides();
-                
-                if (currentIndex === 0 && !hasStarted && playersReady === 2 && bitesQueue.length > 0) {
-                    playerA.cueVideoById(bitesQueue[0].videoId);
-                    currentLoadedA = bitesQueue[0].videoId;
-                    if(bitesQueue.length > 1) {
-                        playerB.cueVideoById(bitesQueue[1].videoId);
-                        currentLoadedB = bitesQueue[1].videoId;
+                if (uniqueNewBites.length > 0) {
+                    uniqueNewBites.forEach(b => bitesQueue.push(b));
+                    renderDOMSlides();
+                    
+                    // 🚀 SAFE INITIALIZATION LOGIC
+                    if (currentIndex === 0 && playersReady === 2 && bitesQueue.length > 0) {
+                        playerA.cueVideoById(bitesQueue[0].videoId);
+                        currentLoadedA = bitesQueue[0].videoId;
+                        if(bitesQueue.length > 1) {
+                            playerB.cueVideoById(bitesQueue[1].videoId);
+                            currentLoadedB = bitesQueue[1].videoId;
+                        }
+                        // Instantly play if they already clicked the start button
+                        if (hasStarted) {
+                            playActivePlayer();
+                            currentVideoStartTime = Date.now();
+                        }
                     }
                 }
             }
@@ -796,7 +756,6 @@
     function cleanUpQueueAndCache() {
         if (isSearchPlaying) return; 
         const cacheSlice = bitesQueue.slice(currentIndex);
-        // Only keep upcoming 10 videos to save memory, but don't slice if we are out of videos
         localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 10))); 
     }
 
@@ -837,7 +796,6 @@
     window.onpopstate = (e) => { 
         const hash = window.location.hash;
 
-        // Restore feed gracefully when exiting search mode
         if (isSearchPlaying && hash === '#discover') {
             isSearchPlaying = false;
             
@@ -849,9 +807,8 @@
             renderDOMSlides();
             
             viewport.scrollTop = currentIndex * viewport.clientHeight;
-            currentVideoStartTime = Date.now(); // Restart telemetry timer
+            currentVideoStartTime = Date.now(); 
             
-            // Protected restoring logic
             const currentVid = bitesQueue[currentIndex]?.videoId;
             const nextVid = bitesQueue[currentIndex+1]?.videoId;
 
@@ -926,9 +883,7 @@
         }
     }
 
-    // Launch Temporary Search Feed
     function launchSearchResultFeed(clickedBite, allResults) {
-        
         const searchInputBox = document.getElementById('search-input');
         if (searchInputBox && searchInputBox.value.trim()) {
             trackExplicitAction(searchInputBox.value.trim(), 'searched');
@@ -951,7 +906,7 @@
         viewedVideoIds.clear();
 
         renderDOMSlides();
-        currentVideoStartTime = Date.now(); // Restart telemetry for search feed
+        currentVideoStartTime = Date.now(); 
         
         const currentVid = bitesQueue[0]?.videoId;
         const nextVid = bitesQueue[1]?.videoId;
