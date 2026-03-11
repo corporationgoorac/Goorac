@@ -86,7 +86,6 @@
         render() {
             this.innerHTML = `
             <style>
-                /* FIXED: targeting the element instead of :host for standard DOM injection */
                 image-picker { 
                     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
                     display: block; 
@@ -99,7 +98,6 @@
                     --ip-ease: cubic-bezier(0.25, 0.8, 0.25, 1);
                 }
                 
-                /* --- Base Overlay (Forced Black & Fullscreen) --- */
                 #ip-overlay {
                     position: fixed !important; top: 0 !important; left: 0 !important; 
                     width: 100vw !important; height: 100vh !important;
@@ -110,7 +108,6 @@
                 }
                 #ip-overlay.open { display: flex; opacity: 1; }
 
-                /* --- Top Navigation --- */
                 .ip-nav {
                     display: flex; justify-content: space-between; align-items: center;
                     padding: 40px 20px 15px 20px; z-index: 100;
@@ -138,7 +135,6 @@
                 .ip-nav-send svg { width: 20px; height: 20px; fill: white; margin-left: 3px; margin-top: 1px;}
                 .ip-nav-send:disabled { opacity: 0.5; box-shadow: none; filter: grayscale(1); }
 
-                /* --- Editor Preview Area --- */
                 .ip-workspace {
                     position: absolute; top: 80px; bottom: 230px; left: 0; right: 0;
                     display: flex; align-items: center; justify-content: center;
@@ -157,7 +153,6 @@
                     object-fit: contain; transition: filter 0.1s ease-out, transform 0.3s var(--ip-ease);
                 }
 
-                /* Text Overlay Layer */
                 #ip-text-layer {
                     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                     pointer-events: none; overflow: hidden; z-index: 15;
@@ -176,7 +171,6 @@
                 }
                 .ip-text-element:active { cursor: grabbing; border: 1.5px dashed rgba(255,255,255,0.8); }
 
-                /* CROP UI MODAL LAYER */
                 #ip-crop-ui {
                     position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
                     z-index: 200; display: none; gap: 15px;
@@ -190,7 +184,6 @@
                 .ip-pill-btn.confirm { background: white; color: black; }
                 .ip-pill-btn:active { transform: scale(0.95); }
 
-                /* --- Bottom Toolbar --- */
                 .ip-toolbar {
                     position: absolute; bottom: 0; left: 0; width: 100%;
                     background: rgba(15,15,15,0.95); padding: 20px 10px 30px 10px;
@@ -220,12 +213,10 @@
                     width: 4px; height: 4px; border-radius: 50%; background: white;
                 }
 
-                /* --- Tool Panels --- */
                 .ip-panel { display: none; width: 100%; padding: 0 10px; box-sizing: border-box; animation: fadeIn 0.3s var(--ip-ease); }
                 .ip-panel.active { display: block; }
                 @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-                /* Adjustments Panel */
                 .ip-adjust-group { display: flex; flex-direction: column; gap: 20px; padding: 5px 0;}
                 .ip-slider-row { display: flex; align-items: center; gap: 15px; }
                 .ip-slider-label { color: white; font-size: 12px; width: 30px; display: flex; justify-content: center;}
@@ -233,7 +224,6 @@
                 .ip-adjust-slider { flex: 1; appearance: none; height: 4px; background: #333; border-radius: 2px; outline: none; }
                 .ip-adjust-slider::-webkit-slider-thumb { appearance: none; width: 22px; height: 22px; border-radius: 50%; background: white; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.8); }
 
-                /* Transform Panel */
                 .ip-transform-grid { display: flex; justify-content: space-around; padding: 10px 0; gap: 10px;}
                 .ip-trans-btn { background: #222; border: 1px solid #333; border-radius: 12px; flex: 1; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: white; font-size: 11px; cursor: pointer; font-weight: 600; transition: all 0.2s;}
                 .ip-trans-btn svg { width: 22px; height: 22px; fill: white; }
@@ -241,7 +231,6 @@
                 .ip-trans-btn.highlight { background: white; color: black; border: none; }
                 .ip-trans-btn.highlight svg { fill: black; }
 
-                /* Filters Panel */
                 .ip-filter-scroll { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 5px; scrollbar-width: none; }
                 .ip-filter-scroll::-webkit-scrollbar { display: none; }
                 .ip-filter-item { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
@@ -250,7 +239,6 @@
                 .ip-filter-name { color: var(--ip-subtext); font-size: 11px; font-weight: 600;}
                 .ip-filter-item.active .ip-filter-name { color: white; }
 
-                /* Text Panel */
                 .ip-text-controls { display: flex; flex-direction: column; gap: 15px; }
                 .ip-text-input-wrap { display: flex; gap: 10px; }
                 .ip-text-input { flex: 1; background: #222; border: 1px solid #333; color: white; padding: 14px 16px; border-radius: 12px; font-size: 15px; outline: none; transition: border 0.3s;}
@@ -268,9 +256,6 @@
                 .ip-color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.8); transition: transform 0.2s;}
                 .ip-color-dot.active { border-color: white; transform: scale(1.2); }
 
-                /* ==========================================
-                   🎬 EXPORT SCREEN (SVG BORDER)
-                   ========================================== */
                 #ip-export-screen {
                     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                     background: var(--ip-bg); z-index: 200000;
@@ -308,7 +293,6 @@
                 }
 
                 #ip-file-input { display: none; }
-                /* Overrides for Cropper.js */
                 .cropper-view-box, .cropper-face { border-radius: 0; }
                 .cropper-modal { background-color: rgba(0, 0, 0, 0.85); }
                 .cropper-bg { background-image: none !important; background-color: #050505; }
@@ -405,7 +389,7 @@
                             Adjust
                         </button>
                         <button class="ip-tool-btn" data-panel="ip-panel-filter">
-                            <svg viewBox="0 0 24 24"><path d="M19.03 7.39l1.42-1.42c-.45-.51-.9-.97-1.41-1.41L17.62 6c-1.55-1.26-3.5-2-5.62-2-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10c0-2.12-.74-4.07-2-5.62zM12 22c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>
+                            <svg viewBox="0 0 24 24"><path d="M19.03 7.39l1.42-1.42c-.45-.51-.9-.97-1.41-1.41L17.62 6c-1.55-1.26-3.5-2-5.62-2-5.62 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10c0-2.12-.74-4.07-2-5.62zM12 22c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>
                             Filters
                         </button>
                         <button class="ip-tool-btn" data-panel="ip-panel-transform">
@@ -570,20 +554,7 @@
                 this.destroyCropper();
             });
             this.querySelector('#ip-btn-crop-save').addEventListener('click', () => {
-                if (!this.cropper) return;
-                const canvas = this.cropper.getCroppedCanvas();
-                this.previewUrl = canvas.toDataURL('image/jpeg', 0.9);
-                
-                const img = this.querySelector('#ip-image-preview');
-                img.src = this.previewUrl;
-                this.originalImgElement.src = this.previewUrl;
-                
-                // Reset simple transforms because crop burned them in
-                this.transforms.rotate = 0;
-                this.transforms.flipH = false;
-                this.transforms.flipV = false;
-                
-                this.destroyCropper();
+                this.commitCrop();
             });
         }
 
@@ -670,6 +641,38 @@
             this.querySelector('#ip-text-layer').style.display = 'block';
             
             this.updateImageVisuals();
+        }
+
+        // --- ASYNC CROP FIX ---
+        // Pauses execution until the new Base64 string is rendered into the DOM Image objects
+        async commitCrop() {
+            return new Promise((resolve) => {
+                if (!this.cropper) return resolve();
+                
+                const canvas = this.cropper.getCroppedCanvas();
+                this.previewUrl = canvas.toDataURL('image/jpeg', 0.9);
+                
+                const img = this.querySelector('#ip-image-preview');
+                let loadedCount = 0;
+                
+                const onImgLoad = () => {
+                    loadedCount++;
+                    if (loadedCount === 2) {
+                        this.transforms.rotate = 0;
+                        this.transforms.flipH = false;
+                        this.transforms.flipV = false;
+                        
+                        this.destroyCropper();
+                        resolve();
+                    }
+                };
+
+                img.onload = onImgLoad;
+                this.originalImgElement.onload = onImgLoad;
+                
+                img.src = this.previewUrl;
+                this.originalImgElement.src = this.previewUrl;
+            });
         }
 
         updateImageVisuals() {
@@ -790,28 +793,37 @@
             reader.onload = (evt) => {
                 this.previewUrl = evt.target.result;
                 const img = this.querySelector('#ip-image-preview');
+                
+                let loadedCount = 0;
+                const onImgLoad = () => {
+                    loadedCount++;
+                    if (loadedCount === 2) {
+                        // Reset State once images safely loaded into memory
+                        this.adjustments = { brightness: 100, contrast: 100, saturation: 100 };
+                        this.transforms = { rotate: 0, flipH: false, flipV: false };
+                        this.selectedFilterPreset = 'none';
+                        this.textOverlays = [];
+                        this.renderTextOverlays();
+                        
+                        this.querySelector('#ip-adj-brightness').value = 100;
+                        this.querySelector('#ip-adj-contrast').value = 100;
+                        this.querySelector('#ip-adj-saturation').value = 100;
+                        this.querySelectorAll('.ip-filter-item').forEach(e => e.classList.remove('active'));
+                        this.querySelector('.ip-filter-item').classList.add('active'); // Original
+                        
+                        this.updateImageVisuals();
+                    }
+                };
+
+                img.onload = onImgLoad;
+                this.originalImgElement.onload = onImgLoad;
+
                 img.src = this.previewUrl;
                 this.originalImgElement.src = this.previewUrl;
-                
-                // Reset State
-                this.adjustments = { brightness: 100, contrast: 100, saturation: 100 };
-                this.transforms = { rotate: 0, flipH: false, flipV: false };
-                this.selectedFilterPreset = 'none';
-                this.textOverlays = [];
-                this.renderTextOverlays();
-                
-                this.querySelector('#ip-adj-brightness').value = 100;
-                this.querySelector('#ip-adj-contrast').value = 100;
-                this.querySelector('#ip-adj-saturation').value = 100;
-                this.querySelectorAll('.ip-filter-item').forEach(e => e.classList.remove('active'));
-                this.querySelector('.ip-filter-item').classList.add('active'); // Original
-                
-                this.updateImageVisuals();
             };
             reader.readAsDataURL(file);
         }
 
-        // captures the UI preview perfectly for the export screen
         captureStaticThumbnail() {
             const previewImg = this.querySelector('#ip-image-preview');
             const canvas = document.createElement('canvas');
@@ -842,9 +854,9 @@
         async startPipeline() {
             if (!this.previewUrl) return;
 
-            // Commit crop if open
+            // Commit crop if open & await completion to prevent 0-byte blob errors
             if (this.cropper) {
-                this.querySelector('#ip-btn-crop-save').click();
+                await this.commitCrop();
             }
 
             // Transition to Export Screen
@@ -958,7 +970,6 @@
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `https://api.imgbb.com/1/upload?key=${this.apiKey}`);
             
-            // Link XHR upload percentage to the elegant SVG border
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total);
@@ -1023,6 +1034,10 @@
             this.mode = 'closed';
             this.querySelector('#ip-overlay').classList.remove('open');
             this.querySelector('#ip-export-screen').classList.remove('active');
+            
+            // --- INPUT RESET FIX ---
+            // Allow selecting the exact same file after closing out of the modal
+            this.querySelector('#ip-file-input').value = ''; 
             
             this.originalFile = null;
             this.previewUrl = null;
