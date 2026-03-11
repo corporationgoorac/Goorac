@@ -113,26 +113,22 @@ class ViewDrops extends HTMLElement {
             /* --- MEDIA CANVAS --- */
             .vd-media-container {
                 position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
-                background: #000; overflow: hidden;
+                background: #000; overflow: hidden; width: 100%; height: 100%;
             }
             .vd-backdrop { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(40px) brightness(0.3); z-index: 1; }
             .vd-media-element { position: relative; z-index: 2; width: 100%; height: 100%; object-fit: contain; }
             
             /* YouTube Card specific */
+            .vd-yt-wrapper {
+                position: relative; z-index: 3; display: none; width: 100%; height: 100%;
+                align-items: center; justify-content: center;
+            }
             .vd-yt-card {
-                position: relative; z-index: 3; width: 85vw; max-width: 360px; aspect-ratio: 9/16;
+                position: relative; width: 85vw; max-width: 360px; aspect-ratio: 9/16;
                 background: #050505; border-radius: 24px; overflow: hidden;
-                box-shadow: 0 20px 50px rgba(0,0,0,0.8); display: none;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.8);
             }
-            .vd-yt-overlay { position: absolute; inset: 0; z-index: 5; }
-            .vd-yt-fullscreen-btn {
-                position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
-                background: rgba(255,255,255,0.2); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-                border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 20px; border-radius: 100px;
-                font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.5); pointer-events: auto; transition: 0.2s;
-            }
-            .vd-yt-fullscreen-btn:active { transform: translateX(-50%) scale(0.95); background: rgba(255,255,255,0.3); }
+            .vd-yt-overlay { position: absolute; inset: 0; z-index: 5; } /* Blocks iframe clicks */
 
             /* --- NAVIGATION TAP ZONES --- */
             .vd-tap-zones { position: absolute; inset: 0; z-index: 30; display: flex; }
@@ -242,11 +238,10 @@ class ViewDrops extends HTMLElement {
                 <img id="vd-image" class="vd-media-element" style="display:none;">
                 <video id="vd-video" class="vd-media-element" playsinline style="display:none;"></video>
                 
-                <div id="vd-yt-card" class="vd-yt-card">
-                    <div id="vd-yt-player"></div>
-                    <div class="vd-yt-overlay"></div>
-                    <div class="vd-yt-fullscreen-btn" id="vd-yt-fullscreen-btn" style="display:none;">
-                        <span class="material-icons-round" style="font-size: 18px;">fullscreen</span> View in full screen
+                <div class="vd-yt-wrapper" id="vd-yt-wrapper">
+                    <div id="vd-yt-card" class="vd-yt-card">
+                        <div id="vd-yt-player-container"></div>
+                        <div class="vd-yt-overlay"></div>
                     </div>
                 </div>
                 
@@ -391,8 +386,10 @@ class ViewDrops extends HTMLElement {
         const vid = this.querySelector('#vd-video');
         vid.pause(); vid.src = '';
         
-        if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
-            this.ytPlayer.pauseVideo();
+        // STRICT YOUTUBE TEARDOWN TO PREVENT AUDIO BLEED
+        if (this.ytPlayer && typeof this.ytPlayer.destroy === 'function') {
+            this.ytPlayer.destroy();
+            this.ytPlayer = null;
         }
 
         const overlay = this.querySelector('#vd-overlay');
@@ -485,13 +482,17 @@ class ViewDrops extends HTMLElement {
         // Clear Media Canvas
         const img = this.querySelector('#vd-image');
         const vid = this.querySelector('#vd-video');
-        const ytCard = this.querySelector('#vd-yt-card');
-        const ytFsBtn = this.querySelector('#vd-yt-fullscreen-btn');
+        const ytWrapper = this.querySelector('#vd-yt-wrapper');
         const backdrop = this.querySelector('#vd-backdrop');
         
-        img.style.display = 'none'; vid.style.display = 'none'; ytCard.style.display = 'none'; ytFsBtn.style.display = 'none';
+        img.style.display = 'none'; vid.style.display = 'none'; ytWrapper.style.display = 'none';
         img.src = ''; vid.src = ''; backdrop.src = '';
-        if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
+        
+        // STRICT YOUTUBE TEARDOWN BEFORE LOADING NEXT
+        if (this.ytPlayer && typeof this.ytPlayer.destroy === 'function') {
+            this.ytPlayer.destroy();
+            this.ytPlayer = null;
+        }
 
         // Load Media & Custom Durations
         if (drop.type === 'image') {
@@ -514,12 +515,17 @@ class ViewDrops extends HTMLElement {
         }
         else if (drop.type === 'youtube') {
             backdrop.src = `https://img.youtube.com/vi/${drop.youtubeId}/maxresdefault.jpg`;
-            ytCard.style.display = 'block';
-            ytFsBtn.style.display = 'flex';
-            ytFsBtn.onclick = () => window.location.href = `bites.html?v=${drop.youtubeId}`;
+            ytWrapper.style.display = 'flex';
             
-            if (!this.ytPlayer && window.YT && window.YT.Player) {
-                this.ytPlayer = new YT.Player('vd-yt-player', {
+            // Re-inject container div because destroy() removes it
+            const card = this.querySelector('#vd-yt-card');
+            const overlay = card.querySelector('.vd-yt-overlay');
+            const newContainer = document.createElement('div');
+            newContainer.id = 'vd-yt-player-container';
+            card.insertBefore(newContainer, overlay);
+            
+            if (window.YT && window.YT.Player) {
+                this.ytPlayer = new YT.Player('vd-yt-player-container', {
                     videoId: drop.youtubeId,
                     playerVars: { 'autoplay': 1, 'controls': 0, 'playsinline': 1, 'mute': drop.songPreview ? 1 : 0 },
                     events: {
@@ -531,19 +537,12 @@ class ViewDrops extends HTMLElement {
                         'onStateChange': (e) => { 
                             if(e.data === YT.PlayerState.ENDED) this.nextDrop(); 
                             if(e.data === YT.PlayerState.PLAYING && this.timerDuration === 30000) {
-                                // Double check duration once playing
                                 const dur = e.target.getDuration() * 1000;
                                 if(dur > 0) this.startProgressTimer(dur);
                             }
                         }
                     }
                 });
-            } else if (this.ytPlayer) {
-                this.ytPlayer.loadVideoById(drop.youtubeId);
-                this.ytPlayer.mute(); if(!drop.songPreview) this.ytPlayer.unMute();
-                this.ytPlayer.playVideo();
-                // Wait for state change to catch duration, default 30s
-                this.startProgressTimer(30000); 
             } else {
                 this.startProgressTimer(30000); 
             }
@@ -588,7 +587,7 @@ class ViewDrops extends HTMLElement {
         this.bgAudio.pause();
         const vid = this.querySelector('#vd-video');
         if (vid.style.display === 'block') vid.pause();
-        if (this.ytPlayer && this.querySelector('#vd-yt-card').style.display === 'block') this.ytPlayer.pauseVideo();
+        if (this.ytPlayer && this.querySelector('#vd-yt-wrapper').style.display === 'flex') this.ytPlayer.pauseVideo();
     }
 
     resumeDrop() {
@@ -597,7 +596,7 @@ class ViewDrops extends HTMLElement {
         if (this.bgAudio.src) this.bgAudio.play().catch(e=>{});
         const vid = this.querySelector('#vd-video');
         if (vid.style.display === 'block') vid.play().catch(e=>{});
-        if (this.ytPlayer && this.querySelector('#vd-yt-card').style.display === 'block') this.ytPlayer.playVideo();
+        if (this.ytPlayer && this.querySelector('#vd-yt-wrapper').style.display === 'flex') this.ytPlayer.playVideo();
     }
 
     nextDrop() {
