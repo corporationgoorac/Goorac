@@ -25,7 +25,8 @@ class MainNavbar extends HTMLElement {
             const link = document.createElement('link');
             link.id = 'material-icons-round-css';
             link.rel = 'stylesheet';
-            link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons+Round';
+            // Changed to Material Symbols Rounded to support CSS outline/fill switching for all icons
+            link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0';
             document.head.appendChild(link);
         }
 
@@ -144,10 +145,13 @@ class MainNavbar extends HTMLElement {
             }
 
             .nav-item .material-icons-round {
+                font-family: 'Material Symbols Rounded', sans-serif;
+                font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; /* Makes all icons outlined by default */
                 font-size: 28px; 
                 transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
                             color 0.3s ease,
-                            filter 0.3s ease;
+                            filter 0.3s ease,
+                            font-variation-settings 0.3s ease;
             }
 
             .nav-item span:not(.material-icons-round) {
@@ -165,6 +169,7 @@ class MainNavbar extends HTMLElement {
             }
 
             .nav-item.active .material-icons-round {
+                font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; /* Makes icon filled when active */
                 transform: translateY(-2px) scale(1.1); 
                 filter: drop-shadow(0px 2px 4px rgba(0,122,255,0.3)); 
             }
@@ -239,6 +244,10 @@ class MainNavbar extends HTMLElement {
                 <span class="material-icons-round">home</span>
                 <span>Home</span>
             </a>
+            <a href="bites.html" class="nav-item" aria-label="Bites">
+                <span class="material-icons-round">amp_stories</span>
+                <span>Bites</span>
+            </a>
             <a href="messages.html" class="nav-item" aria-label="Messages">
                 <span class="material-icons-round">chat_bubble_outline</span>
                 <span>Chats</span>
@@ -246,10 +255,6 @@ class MainNavbar extends HTMLElement {
             <a href="explore.html" class="nav-item" aria-label="Explore">
                 <span class="material-icons-round">explore</span>
                 <span>Explore</span>
-            </a>
-            <a href="bites.html" class="nav-item" aria-label="Bites">
-                <span class="material-icons-round">amp_stories</span>
-                <span>Bites</span>
             </a>
             <a href="visionLobby.html" class="nav-item" aria-label="Vision">
                 <div class="vision-icon-container">
