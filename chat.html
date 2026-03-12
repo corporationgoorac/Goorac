@@ -2811,7 +2811,7 @@ box-shadow: var(--received-shadow);
             if (!oldReaction || oldReaction.emoji !== newReaction.emoji) {
                 // Trigger Visual Pop for BOTH users (Sender sees it locally via click, receiver sees it here)
                 // We add a slight delay if it's the sender to avoid conflict with local click anim
-                if (uid !== myUid) {
+                if (uid !== myUid && newReaction.emoji) {
                     triggerReactionPop(msgId, newReaction.emoji);
                     if(newReaction.emoji === '❤️') triggerHeartAnimation(); // <--- ADDED: Trigger full screen heart for receiver
                 }
@@ -2819,8 +2819,10 @@ box-shadow: var(--received-shadow);
         });
     }
 
-    // NEW FUNCTION: Spawns a floating emoji
+    // NEW FUNCTION: Spawns a floating emoji (FIXED MEDIA BOUNDS GLITCH)
     function triggerReactionPop(msgId, emoji) {
+        if (!emoji) return; // Prevent empty pops
+
         // Try to find the bubble or the media container
         const bubble = document.getElementById(`bubble-${msgId}`) || 
                        document.getElementById(msgId)?.querySelector('.msg-media-wrapper') ||
@@ -2829,10 +2831,19 @@ box-shadow: var(--received-shadow);
         if (!bubble) return;
 
         const rect = bubble.getBoundingClientRect();
-        
-        // Calculate start position (center of bubble roughly)
-        const startX = rect.left + (rect.width / 2) - 20; // 20 is half emoji width
-        const startY = rect.top + (rect.height / 2);
+        const isMedia = bubble.classList.contains('msg-media-wrapper') || bubble.classList.contains('msg-video-container');
+
+        // Calculate start position
+        // For media (which can be tall), start near the bottom right where the reaction badge is.
+        // For text bubbles, center is fine.
+        let startX = isMedia ? (rect.right - 40) : (rect.left + (rect.width / 2) - 20);
+        let startY = isMedia ? (rect.bottom - 40) : (rect.top + (rect.height / 2));
+
+        // Clamp to screen bounds just in case element is partially scrolled out
+        if (startY < 50) startY = 50;
+        if (startY > window.innerHeight - 50) startY = window.innerHeight - 50;
+        if (startX < 20) startX = 20;
+        if (startX > window.innerWidth - 40) startX = window.innerWidth - 40;
 
         const floatEl = document.createElement('div');
         floatEl.className = 'floating-emoji';
@@ -4188,7 +4199,9 @@ box-shadow: var(--received-shadow);
 
     async function applyReactionToId(id, emoji) {
         // 1. Optimistic Update (Visual Pop Instant)
-        triggerReactionPop(id, emoji);
+        if (emoji !== '') {
+            triggerReactionPop(id, emoji);
+        }
         vibrate(30); 
 
         if(messagesMap.has(id)) {
@@ -4217,7 +4230,7 @@ box-shadow: var(--received-shadow);
             await msgRef.update({ [`reactions.${myUid}`]: { emoji: emoji, timestamp: Date.now() } });
             
             // NEW FIX: Updates inbox text and pushes notification instantly if reacting to THEIR message
-            if (data.sender !== myUid) {
+            if (data.sender !== myUid && emoji !== '') {
                 updateLastMsg(`Reacted ${emoji} to a message`);
                 sendPushNotification(`Reacted ${emoji} to your message`);
             }
