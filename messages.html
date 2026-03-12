@@ -410,7 +410,9 @@
 <div id="notes-wrapper">
     <div id="notes-container">
         <div class="note-item" id="my-note-btn">
-            <div id="my-note-preview"></div>
+            <div id="my-note-preview" class="visible" style="background: #262626; color: #a0a0a0; display: flex;">
+                <div class="note-text-content">What's on your mind?</div>
+            </div>
             <img src="https://via.placeholder.com/65" class="note-pfp" id="my-note-pfp">
             <span class="note-username">Your Note</span>
             <div class="add-note-badge">+</div>
@@ -425,8 +427,12 @@
                 const preview = document.getElementById('my-note-preview');
                 const myPfp = document.getElementById('my-note-pfp');
 
+                const cachedMyPfp = localStorage.getItem('goorac_my_pfp_cache');
                 const cachedUData = localStorage.getItem('goorac_u_cache');
-                if(cachedUData) {
+                
+                if (cachedMyPfp) {
+                    myPfp.src = cachedMyPfp;
+                } else if(cachedUData) {
                     try {
                         const parsed = JSON.parse(cachedUData);
                         if(parsed[uid] && parsed[uid].photoURL) {
@@ -435,11 +441,13 @@
                     } catch(e){}
                 }
 
+                let hasValidNote = false;
                 try {
                     const myNoteStr = localStorage.getItem('my_note_cache_' + uid);
                     if(myNoteStr) {
                         const data = JSON.parse(myNoteStr);
                         if(new Date(data.expiresAt || new Date().getTime() + 86400000) > new Date()) {
+                            hasValidNote = true;
                             myBtn.classList.add('has-note'); // CSS will hide the + sign
                             preview.classList.add('visible');
                             preview.style.background = data.bgColor || '#262626';
@@ -458,6 +466,15 @@
                         }
                     }
                 }catch(e){}
+
+                if (!hasValidNote) {
+                    myBtn.classList.remove('has-note');
+                    preview.classList.add('visible');
+                    preview.innerHTML = `<div class="note-text-content">What's on your mind?</div>`;
+                    preview.style.background = '#262626';
+                    preview.style.color = '#a0a0a0';
+                    preview.style.display = 'flex';
+                }
 
                 try {
                     const mutualStr = localStorage.getItem('mutual_notes_cache_' + uid);
@@ -838,6 +855,7 @@
             
             // 🚀 SAVE UID FOR ZERO-MS NOTES TRAY CACHE RENDER ON NEXT LOAD
             localStorage.setItem('goorac_last_uid', user.uid);
+            if (user.photoURL) localStorage.setItem('goorac_my_pfp_cache', user.photoURL);
             
             // 🚀 POPULATE THE USER PFP FOR THE NOTES UI TRAY
             const myNotePfpEl = document.getElementById('my-note-pfp');
