@@ -115,7 +115,7 @@ class ViewDrops extends HTMLElement {
 
             /* --- NEW: SHARED BITE WATERMARK (RE-STYLED & RE-POSITIONED) --- */
             .vd-bite-watermark {
-                position: absolute; top: calc(80px + env(safe-area-inset-top)); left: 20px;
+                position: absolute; top: calc(80px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
                 background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08);
                 backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
                 display: none; align-items: center; gap: 6px; padding: 6px 12px;
@@ -1181,10 +1181,11 @@ const DropsManager = {
             /* --- LOADING SHIMMER EFFECT --- */
             #drops-tray-container.loading-shimmer::after {
                 content: ''; position: absolute; inset: 0; z-index: 10;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-                animation: shimmer 1.5s infinite; pointer-events: none;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite linear; pointer-events: none;
             }
-            @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+            @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
             .dt-item {
                 display: flex; flex-direction: column; align-items: center; gap: 6px;
