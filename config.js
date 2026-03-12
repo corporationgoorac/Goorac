@@ -9,8 +9,8 @@ const firebaseConfig = {
   messagingSenderId: "907666610122",
   appId: "1:907666610122:web:75b3d4b3db96a806706133",
   measurementId: "G-B45S1VTQ4J",
-  // IMPORTANT: Required for Online Status / Presence features
-  databaseURL: "https://goorac-quantum-default-rtdb.firebaseio.com"
+  // IMPORTANT: Updated to asia-southeast1 region to match your database location
+  databaseURL: "https://goorac-quantum-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 // Pusher Beams Configuration for Goorac Quantum (Learning Hack)
