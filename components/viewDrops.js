@@ -339,6 +339,9 @@ class ViewDrops extends HTMLElement {
                     <span class="material-icons-round" style="font-size: 18px;">visibility</span>
                     <span id="vd-own-view-count">0</span>
                 </div>
+                <div class="vd-own-action" id="vd-own-add-btn">
+                    <span class="material-icons-round" style="font-size: 18px;">add</span>
+                </div>
                 <div class="vd-own-action danger" id="vd-own-delete-btn">
                     <span class="material-icons-round" style="font-size: 18px;">delete</span>
                 </div>
@@ -375,8 +378,9 @@ class ViewDrops extends HTMLElement {
             if (e.target.id === 'vd-opt-overlay') this.closeOptions();
         };
 
-        // Own Footer View & Delete Buttons
+        // Own Footer View, Add & Delete Buttons
         this.querySelector('#vd-own-view-btn').onclick = () => this.openViewsModal();
+        this.querySelector('#vd-own-add-btn').onclick = () => window.location.href = 'drops.html';
         this.querySelector('#vd-own-delete-btn').onclick = () => this.deleteOwnDrop();
         this.querySelector('#vd-views-overlay').onclick = (e) => {
             if (e.target.id === 'vd-views-overlay') this.closeViewsModal();
@@ -471,15 +475,10 @@ class ViewDrops extends HTMLElement {
             // STRICT MATH LOCK: Only process vertical swipes. Prevents diagonal or horizontal taps from triggering modal.
             if (Math.abs(deltaX) * 2 > Math.abs(deltaY)) return; 
             
-            const isMyDrop = this.dropsList[this.currentIndex]?.uid === this.myUid;
-            
             if (deltaY > 0) { // Swiping Down (Close)
                 e.preventDefault();
                 overlay.style.transform = `translateY(${deltaY}px)`;
                 overlay.style.opacity = 1 - (deltaY / window.innerHeight);
-            } else if (deltaY < -10 && isMyDrop) { // Swiping Up (Views Modal)
-                e.preventDefault();
-                overlay.style.transform = `translateY(${deltaY}px)`;
             }
         }, {passive: false});
 
@@ -488,7 +487,6 @@ class ViewDrops extends HTMLElement {
             this.state.isDragging = false;
             const deltaY = this.state.currentY - this.state.startY;
             const deltaX = this.state.currentX - this.state.startX;
-            const isMyDrop = this.dropsList[this.currentIndex]?.uid === this.myUid;
             
             overlay.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease';
             
@@ -497,12 +495,6 @@ class ViewDrops extends HTMLElement {
                 if (deltaY > window.innerHeight * 0.15) {
                     // Closed via swipe down
                     this.close();
-                    return;
-                } else if (deltaY < -window.innerHeight * 0.1 && isMyDrop) {
-                    // STRICT Opened views via swipe up (requires pulling up at least 10% of screen)
-                    overlay.style.transform = 'translateY(0)';
-                    overlay.style.opacity = '1';
-                    this.openViewsModal();
                     return;
                 }
             }
