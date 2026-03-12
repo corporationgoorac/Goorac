@@ -27,7 +27,9 @@ class ViewDrops extends HTMLElement {
         // Swipe down to close & Options Modal physics
         this.state = {
             isDragging: false,
+            startX: 0,
             startY: 0,
+            currentX: 0,
             currentY: 0,
             optionsOpen: false,
             viewsOpen: false // Added state for the swipe-up views modal
@@ -113,15 +115,15 @@ class ViewDrops extends HTMLElement {
 
             /* --- NEW: SHARED BITE WATERMARK --- */
             .vd-bite-watermark {
-                position: absolute; top: calc(85px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-                background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
+                position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+                background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15);
                 backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-                display: none; align-items: center; gap: 6px; padding: 6px 14px;
-                border-radius: 100px; color: #fff; z-index: 40; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                display: none; align-items: center; gap: 8px; padding: 8px 18px;
+                border-radius: 100px; color: #fff; z-index: 60; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
                 pointer-events: none;
             }
-            .vd-bite-watermark .material-icons-round { font-size: 16px; color: var(--accent); }
-            .vd-bite-watermark span:last-child { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+            .vd-bite-watermark .material-icons-round { font-size: 18px; color: var(--accent); }
+            .vd-bite-watermark span:last-child { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
 
             /* --- MEDIA CANVAS --- */
             .vd-media-container {
@@ -161,13 +163,26 @@ class ViewDrops extends HTMLElement {
                 padding: 15px 20px; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 100%);
                 display: flex; align-items: center; gap: 15px;
             }
+            .vd-reply-wrap {
+                flex: 1; position: relative; display: flex; align-items: center;
+                background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255,255,255,0.2); border-radius: 100px; transition: 0.2s;
+            }
+            .vd-reply-wrap:focus-within { background: rgba(255,255,255,0.25); border-color: #00d2ff; }
+            
             .vd-reply-box {
-                flex: 1; background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-                border: 1px solid rgba(255,255,255,0.2); border-radius: 100px;
-                padding: 14px 20px; color: #fff; font-size: 15px; outline: none; transition: 0.2s;
+                flex: 1; background: transparent; border: none; padding: 14px 20px;
+                color: #fff; font-size: 15px; outline: none; border-radius: 100px;
             }
             .vd-reply-box::placeholder { color: rgba(255,255,255,0.6); }
-            .vd-reply-box:focus { background: rgba(255,255,255,0.25); border-color: #00d2ff; }
+            
+            .vd-reply-send-btn {
+                background: transparent; border: none; color: #00d2ff; padding: 0 16px 0 0;
+                display: none; align-items: center; justify-content: center; cursor: pointer;
+                transition: transform 0.2s;
+            }
+            .vd-reply-send-btn:active { transform: scale(0.85); }
+            .vd-reply-wrap.typing .vd-reply-send-btn { display: flex; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
             .vd-action-btn {
                 background: none; border: none; color: #fff; cursor: pointer;
@@ -309,7 +324,10 @@ class ViewDrops extends HTMLElement {
             </div>
 
             <div class="vd-footer vd-safe-bottom" id="vd-footer">
-                <input type="text" class="vd-reply-box" id="vd-reply-input" placeholder="Reply..." autocomplete="off">
+                <div class="vd-reply-wrap" id="vd-reply-wrap">
+                    <input type="text" class="vd-reply-box" id="vd-reply-input" placeholder="Reply..." autocomplete="off">
+                    <button class="vd-reply-send-btn" id="vd-reply-send-btn"><span class="material-icons-round">send</span></button>
+                </div>
                 <button class="vd-action-btn" id="vd-like-btn">
                     <span class="material-icons-round" id="vd-like-icon" style="font-size: 32px;">favorite_border</span>
                 </button>
@@ -383,15 +401,35 @@ class ViewDrops extends HTMLElement {
         likeBtn.onclick = () => this.handleLike();
 
         const replyInput = this.querySelector('#vd-reply-input');
+        const replyWrap = this.querySelector('#vd-reply-wrap');
+        const replySendBtn = this.querySelector('#vd-reply-send-btn');
+
         replyInput.addEventListener('focus', () => this.pauseDrop());
         replyInput.addEventListener('blur', () => this.resumeDrop());
-        replyInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && replyInput.value.trim().length > 0) {
-                this.handleReply(replyInput.value.trim());
-                replyInput.value = '';
-                replyInput.blur();
+        
+        replyInput.addEventListener('input', (e) => {
+            if (e.target.value.trim().length > 0) {
+                replyWrap.classList.add('typing');
+            } else {
+                replyWrap.classList.remove('typing');
             }
         });
+
+        const executeReply = () => {
+            const txt = replyInput.value.trim();
+            if (txt.length > 0) {
+                this.handleReply(txt);
+                replyInput.value = '';
+                replyWrap.classList.remove('typing');
+                replyInput.blur();
+            }
+        };
+
+        replyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') executeReply();
+        });
+        
+        replySendBtn.addEventListener('click', executeReply);
 
         window.addEventListener('popstate', (e) => {
             if (this.state.optionsOpen) {
@@ -417,48 +455,61 @@ class ViewDrops extends HTMLElement {
         overlay.addEventListener('touchstart', (e) => {
             if (e.target.tagName.toLowerCase() === 'input' || this.state.optionsOpen || this.state.viewsOpen) return;
             this.state.isDragging = true;
+            this.state.startX = e.touches[0].clientX;
             this.state.startY = e.touches[0].clientY;
             overlay.style.transition = 'none';
         }, {passive: true});
 
         overlay.addEventListener('touchmove', (e) => {
             if (!this.state.isDragging || this.state.optionsOpen || this.state.viewsOpen) return;
+            this.state.currentX = e.touches[0].clientX;
             this.state.currentY = e.touches[0].clientY;
-            const delta = this.state.currentY - this.state.startY;
+            
+            const deltaX = this.state.currentX - this.state.startX;
+            const deltaY = this.state.currentY - this.state.startY;
+            
+            // MATH LOCK: Only process vertical swipes, ignore if swiping sideways
+            if (Math.abs(deltaX) > Math.abs(deltaY)) return; 
             
             const isMyDrop = this.dropsList[this.currentIndex]?.uid === this.myUid;
             
-            if (delta > 0) { // Swiping Down (Close)
+            if (deltaY > 0) { // Swiping Down (Close)
                 e.preventDefault();
-                overlay.style.transform = `translateY(${delta}px)`;
-                overlay.style.opacity = 1 - (delta / window.innerHeight);
-            } else if (delta < 0 && isMyDrop) { // Swiping Up (Views Modal - ONLY for own drops)
+                overlay.style.transform = `translateY(${deltaY}px)`;
+                overlay.style.opacity = 1 - (deltaY / window.innerHeight);
+            } else if (deltaY < -20 && isMyDrop) { // Swiping Up (Views Modal - ONLY for own drops with strict threshold)
                 e.preventDefault();
-                overlay.style.transform = `translateY(${delta}px)`;
+                overlay.style.transform = `translateY(${deltaY}px)`;
             }
         }, {passive: false});
 
         overlay.addEventListener('touchend', () => {
             if (!this.state.isDragging || this.state.optionsOpen || this.state.viewsOpen) return;
             this.state.isDragging = false;
-            const delta = this.state.currentY - this.state.startY;
+            const deltaY = this.state.currentY - this.state.startY;
+            const deltaX = this.state.currentX - this.state.startX;
             const isMyDrop = this.dropsList[this.currentIndex]?.uid === this.myUid;
             
             overlay.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease';
             
-            if (delta > window.innerHeight * 0.2) {
-                // Closed via swipe down
-                this.close();
-            } else if (delta < -window.innerHeight * 0.15 && isMyDrop) {
-                // Opened views via swipe up
-                overlay.style.transform = 'translateY(0)';
-                overlay.style.opacity = '1';
-                this.openViewsModal();
-            } else {
-                // Snap back
-                overlay.style.transform = 'translateY(0)';
-                overlay.style.opacity = '1';
+            // Verify it was a vertical swipe, not a horizontal one
+            if (Math.abs(deltaY) > Math.abs(deltaX)) {
+                if (deltaY > window.innerHeight * 0.15) {
+                    // Closed via swipe down
+                    this.close();
+                    return;
+                } else if (deltaY < -window.innerHeight * 0.1 && isMyDrop) {
+                    // Opened views via swipe up
+                    overlay.style.transform = 'translateY(0)';
+                    overlay.style.opacity = '1';
+                    this.openViewsModal();
+                    return;
+                }
             }
+            
+            // Snap back
+            overlay.style.transform = 'translateY(0)';
+            overlay.style.opacity = '1';
         });
     }
 
@@ -659,8 +710,11 @@ class ViewDrops extends HTMLElement {
                     events: {
                         'onReady': (e) => { 
                             e.target.playVideo(); 
-                            const dur = e.target.getDuration() * 1000 || 30000;
-                            this.startProgressTimer(dur);
+                            // Safety fallback if getDuration fails immediately
+                            setTimeout(() => {
+                                const dur = e.target.getDuration() * 1000 || 30000;
+                                this.startProgressTimer(dur);
+                            }, 500);
                         },
                         'onStateChange': (e) => { 
                             if(e.data === YT.PlayerState.ENDED) this.nextDrop(); 
@@ -849,10 +903,26 @@ class ViewDrops extends HTMLElement {
         window.history.pushState({ optModalOpen: true }, "", "#drops-opt");
 
         if (drop.uid === this.myUid) {
+            // Fetch live counts for MY drop
+            let viewsCount = 0; let likesCount = 0;
+            try {
+                const viewsSnap = await this.db.collection('drops').doc(this.myUid).collection('views').get();
+                viewsCount = viewsSnap.size;
+                const likesSnap = await this.db.collection('drops').doc(this.myUid).collection('likes').get();
+                likesCount = likesSnap.size;
+            } catch(e) {}
+
             content.innerHTML = `
-                <button class="vd-opt-btn" onclick="document.querySelector('view-drops').openViewsModal(); document.querySelector('view-drops').closeOptions(false);">
-                    <span class="material-icons-round">bar_chart</span> Analytics & Viewers
-                </button>
+                <div class="vd-opt-stats">
+                    <div class="vd-stat-item">
+                        <span class="vd-stat-val">${viewsCount}</span>
+                        <span class="vd-stat-lbl">Views</span>
+                    </div>
+                    <div class="vd-stat-item">
+                        <span class="vd-stat-val" style="color:#ff3b30;">${likesCount}</span>
+                        <span class="vd-stat-lbl">Likes</span>
+                    </div>
+                </div>
                 <button class="vd-opt-btn" onclick="window.location.href='drops.html'">
                     <span class="material-icons-round">add_circle</span> New Drop
                 </button>
