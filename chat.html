@@ -1658,14 +1658,13 @@ box-shadow: var(--received-shadow);
                 <textarea id="m-input" class="msg-input" placeholder="Message..." rows="1"></textarea>
             </div>
             
-            <div id="emoji-toggle-right" class="emoji-toggle-btn" onclick="toggleEmojiKeyboard()">
-                <span class="material-icons-round">emoji_emotions</span>
-            </div>
-            
             <div id="gif-toggle-right" class="emoji-toggle-btn" onclick="toggleGifKeyboard()">
                 <span class="material-icons-round">gif_box</span>
             </div>
-
+            
+            <div id="emoji-toggle-right" class="emoji-toggle-btn" onclick="toggleEmojiKeyboard()">
+                <span class="material-icons-round">emoji_emotions</span>
+            </div>
             <button id="send-btn" class="send-btn">
                 <span class="material-icons-round">send</span>
             </button>
@@ -2625,7 +2624,8 @@ box-shadow: var(--received-shadow);
                 let didRemoveMessage = false; // NEW
 
                 snapshot.docChanges().forEach(change => {
-                    const msgData = change.doc.data();
+                    // FIX: Make optimistic sending blazingly fast by requesting an estimated timestamp locally
+                    const msgData = change.doc.data({ serverTimestamps: 'estimate' });
                     const msgId = change.doc.id;
                     msgData.id = msgId; 
                     
@@ -2688,16 +2688,14 @@ box-shadow: var(--received-shadow);
                         }
                     } 
                     else if (change.type === "removed") {
-                        // FIX FOR DISAPPEARING MESSAGES: Verify if genuinely deleted or just fell out of query limit
-                        db.collection("chats").doc(chatId).collection("messages").doc(msgId).get().then(docSnap => {
-                            if (!docSnap.exists) {
-                                messagesMap.delete(msgId);
-                                const el = document.getElementById(msgId);
-                                if(el) el.remove();
-                                renderAll();
-                            }
-                        });
-                        didRemoveMessage = true; 
+                        // FIX FOR DISAPPEARING MESSAGES: Safely and reliably clean up unsent messages
+                        if (messagesMap.has(msgId)) {
+                            messagesMap.delete(msgId);
+                            const el = document.getElementById(msgId);
+                            if(el) el.remove();
+                            didRemoveMessage = true;
+                            hasVisualChanges = true; 
+                        }
                     }
                     
                     // Mark read logic
@@ -2723,7 +2721,7 @@ box-shadow: var(--received-shadow);
                     }
                 }
 
-                if (hasVisualChanges || isFirstLoad) {
+                if (hasVisualChanges || isFirstLoad || didRemoveMessage) {
                     if (isFirstLoad) {
                         renderAll();
                         chatFlow.scrollTop = chatFlow.scrollHeight;
@@ -3867,9 +3865,11 @@ box-shadow: var(--received-shadow);
             imageUrl: imageUrl
         };
         cancelInteraction();
-        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
+        // Removed blocking await for instant performance
+        db.collection("chats").doc(chatId).collection("messages").add(msgData).catch(e => console.error(e));
+        
         updateLastMsg("📷 Image");
-        updateInboxCacheLocal(chatId, "📷 Image", myUid, false); // INBOX SYNC
         sendPushNotification("📷 Sent you an image");
         window.scrollToBottom(true);
     }
@@ -3889,9 +3889,11 @@ box-shadow: var(--received-shadow);
             isGif: true // Special flag for replies/inbox UI
         };
         cancelInteraction();
-        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
+        // Removed blocking await for instant performance
+        db.collection("chats").doc(chatId).collection("messages").add(msgData).catch(e => console.error(e));
+        
         updateLastMsg("🎞️ GIF");
-        updateInboxCacheLocal(chatId, "🎞️ GIF", myUid, false); // INBOX SYNC
         sendPushNotification("🎞️ Sent you a GIF");
         window.scrollToBottom(true);
     }
@@ -3912,17 +3914,20 @@ box-shadow: var(--received-shadow);
             fileMeta: metadata
         };
         cancelInteraction();
-        await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+        
+        // Removed blocking await for instant performance
+        db.collection("chats").doc(chatId).collection("messages").add(msgData).catch(e => console.error(e));
+        
         let label = "📄 File";
         if(metadata.type && metadata.type.indexOf('video') !== -1) label = "🎥 Video Message";
         else if(metadata.type && metadata.type.indexOf('audio') !== -1) label = "🎤 Voice Message";
+        
         updateLastMsg(caption ? label + " " + caption : label);
-        updateInboxCacheLocal(chatId, caption ? label + " " + caption : label, myUid, false); // INBOX SYNC
         sendPushNotification(caption ? label + " " + caption : label);
         window.scrollToBottom(true);
     }
 
-    async function sendMsg() {
+    function sendMsg() {
         const text = mInput.value.trim();
         if (!text) {
             inputBox.classList.add('shake-anim');
@@ -3955,7 +3960,7 @@ box-shadow: var(--received-shadow);
         if (editModeId) {
             const idToEdit = editModeId; editModeId = null;
             cancelInteraction(); 
-            await db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true });
+            db.collection("chats").doc(chatId).collection("messages").doc(idToEdit).update({ text, edited: true }).catch(e=>console.error(e));
         } else {
             const rText = replyingTo; cancelInteraction(); 
             window.scrollToBottom(true);
@@ -3963,22 +3968,25 @@ box-shadow: var(--received-shadow);
                 text, sender: myUid, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 replyTo: rText, seen: false, reactions: {}
             };
-            await db.collection("chats").doc(chatId).collection("messages").add(msgData);
+            
+            // Removed await for immediate, non-blocking UI
+            db.collection("chats").doc(chatId).collection("messages").add(msgData).catch(e => console.error("Send error:", e));
+            
             updateLastMsg(text);
-            updateInboxCacheLocal(chatId, text, myUid, false); // INBOX SYNC
             sendPushNotification(text);
         }
         window.scrollToBottom(true);
     }
 
-    async function updateLastMsg(msgText) {
-        await db.collection("chats").doc(chatId).set({
+    function updateLastMsg(msgText) {
+        db.collection("chats").doc(chatId).set({
             lastMessage: msgText, 
             lastSender: myUid,
             lastTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
             participants: [myUid, targetUid], seen: false,
             [`unreadCount.${targetUid}`]: firebase.firestore.FieldValue.increment(1)
-        }, { merge: true });
+        }, { merge: true }).catch(e => console.error(e));
+        
         updateInboxCacheLocal(chatId, msgText, myUid, false); // INBOX SYNC FALLBACK
     }
 
@@ -4021,40 +4029,42 @@ box-shadow: var(--received-shadow);
 
     async function unsendMsg() { 
         const idToDelete = activeMenuId; closeMenu();
-        // Optimistic Remove
+        
+        // Optimistic Remove ensuring local storage properly reflects immediately 
         if (messagesMap.has(idToDelete)) { 
             messagesMap.delete(idToDelete); 
-            // Also force remove from DOM immediately
             const el = document.getElementById(idToDelete);
             if(el) el.remove();
+            saveMessagesToCache(); 
             renderAll(); 
         }
         
-        await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
-        const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
-        if (!snapshot.empty) {
-            const lastMsg = snapshot.docs[0].data();
-            let txt = lastMsg.text || "";
-            
-            // Logic to determine type of the NEW last message
-            if (lastMsg.isBite) {
-                txt = txt ? "🎬 " + txt : "🎬 Bite";
-            } else if (lastMsg.isGif) {
-                txt = txt ? "🎞️ " + txt : "🎞️ GIF";
-            } else if (lastMsg.imageUrl) {
-                txt = txt ? "📷 " + txt : "📷 Image";
-            } else if (lastMsg.fileUrl) {
-                const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
-                let icon = "📄";
-                let label = "File";
-                if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
-                else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
+        try {
+            await db.collection("chats").doc(chatId).collection("messages").doc(idToDelete).delete();
+            const snapshot = await db.collection("chats").doc(chatId).collection("messages").orderBy("timestamp", "desc").limit(1).get();
+            if (!snapshot.empty) {
+                const lastMsg = snapshot.docs[0].data({ serverTimestamps: 'estimate' });
+                let txt = lastMsg.text || "";
                 
-                txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
+                if (lastMsg.isBite) txt = txt ? "🎬 " + txt : "🎬 Bite";
+                else if (lastMsg.isGif) txt = txt ? "🎞️ " + txt : "🎞️ GIF";
+                else if (lastMsg.imageUrl) txt = txt ? "📷 " + txt : "📷 Image";
+                else if (lastMsg.fileUrl) {
+                    const type = lastMsg.fileMeta ? lastMsg.fileMeta.type : 'file';
+                    let icon = "📄", label = "File";
+                    if(type.indexOf('video') !== -1) { icon = "🎥"; label = "Video"; }
+                    else if(type.indexOf('audio') !== -1) { icon = "🎵"; label = "Audio"; }
+                    txt = txt ? `${icon} ${txt}` : `${icon} ${label}`;
+                }
+                
+                db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
+                updateInboxCacheLocal(chatId, txt, lastMsg.sender, false); 
+            } else {
+                db.collection("chats").doc(chatId).update({ lastMessage: "", lastSender: myUid, lastTimestamp: firebase.firestore.FieldValue.serverTimestamp() });
+                updateInboxCacheLocal(chatId, "", myUid, false); 
             }
-            
-            await db.collection("chats").doc(chatId).update({ lastMessage: txt, lastSender: lastMsg.sender, lastTimestamp: lastMsg.timestamp });
-            updateInboxCacheLocal(chatId, txt, lastMsg.sender, false); // INBOX SYNC
+        } catch (err) {
+            console.error("Unsend failed", err);
         }
     }
 
@@ -4095,7 +4105,7 @@ box-shadow: var(--received-shadow);
 
             if (!snapshot.empty) {
                 snapshot.forEach(doc => {
-                    let d = doc.data();
+                    let d = doc.data({ serverTimestamps: 'estimate' });
                     d.id = doc.id;
                     if (!messagesMap.has(doc.id)) {
                         messagesMap.set(doc.id, d);
