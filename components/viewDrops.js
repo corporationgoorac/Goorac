@@ -1130,7 +1130,7 @@ const DropsManager = {
     myUid: null,
     myUserData: null,
     myCloseFriends: [],
-    myFriends: [],
+    mutualUIDs: [],
     _isFirstLoad: true, // Tracking first load for shimmer effect
 
     init: function() {
@@ -1153,16 +1153,16 @@ const DropsManager = {
                     if (myDoc.exists) {
                         this.myUserData = myDoc.data();
                         this.myCloseFriends = this.myUserData.closeFriends || [];
-                        this.myFriends = this.myUserData.friends || this.myUserData.following || [];
                         
                         // Store my profile pic to local storage
                         if (this.myUserData.photoURL) {
-                            localStorage.setItem('goorac_my_pfp', this.myUserData.photoURL);
+                            localStorage.setItem(`my_pfp_${this.myUid}`, this.myUserData.photoURL);
                         }
-                    } else {
-                        this.myUserData = null;
-                        this.myCloseFriends = [];
-                        this.myFriends = [];
+
+                        // Calculate mutual friends
+                        const followingUIDs = (this.myUserData.following || []).map(i => typeof i === 'string' ? i : i.uid);
+                        const followersUIDs = (this.myUserData.followers || []).map(i => typeof i === 'string' ? i : i.uid);
+                        this.mutualUIDs = followingUIDs.filter(uid => followersUIDs.includes(uid));
                     }
                     
                     if(document.getElementById('drops-tray-container')) {
@@ -1287,37 +1287,17 @@ const DropsManager = {
             
             const secureDrops = [];
             for (let d of this._cachedLiveDrops) {
-                // ALWAYS show own drop
-                if (d.uid === this.myUid) {
-                    secureDrops.push(d);
-                    continue;
-                }
+                // Mutual friends check (allow own drop)
+                if (d.uid !== this.myUid && !this.mutualUIDs.includes(d.uid)) continue;
 
-                if (d.uid !== this.myUid) {
+                if (d.audience === 'close_friends' && d.uid !== this.myUid) {
                     try {
                         const creatorDoc = await db.collection('users').doc(d.uid).get();
-                        if (creatorDoc.exists) {
-                            const creatorData = creatorDoc.data();
-                            const creatorFriends = creatorData.friends || creatorData.following || [];
-                            const creatorCFList = creatorData.closeFriends || [];
-
-                            // MUTUAL FRIENDS LOGIC:
-                            // Check if I am in their friends list AND they are in my friends list
-                            const theyAreInMyList = this.myFriends.includes(d.uid);
-                            const iAmInTheirList = creatorFriends.includes(this.myUid);
-                            const isMutual = theyAreInMyList && iAmInTheirList;
-
-                            if (isMutual) {
-                                if (d.audience === 'close_friends') {
-                                    if (creatorCFList.includes(this.myUid)) {
-                                        secureDrops.push(d);
-                                    }
-                                } else {
-                                    secureDrops.push(d);
-                                }
-                            }
-                        }
-                    } catch (e) { console.error(e); }
+                        const creatorCFList = creatorDoc.exists ? (creatorDoc.data().closeFriends || []) : [];
+                        if (creatorCFList.includes(this.myUid)) secureDrops.push(d);
+                    } catch (e) { }
+                } else {
+                    secureDrops.push(d);
                 }
             }
 
@@ -1398,8 +1378,10 @@ const DropsManager = {
             };
         } else {
             myItem.className = `dt-item me-empty`;
-            const myStoredPfp = localStorage.getItem('goorac_my_pfp');
-            const myPfp = (this.myUserData && this.myUserData.photoURL) ? this.myUserData.photoURL : (myStoredPfp ? myStoredPfp : 'https://via.placeholder.com/150');
+            
+            // Retrieve from localStorage fallback
+            const storedPfp = localStorage.getItem(`my_pfp_${this.myUid}`);
+            const myPfp = (this.myUserData && this.myUserData.photoURL) ? this.myUserData.photoURL : (storedPfp || 'https://via.placeholder.com/150');
             
             myItem.innerHTML = `
                 <div class="dt-ring-wrap">
@@ -1438,3 +1420,4 @@ const DropsManager = {
 };
 
 document.addEventListener('DOMContentLoaded', () => DropsManager.init());
+
