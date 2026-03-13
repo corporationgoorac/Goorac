@@ -315,7 +315,19 @@
             myUid = user.uid; 
             db.collection("users").doc(myUid).get().then(doc => {
                 if(doc.exists && doc.data().interests) {
+                    // === ADVANCED NLP TIME-DECAY (DATE BASED SAVING) INJECTION ===
+                    // Automatically prunes older interests so new content remains relevant
+                    let decayedInts = doc.data().interests;
+                    const lastUpdate = doc.data().lastInterestSyncTS || Date.now();
+                    const daysOld = Math.floor((Date.now() - lastUpdate) / (1000 * 60 * 60 * 24));
+                    if (daysOld > 0) {
+                        for (let k in decayedInts) decayedInts[k] = Math.max(0, decayedInts[k] * Math.pow(0.85, daysOld)); // 15% decay per day
+                        db.collection("users").doc(myUid).set({ interests: decayedInts, lastInterestSyncTS: Date.now() }, { merge: true }).catch(()=>{});
+                    }
+                    // =============================================================
+
                     const ints = doc.data().interests;
+                    Object.assign(ints, decayedInts); // Apply the temporal decay to local logic
                     myInterests = Object.keys(ints).sort((a,b) => ints[b] - ints[a]).slice(0, 5);
                     if(myInterests.length === 0) myInterests = ["tamil"]; 
                 }
@@ -670,6 +682,49 @@
     }
 
     // ==========================================================================
+    // 🧠 ADVANCED NLP SEMANTIC ENGINE (NEW)
+    // ==========================================================================
+    const semanticSynonyms = {
+        "dhoni": "cricket", "kohli": "cricket", "ipl": "cricket", "rohit": "cricket", "bcci": "cricket",
+        "vaayavmoodi": "song", "anirudh": "song", "arr": "song", "bgm": "song", "music": "song", "kadalalle": "song", "melody": "song",
+        "red": "color", "read": "color", "black": "color", "blue": "color", "white": "color", "green": "color", "yellow": "color",
+        "flower": "nature", "rose": "flower", "tree": "nature", "sunset": "nature", "rain": "nature", "waterfall": "nature",
+        "coding": "tech", "developer": "tech", "javascript": "tech", "python": "tech", "ai": "tech", "software": "tech",
+        "thalapathy": "actor", "vijay": "actor", "thala": "actor", "ajith": "actor", "cinema": "movies", "film": "movies"
+    };
+
+    function processAdvancedNLP(text) {
+        if (!text) return [];
+        const cleanStr = text.toLowerCase();
+        let extracted = new Set();
+        
+        const hashMatches = cleanStr.match(/#[\w]+/g);
+        if (hashMatches) {
+            hashMatches.forEach(t => extracted.add(t.replace('#', '')));
+        }
+        
+        const words = cleanStr.replace(/[^\w\s]/g, '').split(/\s+/);
+        words.forEach(word => {
+            if (word.length > 2) {
+                if (word.length > 4) extracted.add(word);
+                if (semanticSynonyms[word]) {
+                    extracted.add(semanticSynonyms[word]);
+                    // Double linkage (e.g. rose -> flower -> nature)
+                    if (semanticSynonyms[semanticSynonyms[word]]) {
+                        extracted.add(semanticSynonyms[semanticSynonyms[word]]);
+                    }
+                }
+                for (const [key, category] of Object.entries(semanticSynonyms)) {
+                    if (word.includes(key) && key.length >= 4) {
+                        extracted.add(category);
+                    }
+                }
+            }
+        });
+        return Array.from(extracted);
+    }
+
+    // ==========================================================================
     // 🧠 THE BATCHED DEEP-LEARNING ALGORITHM
     // ==========================================================================
     let pendingInterestUpdates = {};
@@ -694,6 +749,9 @@
         for(let key in pendingInterestUpdates) {
             firestoreUpdates[key] = firebase.firestore.FieldValue.increment(pendingInterestUpdates[key]);
         }
+
+        // NEW FIX: Record the exact timestamp of this interest sync for the Time-Decay Engine
+        firestoreUpdates['lastInterestSyncTS'] = Date.now();
         
         db.collection("users").doc(myUid).set(firestoreUpdates, { merge: true }).catch(e => {});
         
@@ -704,7 +762,9 @@
     function extractHashtags(text) {
         if (!text) return [];
         const matches = text.match(/#[\w]+/g);
-        return matches ? matches.map(t => t.toLowerCase().replace('#', '')) : [];
+        // We intercept the original hash extraction to pass it through our Deep NLP scanner!
+        const originalLogic = matches ? matches.map(t => t.toLowerCase().replace('#', '')) : [];
+        return processAdvancedNLP(text);
     }
 
     function processEngagementAlgorithm(bite, timeSpentMs) {
@@ -734,6 +794,8 @@
         if (action === 'liked') { scoreChange = 15; tags = extractHashtags(biteTitle).slice(0, 3); } 
         else if (action === 'searched') scoreChange = 20;
         else if (action === 'rewatched') { scoreChange = 8; tags = extractHashtags(biteTitle).slice(0, 3); }
+        // NEW ADVANCED ACTION: Share tracking pushes the most points to the NLP algorithm!
+        else if (action === 'shared') { scoreChange = 25; tags = extractHashtags(biteTitle).slice(0, 5); }
 
         if(scoreChange !== 0) queueInterestUpdate(category, scoreChange);
         tags.forEach(tag => queueInterestUpdate(tag, 5));
@@ -948,6 +1010,11 @@
     window.shareBite = function(event, index) {
         event.stopPropagation();
         const bite = bitesQueue[index];
+
+        // --- NEW: Track the share event using the Advanced NLP engine ---
+        trackExplicitAction(bite.category || "trending", 'shared', bite.title);
+        // ----------------------------------------------------------------
+
         const shareModal = document.getElementById('share-bites-modal');
         const navBar = document.querySelector('main-navbar');
         
