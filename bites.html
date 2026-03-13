@@ -331,6 +331,15 @@
                     else if (userLang.startsWith('hi')) myInterests = ["hindi"];
                     else myInterests = ["trending"];
                 }
+
+                // If players are ready but we were waiting for interests to load, fetch now
+                if (playersReady === 2 && bitesQueue.length === 0 && !isFetching && !isSearchPlaying) {
+                    fetchMoreBites();
+                }
+            }).catch(e => {
+                console.error("Failed to load user profile:", e);
+                myInterests = ["trending"];
+                if (playersReady === 2 && bitesQueue.length === 0 && !isFetching && !isSearchPlaying) fetchMoreBites();
             });
         } 
         else { window.location.href = 'login.html'; }
@@ -457,7 +466,8 @@
                 renderDOMSlides();
                 if (bitesQueue.length < 8) fetchMoreBites();
             } else {
-                fetchMoreBites();
+                // Only fetch if interests are loaded. Otherwise, the auth listener will trigger it.
+                if (myInterests.length > 0) fetchMoreBites();
             }
         }
     }
@@ -742,7 +752,7 @@
     }
 
     // ==========================================================================
-    // 🚀 NEW: DIRECT FIRESTORE CONTENT ENGINE & CLIENT SHUFFLE
+    // 🚀 DIRECT FIRESTORE CONTENT ENGINE & CLIENT SHUFFLE (NO PROXY FALLBACKS)
     // ==========================================================================
     function addictiveShuffle(videosArray) {
         let freshVideos = videosArray.filter(v => 
@@ -767,12 +777,13 @@
         if (loaderText) loaderText.innerText = "Diving into the pools...";
 
         try {
+            // Always have a fallback topic in case interests are entirely empty
             let topicsToFetch = overrideTopic ? [overrideTopic] : myInterests;
             if (!topicsToFetch || topicsToFetch.length === 0) topicsToFetch = ["trending"];
             
             let combinedVideos = [];
 
-            // 1. Direct Communication: Read Topic Pools from Firestore bypassing Render
+            // 1. Direct Communication: Read Topic Pools from Firestore bypassing Render completely
             const fetchPromises = topicsToFetch.map(topic => {
                 const safeName = topic.toLowerCase().replace(/\s+/g, '_');
                 return db.collection('bites_pools').doc(safeName).get();
@@ -781,7 +792,13 @@
             const snapshots = await Promise.all(fetchPromises);
 
             snapshots.forEach(doc => {
-                if (doc.exists && doc.data().videos) combinedVideos.push(...doc.data().videos);
+                if (doc.exists) {
+                    const data = doc.data();
+                    // Double check data validity to prevent crashing if the backend is slow
+                    if (data && data.videos && Array.isArray(data.videos)) {
+                        combinedVideos.push(...data.videos);
+                    }
+                }
             });
 
             // 2. Addictive Client-Side Shuffle & Filter
@@ -796,8 +813,8 @@
                 syncPlayersToScrollPosition();
                 cleanUpQueueAndCache();
             } else {
-                // 3. EMERGENCY FALLBACK: Pools empty or exhausted, use live proxy
-                await fetchSearchFallback(topicsToFetch[0]);
+                // 3. FALLBACKS REMOVED. Just notify the user they've seen everything available.
+                if (loaderText) loaderText.innerText = "You've seen it all! Refresh or search for new topics.";
             }
         } catch (error) {
             console.error("Direct Firestore Read Failed:", error);
@@ -805,20 +822,6 @@
         } finally {
             isFetching = false;
         }
-    }
-
-    async function fetchSearchFallback(topic) {
-        try {
-            const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(topic)}&search=true`);
-            const data = await res.json();
-            if (data.success && data.bites && data.bites.length > 0) {
-                const finalBatch = addictiveShuffle(data.bites).slice(0, 15);
-                finalBatch.forEach(b => { viewedVideoIds.add(b.videoId); bitesQueue.push(b); });
-                renderDOMSlides();
-                syncPlayersToScrollPosition();
-                cleanUpQueueAndCache();
-            }
-        } catch (e) { console.error("Fallback failed", e); }
     }
 
     window.shareBite = function(event, index) {
@@ -909,11 +912,13 @@
         grid.innerHTML = skelHtml;
 
         try {
-            // Live Search always asks the Render API Proxy
+            // Live Search always asks the Render API Proxy. Make sure URL is exactly correct.
             const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(query)}&search=true`);
+            if (!res.ok) throw new Error("Server responded with error status");
+            
             const data = await res.json();
             
-            if (data.success && data.bites.length > 0) {
+            if (data.success && data.bites && data.bites.length > 0) {
                 grid.innerHTML = '';
                 data.bites.forEach(bite => {
                     const el = document.createElement('div');
@@ -922,9 +927,12 @@
                     el.innerHTML = `<img src="${bite.imgUrl}"><div class="views-overlay"><span class="material-icons-round" style="font-size:14px;">play_arrow</span> ${formatNumber(bite.likes)}</div>`;
                     grid.appendChild(el);
                 });
-            } else grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding: 50px 20px; color: #666;">No results found.</div>`;
+            } else {
+                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding: 50px 20px; color: #666;">No results found.</div>`;
+            }
         } catch (error) {
-            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding: 50px 20px; color: #ff4444;">Connection failed.</div>`;
+            console.error("Search fetch failed:", error);
+            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding: 50px 20px; color: #ff4444;">Search failed to connect.</div>`;
         }
     }
 
