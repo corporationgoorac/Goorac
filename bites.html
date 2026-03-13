@@ -312,11 +312,31 @@
     let myUid = null;
     let myInterests = []; 
 
-    // 🚀 DYNAMIC LANGUAGE DETECTION (No more hardcoded Tamil)
+    // 🚀 NEW: IP GEOLOCATION SNIFFING (Solves the "English OS" India problem)
+    async function sniffRegionalInterest() {
+        try {
+            // Free, extremely reliable IP locator
+            const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+            const data = await res.json();
+            const region = (data.region || "").toLowerCase();
+            
+            if (region.includes("tamil nadu")) return "tamil";
+            if (region.includes("kerala")) return "malayalam";
+            if (region.includes("karnataka")) return "kannada";
+            if (region.includes("andhra") || region.includes("telangana")) return "telugu";
+            if (region.includes("maharashtra") || region.includes("gujarat") || region.includes("delhi")) return "hindi";
+            
+            return null;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    // 🚀 DYNAMIC HYBRID DETECTION
     auth.onAuthStateChanged(user => {
         if (user) { 
             myUid = user.uid; 
-            db.collection("users").doc(myUid).get().then(doc => {
+            db.collection("users").doc(myUid).get().then(async doc => {
                 if(doc.exists && doc.data().interests) {
                     const ints = doc.data().interests;
                     myInterests = Object.keys(ints).sort((a,b) => ints[b] - ints[a]).slice(0, 5);
@@ -324,12 +344,20 @@
                 
                 // Smart Fallback if profile is new/empty
                 if(!myInterests || myInterests.length === 0) {
+                    myInterests = ["trending"]; // Universal baseline
+                    
+                    // 1. Try IP Sniffing first (Most accurate for India)
+                    const regionalTopic = await sniffRegionalInterest();
+                    if (regionalTopic && !myInterests.includes(regionalTopic)) {
+                        myInterests.push(regionalTopic);
+                    }
+                    
+                    // 2. Keep the language check as a secondary backup without deleting it
                     const userLang = navigator.language || navigator.userLanguage; 
-                    if (userLang.startsWith('ml')) myInterests = ["malayalam"];
-                    else if (userLang.startsWith('te')) myInterests = ["telugu"];
-                    else if (userLang.startsWith('ta')) myInterests = ["tamil"];
-                    else if (userLang.startsWith('hi')) myInterests = ["hindi"];
-                    else myInterests = ["trending"];
+                    if (userLang.startsWith('ml') && !myInterests.includes('malayalam')) myInterests.push('malayalam');
+                    else if (userLang.startsWith('te') && !myInterests.includes('telugu')) myInterests.push('telugu');
+                    else if (userLang.startsWith('ta') && !myInterests.includes('tamil')) myInterests.push('tamil');
+                    else if (userLang.startsWith('hi') && !myInterests.includes('hindi')) myInterests.push('hindi');
                 }
 
                 // If players are ready but we were waiting for interests to load, fetch now
@@ -751,7 +779,7 @@
     }
 
     // ==========================================================================
-    // 🚀 DIRECT FIRESTORE CONTENT ENGINE & CLIENT SHUFFLE (NO PROXY FALLBACKS)
+    // 🚀 DIRECT FIRESTORE CONTENT ENGINE & PROXY FALLBACK FOR COLD STARTS
     // ==========================================================================
     function addictiveShuffle(videosArray) {
         let freshVideos = videosArray.filter(v => 
@@ -779,18 +807,12 @@
             let topicsToFetch = overrideTopic ? [overrideTopic] : [...myInterests];
             if (!topicsToFetch || topicsToFetch.length === 0) topicsToFetch = ["trending"];
             
-            // 💡 FIX 1: Always append backend-supported CORE_TOPICS so the feed never searches a ghost town
+            // Always append backend-supported CORE_TOPICS so the feed never searches a ghost town
             if (!topicsToFetch.includes('trending')) topicsToFetch.push('trending');
-            
-            // Inject regional core topic if missing
-            const userLang = navigator.language || navigator.userLanguage; 
-            if (userLang.startsWith('ta') && !topicsToFetch.includes('tamil')) topicsToFetch.push('tamil');
-            else if (userLang.startsWith('te') && !topicsToFetch.includes('telugu')) topicsToFetch.push('telugu');
-            else if (userLang.startsWith('ml') && !topicsToFetch.includes('malayalam')) topicsToFetch.push('malayalam');
 
             let combinedVideos = [];
 
-            // 1. Direct Communication: Read Topic Pools from Firestore bypassing Render
+            // 1. Direct Communication: Read Topic Pools from Firestore
             const fetchPromises = topicsToFetch.map(topic => {
                 const safeName = topic.toLowerCase().replace(/\s+/g, '_');
                 return db.collection('bites_pools').doc(safeName).get();
@@ -807,14 +829,7 @@
                 }
             });
 
-            // 💡 FIX 2: If the backend hasn't finished its very first boot sequence yet, wait and retry.
-            if (combinedVideos.length === 0) {
-                if (loaderText) loaderText.innerText = "Server is stocking the grocery store... Retrying in 3s...";
-                setTimeout(() => { isFetching = false; fetchMoreBites(overrideTopic); }, 3000);
-                return;
-            }
-
-            // 💡 FIX 3: Addictive Shuffle with History Failsafe
+            // 2. Addictive Client-Side Shuffle & Filter
             let finalBatch = addictiveShuffle(combinedVideos).slice(0, 15);
             
             // If local history aggressively filtered everything out, clear history and try again
@@ -834,13 +849,43 @@
                 syncPlayersToScrollPosition();
                 cleanUpQueueAndCache();
             } else {
-                if (loaderText) loaderText.innerText = "You've seen it all! Refresh or search for new topics.";
+                // 💡 NEW: INSTANT LIVE PROXY FALLBACK (For Cold Starts or Empty Pools)
+                // Instead of showing a blank screen, we immediately ask Render to scrape the web!
+                if (loaderText) loaderText.innerText = "Live fetching new topics from web...";
+                const primaryTopic = topicsToFetch[0] || "trending";
+                await fetchSearchFallback(primaryTopic);
             }
         } catch (error) {
             console.error("Direct Firestore Read Failed:", error);
             if (loaderText) loaderText.innerText = "Connection failed. Scroll to retry.";
         } finally {
             isFetching = false;
+        }
+    }
+
+    // 💡 LIVE PROXY FALLBACK FUNCTION (Re-Integrated and Enhanced)
+    async function fetchSearchFallback(topic) {
+        try {
+            const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(topic)}&search=true`);
+            if (!res.ok) throw new Error("Proxy error");
+            const data = await res.json();
+            
+            if (data.success && data.bites && data.bites.length > 0) {
+                const finalBatch = addictiveShuffle(data.bites).slice(0, 15);
+                if (finalBatch.length > 0) {
+                    finalBatch.forEach(b => { viewedVideoIds.add(b.videoId); bitesQueue.push(b); });
+                    renderDOMSlides();
+                    syncPlayersToScrollPosition();
+                    cleanUpQueueAndCache();
+                } else {
+                    const loaderText = document.querySelector('.loader-text');
+                    if (loaderText) loaderText.innerText = "You've seen it all! Refresh or search for new topics.";
+                }
+            }
+        } catch (e) {
+            console.error("Fallback failed", e);
+            const loaderText = document.querySelector('.loader-text');
+            if (loaderText) loaderText.innerText = "Connection failed. Scroll to retry.";
         }
     }
 
