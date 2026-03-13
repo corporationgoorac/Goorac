@@ -19,7 +19,7 @@
     <chat-loader></chat-loader>
     
     <script src="components/imagePicker.js" defer></script>
-    <script src="components/navbar.js" defer></script>
+    <script src="components/navbar.js"></script>
     
     <script src="components/viewNotes.js" defer></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -204,19 +204,13 @@
         .hide-nav { opacity: 0 !important; pointer-events: none !important; transform: translateY(100px) !important; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         
         /* 🚀 MAIN NAVBAR PRE-ALLOCATION TO FIX GLITCHING */
-        main-navbar { 
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: calc(65px + env(safe-area-inset-bottom));
-            background-color: var(--bg) !important;
-            z-index: 1000;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            contain: layout size;
+        main-navbar {
+            display: block; position: fixed; bottom: 0; left: 0; width: 100%;
+            height: calc(65px + env(safe-area-inset-bottom)); background-color: var(--bg); z-index: 1000;
+        }
+        main-navbar.hidden-nav {
+            opacity: 0 !important; pointer-events: none !important;
+            transform: translateY(100px) !important; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         /* NETWORK TOAST */
@@ -395,7 +389,13 @@
         <svg onclick="openGroupModal()" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; cursor: pointer; opacity: 0.95;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
     </div>
 </header>
-<main-navbar></main-navbar>
+<main-navbar id="main-nav"></main-navbar>
+<script>
+    const cachedNavbarHtmlData = localStorage.getItem('goorac_navbar_html_cache');
+    if (cachedNavbarHtmlData) {
+        // Handled by component logic
+    }
+</script>
 
 <script>
     (function loadAppIconInstant() {
@@ -773,14 +773,14 @@
         document.getElementById('search-modal').classList.add('active');
         history.pushState({ modal: 'search' }, "", "#search");
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
+        if(nav) nav.classList.add('hidden-nav');
         setTimeout(() => document.getElementById('main-search').focus(), 100);
     };
 
     window.closeSearchModal = function(shouldGoBack) {
         document.getElementById('search-modal').classList.remove('active');
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.remove('hide-nav');
+        if(nav) nav.classList.remove('hidden-nav');
         
         // Reset search field when closing
         document.getElementById('main-search').value = "";
@@ -797,7 +797,7 @@
         overlay.style.display = 'block';
         history.pushState({ modal: 'sort' }, "", "#sort");
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
+        if(nav) nav.classList.add('hidden-nav');
 
         setTimeout(() => {
             overlay.style.opacity = '1';
@@ -815,7 +815,7 @@
         setTimeout(() => {
             overlay.style.display = 'none';
             const nav = document.querySelector('main-navbar');
-            if(nav) nav.classList.remove('hide-nav');
+            if(nav) nav.classList.remove('hidden-nav');
         }, 350);
 
         if(shouldGoBack && window.location.hash === "#sort") history.back();
@@ -1179,7 +1179,7 @@
         document.getElementById('delete-menu').classList.add('active');
         document.getElementById('overlay').style.display = 'block';
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
+        if(nav) nav.classList.add('hidden-nav');
     }
 
     window.onpopstate = (e) => { 
@@ -1217,7 +1217,7 @@
         document.getElementById('delete-menu').classList.remove('active');
         document.getElementById('overlay').style.display = 'none';
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.remove('hide-nav');
+        if(nav) nav.classList.remove('hidden-nav');
         if(shouldGoBack && window.location.hash === "#menu") history.back();
     }
 
@@ -1340,7 +1340,7 @@
         document.getElementById('group-modal').classList.add('active');
         history.pushState({ modal: 'group' }, "", "#group");
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.add('hide-nav');
+        if(nav) nav.classList.add('hidden-nav');
         
         selectedGroupMembers = [];
         groupBase64Image = null;
@@ -1355,7 +1355,7 @@
     window.closeGroupModal = function(shouldGoBack) {
         document.getElementById('group-modal').classList.remove('active');
         const nav = document.querySelector('main-navbar');
-        if(nav) nav.classList.remove('hide-nav');
+        if(nav) nav.classList.remove('hidden-nav');
         if(shouldGoBack && window.location.hash === "#group") history.back();
     };
 
