@@ -466,7 +466,6 @@
                 renderDOMSlides();
                 if (bitesQueue.length < 8) fetchMoreBites();
             } else {
-                // Only fetch if interests are loaded. Otherwise, the auth listener will trigger it.
                 if (myInterests.length > 0) fetchMoreBites();
             }
         }
@@ -777,13 +776,21 @@
         if (loaderText) loaderText.innerText = "Diving into the pools...";
 
         try {
-            // Always have a fallback topic in case interests are entirely empty
-            let topicsToFetch = overrideTopic ? [overrideTopic] : myInterests;
+            let topicsToFetch = overrideTopic ? [overrideTopic] : [...myInterests];
             if (!topicsToFetch || topicsToFetch.length === 0) topicsToFetch = ["trending"];
             
+            // 💡 FIX 1: Always append backend-supported CORE_TOPICS so the feed never searches a ghost town
+            if (!topicsToFetch.includes('trending')) topicsToFetch.push('trending');
+            
+            // Inject regional core topic if missing
+            const userLang = navigator.language || navigator.userLanguage; 
+            if (userLang.startsWith('ta') && !topicsToFetch.includes('tamil')) topicsToFetch.push('tamil');
+            else if (userLang.startsWith('te') && !topicsToFetch.includes('telugu')) topicsToFetch.push('telugu');
+            else if (userLang.startsWith('ml') && !topicsToFetch.includes('malayalam')) topicsToFetch.push('malayalam');
+
             let combinedVideos = [];
 
-            // 1. Direct Communication: Read Topic Pools from Firestore bypassing Render completely
+            // 1. Direct Communication: Read Topic Pools from Firestore bypassing Render
             const fetchPromises = topicsToFetch.map(topic => {
                 const safeName = topic.toLowerCase().replace(/\s+/g, '_');
                 return db.collection('bites_pools').doc(safeName).get();
@@ -794,15 +801,29 @@
             snapshots.forEach(doc => {
                 if (doc.exists) {
                     const data = doc.data();
-                    // Double check data validity to prevent crashing if the backend is slow
                     if (data && data.videos && Array.isArray(data.videos)) {
                         combinedVideos.push(...data.videos);
                     }
                 }
             });
 
-            // 2. Addictive Client-Side Shuffle & Filter
-            const finalBatch = addictiveShuffle(combinedVideos).slice(0, 15);
+            // 💡 FIX 2: If the backend hasn't finished its very first boot sequence yet, wait and retry.
+            if (combinedVideos.length === 0) {
+                if (loaderText) loaderText.innerText = "Server is stocking the grocery store... Retrying in 3s...";
+                setTimeout(() => { isFetching = false; fetchMoreBites(overrideTopic); }, 3000);
+                return;
+            }
+
+            // 💡 FIX 3: Addictive Shuffle with History Failsafe
+            let finalBatch = addictiveShuffle(combinedVideos).slice(0, 15);
+            
+            // If local history aggressively filtered everything out, clear history and try again
+            if (finalBatch.length === 0 && combinedVideos.length > 0) {
+                console.warn("Watch history full! Resetting to prevent empty feed.");
+                bitesHistory = [];
+                localStorage.setItem('goorac_bites_history', '[]');
+                finalBatch = addictiveShuffle(combinedVideos).slice(0, 15);
+            }
 
             if (finalBatch.length > 0) {
                 finalBatch.forEach(b => {
@@ -813,7 +834,6 @@
                 syncPlayersToScrollPosition();
                 cleanUpQueueAndCache();
             } else {
-                // 3. FALLBACKS REMOVED. Just notify the user they've seen everything available.
                 if (loaderText) loaderText.innerText = "You've seen it all! Refresh or search for new topics.";
             }
         } catch (error) {
@@ -912,7 +932,7 @@
         grid.innerHTML = skelHtml;
 
         try {
-            // Live Search always asks the Render API Proxy. Make sure URL is exactly correct.
+            // Live Search always asks the Render API Proxy.
             const res = await fetch(`https://pishaa.onrender.com/api/reels?topic=${encodeURIComponent(query)}&search=true`);
             if (!res.ok) throw new Error("Server responded with error status");
             
