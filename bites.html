@@ -56,7 +56,7 @@
             overflow: hidden; 
             width: 100vw; height: 100vh;
             user-select: none; -webkit-user-select: none; 
-            touch-action: none; /* Prevents pull-to-refresh on mobile */
+            touch-action: none; 
         }
 
         /* ==========================================================================
@@ -111,21 +111,22 @@
             width: 100vw; height: calc(100vh - var(--nav-height));
             scroll-snap-align: start; scroll-snap-stop: always;
             position: relative; touch-action: pan-y; 
-            background: #000;
+            background: transparent; /* 🔥 FIX: Changed from #000 so the YT Player underneath is visible! */
         }
 
         /* THE SEAMLESS COVER IMAGE FIX (NO YOUTUBE FLASH) */
         .video-cover {
             position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-            z-index: 5; transition: opacity 0.4s ease; pointer-events: none; background: #050505;
+            z-index: 5; transition: opacity 0.3s ease-out; pointer-events: none; background: #050505;
             filter: brightness(0.9);
         }
 
-        /* THE HARDWARE PLAYERS (LEAPFROG SCROLLING) */
+        /* THE HARDWARE PLAYERS (GPU ACCELERATED LEAPFROG) */
         .yt-player-container {
             position: absolute; top: 0; left: 0; width: 100vw; 
             height: calc(100vh - var(--nav-height));
             z-index: 1; opacity: 1; pointer-events: none; background: #000;
+            will-change: transform; /* 🔥 FIX: Forces GPU Acceleration to stop lag */
         }
         .yt-player-container.active { z-index: 2; }
         
@@ -285,7 +286,7 @@
         /* MAIN FEED SKELETON LOADER (UPGRADED) */
         #main-skeleton {
             position: absolute; inset: 0; z-index: 15; background: transparent;
-            display: flex; flex-direction: column; justify-content: flex-end; padding: 15px; padding-bottom: 25px;
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 15px; padding-bottom: 25px; pointer-events: none;
         }
         .skel-side { position: absolute; right: 15px; bottom: 25px; display: flex; flex-direction: column; gap: 25px; align-items: center; }
         .skel-circle { width: 48px; height: 48px; border-radius: 50%; }
@@ -372,48 +373,32 @@
             }
         } catch(e) { console.log("TF Load skipped, falling back to Neural Lexicon."); }
     }
-    setTimeout(initTensorFlowML, 3000); // Defer loading so it doesn't block initial UI render
+    setTimeout(initTensorFlowML, 3000); 
 
     // ==========================================================================
     // 🧠 VADER-STYLE MULTILINGUAL NLP ENGINE & COMPROMISE.JS INTEGRATION
     // ==========================================================================
     class AdvancedNeuralAnalyzer {
-        // Massive Semantic Matrix for Sentiment & Topic Categorization
-        // Format: "keyword": { score: sentiment(-4 to 4), topic: "category" }
         static lexicon = {
-            // Tamil & English Emotions
             "love": {score: 3, topic: "emotion"}, "kadhal": {score: 3, topic: "emotion"}, "anbu": {score: 3, topic: "emotion"}, "romance": {score: 3, topic: "emotion"}, "heart": {score: 3, topic: "emotion"},
             "sad": {score: -2, topic: "emotion"}, "sogam": {score: -2, topic: "emotion"}, "azhugai": {score: -2, topic: "emotion"}, "crying": {score: -2, topic: "emotion"}, "pain": {score: -3, topic: "emotion"}, "broken": {score: -3, topic: "emotion"},
             "happy": {score: 3, topic: "comedy"}, "santhosham": {score: 3, topic: "comedy"}, "siripu": {score: 3, topic: "comedy"}, "funny": {score: 3, topic: "comedy"}, "comedy": {score: 3, topic: "comedy"}, "meme": {score: 2, topic: "comedy"}, "laugh": {score: 3, topic: "comedy"}, "hilarious": {score: 4, topic: "comedy"},
             "angry": {score: -3, topic: "emotion"}, "kobam": {score: -3, topic: "emotion"}, "verithanam": {score: 4, topic: "hype"}, "mass": {score: 4, topic: "hype"}, "goosebumps": {score: 4, topic: "hype"}, "fire": {score: 4, topic: "hype"}, "lit": {score: 4, topic: "hype"},
-            
-            // Sports
             "dhoni": {score: 4, topic: "cricket"}, "thala": {score: 4, topic: "cricket"}, "kohli": {score: 3, topic: "cricket"}, "ipl": {score: 2, topic: "cricket"}, "csk": {score: 4, topic: "cricket"}, "football": {score: 2, topic: "sports"}, "messi": {score: 3, topic: "sports"}, "ronaldo": {score: 3, topic: "sports"}, "sports": {score: 2, topic: "sports"}, "match": {score: 2, topic: "sports"}, "stadium": {score: 2, topic: "sports"},
-            
-            // Cinema & Actors
             "vijay": {score: 4, topic: "actor"}, "thalapathy": {score: 4, topic: "actor"}, "ajith": {score: 4, topic: "actor"}, "rajini": {score: 4, topic: "actor"}, "kamal": {score: 3, topic: "actor"}, "suriya": {score: 3, topic: "actor"}, "dhanush": {score: 3, topic: "actor"}, "cinema": {score: 2, topic: "movies"}, "film": {score: 2, topic: "movies"}, "trailer": {score: 2, topic: "movies"}, "sun tv": {score: 1, topic: "movies"}, "netflix": {score: 2, topic: "movies"}, "movie": {score: 2, topic: "movies"}, "scene": {score: 2, topic: "movies"}, "hollywood": {score: 2, topic: "movies"}, "bollywood": {score: 2, topic: "movies"}, "kollywood": {score: 3, topic: "movies"},
-            
-            // Music
             "song": {score: 2, topic: "music"}, "paattu": {score: 2, topic: "music"}, "music": {score: 2, topic: "music"}, "bgm": {score: 3, topic: "music"}, "anirudh": {score: 4, topic: "music"}, "arr": {score: 4, topic: "music"}, "yuvan": {score: 4, topic: "music"}, "sony music": {score: 1, topic: "music"}, "concert": {score: 3, topic: "music"}, "beats": {score: 3, topic: "music"}, "bass": {score: 3, topic: "music"}, "audio": {score: 2, topic: "music"}, "lyrics": {score: 2, topic: "music"},
-            
-            // Tech & Gaming
             "tech": {score: 2, topic: "technology"}, "coding": {score: 2, topic: "technology"}, "python": {score: 1, topic: "technology"}, "ai": {score: 3, topic: "technology"}, "gaming": {score: 3, topic: "gaming"}, "freefire": {score: 3, topic: "gaming"}, "pubg": {score: 3, topic: "gaming"}, "gta": {score: 3, topic: "gaming"}, "iphone": {score: 2, topic: "technology"}, "hacker": {score: 2, topic: "technology"}, "developer": {score: 2, topic: "technology"}, "software": {score: 2, topic: "technology"}, "apple": {score: 2, topic: "technology"}, "android": {score: 2, topic: "technology"},
-            
-            // Food & Nature
             "food": {score: 3, topic: "food"}, "saapadu": {score: 3, topic: "food"}, "biryani": {score: 4, topic: "food"}, "chicken": {score: 3, topic: "food"}, "nature": {score: 2, topic: "nature"}, "iyarkai": {score: 2, topic: "nature"}, "rain": {score: 2, topic: "nature"}, "mazhai": {score: 2, topic: "nature"}, "travel": {score: 3, topic: "travel"}, "vlog": {score: 2, topic: "travel"}, "cooking": {score: 3, topic: "food"}, "recipe": {score: 3, topic: "food"}, "street food": {score: 4, topic: "food"}, "tasty": {score: 3, topic: "food"}, "spicy": {score: 3, topic: "food"}, "mountain": {score: 3, topic: "travel"}, "beach": {score: 3, topic: "travel"}
         };
 
-        // Stop words to ignore in NLP processing
         static stopWords = new Set(["and", "the", "is", "in", "to", "of", "a", "for", "with", "on", "naan", "oru", "athu", "ithu", "endru", "shorts", "video", "youtube", "channel", "subscribe", "like", "share", "comment", "watch", "this", "that", "it"]);
 
         static analyze(textContext) {
             if (!textContext) return { sentiment: 0, topics: [] };
-            
             let totalSentiment = 0;
             let extractedTopics = new Set();
             let validWordCount = 0;
 
-            // === NEW: EXTERNAL OPEN-SOURCE NLP INTEGRATION (Compromise.js) ===
             try {
                 if (typeof window.nlp !== 'undefined') {
                     let doc = window.nlp(textContext);
@@ -423,53 +408,44 @@
                     let topics = doc.topics().out('array');
                     
                     const externalEntities = [...places, ...organizations, ...people, ...topics].map(e => e.toLowerCase().trim());
-                    
                     externalEntities.forEach(entity => {
                         if(entity.length > 3 && !this.stopWords.has(entity)) {
-                            extractedTopics.add(entity); // Dynamically capture true global entities
+                            extractedTopics.add(entity); 
                         }
                     });
                 }
-            } catch(e) { console.error("External NLP Error", e); }
-            // ================================================================
+            } catch(e) {}
 
-            const cleanText = textContext.toLowerCase().replace(/[^\w\s\u0B80-\u0BFF]/g, ' '); // Include Tamil Unicode range
+            const cleanText = textContext.toLowerCase().replace(/[^\w\s\u0B80-\u0BFF]/g, ' '); 
             const words = cleanText.split(/\s+/);
 
-            // N-Gram & Word Analysis
             for (let i = 0; i < words.length; i++) {
                 const word = words[i];
                 if (this.stopWords.has(word) || word.length < 3) continue;
 
-                // Check bi-grams (e.g., "sony music", "free fire")
                 if (i < words.length - 1) {
                     const bigram = `${word} ${words[i+1]}`;
                     if (this.lexicon[bigram]) {
                         totalSentiment += this.lexicon[bigram].score;
                         extractedTopics.add(this.lexicon[bigram].topic);
                         validWordCount++;
-                        i++; // Skip next word
+                        i++; 
                         continue;
                     }
                 }
 
-                // Check single words against Neural Dictionary
                 if (this.lexicon[word]) {
                     totalSentiment += this.lexicon[word].score;
                     extractedTopics.add(this.lexicon[word].topic);
-                    
-                    // Deep node linking (rose -> flower -> nature)
                     if (this.lexicon[this.lexicon[word].topic]) {
                          extractedTopics.add(this.lexicon[this.lexicon[word].topic].topic);
                     }
                     validWordCount++;
                 } else if (word.length > 4) {
-                    // Save strong unknown words as exact topics (TF-IDF assumption)
                     extractedTopics.add(word);
                 }
             }
 
-            // Extract explicit hashtags
             const hashMatches = textContext.toLowerCase().match(/#[\p{L}\p{N}_]+/gu);
             if (hashMatches) {
                 hashMatches.forEach(t => extractedTopics.add(t.replace('#', '').trim()));
@@ -478,7 +454,7 @@
             const normalizedSentiment = validWordCount > 0 ? (totalSentiment / validWordCount) : 0;
             return {
                 sentiment: normalizedSentiment,
-                topics: Array.from(extractedTopics).slice(0, 10) // Max 10 deep vectors per analysis
+                topics: Array.from(extractedTopics).slice(0, 10) 
             };
         }
     }
@@ -496,15 +472,13 @@
             myUid = user.uid; 
             db.collection("users").doc(myUid).get().then(doc => {
                 if(doc.exists && doc.data().interests) {
-                    // === ADVANCED NLP TIME-DECAY (DATE BASED SAVING) INJECTION ===
                     let decayedInts = doc.data().interests;
                     const lastUpdate = doc.data().lastInterestSyncTS || Date.now();
                     const daysOld = Math.floor((Date.now() - lastUpdate) / (1000 * 60 * 60 * 24));
                     if (daysOld > 0) {
-                        for (let k in decayedInts) decayedInts[k] = Math.max(0, decayedInts[k] * Math.pow(0.85, daysOld)); // 15% decay per day
+                        for (let k in decayedInts) decayedInts[k] = Math.max(0, decayedInts[k] * Math.pow(0.85, daysOld)); 
                         db.collection("users").doc(myUid).set({ interests: decayedInts, lastInterestSyncTS: Date.now() }, { merge: true }).catch(()=>{});
                     }
-                    // =============================================================
 
                     const ints = doc.data().interests;
                     Object.assign(ints, decayedInts); 
@@ -542,24 +516,21 @@
     let globalMuted = false;
     let progressInterval = null; 
 
-    // 🚀 DYNAMIC URL REDIRECTION: Check if user arrived via a shared link
     let sharedVidId = null;
     const urlParams = new URLSearchParams(window.location.search);
     const rawUrlParam = urlParams.get('v') || urlParams.get('url');
     
     if (rawUrlParam) {
         if (rawUrlParam.length === 11) {
-            sharedVidId = rawUrlParam; // Clean ID provided
+            sharedVidId = rawUrlParam; 
         } else {
             const match = rawUrlParam.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);
             if (match) sharedVidId = match[1];
         }
     }
 
-    // 🌐 NEW: FETCH REAL METADATA FOR DYNAMIC LINK VIA PIPED/NOEMBED
     async function fetchRealVideoData(vid) {
         try {
-            // First try advanced scrape (Piped API for full description, likes, views)
             const pipedRes = await fetch(`https://pipedapi.kavin.rocks/streams/${vid}`);
             if (pipedRes.ok) {
                 const data = await pipedRes.json();
@@ -577,18 +548,12 @@
         } catch (e) {}
 
         try {
-            // Fallback to Noembed
             const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
             const data = await res.json();
             return {
-                videoId: vid,
-                title: data.title || "Shared Video",
-                author: data.author_name || "Goorac Creator",
-                category: "shared",
-                likes: Math.floor(Math.random() * 50000) + 1000,
-                views: Math.floor(Math.random() * 500000) + 10000,
-                imgUrl: `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`,
-                description: ""
+                videoId: vid, title: data.title || "Shared Video", author: data.author_name || "Goorac Creator",
+                category: "shared", likes: Math.floor(Math.random() * 50000) + 1000, views: Math.floor(Math.random() * 500000) + 10000,
+                imgUrl: `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`, description: ""
             };
         } catch (e) {
             return {
@@ -598,7 +563,6 @@
         }
     }
 
-    // Cache Loader Engine
     (async function initializeAppQueue() {
         const uniqueCache = [];
         const seen = new Set();
@@ -610,7 +574,6 @@
             viewedVideoIds.add(sharedVidId);
             window.history.replaceState({}, document.title, window.location.pathname);
             
-            // Set the cinematic background dynamically for the shared video
             const bgImg = document.getElementById('start-bg-img');
             if (bgImg) bgImg.src = realData.imgUrl;
         }
@@ -621,7 +584,6 @@
                 const parsed = JSON.parse(cached);
                 if (parsed.length > 0) {
                     parsed.forEach(b => {
-                        // 🛡️ STRICT DEDUPLICATION: Verify against history before loading cache
                         if(b && b.videoId && !seen.has(b.videoId) && !bitesHistory.includes(b.videoId)) {
                             seen.add(b.videoId);
                             uniqueCache.push(b);
@@ -634,7 +596,6 @@
         
         bitesQueue = uniqueCache; 
         
-        // Ensure background image exists if not shared link
         if (!sharedVidId && bitesQueue.length > 0) {
             const bgImg = document.getElementById('start-bg-img');
             if (bgImg) bgImg.src = bitesQueue[0].imgUrl;
@@ -654,7 +615,7 @@
         if (!videoId || isSearchPlaying) return; 
         if (!bitesHistory.includes(videoId)) {
             bitesHistory.push(videoId);
-            if (bitesHistory.length > 3000) bitesHistory.shift(); // Keep last 3000 videos explicitly blocked
+            if (bitesHistory.length > 3000) bitesHistory.shift(); 
             localStorage.setItem('goorac_bites_history', JSON.stringify(bitesHistory));
         }
     }
@@ -665,9 +626,6 @@
         localStorage.setItem('goorac_bites_queue', JSON.stringify(cacheSlice.slice(0, 20))); 
     }
 
-    // ==========================================================================
-    // BACKGROUND APP SUPPORT & FIRESTORE BATCH SYNC TRIGGER
-    // ==========================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             if (playerA && typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
@@ -679,9 +637,6 @@
         }
     });
 
-    // ==========================================================================
-    // YOUTUBE IFRAME API DYNAMIC INJECTION
-    // ==========================================================================
     window.onYouTubeIframeAPIReady = function() {
         const playerVars = { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'modestbranding': 1, 'playsinline': 1, 'mute': 0 };
         
@@ -750,7 +705,6 @@
             slide.className = 'bite-slide';
             slide.dataset.index = i;
             
-            // ADVANCED UI Event Handlers (Long Press / Tap / Double Tap)
             slide.onpointerdown = (e) => handlePointerDown(e);
             slide.onpointerup = (e) => handlePointerUp(e, i);
             slide.onpointerleave = (e) => handlePointerLeave(e);
@@ -822,7 +776,6 @@
             const p = activePlayer === 'A' ? playerA : playerB;
             if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
             
-            // Hide UI dynamically during long press
             const currentSlide = document.querySelector(`.bite-slide[data-index="${currentIndex}"]`);
             if(currentSlide) currentSlide.querySelector('.bite-ui-layer').style.opacity = '0';
         }, 250); 
@@ -837,18 +790,16 @@
 
         const now = Date.now();
         if (!isLongPress && now - lastTapTime < 300) {
-            // 🔥 DOUBLE TAP DETECTED
             triggerDoubleTapAnimation(event.clientX, event.clientY, currentSlide);
             handleLike(new Event('click'), index);
-            lastTapTime = 0; // Reset
+            lastTapTime = 0; 
             return;
         }
         lastTapTime = now;
 
         if (isLongPress) {
-            playActivePlayer(); // Release resumes play
+            playActivePlayer(); 
         } else {
-            // Single Tap -> Mute/Unmute
             setTimeout(() => {
                 if (Date.now() - lastTapTime > 250) toggleMute();
             }, 300);
@@ -872,7 +823,7 @@
         heart.style.left = `${x}px`;
         heart.style.top = `${y}px`;
         slideEl.appendChild(heart);
-        setTimeout(() => heart.remove(), 1000); // Cleanup DOM
+        setTimeout(() => heart.remove(), 1000); 
     }
 
     function toggleMute() {
@@ -898,9 +849,6 @@
         setTimeout(() => icon.classList.remove('show'), 600);
     }
 
-    // ==========================================================================
-    // REAL-TIME PROGRESS BAR
-    // ==========================================================================
     function startProgressBar(p) {
         clearInterval(progressInterval);
         progressInterval = setInterval(() => {
@@ -920,14 +868,13 @@
     }
 
     // ==========================================================================
-    // SCROLL-SYNC ENGINE
+    // SCROLL-SYNC ENGINE (🔥 GPU ACCELERATED TRANSFORMS 🔥)
     // ==========================================================================
     function syncPlayersToScrollPosition() {
         const viewport = document.getElementById('bites-viewport');
         if (!viewport || playersReady < 2) return;
         
-        const firstSlide = document.querySelector('.bite-slide');
-        const slideHeight = firstSlide ? firstSlide.clientHeight : viewport.clientHeight;
+        const slideHeight = viewport.clientHeight;
         const scrollPosition = viewport.scrollTop;
         const actualIndex = Math.round(scrollPosition / slideHeight) || 0;
 
@@ -955,12 +902,10 @@
 
         const now = Date.now();
         const viewport = document.getElementById('bites-viewport');
-        
-        const firstSlide = document.querySelector('.bite-slide');
-        const slideHeight = firstSlide ? firstSlide.clientHeight : viewport.clientHeight;
+        const slideHeight = viewport.clientHeight;
         const scrollPosition = viewport.scrollTop;
 
-        // DYNAMIC PLAYER LEAPFROG TO SWIPE WITH SLIDES
+        // 🔥 DYNAMIC PLAYER GPU LEAPFROG TO SWIPE WITH SLIDES 🔥
         const inactiveId = activePlayer === 'A' ? 'player-container-b' : 'player-container-a';
         const inactiveEl = document.getElementById(inactiveId);
         const inactivePlayerObj = activePlayer === 'A' ? playerB : playerA;
@@ -968,7 +913,7 @@
         if (scrollPosition < currentIndex * slideHeight - 10) {
             if (lastScrollDir !== 'up') {
                 lastScrollDir = 'up';
-                inactiveEl.style.top = ((currentIndex - 1) * slideHeight) + 'px';
+                inactiveEl.style.transform = `translateY(${(currentIndex - 1) * slideHeight}px)`;
                 const prevVid = bitesQueue[currentIndex - 1]?.videoId;
                 if (prevVid) {
                     inactivePlayerObj.cueVideoById(prevVid);
@@ -978,7 +923,7 @@
         } else if (scrollPosition > currentIndex * slideHeight + 10) {
             if (lastScrollDir !== 'down') {
                 lastScrollDir = 'down';
-                inactiveEl.style.top = ((currentIndex + 1) * slideHeight) + 'px';
+                inactiveEl.style.transform = `translateY(${(currentIndex + 1) * slideHeight}px)`;
                 const nextVid = bitesQueue[currentIndex + 1]?.videoId;
                 if (nextVid) {
                     inactivePlayerObj.cueVideoById(nextVid);
@@ -1009,7 +954,8 @@
             const timeSpentMs = now - currentVideoStartTime;
             const previousBite = bitesQueue[currentIndex];
             
-            processEngagementAlgorithm(previousBite, timeSpentMs);
+            // Push heavy NLP math to background worker
+            setTimeout(() => { processEngagementAlgorithm(previousBite, timeSpentMs); }, 50);
 
             currentIndex = newIndex;
             if(bitesQueue[currentIndex]) markAsViewed(bitesQueue[currentIndex].videoId); 
@@ -1023,7 +969,6 @@
             }
         }
 
-        // Rapid scroll auto-play recovery lock
         clearTimeout(scrollStopTimer);
         scrollStopTimer = setTimeout(() => {
             const finalIndex = Math.round(viewport.scrollTop / slideHeight);
@@ -1034,7 +979,7 @@
     }
 
     // ==========================================================================
-    // 🧠 THE BATCHED DEEP-LEARNING ALGORITHM (USING INLINE VADER NLP)
+    // 🧠 THE BATCHED DEEP-LEARNING ALGORITHM 
     // ==========================================================================
     let pendingInterestUpdates = {};
     let interestSyncTimer = null;
@@ -1073,7 +1018,6 @@
         let scoreChange = 0;
         let shouldExtractTags = false;
 
-        // Neural Engagement Time Processing
         if (timeSpentMs < 2500) {
             scoreChange = -3;
         } else if (timeSpentMs >= 7000) { 
@@ -1083,12 +1027,9 @@
             scoreChange = 1;
         }
 
-        // Analyze sentiment of the skipped/watched video to adjust the baseline score
         const nlpResult = AdvancedNeuralAnalyzer.analyze(bite.title + " " + bite.author + " " + (bite.description || ""));
         
-        // If they watched a highly positive video, boost it more.
         if (shouldExtractTags && nlpResult.sentiment > 1) scoreChange += 2;
-        // If they skipped a highly negative video, drop the category faster.
         if (timeSpentMs < 2500 && nlpResult.sentiment < -1) scoreChange -= 2;
 
         if(scoreChange !== 0) queueInterestUpdate(bite.category, scoreChange);
@@ -1101,18 +1042,19 @@
     function trackExplicitAction(category, action, biteTitle = "", biteAuthor = "") {
         if (!myUid || !category || isSearchPlaying) return;
         
-        const nlpResult = AdvancedNeuralAnalyzer.analyze(biteTitle + " " + biteAuthor);
-        
-        let scoreChange = 0;
-        let tags = nlpResult.topics;
+        setTimeout(() => {
+            const nlpResult = AdvancedNeuralAnalyzer.analyze(biteTitle + " " + biteAuthor);
+            let scoreChange = 0;
+            let tags = nlpResult.topics;
 
-        if (action === 'liked') { scoreChange = 15; tags = tags.slice(0, 4); } 
-        else if (action === 'searched') { scoreChange = 20; }
-        else if (action === 'rewatched') { scoreChange = 8; tags = tags.slice(0, 4); }
-        else if (action === 'shared') { scoreChange = 25; tags = tags.slice(0, 6); }
+            if (action === 'liked') { scoreChange = 15; tags = tags.slice(0, 4); } 
+            else if (action === 'searched') { scoreChange = 20; }
+            else if (action === 'rewatched') { scoreChange = 8; tags = tags.slice(0, 4); }
+            else if (action === 'shared') { scoreChange = 25; tags = tags.slice(0, 6); }
 
-        if(scoreChange !== 0) queueInterestUpdate(category, scoreChange);
-        tags.forEach(tag => queueInterestUpdate(tag, 5));
+            if(scoreChange !== 0) queueInterestUpdate(category, scoreChange);
+            tags.forEach(tag => queueInterestUpdate(tag, 5));
+        }, 50); // Background it to prevent UI lag
     }
 
     // ==========================================================================
@@ -1128,21 +1070,22 @@
         if (typeof playerA.pauseVideo === 'function') playerA.pauseVideo();
         if (typeof playerB.pauseVideo === 'function') playerB.pauseVideo();
 
-        stopProgressBar(); // Reset bar on swipe
+        stopProgressBar();
 
-        // Reset Cover opacity so the next video stays hidden while buffering
         const allCovers = document.querySelectorAll('.video-cover');
-        allCovers.forEach(c => c.style.opacity = '1'); 
+        allCovers.forEach(c => {
+            if (c.id !== `cover-${currentIndex}`) c.style.opacity = '1'; 
+        });
 
-        const firstSlide = document.querySelector('.bite-slide');
-        const h = firstSlide ? firstSlide.clientHeight : 0;
+        const viewport = document.getElementById('bites-viewport');
+        const h = viewport ? viewport.clientHeight : 0;
 
         if (isEven) {
             activePlayer = 'A';
             document.getElementById('player-container-b').classList.remove('active');
             document.getElementById('player-container-a').classList.add('active');
             
-            document.getElementById('player-container-a').style.top = (currentIndex * h) + 'px';
+            document.getElementById('player-container-a').style.transform = `translateY(${currentIndex * h}px)`;
             
             if (currentVid) {
                 if (currentLoadedA !== currentVid) {
@@ -1151,7 +1094,7 @@
                 } else if (hasStarted && !isLongPress) playerA.playVideo();
             }
             if (nextVid && currentLoadedB !== nextVid) {
-                document.getElementById('player-container-b').style.top = ((currentIndex + 1) * h) + 'px';
+                document.getElementById('player-container-b').style.transform = `translateY(${((currentIndex + 1) * h)}px)`;
                 playerB.cueVideoById(nextVid);
                 currentLoadedB = nextVid;
             }
@@ -1160,7 +1103,7 @@
             document.getElementById('player-container-a').classList.remove('active');
             document.getElementById('player-container-b').classList.add('active');
             
-            document.getElementById('player-container-b').style.top = (currentIndex * h) + 'px';
+            document.getElementById('player-container-b').style.transform = `translateY(${currentIndex * h}px)`;
             
             if (currentVid) {
                 if (currentLoadedB !== currentVid) {
@@ -1169,7 +1112,7 @@
                 } else if (hasStarted && !isLongPress) playerB.playVideo();
             }
             if (nextVid && currentLoadedA !== nextVid) {
-                document.getElementById('player-container-a').style.top = ((currentIndex + 1) * h) + 'px';
+                document.getElementById('player-container-a').style.transform = `translateY(${((currentIndex + 1) * h)}px)`;
                 playerA.cueVideoById(nextVid);
                 currentLoadedA = nextVid;
             }
@@ -1197,15 +1140,15 @@
                 if (typeof p.getPlayerState === 'function' && p.getPlayerState() !== 1 && !isLongPress) {
                     p.playVideo();
                 }
-            }, 250);
+            }, 300);
         }
     }
 
-    // 🚀 THE EXACT MOMENT YT STARTS PLAYING, HIDE THE COVER & START BAR!
+    // 🚀 HIDE COVER SEAMLESSLY AND FORCE LOOP
     function onPlayerStateChange(event) {
         if (event.data === YT.PlayerState.PLAYING) {
             const cover = document.getElementById(`cover-${currentIndex}`);
-            if (cover) cover.style.opacity = '0'; // Disappear seamlessly!
+            if (cover) cover.style.opacity = '0'; 
             startProgressBar(event.target);
         } else if (event.data !== YT.PlayerState.PLAYING) {
             stopProgressBar();
@@ -1213,8 +1156,8 @@
 
         // 🚀 FLAWLESS HARD VIDEO LOOPING ENFORCEMENT
         if (event.data === YT.PlayerState.ENDED) {
-            event.target.seekTo(0);  // Mathematically force playback to second 0
-            event.target.playVideo(); // Restart it instantly
+            event.target.seekTo(0);  
+            event.target.playVideo(); 
             if(bitesQueue[currentIndex]) {
                 trackExplicitAction(bitesQueue[currentIndex].category, 'rewatched', bitesQueue[currentIndex].title, bitesQueue[currentIndex].author);
             }
@@ -1222,7 +1165,7 @@
     }
 
     // ==========================================================================
-    // BULLETPROOF LINEAR FETCHING ENGINE (STRICT FILTERING)
+    // BULLETPROOF LINEAR FETCHING ENGINE 
     // ==========================================================================
     async function fetchMoreBites(overrideTopic = null) {
         if (isFetching) return;
@@ -1259,9 +1202,7 @@
                 if (data.success && data.bites && data.bites.length > 0) {
                     const uniqueNewBites = [];
                     data.bites.forEach(b => {
-                        // 🛡️ STRICT DEDUPLICATION: Check history directly before accepting
                         if (viewedVideoIds.has(b.videoId) || bitesHistory.includes(b.videoId) || bitesQueue.some(q => q.videoId === b.videoId)) return;
-                        
                         viewedVideoIds.add(b.videoId);
                         uniqueNewBites.push(b);
                     });
@@ -1292,7 +1233,7 @@
         isFetching = false; 
     }
 
-    // 🚀 DYNAMIC SHARING ENGINE WITH SHARE-BITES COMPONENT
+    // 🚀 DYNAMIC SHARING ENGINE 
     window.shareBite = function(event, index) {
         event.stopPropagation();
         const bite = bitesQueue[index];
@@ -1304,7 +1245,7 @@
         
         if (shareModal && typeof shareModal.open === 'function') {
             if (navBar) navBar.style.display = 'none';
-            // NEW: Pause video when share modal opens
+            
             const p = activePlayer === 'A' ? playerA : playerB;
             if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
             
@@ -1312,7 +1253,6 @@
                 const origClose = shareModal.close;
                 shareModal.close = function(triggerBack) {
                     if (navBar) navBar.style.display = 'block';
-                    // NEW: Resume video when share modal closes
                     if (!isSearchPlaying && hasStarted) {
                         const activeP = activePlayer === 'A' ? playerA : playerB;
                         if (activeP && typeof activeP.playVideo === 'function') activeP.playVideo();
@@ -1344,7 +1284,7 @@
     }
 
     // ==========================================================================
-    // INSTAGRAM-STYLE DISCOVER MODAL
+    // 🔥 FIX: FLAWLESS INSTAGRAM-STYLE DISCOVER MODAL
     // ==========================================================================
     window.openDiscoverModal = function() {
         document.getElementById('discover-modal').classList.add('active');
@@ -1353,7 +1293,6 @@
         const grid = document.getElementById('search-grid');
         if(grid.children.length <= 1) executeSearch("tamil");
         
-        // NEW: Pause video when search modal is opened
         const p = activePlayer === 'A' ? playerA : playerB;
         if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
     }
@@ -1362,7 +1301,6 @@
         document.getElementById('discover-modal').classList.remove('active');
         if(shouldGoBack && window.location.hash === "#discover") history.back();
         
-        // NEW: Resume video when search modal is closed
         if (!isSearchPlaying && hasStarted) {
             const p = activePlayer === 'A' ? playerA : playerB;
             if (p && typeof p.playVideo === 'function') p.playVideo();
@@ -1379,32 +1317,26 @@
             currentIndex = backupIndex;
             
             const viewport = document.getElementById('bites-viewport');
-            
-            document.getElementById('player-container-a').style.top = '0px';
-            document.getElementById('player-container-b').style.top = '0px';
-
             const playerA_el = document.getElementById('player-container-a');
             const playerB_el = document.getElementById('player-container-b');
             
-            playerA_el.remove();
-            playerB_el.remove();
+            // 🔥 FIX: DO NOT REMOVE IFRAMES. JUST CLEAR THE SLIDES!
+            document.querySelectorAll('.bite-slide').forEach(el => el.remove());
+            const loader = document.getElementById('infinite-loader-slide');
+            if (loader) loader.remove();
             
-            viewport.innerHTML = '';
-            
-            viewport.appendChild(playerA_el);
-            viewport.appendChild(playerB_el);
+            playerA_el.style.transform = 'translateY(0px)';
+            playerB_el.style.transform = 'translateY(0px)';
             
             renderDOMSlides();
             
-            const firstSlide = document.querySelector('.bite-slide');
-            const slideHeight = firstSlide ? firstSlide.clientHeight : viewport.clientHeight;
+            const slideHeight = viewport.clientHeight;
             viewport.scrollTop = currentIndex * slideHeight;
             currentVideoStartTime = Date.now(); 
             
             syncPlayersToScrollPosition(); 
             document.getElementById('discover-modal').classList.add('active');
             
-            // NEW: Pause video since we are back in the search modal
             const p = activePlayer === 'A' ? playerA : playerB;
             if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
             
@@ -1429,12 +1361,13 @@
         const grid = document.getElementById('search-grid');
         
         let skelHtml = '';
-        // NEW: Added inline styles to guarantee skeleton rendering
-        for(let i=0; i<12; i++) { skelHtml += `<div class="skel-grid-item skel-shimmer" style="width:100%; min-height:150px; aspect-ratio:9/16; background:#1a1a1a; border-radius:4px;"></div>`; }
+        for(let i=0; i<18; i++) { 
+            skelHtml += `<div class="skel-grid-item skel-shimmer" style="width:100%; min-height:150px; aspect-ratio:9/16; background:#1a1a1a; border-radius:4px;"></div>`; 
+        }
         grid.innerHTML = skelHtml;
 
         try {
-            // NEW: Added timestamp to bypass cache and fetch new searches
+            // 🔥 FIX: Cache Buster Timestamp for fresh search results
             const res = await fetch(`https://pish-uigm.onrender.com/api/reels?topic=${encodeURIComponent(query)}&search=true&t=${Date.now()}`);
             const data = await res.json();
             
@@ -1466,38 +1399,4 @@
 
         backupQueue = [...bitesQueue];
         backupIndex = currentIndex;
-        isSearchPlaying = true;
-
-        history.pushState({ modal: 'search-playing' }, "", "#search-playing");
-        document.getElementById('discover-modal').classList.remove('active');
-        
-        const otherResults = allResults.filter(b => b.videoId !== clickedBite.videoId);
-        bitesQueue = [clickedBite, ...otherResults];
-        
-        const viewport = document.getElementById('bites-viewport');
-        
-        const playerA_el = document.getElementById('player-container-a');
-        const playerB_el = document.getElementById('player-container-b');
-        playerA_el.style.top = '0px';
-        playerB_el.style.top = '0px';
-        
-        playerA_el.remove();
-        playerB_el.remove();
-        
-        viewport.innerHTML = '';
-        viewport.appendChild(playerA_el);
-        viewport.appendChild(playerB_el);
-        
-        currentIndex = 0;
-        viewport.scrollTop = 0;
-        viewedVideoIds.clear();
-
-        renderDOMSlides();
-        currentVideoStartTime = Date.now(); 
-        
-        syncPlayersToScrollPosition(); 
-    }
-
-</script>
-</body>
-</html>
+        isSearchPlaying
