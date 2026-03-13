@@ -10,6 +10,7 @@ class ShareBites extends HTMLElement {
         this.selectedChats = new Set();
         this.currentBite = null;
         this.userCache = JSON.parse(localStorage.getItem('goorac_u_cache')) || {};
+        this.searchTimeout = null; // Added for debouncing global search
 
         this.shadowRoot.innerHTML = `
             <style>
@@ -288,15 +289,17 @@ class ShareBites extends HTMLElement {
                     rawChats.push(chat);
                 } else {
                     const otherUid = chat.participants.find(id => id !== this.myUid);
-                    let otherUser = this.userCache[otherUid];
+                    let otherUser = null;
                     
-                    if (!otherUser) {
-                        const uSnap = await this.db.collection("users").doc(otherUid).get();
-                        if (uSnap.exists) {
-                            otherUser = uSnap.data();
-                            this.userCache[otherUid] = otherUser;
-                        }
+                    // Force fetching from DB to ensure real-time profile picture accuracy
+                    const uSnap = await this.db.collection("users").doc(otherUid).get();
+                    if (uSnap.exists) {
+                        otherUser = uSnap.data();
+                        this.userCache[otherUid] = otherUser; // Update cache with fresh data
+                    } else if (this.userCache[otherUid]) {
+                        otherUser = this.userCache[otherUid]; // Fallback to cache
                     }
+                    
                     if (otherUser) {
                         chat.displayName = otherUser.name || otherUser.username;
                         chat.displayPic = otherUser.photoURL || "https://via.placeholder.com/150";
@@ -311,13 +314,15 @@ class ShareBites extends HTMLElement {
                 const missingUids = this.mutualUIDs.filter(uid => !addedUids.has(uid));
                 
                 for (let uid of missingUids) {
-                    let userObj = this.userCache[uid];
-                    if (!userObj) {
-                        const uSnap = await this.db.collection("users").doc(uid).get();
-                        if (uSnap.exists) {
-                            userObj = uSnap.data();
-                            this.userCache[uid] = userObj;
-                        }
+                    let userObj = null;
+                    
+                    // Force fetching from DB for real-time accuracy for mutuals too
+                    const uSnap = await this.db.collection("users").doc(uid).get();
+                    if (uSnap.exists) {
+                        userObj = uSnap.data();
+                        this.userCache[uid] = userObj; // Update cache with fresh data
+                    } else if (this.userCache[uid]) {
+                        userObj = this.userCache[uid]; // Fallback
                     }
                     
                     if (userObj) {
@@ -335,6 +340,9 @@ class ShareBites extends HTMLElement {
                     }
                 }
             }
+
+            // Save the newly refreshed real-time profile pics to localStorage cache
+            localStorage.setItem('goorac_u_cache', JSON.stringify(this.userCache));
 
             // Sort by share frequency and recent timestamp
             const shareFreq = JSON.parse(localStorage.getItem('goorac_share_freq') || '{}');
@@ -394,10 +402,65 @@ class ShareBites extends HTMLElement {
         });
     }
 
-    filterChats(query) {
-        const q = query.toLowerCase();
-        const filtered = this.chatsData.filter(c => c.displayName.toLowerCase().includes(q));
+    async filterChats(query) {
+        const q = query.toLowerCase().trim();
+        
+        // 1. Immediately filter and show local results (Zero extra reads)
+        let filtered = this.chatsData.filter(c => c.displayName.toLowerCase().includes(q));
         this.renderGrid(filtered);
+
+        // If the search bar is cleared, just show the local grid and stop.
+        if (!q) return;
+
+        // 2. Perform a debounced Global Search to find users outside existing chats/mutuals
+        if (this.searchTimeout) clearTimeout(this.searchTimeout);
+        
+        // Wait 400ms after user stops typing to trigger DB read
+        this.searchTimeout = setTimeout(async () => {
+            try {
+                // Query DB. Limited to 10 to drastically reduce read counts
+                const snap = await this.db.collection('users')
+                    .where('username', '>=', q)
+                    .where('username', '<=', q + '\uf8ff')
+                    .limit(10)
+                    .get();
+                
+                let globalResults = [];
+                
+                snap.forEach(doc => {
+                    if (doc.id === this.myUid) return; // Don't show yourself
+                    let u = doc.data();
+                    
+                    // Prevent showing duplicates if they were already in the local "filtered" array
+                    const alreadyShown = filtered.find(c => c.participants && c.participants.includes(doc.id));
+                    
+                    if (!alreadyShown) {
+                        const generatedChatId = this.myUid < doc.id ? `${this.myUid}_${doc.id}` : `${doc.id}_${this.myUid}`;
+                        globalResults.push({
+                            id: generatedChatId,
+                            isGroup: false,
+                            displayName: u.name || u.username || "User",
+                            displayPic: u.photoURL || "https://via.placeholder.com/150",
+                            participants: [this.myUid, doc.id],
+                            lastTimestamp: { toMillis: () => 0 } 
+                        });
+                        
+                        // Update cache with fresh global search data
+                        this.userCache[doc.id] = u;
+                    }
+                });
+
+                // Merge and render if global results were found
+                if (globalResults.length > 0) {
+                    filtered = [...filtered, ...globalResults];
+                    this.renderGrid(filtered);
+                    localStorage.setItem('goorac_u_cache', JSON.stringify(this.userCache));
+                }
+
+            } catch (error) {
+                console.error("Global search error:", error);
+            }
+        }, 400); 
     }
 
     updateSendButton() {
@@ -427,7 +490,8 @@ class ShareBites extends HTMLElement {
         const shareFreq = JSON.parse(localStorage.getItem('goorac_share_freq') || '{}');
 
         const sendPromises = Array.from(this.selectedChats).map(async (chatId) => {
-            const chat = this.chatsData.find(c => c.id === chatId);
+            const chat = this.chatsData.find(c => c.id === chatId) || { id: chatId, participants: chatId.split('_') }; 
+            // Note: Added fallback for global searched users who aren't in this.chatsData yet
             if (!chat) return;
 
             shareFreq[chatId] = (shareFreq[chatId] || 0) + 1;
@@ -452,7 +516,7 @@ class ShareBites extends HTMLElement {
                 if (uid !== this.myUid) unreadUpdates[`unreadCount.${uid}`] = firebase.firestore.FieldValue.increment(1);
             });
 
-            // UPDATED: Using .set() with { merge: true } so we don't error out if chat document is brand new!
+            // Using .set() with { merge: true } so we don't error out if chat document is brand new!
             await this.db.collection("chats").doc(chat.id).set({
                 lastMessage: "🎬 Shared a Bite",
                 lastSender: this.myUid,
