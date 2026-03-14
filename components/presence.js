@@ -4,117 +4,117 @@
 // This prevents "Firebase App named '[DEFAULT]' already exists" errors
 
 let app, auth, firestore, rdb;
-
-// 2. Initialize using the global core function (from config.js)
-if (typeof window.initFirebaseCore === 'function') {
-    window.initFirebaseCore();
-    // Use the global instances created by config.js
-    app = firebase.app(); // Get the default app
-    auth = firebase.auth();
-    firestore = firebase.firestore();
-    rdb = firebase.database();
-} else {
-    // Fallback if config.js wasn't loaded (Safety net)
-    // We use the compat libraries here to match the rest of your app's style
-    if (!firebase.apps.length) {
-        firebase.initializeApp({
-            apiKey: "AIzaSyCFzAEHC5KLiO2DEkVtoTlFn9zeCQrwImE",
-            authDomain: "goorac-c3b59.firebaseapp.com",
-            projectId: "goorac-c3b59",
-            storageBucket: "goorac-c3b59.firebasestorage.app",
-            messagingSenderId: "746746595332",
-            appId: "1:746746595332:web:d3f8527d27fe8ca2530d51",
-            measurementId: "G-M46FEVRYSS"
-        });
-    }
-    app = firebase.app();
-    auth = firebase.auth();
-    firestore = firebase.firestore();
-    rdb = firebase.database();
-}
-
 let presenceTimer;
 
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        const uid = user.uid;
-        const userDocRef = firestore.collection("users").doc(uid);
-        const statusRef = rdb.ref('/status/' + uid);
-        const connectedRef = rdb.ref('.info/connected');
-
-        const offlineState = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
-        const onlineState = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
-
-        userDocRef.onSnapshot((docSnap) => {
-            if (docSnap.exists) {
-                const data = docSnap.data();
-                
-                // --- 1. SUSPENSION CHECK ---
-                if (data.suspended === true) {
-                    renderLockoutScreen();
-                    statusRef.set(offlineState);
-                    return; 
-                } else {
-                    const existingLock = document.getElementById('nexus-lockout');
-                    if (existingLock) {
-                        existingLock.remove();
-                        document.body.style.overflow = 'auto';
-                    }
-                }
-
-                // --- 1.5. SERVER ERROR CHECK ---
-                if (data.serverError === true) {
-                    renderServerErrorScreen();
-                    statusRef.set(offlineState);
-                    return; 
-                } else {
-                    const existingCrash = document.getElementById('quantum-server-crash');
-                    if (existingCrash) {
-                        existingCrash.remove();
-                        document.body.style.overflow = 'auto';
-                    }
-                }
-
-                // --- 2. INITIALIZE PREFERENCE ---
-                if (data.showActivityStatus === undefined) {
-                    userDocRef.update({ showActivityStatus: true });
-                }
-
-                const isActivityEnabled = data.showActivityStatus !== false;
-
-                // --- 3. DYNAMIC PRESENCE ENGINE ---
-                // FIX: Remove old listeners to prevent multiple timers running at once
-                connectedRef.off(); 
-
-                connectedRef.on('value', (snapshot) => {
-                    if (snapshot.val() === false) return;
-
-                    // ALWAYS clear existing timers first
-                    clearTimeout(presenceTimer);
-
-                    if (!isActivityEnabled) {
-                        // FIX: If toggle is OFF, cancel all background hooks and force offline
-                        statusRef.onDisconnect().cancel(); 
-                        statusRef.set(offlineState);
-                        return;
-                    }
-
-                    // --- 4. ZERO-FLICKER BUFFER ---
-                    // "If I lose connection, tell the server I'm offline"
-                    statusRef.onDisconnect().set(offlineState).then(() => {
-                        // "If I'm still connected after 4 seconds, tell the server I'm online"
-                        presenceTimer = setTimeout(() => {
-                            // Final check before pushing online status
-                            if (isActivityEnabled) {
-                                statusRef.set(onlineState);
-                            }
-                        }, 4000);
-                    });
-                });
-            }
-        });
+// 2. Initialize using the global core function (from config.js in root folder)
+function checkAndInitFirebase() {
+    if (typeof window.initFirebaseCore === 'function' || (typeof firebase !== 'undefined' && window.firebaseConfig)) {
+        if (typeof window.initFirebaseCore === 'function') {
+            window.initFirebaseCore();
+        } else if (!firebase.apps.length && window.firebaseConfig) {
+            firebase.initializeApp(window.firebaseConfig);
+        }
+        
+        // Use the global instances created by config.js
+        app = firebase.app(); // Get the default app
+        auth = firebase.auth();
+        firestore = firebase.firestore();
+        rdb = firebase.database();
+        
+        // Firebase is ready, start the presence listener
+        startPresenceEngine();
+    } else {
+        // Fallback if config.js wasn't loaded yet (Safety net for load order change)
+        // We use a timeout retry loop here to match the rest of your app's style
+        setTimeout(checkAndInitFirebase, 50);
     }
-});
+}
+
+function startPresenceEngine() {
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            const uid = user.uid;
+            const userDocRef = firestore.collection("users").doc(uid);
+            const statusRef = rdb.ref('/status/' + uid);
+            const connectedRef = rdb.ref('.info/connected');
+
+            const offlineState = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
+            const onlineState = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
+
+            userDocRef.onSnapshot((docSnap) => {
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    
+                    // --- 1. SUSPENSION CHECK ---
+                    if (data.suspended === true) {
+                        renderLockoutScreen();
+                        statusRef.set(offlineState);
+                        return; 
+                    } else {
+                        const existingLock = document.getElementById('nexus-lockout');
+                        if (existingLock) {
+                            existingLock.remove();
+                            document.body.style.overflow = 'auto';
+                        }
+                    }
+
+                    // --- 1.5. SERVER ERROR CHECK ---
+                    if (data.serverError === true) {
+                        renderServerErrorScreen();
+                        statusRef.set(offlineState);
+                        return; 
+                    } else {
+                        const existingCrash = document.getElementById('quantum-server-crash');
+                        if (existingCrash) {
+                            existingCrash.remove();
+                            document.body.style.overflow = 'auto';
+                        }
+                    }
+
+                    // --- 2. INITIALIZE PREFERENCE ---
+                    if (data.showActivityStatus === undefined) {
+                        userDocRef.update({ showActivityStatus: true });
+                    }
+
+                    const isActivityEnabled = data.showActivityStatus !== false;
+
+                    // --- 3. DYNAMIC PRESENCE ENGINE ---
+                    // FIX: Remove old listeners to prevent multiple timers running at once
+                    connectedRef.off(); 
+
+                    connectedRef.on('value', (snapshot) => {
+                        if (snapshot.val() === false) return;
+
+                        // ALWAYS clear existing timers first
+                        clearTimeout(presenceTimer);
+
+                        if (!isActivityEnabled) {
+                            // FIX: If toggle is OFF, cancel all background hooks and force offline
+                            statusRef.onDisconnect().cancel(); 
+                            statusRef.set(offlineState);
+                            return;
+                        }
+
+                        // --- 4. ZERO-FLICKER BUFFER ---
+                        // "If I lose connection, tell the server I'm offline"
+                        statusRef.onDisconnect().set(offlineState).then(() => {
+                            // "If I'm still connected after 4 seconds, tell the server I'm online"
+                            presenceTimer = setTimeout(() => {
+                                // Final check before pushing online status
+                                if (isActivityEnabled) {
+                                    statusRef.set(onlineState);
+                                }
+                            }, 4000);
+                        });
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Start the check loop
+checkAndInitFirebase();
 
 // --- UI RENDERER (Preserved exactly as requested) ---
 function renderLockoutScreen() {
