@@ -1,25 +1,24 @@
 <div align="center">
-  <img src="images/icon.png" alt="Goorac Quantum Icon" width="150"/>
+  <img src="images/icon.png" alt="Goorac Quantum Logo" width="150"/>
   
   # Goorac Quantum
-  **Next-Generation Quantum Computing Infrastructure**
+  **Next-Generation Messaging and Social Ecosystem**
 </div>
 
 ---
 
 ## 🌐 Overview
 
-**Goorac Quantum** is an advanced, proprietary quantum computing platform developed by Goorac Corporation. Designed for enterprise-scale computational problem solving, it integrates cutting-edge quantum algorithms with highly secure infrastructure. 
+**Goorac Quantum** is a proprietary, highly scalable messaging and social media platform developed by Goorac Corporation. Engineered for seamless communication and rich social interaction, Quantum integrates state-of-the-art backend architecture with a built-in intelligent AI assistant, delivering a fast, secure, and modern digital experience.
 
 ## 🏢 Corporate Leadership
 
-**Goorac Corporation** is driven by a mission to revolutionize computing through quantum mechanics and advanced engineering. 
+**Goorac Corporation** is dedicated to building robust, innovative software solutions that redefine digital communication and user connectivity. 
 
-* **Chief Executive Officer (CEO):** [Insert CEO Name]
-* **Headquarters:** [Insert Location/City]
-* **Mission:** To provide unparalleled quantum computational power while maintaining the highest standards of corporate security and data integrity.
+* **Chief Executive Officer:** Siva Manihandan
+* **Organization:** Goorac Corporation
 
-Under the leadership of our CEO and executive board, Goorac Corporation remains at the forefront of the quantum technology sector, partnering with elite enterprise clients globally.
+Under executive leadership, Goorac Corporation leverages advanced technologies to ensure Quantum remains a highly performant, secure, and industry-leading application.
 
 ---
 
@@ -27,27 +26,19 @@ Under the leadership of our CEO and executive board, Goorac Corporation remains 
 
 **STRICTLY CONFIDENTIAL AND PROPRIETARY**
 
-This repository, including all source code, documentation, algorithms, and related assets, is the sole and exclusive property of **Goorac Corporation**. 
+This repository, including all source code, architectural documentation, algorithms, and UI/UX assets, is the sole and exclusive intellectual property of **Goorac Corporation**. 
 
-* **NOT OPEN SOURCE:** This is **closed-source**, private software. 
-* **COPYRIGHT:** © [Current Year] Goorac Corporation. All Rights Reserved.
-* **NO DISTRIBUTION:** You may not copy, reproduce, distribute, publish, display, perform, modify, create derivative works, transmit, or in any way exploit any part of this code or documentation without the express, prior written consent of Goorac Corporation.
-* **UNAUTHORIZED ACCESS:** Any unauthorized access, use, or distribution of this material is strictly prohibited and will be prosecuted to the maximum extent of the law. 
+* **License Status:** Closed-Source / Private Software
+* **Copyright:** © 2026 Goorac Corporation. All Rights Reserved.
+* **Prohibited Actions:** You may not copy, reproduce, distribute, publish, display, perform, modify, create derivative works, transmit, or in any way exploit any part of this code or documentation.
+* **Unauthorized Access:** This software is not open source. Access is strictly restricted to authorized developers and personnel under active Non-Disclosure Agreements (NDAs). Any unauthorized access, use, or distribution is strictly prohibited and subject to immediate legal action.
 
-If you have received access to this repository in error, you must immediately delete all local copies and notify Goorac Corporation's legal department at [Insert Legal Email].
+If you have gained access to this repository in error, you must immediately destroy all local copies and purge the files from your system.
 
 ---
 
 ## 🛠️ Usage & Documentation
 
-*Note: Access to Goorac Quantum environments requires valid enterprise authentication and an active licensing agreement.*
+*Note: Access to Goorac Quantum deployment environments requires valid internal authentication.*
 
-For authorized personnel, full technical documentation, API endpoints, and deployment guides can be found on our secure internal portal:
-**[Link to Internal Secure Docs]**
-
-## 📞 Support & Contact
-
-For technical assistance, authorized users may contact the Goorac Quantum Enterprise Support team:
-
-* **Support Portal:** [Insert Support Link]
-* **Enterprise Contact:** [Insert Contact Email]
+For authorized engineering teams, full technical documentation, Firebase backend configurations, API specifications, and deployment protocols are maintained exclusively on the secure Goorac Corporation internal engineering portal.
